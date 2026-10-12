@@ -1,0 +1,11 @@
+# Checkpoints and Cache
+.ipynb_checkpoints/
+*/.ipynb_checkpoints/
+__pycache__/
+*/__pycache__/
+
+#Image files and pdfs
+*.png
+*.jpeg
+*.jpg
+*.pdf
