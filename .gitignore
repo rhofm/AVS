@@ -9,3 +9,28 @@ __pycache__/
 *.jpeg
 *.jpg
 *.pdf
+
+# Databases (privacy van atleten!) - NOOIT committen
+data/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+
+# Echte exports/imports van atleetgegevens
+*.csv
+*.xlsx
+
+# Build-output (PyInstaller)
+build/
+dist/
+*.spec
+
+# Virtuele omgevingen en editors
+.venv/
+venv/
+.env
+.vscode/
+.idea/

@@ -17,7 +17,7 @@
 
 (Bouw elke feature in een losse branch, merge die in dev branch (develepment), merge die in staging (generale auditie), merge die in main (productie/gepubliceerd).
 ### Structuur
-Dit staat in het [Structuur](Structuur.md) bestand.
+Dit staat in het [Structuur](docs/Structuur.md) bestand.
 
 
 
