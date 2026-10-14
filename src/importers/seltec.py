@@ -22,31 +22,27 @@ Vereist: pip install requests beautifulsoup4
 """
 
 import argparse
-import csv
 import difflib
 import json
 import re
 import sys
-import time
-import unicodedata
 from collections import Counter
 from dataclasses import asdict, dataclass
 from datetime import date
 from pathlib import Path
 from urllib.parse import urljoin, urlparse
 
-import requests
 from bs4 import BeautifulSoup, Tag
+
+try:                                    # als pakket: from src.importers import seltec
+    from .base import (Importer, ImportFout, clean, filter_atleten, filter_vereniging,
+                       to_number, write_csv)
+except ImportError:                     # als script: python seltec.py ...
+    from base import (Importer, ImportFout, clean, filter_atleten, filter_vereniging,  # type: ignore
+                      to_number, write_csv)
 
 BASIS_URL = "https://uitslagen.atletiek.nl"
 OVERZICHT_PAD = "/Competitions/Resultoverview/{id}"
-HEADERS = {
-    "User-Agent": (
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-        "(KHTML, like Gecko) Chrome/126.0 Safari/537.36"
-    ),
-    "Accept-Language": "nl-NL,nl;q=0.9,en;q=0.8",
-}
 
 MAANDEN_KORT = {m: i for i, m in enumerate(
     ["jan", "feb", "mrt", "apr", "mei", "jun", "jul", "aug", "sep", "okt", "nov", "dec"], start=1)}
@@ -98,31 +94,7 @@ class Uitslag:
 
 # --------------------------------------------------------------------------- helpers
 
-def clean(text: str) -> str:
-    return re.sub(r"\s+", " ", (text or "").replace("\xa0", " ")).strip()
-
-
-def normaliseer(naam: str) -> str:
-    """Voor vergelijken: hoofdletterongevoelig, zonder accenten, enkele spaties."""
-    zonder_accent = "".join(c for c in unicodedata.normalize("NFKD", naam or "")
-                            if not unicodedata.combining(c))
-    return clean(zonder_accent).casefold()
-
-
-def to_number(prestatie: str) -> float | None:
-    """'1:54,71' -> 114.71 | '1:02:03,4' -> 3723.4 | '10,1h' -> 10.1 | '3785' -> 3785 | 'DNF' -> None"""
-    s = prestatie.strip().rstrip("hH").strip().replace(",", ".")
-    if not re.fullmatch(r"\d[\d.:]*", s):
-        return None
-    try:
-        delen = s.split(":")
-        waarde = 0.0
-        for deel in delen[:-1]:
-            waarde = waarde * 60 + int(deel)
-        return round(waarde * 60 + float(delen[-1]), 3) if len(delen) > 1 else float(s)
-    except ValueError:
-        return None
-
+# clean en to_number komen uit base.py.
 
 def wind_tekst(tekst: str) -> str:
     """'(+1,5)' / '+2,1' -> '+1,5 m/s' ('' als er geen windgetal in staat)."""
@@ -402,53 +374,10 @@ def parse_overzicht(html: str, url: str = "", alleen_lijst: str = "") -> tuple[W
 
 
 # --------------------------------------------------------------------------- filteren
-
-def naam_past(waarden: list[str], gezocht: str):
-    """
-    Geeft een functie die test of een verenigingsnaam overeenkomt: exact (hoofdletterongevoelig)
-    als die naam voorkomt, anders 'bevat'.
-    """
-    doel = normaliseer(gezocht)
-    if any(normaliseer(w) == doel for w in waarden):
-        return lambda w: normaliseer(w) == doel
-    return lambda w: bool(doel) and doel in normaliseer(w)
+# filter_vereniging en filter_atleten komen uit base.py (Seltec kent geen teams).
 
 
-def filter_vereniging(uitslagen: list[Uitslag], vereniging: str) -> list[Uitslag]:
-    past = naam_past([u.vereniging for u in uitslagen], vereniging)
-    return [u for u in uitslagen if past(u.vereniging)]
-
-
-def filter_atleten(uitslagen: list[Uitslag], namen: list[str]) -> tuple[list[Uitslag], list[str]]:
-    """Uitslagen van deze atleten. Geeft (gevonden uitslagen, namen zonder uitslag) terug."""
-    gezocht = {normaliseer(n): n for n in namen if clean(n)}
-    gevonden, aanwezig = [], set()
-    for u in uitslagen:
-        namen_in_rij = {normaliseer(n) for n in u.lopers.split(", ") if n} | {normaliseer(u.atleet)}
-        if namen_in_rij & gezocht.keys():
-            gevonden.append(u)
-            aanwezig |= namen_in_rij & gezocht.keys()
-    return gevonden, [n for k, n in gezocht.items() if k not in aanwezig]
-
-
-# --------------------------------------------------------------------------- ophalen
-
-def haal_op(sessie: requests.Session, url: str, max_pogingen: int = 4) -> str:
-    """Haal een pagina op; bij 429/5xx even wachten en opnieuw proberen."""
-    wacht = 5.0
-    for poging in range(1, max_pogingen + 1):
-        resp = sessie.get(url, headers=HEADERS, timeout=60)   # het overzicht kan enkele MB's zijn
-        if resp.status_code not in (429, 500, 502, 503, 504):
-            break
-        if poging == max_pogingen:
-            sys.exit(f"Seltec blijft fout {resp.status_code} geven voor {url}. Probeer het later opnieuw.")
-        print(f"  Seltec gaf fout {resp.status_code} - {wacht:.0f} s wachten...", file=sys.stderr)
-        time.sleep(wacht)
-        wacht *= 2
-    resp.raise_for_status()
-    resp.encoding = resp.encoding or "utf-8"
-    return resp.text
-
+# --------------------------------------------------------------------------- importer
 
 def overzicht_url(bron: str) -> str:
     """Wedstrijd-id of willekeurige Seltec-wedstrijd-URL -> URL van het uitslagenoverzicht."""
@@ -456,64 +385,66 @@ def overzicht_url(bron: str) -> str:
         return BASIS_URL + OVERZICHT_PAD.format(id=bron)
     wid = wedstrijd_id_uit_url(bron)
     if not wid:
-        sys.exit(f"Kan geen wedstrijd-id halen uit '{bron}'.")
+        raise ImportFout(f"Kan geen wedstrijd-id halen uit '{bron}'.")
     p = urlparse(bron)
     basis = f"{p.scheme or 'https'}://{p.netloc}" if p.netloc else BASIS_URL
     return basis + OVERZICHT_PAD.format(id=wid)
 
 
-def laad_uitslagen(bron: str, log=print) -> tuple[Wedstrijd, list[Uitslag]]:
+class SeltecImporter(Importer):
     """
-    Accepteert een wedstrijd-id, een Seltec-URL (uitslagenoverzicht, tijdschema, deelnemerslijst of
-    één onderdeellijst), een opgeslagen HTML-bestand van het uitslagenoverzicht of een map daarmee.
-    Bij een onderdeellijst-URL (/CurrentList/<lijst>/<wedstrijd>) komt alleen dat onderdeel terug.
+    Wedstrijduitslagen van Seltec. parse(bron) geeft (Wedstrijd, [Uitslag, ...]) terug, ongefilterd;
+    filter daarna met filter_vereniging / filter_atleten.
     """
-    pad = Path(bron)
-    if pad.is_file() or pad.is_dir():
-        bestanden = sorted(pad.glob("*.htm*")) if pad.is_dir() else [pad]
-        if not bestanden:
-            sys.exit(f"Geen .html-bestanden gevonden in {pad}")
-        wedstrijd, uitslagen, gezien = None, [], set()
-        for f in bestanden:
-            w, rijen = parse_overzicht(f.read_text(encoding="utf-8"), f.resolve().as_uri())
-            wedstrijd = wedstrijd or w
-            for u in rijen:                       # dubbele blokken over bestanden heen overslaan
-                if (u.deelnemer_id, u.onderdeel_code) not in gezien:
-                    gezien.add((u.deelnemer_id, u.onderdeel_code))
-                    uitslagen.append(u)
+
+    bron = "seltec"
+    site = "Seltec"
+    url_patronen = (
+        r"(uitslagen\.atletiek\.nl|seltec)[^/]*/Competitions/"
+        r"(Resultoverview|CurrentList|Details|Competitoroverview)/",
+    )
+    timeout = 60                          # het overzicht kan enkele MB's zijn
+    max_pogingen = 4
+
+    def parse(self, bron: str) -> tuple[Wedstrijd, list[Uitslag]]:
+        """
+        Accepteert een wedstrijd-id, een Seltec-URL (uitslagenoverzicht, tijdschema, deelnemerslijst of
+        één onderdeellijst), een opgeslagen HTML-bestand van het uitslagenoverzicht of een map daarmee.
+        Bij een onderdeellijst-URL (/CurrentList/<lijst>/<wedstrijd>) komt alleen dat onderdeel terug.
+        """
+        if self.is_lokaal(bron):
+            wedstrijd, uitslagen, gezien = None, [], set()
+            for uri, html in self.lees_bestanden(bron):
+                w, rijen = parse_overzicht(html, uri)
+                wedstrijd = wedstrijd or w
+                for u in rijen:                   # dubbele blokken over bestanden heen overslaan
+                    if (u.deelnemer_id, u.onderdeel_code) not in gezien:
+                        gezien.add((u.deelnemer_id, u.onderdeel_code))
+                        uitslagen.append(u)
+            return wedstrijd, uitslagen
+
+        url = overzicht_url(bron)
+        wedstrijd, uitslagen = parse_overzicht(self.haal_op(url), url, alleen_lijst=lijst_id_uit_url(bron))
+        self.log(f"{wedstrijd.naam} ({wedstrijd.plaats}, {wedstrijd.datum}) - "
+                 f"{len({u.onderdeel_code for u in uitslagen})} onderdeellijsten, {len(uitslagen)} uitslagen")
         return wedstrijd, uitslagen
 
-    url = overzicht_url(bron)
-    html = haal_op(requests.Session(), url)
-    wedstrijd, uitslagen = parse_overzicht(html, url, alleen_lijst=lijst_id_uit_url(bron))
-    log(f"{wedstrijd.naam} ({wedstrijd.plaats}, {wedstrijd.datum}) - "
-        f"{len({u.onderdeel_code for u in uitslagen})} onderdeellijsten, {len(uitslagen)} uitslagen")
-    return wedstrijd, uitslagen
+
+# Functie-interface (zoals vóór de klasse), voor scripts en bestaande code.
+
+def laad_uitslagen(bron: str, log=print) -> tuple[Wedstrijd, list[Uitslag]]:
+    return SeltecImporter(log=log).parse(bron)
 
 
-# --------------------------------------------------------------------------- importer-interface
-# Gedeelde interface uit importers/base.py, zodat importers/detect.py deze importer kan kiezen.
-
-def can_handle(url: str) -> bool:
-    return bool(re.search(
-        r"(uitslagen\.atletiek\.nl|seltec)[^/]*/Competitions/(Resultoverview|CurrentList|Details|Competitoroverview)/",
-        url or "", re.I))
+can_handle = SeltecImporter.can_handle
 
 
 def parse(url: str) -> tuple[Wedstrijd, list[Uitslag]]:
     """Alle uitslagen van de wedstrijd (ongefilterd); filter daarna met filter_vereniging/filter_atleten."""
-    return laad_uitslagen(url, log=lambda *a: None)
+    return SeltecImporter().parse(url)
 
 
 # --------------------------------------------------------------------------- uitvoer
-
-def write_csv(path: str, rows: list[dict]) -> None:
-    with open(path, "w", newline="", encoding="utf-8-sig") as f:  # -sig: opent goed in Excel
-        writer = csv.DictWriter(f, fieldnames=list(rows[0].keys()) if rows else
-                                list(Uitslag.__dataclass_fields__), delimiter=";")
-        writer.writeheader()
-        writer.writerows(rows)
-
 
 def print_overzicht(uitslagen: list[Uitslag]) -> None:
     per_atleet: dict[str, list[Uitslag]] = {}
@@ -541,7 +472,10 @@ def main() -> None:
     ap.add_argument("--json", help="optioneel pad voor JSON-uitvoer {'wedstrijd': {...}, 'uitslagen': [...]}")
     args = ap.parse_args()
 
-    wedstrijd, alle = laad_uitslagen(args.bron)
+    try:
+        wedstrijd, alle = laad_uitslagen(args.bron)
+    except ImportFout as fout:
+        sys.exit(str(fout))
     if not alle:
         sys.exit("Geen uitslagen gevonden (nog geen uitslagen gepubliceerd?).")
 
@@ -562,7 +496,7 @@ def main() -> None:
             print(f"Let op: geen uitslagen voor '{naam}'" + (f" (bedoel je {', '.join(tips)}?)" if tips else ""))
 
     rows = [asdict(u) for u in uitslagen]
-    write_csv(args.csv, rows)
+    write_csv(args.csv, rows, Uitslag.__dataclass_fields__)
     print_overzicht(uitslagen)
 
     print(f"\n{wedstrijd.naam} - {wedstrijd.plaats} - {wedstrijd.datum}"

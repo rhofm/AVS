@@ -16,17 +16,14 @@ Gebruik:
     python atletieknu_wedstrijd.py opgeslagen_map/ --vereniging Nijmegen  # opgeslagen onderdeelpagina's
     python atletieknu_wedstrijd.py 43465 --vereniging Nijmegen --csv uitslagen.csv --json uitslagen.json
 
-Vereist: pip install requests beautifulsoup4
+Vereist: pip install requests beautifulsoup4 curl_cffi
 """
 
 import argparse
-import csv
 import difflib
 import json
 import re
 import sys
-import time
-import unicodedata
 from collections import Counter
 from dataclasses import asdict, dataclass
 from datetime import date
@@ -36,16 +33,15 @@ from urllib.parse import unquote, urljoin
 import requests
 from bs4 import BeautifulSoup, Tag
 
+try:                                    # als pakket: from src.importers import atletieknu_wedstrijd
+    from .base import (Importer, ImportFout, clean, filter_atleten, filter_team,
+                       filter_vereniging, lopers_lijst, to_number, write_csv)
+except ImportError:                     # als script: python atletieknu_wedstrijd.py ...
+    from base import (Importer, ImportFout, clean, filter_atleten, filter_team,  # type: ignore
+                      filter_vereniging, lopers_lijst, to_number, write_csv)
+
 BASIS_URL = "https://www.atletiek.nu"
 UITSLAGEN_URL = BASIS_URL + "/wedstrijd/uitslagen/{id}/"
-HEADERS = {
-    "User-Agent": (
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-        "(KHTML, like Gecko) Chrome/126.0 Safari/537.36"
-    ),
-    "Accept-Language": "nl-NL,nl;q=0.9,en;q=0.8",
-}
-PAUZE = 1.0  # seconden tussen verzoeken; atletiek.nu blokkeert tijdelijk bij te veel snelle verzoeken
 
 MAANDEN = {m: i for i, m in enumerate(
     ["januari", "februari", "maart", "april", "mei", "juni", "juli",
@@ -94,32 +90,7 @@ class Uitslag:
 
 # --------------------------------------------------------------------------- helpers
 
-def clean(text: str) -> str:
-    return re.sub(r"\s+", " ", text or "").strip()
-
-
-def normaliseer(naam: str) -> str:
-    """Voor vergelijken: hoofdletterongevoelig, zonder accenten, enkele spaties."""
-    zonder_accent = "".join(c for c in unicodedata.normalize("NFKD", naam or "")
-                            if not unicodedata.combining(c))
-    return clean(zonder_accent).casefold()
-
-
-def to_number(prestatie: str) -> float | None:
-    """'1:54,71' -> 114.71 | '1.02:03,4' -> 3723.4 | '10,1h' -> 10.1 | '3785' -> 3785 | 'DNF' -> None"""
-    s = prestatie.strip().rstrip("hH").strip().replace(",", ".")
-    if not re.fullmatch(r"\d[\d.:]*", s):
-        return None
-    try:
-        if ":" in s:
-            head, sec = s.rsplit(":", 1)
-            if "." in head:                       # uren: "1.02:03.4"
-                h, m = head.split(".", 1)
-                return round(int(h) * 3600 + int(m) * 60 + float(sec), 3)
-            return round(int(head) * 60 + float(sec), 3)
-        return float(s)
-    except ValueError:
-        return None
+# clean en to_number komen uit base.py.
 
 
 def tooltip_delen(title: str) -> list[str]:
@@ -281,10 +252,6 @@ def team_uit(tr: Tag) -> str:
     return clean(deel.get_text())
 
 
-def lopers_lijst(u: "Uitslag") -> list[str]:
-    return [n for n in u.lopers.split(", ") if n]
-
-
 def parse_rij(tr: Tag, kop: str, code: str, wedstrijd: Wedstrijd, url: str,
               th_onderdelen: list[str]) -> list[Uitslag]:
     tds = tr.find_all("td", recursive=False)
@@ -376,148 +343,91 @@ def parse_onderdeel_pagina(html: str, url: str, wedstrijd: Wedstrijd) -> list[Ui
 
 
 # --------------------------------------------------------------------------- filteren
-
-def naam_past(waarden: list[str], gezocht: str):
-    """
-    Geeft een functie die test of een naam (vereniging/team) overeenkomt: exact
-    (hoofdletterongevoelig) als die naam voorkomt, anders 'bevat'.
-    """
-    doel = normaliseer(gezocht)
-    if any(normaliseer(w) == doel for w in waarden):
-        return lambda w: normaliseer(w) == doel
-    return lambda w: bool(doel) and doel in normaliseer(w)
+# filter_vereniging, filter_team en filter_atleten komen uit base.py.
 
 
-def filter_vereniging(uitslagen: list[Uitslag], vereniging: str) -> list[Uitslag]:
-    """
-    Individuele uitslagen van atleten van de vereniging, plus estafettes waarin minstens één
-    van die atleten liep (de estafetterij zelf noemt vaak een andere club of 'Onbekend').
-    """
-    past = naam_past([u.vereniging for u in uitslagen], vereniging)
-    leden = {normaliseer(u.atleet) for u in uitslagen if not u.estafette and past(u.vereniging)}
-    return [u for u in uitslagen if past(u.vereniging)
-            or (u.estafette and leden & {normaliseer(n) for n in lopers_lijst(u)})]
-
-
-def filter_team(uitslagen: list[Uitslag], team: str) -> list[Uitslag]:
-    """Alle uitslagen (individueel én estafettes) van één competitieteam, bv. 'Nijmegen Heren 1'."""
-    past = naam_past([u.team for u in uitslagen], team)
-    return [u for u in uitslagen if u.team and past(u.team)]
-
-
-def filter_atleten(uitslagen: list[Uitslag], namen: list[str]) -> tuple[list[Uitslag], list[str]]:
-    """
-    Individuele uitslagen van deze atleten, plus estafettes waarin ze liepen.
-    Geeft (gevonden uitslagen, namen zonder uitslag) terug.
-    """
-    gezocht = {normaliseer(n): n for n in namen if clean(n)}
-    gevonden, aanwezig = [], set()
-    for u in uitslagen:
-        namen_in_rij = {normaliseer(n) for n in lopers_lijst(u)} if u.estafette else {normaliseer(u.atleet)}
-        if namen_in_rij & gezocht.keys():
-            gevonden.append(u)
-            aanwezig |= namen_in_rij & gezocht.keys()
-    return gevonden, [n for k, n in gezocht.items() if k not in aanwezig]
-
-
-# --------------------------------------------------------------------------- ophalen
+# --------------------------------------------------------------------------- importer
 
 TE_VEEL_RE = re.compile(r"<title>\s*Too many requests", re.I)
 
 
-def haal_op(sessie: requests.Session, url: str, max_pogingen: int = 6) -> str:
+class AtletiekNuWedstrijdImporter(Importer):
     """
-    Haal een pagina op. atletiek.nu geeft na ±10 snelle verzoeken een 'Too many requests'-pagina
-    (soms met status 200!). Dan wachten we steeds langer en proberen opnieuw, zodat er nooit
-    stilletjes onderdelen ontbreken.
+    Wedstrijduitslagen van atletiek.nu. parse(bron) geeft (Wedstrijd, [Uitslag, ...]) terug,
+    ongefilterd; filter daarna met filter_vereniging / filter_team / filter_atleten.
     """
-    wacht = 5.0
-    for poging in range(1, max_pogingen + 1):
-        resp = sessie.get(url, headers=HEADERS, timeout=20)
-        if resp.status_code != 429 and not TE_VEEL_RE.search(resp.text):
-            break
-        if poging == max_pogingen:
-            sys.exit(f"atletiek.nu blijft 'Too many requests' geven voor {url}. Probeer het later opnieuw.")
-        retry_after = resp.headers.get("Retry-After", "")
-        pauze = float(retry_after) if retry_after.isdigit() else wacht
-        print(f"  atletiek.nu vraagt om rustiger aan te doen - {pauze:.0f} s wachten...", file=sys.stderr)
-        time.sleep(pauze)
-        wacht *= 2
-    resp.raise_for_status()
-    html = resp.text
-    # atletiek.nu toont soms een "Checking your browser"-pagina aan scripts.
-    if "Checking your browser" in html and "deelnemerstabel" not in html and "pageTitle" not in html:
-        sys.exit(
-            f"atletiek.nu gaf een browsercontrole-pagina terug voor {url}.\n"
-            "Open de onderdeelpagina's in je browser, sla ze op (Ctrl+S, 'Alleen HTML') in één map\n"
-            "en draai:  python atletieknu_wedstrijd.py pad/naar/map --vereniging \"...\""
-        )
-    return html
 
+    bron = "atletieknu"
+    site = "atletiek.nu"
+    url_patronen = (r"atletiek\.nu/wedstrijd/(uitslagen|uitslagenonderdeel|main)/\d+",)
+    pauze = 1.0               # atletiek.nu blokkeert tijdelijk bij te veel snelle verzoeken
+    imiteer_browser = "chrome"  # atletiek.nu blokkeert de Python-bibliotheek requests
+    max_pogingen = 6
+    opnieuw_bij_status = (429,)
 
-def laad_uitslagen(bron: str, log=print) -> tuple[Wedstrijd, list[Uitslag]]:
-    """
-    Accepteert een wedstrijd-id, een wedstrijd-URL, een URL van één onderdeelpagina,
-    een opgeslagen HTML-bestand of een map met opgeslagen HTML-bestanden.
-    """
-    pad = Path(bron)
-    if pad.is_file() or pad.is_dir():
-        bestanden = sorted(pad.glob("*.htm*")) if pad.is_dir() else [pad]
-        if not bestanden:
-            sys.exit(f"Geen .html-bestanden gevonden in {pad}")
-        paginas = [(f.resolve().as_uri(), f.read_text(encoding="utf-8")) for f in bestanden]
-        wedstrijd = parse_wedstrijd(paginas[0][1])
-        uitslagen = []
-        for url, html in paginas:
-            uitslagen += parse_onderdeel_pagina(html, url, wedstrijd)
+    def moet_wachten(self, resp: requests.Response) -> bool:
+        # Na ±10 snelle verzoeken een 'Too many requests'-pagina, soms met status 200!
+        return super().moet_wachten(resp) or bool(TE_VEEL_RE.search(resp.text))
+
+    def controleer_pagina(self, html: str, url: str) -> None:
+        # atletiek.nu toont soms een "Checking your browser"-pagina aan scripts.
+        if "Checking your browser" in html and "deelnemerstabel" not in html and "pageTitle" not in html:
+            raise ImportFout(
+                f"atletiek.nu gaf een browsercontrole-pagina terug voor {url}.\n"
+                "Open de onderdeelpagina's in je browser, sla ze op (Ctrl+S, 'Alleen HTML') in één map\n"
+                "en importeer die map.")
+
+    def parse(self, bron: str) -> tuple[Wedstrijd, list[Uitslag]]:
+        """
+        Accepteert een wedstrijd-id, een wedstrijd-URL, een URL van één onderdeelpagina,
+        een opgeslagen HTML-bestand of een map met opgeslagen HTML-bestanden.
+        """
+        if self.is_lokaal(bron):
+            paginas = self.lees_bestanden(bron)
+            wedstrijd = parse_wedstrijd(paginas[0][1])
+            uitslagen = []
+            for url, html in paginas:
+                uitslagen += parse_onderdeel_pagina(html, url, wedstrijd)
+            return wedstrijd, uitslagen
+
+        if "/uitslagenonderdeel/" in bron:            # één onderdeel
+            url = bron.split("#")[0]
+            html = self.haal_op(url)
+            wedstrijd = parse_wedstrijd(html, url)
+            return wedstrijd, parse_onderdeel_pagina(html, url, wedstrijd)
+
+        wid = bron if bron.isdigit() else wedstrijd_id_uit_url(bron)
+        if not wid:
+            raise ImportFout(f"Kan geen wedstrijd-id halen uit '{bron}'.")
+        url = UITSLAGEN_URL.format(id=wid)
+        html = self.haal_op(url)
+        wedstrijd = parse_wedstrijd(html, url)
+        links = onderdeel_links(html, wid)
+        if not links:
+            raise ImportFout("Geen onderdelen gevonden op de uitslagenpagina (nog geen uitslagen?).")
+
+        self.log(f"{wedstrijd.naam} ({wedstrijd.plaats}, {wedstrijd.datum}) - {len(links)} onderdelen ophalen...")
+        uitslagen: list[Uitslag] = []
+        for link in links:
+            uitslagen += parse_onderdeel_pagina(self.haal_op(link), link, wedstrijd)
         return wedstrijd, uitslagen
 
-    sessie = requests.Session()
-    if "/uitslagenonderdeel/" in bron:                # één onderdeel
-        url = bron.split("#")[0]
-        html = haal_op(sessie, url)
-        wedstrijd = parse_wedstrijd(html, url)
-        return wedstrijd, parse_onderdeel_pagina(html, url, wedstrijd)
 
-    wid = bron if bron.isdigit() else wedstrijd_id_uit_url(bron)
-    if not wid:
-        sys.exit(f"Kan geen wedstrijd-id halen uit '{bron}'.")
-    url = UITSLAGEN_URL.format(id=wid)
-    html = haal_op(sessie, url)
-    wedstrijd = parse_wedstrijd(html, url)
-    links = onderdeel_links(html, wid)
-    if not links:
-        sys.exit("Geen onderdelen gevonden op de uitslagenpagina (nog geen uitslagen?).")
+# Functie-interface (zoals vóór de klasse), voor scripts en bestaande code.
 
-    log(f"{wedstrijd.naam} ({wedstrijd.plaats}, {wedstrijd.datum}) - {len(links)} onderdelen ophalen...")
-    uitslagen: list[Uitslag] = []
-    for link in links:
-        time.sleep(PAUZE)
-        uitslagen += parse_onderdeel_pagina(haal_op(sessie, link), link, wedstrijd)
-    return wedstrijd, uitslagen
+def laad_uitslagen(bron: str, log=print) -> tuple[Wedstrijd, list[Uitslag]]:
+    return AtletiekNuWedstrijdImporter(log=log).parse(bron)
 
 
-# --------------------------------------------------------------------------- importer-interface
-# Gedeelde interface uit importers/base.py, zodat importers/detect.py deze importer kan kiezen.
-
-def can_handle(url: str) -> bool:
-    return bool(re.search(r"atletiek\.nu/wedstrijd/(uitslagen|uitslagenonderdeel|main)/\d+", url or ""))
+can_handle = AtletiekNuWedstrijdImporter.can_handle
 
 
 def parse(url: str) -> tuple[Wedstrijd, list[Uitslag]]:
     """Alle uitslagen van de wedstrijd (ongefilterd); filter daarna met filter_vereniging/filter_atleten."""
-    return laad_uitslagen(url, log=lambda *a: None)
+    return AtletiekNuWedstrijdImporter().parse(url)
 
 
 # --------------------------------------------------------------------------- uitvoer
-
-def write_csv(path: str, rows: list[dict]) -> None:
-    with open(path, "w", newline="", encoding="utf-8-sig") as f:  # -sig: opent goed in Excel
-        writer = csv.DictWriter(f, fieldnames=list(rows[0].keys()) if rows else
-                                list(Uitslag.__dataclass_fields__), delimiter=";")
-        writer.writeheader()
-        writer.writerows(rows)
-
 
 def print_overzicht(uitslagen: list[Uitslag]) -> None:
     per_atleet: dict[str, list[Uitslag]] = {}
@@ -556,7 +466,10 @@ def main() -> None:
     ap.add_argument("--json", help="optioneel pad voor JSON-uitvoer {'wedstrijd': {...}, 'uitslagen': [...]}")
     args = ap.parse_args()
 
-    wedstrijd, alle = laad_uitslagen(args.bron)
+    try:
+        wedstrijd, alle = laad_uitslagen(args.bron)
+    except ImportFout as fout:
+        sys.exit(str(fout))
     if not alle:
         sys.exit("Geen uitslagen gevonden.")
 
@@ -586,7 +499,7 @@ def main() -> None:
             print(f"Let op: geen uitslagen voor '{naam}'" + (f" (bedoel je {', '.join(tips)}?)" if tips else ""))
 
     rows = [asdict(u) for u in uitslagen]
-    write_csv(args.csv, rows)
+    write_csv(args.csv, rows, Uitslag.__dataclass_fields__)
     print_overzicht(uitslagen)
 
     print(f"\n{wedstrijd.naam} - {wedstrijd.plaats} - {wedstrijd.datum}"
