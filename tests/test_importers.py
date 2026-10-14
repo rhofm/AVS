@@ -8,6 +8,7 @@ REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
 
 from src.importers import atletieknu_prs, atletieknu_wedstrijd, base, detect, seltec  # noqa: E402
+from src.importers import seltec  # noqa: E402
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 SELTEC_URL = "https://uitslagen.atletiek.nl/Competitions/Resultoverview/19133"
