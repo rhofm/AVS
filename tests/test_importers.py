@@ -1,6 +1,4 @@
 """Tests voor importers, tegen opgeslagen (geanonimiseerde) pagina's in fixtures/."""
-<<<<<<< Updated upstream
-=======
 
 import sys
 import unittest
@@ -276,4 +274,3 @@ class TestBase(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
->>>>>>> Stashed changes
