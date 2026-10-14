@@ -458,7 +458,7 @@ def laad_uitslagen(bron: str, log=print) -> tuple[Wedstrijd, list[Uitslag]]:
         bestanden = sorted(pad.glob("*.htm*")) if pad.is_dir() else [pad]
         if not bestanden:
             sys.exit(f"Geen .html-bestanden gevonden in {pad}")
-        paginas = [(f.as_uri(), f.read_text(encoding="utf-8")) for f in bestanden]
+        paginas = [(f.resolve().as_uri(), f.read_text(encoding="utf-8")) for f in bestanden]
         wedstrijd = parse_wedstrijd(paginas[0][1])
         uitslagen = []
         for url, html in paginas:
