@@ -31,7 +31,7 @@ from collections import Counter
 from dataclasses import asdict, dataclass
 from datetime import date
 from pathlib import Path
-from urllib.parse import urljoin
+from urllib.parse import unquote, urljoin
 
 import requests
 from bs4 import BeautifulSoup, Tag
@@ -293,9 +293,13 @@ def parse_rij(tr: Tag, kop: str, code: str, wedstrijd: Wedstrijd, url: str,
         return []
     estafette = "/estafetteteam/" in naam_a.get("href", "")
     lopers = ", ".join(lopers_uit(tds)) if estafette else ""
+    # Lange namen staan niet als tekst in de link maar als
+    #   <span class="visible-xs-inline">R. van den...naamhoeve</span><span class="hidden-xs">Volledige Naam</span>
+    volledig = naam_a.find("span", class_="hidden-xs", recursive=False)
+    volledig = clean(volledig.get_text()) if volledig else ""
     for detail in naam_a.find_all("span"):            # "Nijmegen - 76.2cm" (alleen op mobiel)
         detail.extract()
-    naam = clean(naam_a.get_text())
+    naam = clean(naam_a.get_text()) or volledig
 
     ver_a = tr.select_one("a[href*='/wedstrijd/vereniging/']")
     cat_a = tr.select_one("a[href*='/wedstrijd/categorie/']")
@@ -352,7 +356,10 @@ def parse_rij(tr: Tag, kop: str, code: str, wedstrijd: Wedstrijd, url: str,
 
 def parse_onderdeel_pagina(html: str, url: str, wedstrijd: Wedstrijd) -> list[Uitslag]:
     soup = BeautifulSoup(html, "html.parser")
-    code = url.rstrip("/").rsplit("/", 1)[-1] if "/uitslagenonderdeel/" in url else ""
+    if "/uitslagenonderdeel/" not in url:            # opgeslagen pagina: code uit de kruimelnavigatie
+        kruimel = soup.select("#menubottom a[href*='/uitslagenonderdeel/']")
+        url = urljoin(BASIS_URL, kruimel[-1]["href"]) if kruimel else url
+    code = unquote(url.rstrip("/").rsplit("/", 1)[-1]) if "/uitslagenonderdeel/" in url else ""
     uitslagen: list[Uitslag] = []
     for table in soup.select("table.deelnemerstabel"):
         kop_el = table.find_previous(["h2", "h3"])
