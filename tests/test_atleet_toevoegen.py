@@ -15,7 +15,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from atleten import beheer  # noqa: E402
 from atleten.atleet_toevoegen_atletieknu import (  # noqa: E402
-    atletieknu_id_uit, voeg_toe, volledige_achternaam,
+    atletieknu_id_uit, voeg_toe,
 )
 from db.init_db import init_db  # noqa: E402
 from db.queries import Opslag  # noqa: E402
@@ -34,8 +34,6 @@ def opslag():
 
 
 def test_hulpjes():
-    assert volledige_achternaam("Vries", "de") == "de Vries"
-    assert volledige_achternaam("Jansen", "  ") == "Jansen"
     assert atletieknu_id_uit("999999") == "999999"
     assert atletieknu_id_uit("https://www.atletiek.nu/atleet/profiel/999999/#prs") == "999999"
     try:
@@ -50,6 +48,8 @@ def test_nieuwe_atleet_en_opnieuw_importeren():
         u = voeg_toe(db, "Test", "Vries", "999999", tussenvoegsel="de", html=PROFIEL)
         assert u.status == "nieuw"
         assert u.atleet.naam == "Test de Vries" and u.atleet.atletieknu_id == "999999"
+        opgeslagen = db.atleet(u.atleet.master_id)
+        assert (opgeslagen.tussenvoegsel, opgeslagen.achternaam) == ("de", "Vries")
         assert (u.nieuw, u.bekend, u.overgeslagen) == (2, 0, 1)      # DNF overgeslagen
         assert len(db.prestaties(u.atleet.master_id)) == 2
 
@@ -68,6 +68,15 @@ def test_bestaande_atleet_zonder_id_koppelen():
         assert u.status == "id_toegevoegd" and u.atleet.master_id == oud.master_id
         assert db.atleet(oud.master_id).atletieknu_id == "999999"
         assert len(db.atleten(alleen_actief=False)) == 1
+
+
+def test_tussenvoegsel_telt_mee_bij_dubbelen():
+    with opslag() as db:
+        oud = beheer.nieuwe_atleet(db, "Test", "Berg", tussenvoegsel="van den")
+        # 'Test Berg' zonder tussenvoegsel is een andere naam: geen kandidaat.
+        u = voeg_toe(db, "Test", "Berg", "999999", html=PROFIEL, bevestig=lambda a: True)
+        assert u.status == "nieuw" and u.atleet.master_id != oud.master_id
+        assert u.atleet.tussenvoegsel is None
 
 
 def test_niet_bevestigd_of_ander_id_wordt_nieuwe_atleet():

@@ -16,8 +16,8 @@ Werkwijze:
 Daarna worden de prestaties geïmporteerd met importeer_atletieknu.importeer().
 Opnieuw draaien is veilig: bestaande prestaties worden overgeslagen.
 
-Het tussenvoegsel komt vóór de achternaam in het veld `achternaam`
-('de Vries'), zodat de naam overeenkomt met hoe atletiek.nu hem toont.
+Het tussenvoegsel wordt apart opgeslagen (kolom `tussenvoegsel`); de
+achternaam zonder tussenvoegsel ('Vries'). Atleet.naam geeft 'Jan de Vries'.
 
 Vereist: pip install requests beautifulsoup4 curl_cffi sqlcipher3-wheels keyring
 """
@@ -52,11 +52,6 @@ class Uitkomst:
     overgeslagen: int = 0   # DNF, DNS, ... (geen waarde)
 
 
-def volledige_achternaam(achternaam: str, tussenvoegsel: str | None = None) -> str:
-    """('Vries', 'de') -> 'de Vries'."""
-    return " ".join(d for d in ((tussenvoegsel or "").strip(), achternaam.strip()) if d)
-
-
 def atletieknu_id_uit(bron: str) -> str:
     """atletiek.nu-id uit een id of profiel-URL. Gooit ValueError als dat niet lukt."""
     atletieknu_id = atleet_id_uit(bron.strip())
@@ -74,14 +69,15 @@ def zoek_of_maak_atleet(db: Opslag, voornaam: str, achternaam: str, atletieknu_i
     `bevestig(kandidaat)` wordt gevraagd als er al een atleet met dezelfde naam
     maar zonder atletiek.nu-id bestaat. True: die atleet krijgt het id. Zonder
     bevestig-functie (of bij False voor alle kandidaten) wordt een nieuwe atleet
-    aangemaakt. Extra gegevens: geslacht, geboortedatum, club.
+    aangemaakt. Extra gegevens: tussenvoegsel, geslacht, geboortedatum, club.
     """
     bestaand = db.atleet_op_atletieknu_id(atletieknu_id)
     if bestaand is not None:
         return bestaand, "bestond"
 
     gegevens = {k: v for k, v in gegevens.items() if v}
-    kandidaten = [a for a in beheer.mogelijke_dubbelen(db, voornaam, achternaam, gegevens.get("geboortedatum"))
+    kandidaten = [a for a in beheer.mogelijke_dubbelen(db, voornaam, achternaam, gegevens.get("geboortedatum"),
+                                                       tussenvoegsel=gegevens.get("tussenvoegsel"))
                   if not a.atletieknu_id]
     if bevestig is not None:
         for kandidaat in kandidaten:
@@ -120,8 +116,7 @@ def voeg_toe(db: Opslag, voornaam: str, achternaam: str, bron: str, *,
     (dan wordt niets opgehaald). De pagina wordt eerst gelezen; lukt dat niet,
     dan verandert er niets in de databases.
     """
-    voornaam = voornaam.strip()
-    achternaam = volledige_achternaam(achternaam, tussenvoegsel)
+    voornaam, achternaam = voornaam.strip(), achternaam.strip()
     if not voornaam or not achternaam:
         raise ValueError("Voor- en achternaam zijn verplicht.")
     atletieknu_id = atletieknu_id_uit(bron)
@@ -130,8 +125,8 @@ def voeg_toe(db: Opslag, voornaam: str, achternaam: str, bron: str, *,
         html = laad_profiel(atletieknu_id)
     resultaten = parse_results(html)            # ValueError als het geen profielpagina is
 
-    atleet, status = zoek_of_maak_atleet(db, voornaam, achternaam, atletieknu_id,
-                                         bevestig=bevestig, **gegevens)
+    atleet, status = zoek_of_maak_atleet(db, voornaam, achternaam, atletieknu_id, bevestig=bevestig,
+                                         tussenvoegsel=tussenvoegsel, **gegevens)
     nieuw, bekend, overgeslagen = importeer(db, atleet.master_id, resultaten)
     return Uitkomst(atleet, status, nieuw, bekend, overgeslagen)
 
@@ -211,7 +206,7 @@ def main() -> int:
         return 1
 
     if u.status == "bestond":
-        opgegeven = f"{args.voornaam} {volledige_achternaam(args.achternaam, args.tussenvoegsel)}"
+        opgegeven = Atleet(args.voornaam.strip(), args.achternaam.strip(), tussenvoegsel=args.tussenvoegsel).naam
         print(f"{u.atleet.naam} stond al in de database met atletiek.nu-id {atletieknu_id}.")
         if normaliseer(opgegeven) != normaliseer(u.atleet.naam):
             print(f"  Let op: opgegeven naam was '{opgegeven}'. Controleer of het id klopt.")
