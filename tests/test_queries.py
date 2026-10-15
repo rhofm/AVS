@@ -122,7 +122,7 @@ def test_prestaties_en_prs():
 def test_pr_alleen_windlegaal():
     with opslag() as db:
         versie = db.prestaties_db.execute("SELECT MAX(versie) FROM schema_version").fetchone()[0]
-        assert versie >= 3, "migratie prestaties/003 is niet toegepast"
+        assert versie >= 2, "migratie prestaties/002 is niet toegepast"
         anna, tim, sprint, ver = _basis(db)
         assert sprint.windmeting and ver.windmeting
         for waarde, wind in [(13.2, 1.1), (12.9, 2.6), (13.0, 2.0), (12.8, None)]:
@@ -184,7 +184,7 @@ WINDNAMEN = [
 
 
 def test_migratie_op_bestaande_database():
-    """Een database op versie 1 krijgt migratie 002 t/m 004 bij de volgende init_db().
+    """Een database op versie 1 krijgt migratie 002 bij de volgende init_db().
     De SQL-indeling van bestaande onderdelen moet gelijk zijn aan heeft_windmeting()."""
     import db.init_db as init_mod
     with tempfile.TemporaryDirectory() as tmp:
@@ -216,7 +216,7 @@ def test_migratie_op_bestaande_database():
         with contextlib.redirect_stdout(io.StringIO()):
             init_db(Path(tmp), hoofd=TESTSLEUTEL)
         with Opslag(map=Path(tmp), hoofd=TESTSLEUTEL) as db:
-            assert db.prestaties_db.execute("SELECT MAX(versie) FROM schema_version").fetchone()[0] == 4
+            assert db.prestaties_db.execute("SELECT MAX(versie) FROM schema_version").fetchone()[0] == 2
             assert db.prs(anna.master_id) == []                  # te veel wind / geen meting
             assert len(db.prestaties(anna.master_id)) == 2       # de prestaties zelf zijn er nog
             sql = {o.naam: o.windmeting for o in db.onderdelen()}

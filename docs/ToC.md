@@ -55,9 +55,8 @@ AVS/
 │   │   ├── schema.sql            ⚠️ old single-database schema, no longer used
 │   │   └── migrations/
 │   │       └── prestaties/
-│   │           ├── 002_pr_alleen_windlegaal.sql       ✅ PR view: no wind over +2.0
-│   │           ├── 003_windmeting_per_onderdeel.sql   ✅ windmeting per event
-│   │           └── 004_horden_en_indoor.sql           ✅ hurdles ≤200 m, indoor always counts
+│   │           └── 002_pr_alleen_windlegaal.sql       ✅ PR view: windmeting per event (sprint/hurdles ≤200 m,
+│   │                                                     long/triple jump), max +2.0, indoor always counts
 │   │
 │   ├── models/                   ✅ dataclasses, no SQL
 │   │   ├── atleet.py             Atleet (names hidden from repr)

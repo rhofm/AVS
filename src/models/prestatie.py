@@ -32,7 +32,7 @@ def heeft_windmeting(naam: str) -> bool:
 
     Ja voor sprints en horden t/m 200 m, verspringen en hinkstapspringen.
     Nee voor estafettes en al het andere. Dezelfde regel staat in SQL in
-    db/migrations/prestaties/003_*.sql en 004_*.sql; houd ze gelijk
+    db/migrations/prestaties/002_pr_alleen_windlegaal.sql; houd ze gelijk
     (tests/test_queries.py controleert dat).
     """
     n = naam.strip().lower()
