@@ -12,7 +12,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from models import (  # noqa: E402
     Absentie, Atleet, Groep, Leerlijn, LeerlijnStap, LeerlijnVoortgang,
-    Onderdeel, Periodeplan, Prestatie,
+    Onderdeel, Periodeplan, Prestatie, heeft_windmeting,
 )
 
 NEP_ID = "a" * 32
@@ -59,6 +59,20 @@ def test_onderdeel_beter_en_beste():
     assert ver.beste([4.5, 4.8]) == 4.8
     assert sprint.beste([]) is None
     _verwacht_fout(lambda: Onderdeel("x", "kilo", True))
+
+
+def test_windmeting_en_windlegaal():
+    for naam in ("60m", "100m", "150 m", "200 meter", "Verspringen", "Hinkstapspringen"):
+        assert heeft_windmeting(naam), naam
+    for naam in ("300m", "400m", "80m horden", "4x100m", "1 mijl", "Hoogspringen", "Kogelstoten"):
+        assert not heeft_windmeting(naam), naam
+    sprint = Onderdeel("100m", "tijd", True)
+    assert sprint.windmeting
+    assert sprint.windlegaal(2.0) and sprint.windlegaal(-1.5)
+    assert not sprint.windlegaal(2.1) and not sprint.windlegaal(None)
+    acht = Onderdeel("800m", "tijd", True)
+    assert acht.windlegaal(None) and acht.windlegaal(5.0)
+    assert Onderdeel("100m horden", "tijd", True, windmeting=True).windmeting  # handmatig te overrulen
 
 
 def test_prestatie_koppelen_wist_brongegevens():

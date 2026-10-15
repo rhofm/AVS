@@ -7,9 +7,7 @@ import re
 from datetime import date
 
 from db.queries import Opslag, OpslagFout
-from models import Onderdeel, Prestatie
-
-MAX_WIND = 2.0  # m/s; bij meer rugwind telt een prestatie niet voor records
+from models import MAX_WIND, Onderdeel, Prestatie  # noqa: F401  (MAX_WIND hier ook beschikbaar)
 
 
 # ============================================================
@@ -49,8 +47,9 @@ def toon_waarde(waarde: float, eenheid: str) -> str:
     return f"{waarde:.0f} pnt"
 
 
-def windlegaal(p: Prestatie) -> bool:
-    return p.wind is None or p.wind <= MAX_WIND
+def windlegaal(p: Prestatie, onderdeel: Onderdeel) -> bool:
+    """Telt deze prestatie voor een PR? Zie Onderdeel.windlegaal()."""
+    return onderdeel.windlegaal(p.wind)
 
 
 # ============================================================
@@ -71,13 +70,13 @@ def handmatig_toevoegen(db: Opslag, master_id: str, onderdeel: str | int, datum:
     if isinstance(waarde, str):
         waarde = lees_waarde(waarde, o.eenheid)
 
-    # Niet db.prs(): de view `pr` telt ook prestaties met te veel rugwind mee.
+    # Zelfde regel als de view `pr` (migratie prestaties/003): alleen windlegaal.
     historie = pr_historie(db, master_id, o.id, alleen_windlegaal=True)
     oud_pr = historie[-1].waarde if historie else None
     p = Prestatie(o.naam, datum, waarde, atleet_id=master_id, onderdeel_id=o.id,
                   wedstrijd_id=wedstrijd_id, wind=wind, ronde=ronde, bron="handmatig")
     db.prestatie_opslaan(p)
-    nieuw_pr = windlegaal(p) and (oud_pr is None or o.is_beter(waarde, oud_pr))
+    nieuw_pr = windlegaal(p, o) and (oud_pr is None or o.is_beter(waarde, oud_pr))
     return p, nieuw_pr
 
 
@@ -93,7 +92,7 @@ def pr_historie(db: Opslag, master_id: str, onderdeel_id: int,
     prestaties = sorted(db.prestaties(master_id, onderdeel_id), key=lambda p: p.datum)
     historie: list[Prestatie] = []
     for p in prestaties:
-        if alleen_windlegaal and not windlegaal(p):
+        if alleen_windlegaal and not windlegaal(p, o):
             continue
         if not historie or o.is_beter(p.waarde, historie[-1].waarde):
             historie.append(p)
@@ -106,10 +105,11 @@ def beste_in_periode(db: Opslag, master_id: str, van: date, tot: date,
     onderdelen: dict[int, Onderdeel] = {o.id: o for o in db.onderdelen()}
     beste: dict[int, Prestatie] = {}
     for p in db.prestaties(master_id):
-        if not (van <= p.datum <= tot) or (alleen_windlegaal and not windlegaal(p)):
+        o = onderdelen[p.onderdeel_id]
+        if not (van <= p.datum <= tot) or (alleen_windlegaal and not windlegaal(p, o)):
             continue
         huidig = beste.get(p.onderdeel_id)
-        if huidig is None or onderdelen[p.onderdeel_id].is_beter(p.waarde, huidig.waarde):
+        if huidig is None or o.is_beter(p.waarde, huidig.waarde):
             beste[p.onderdeel_id] = p
     return beste
 

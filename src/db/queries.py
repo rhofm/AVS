@@ -205,17 +205,23 @@ class Opslag:
     @staticmethod
     def _onderdeel(r) -> Onderdeel:
         return Onderdeel(naam=r["naam"], eenheid=r["eenheid"], lager_is_beter=bool(r["lager_is_beter"]),
-                         categorie=r["categorie"], id=r["id"])
+                         categorie=r["categorie"], id=r["id"], windmeting=bool(r["windmeting"]))
 
     def onderdeel_opslaan(self, o: Onderdeel) -> Onderdeel:
-        """Toevoegen of bijwerken. Bestaat de naam al, dan wordt die rij bijgewerkt."""
+        """Toevoegen of bijwerken. Bestaat de naam al, dan wordt die rij bijgewerkt.
+
+        windmeting (vanaf migratie prestaties/003) bepaalt of de wind moet
+        kloppen voor een PR; zonder opgave volgt hij uit de naam.
+        """
         with self.prestaties_db:
             r = self.prestaties_db.execute(
-                """INSERT INTO onderdeel (naam, categorie, eenheid, lager_is_beter) VALUES (?, ?, ?, ?)
+                """INSERT INTO onderdeel (naam, categorie, eenheid, lager_is_beter, windmeting)
+                   VALUES (?, ?, ?, ?, ?)
                    ON CONFLICT (naam) DO UPDATE SET categorie = excluded.categorie,
-                       eenheid = excluded.eenheid, lager_is_beter = excluded.lager_is_beter
+                       eenheid = excluded.eenheid, lager_is_beter = excluded.lager_is_beter,
+                       windmeting = excluded.windmeting
                    RETURNING id""",
-                (o.naam, o.categorie, o.eenheid, int(o.lager_is_beter)),
+                (o.naam, o.categorie, o.eenheid, int(o.lager_is_beter), int(bool(o.windmeting))),
             ).fetchone()
         o.id = r[0]
         return o

@@ -14,6 +14,7 @@ from .leerlijn import Leerlijn, LeerlijnStap, LeerlijnVoortgang
 from .prestatie import (
     BRONNEN,
     EENHEDEN,
+    MAX_WIND,
     PR,
     Bron,
     Eenheid,
@@ -23,12 +24,13 @@ from .prestatie import (
     Test,
     Testresultaat,
     Wedstrijd,
+    heeft_windmeting,
 )
 
 __all__ = [
     "Atleet", "Geslacht", "GESLACHTEN",
     "Onderdeel", "Wedstrijd", "Prestatie", "Inschrijving", "PR", "Test", "Testresultaat",
-    "Bron", "BRONNEN", "Eenheid", "EENHEDEN",
+    "Bron", "BRONNEN", "Eenheid", "EENHEDEN", "MAX_WIND", "heeft_windmeting",
     "Groep", "Training", "Absentie", "AbsentieStatus", "ABSENTIE_STATUSSEN", "Periodeplan",
     "Leerlijn", "LeerlijnStap", "LeerlijnVoortgang",
 ]

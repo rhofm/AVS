@@ -12,6 +12,7 @@ atleet in personen.db te kunnen vinden. Die velden zijn tijdelijk: na het koppel
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field, replace
 from datetime import date
 from typing import Iterable, Literal
@@ -21,6 +22,28 @@ BRONNEN: tuple[str, ...] = ("atletieknu", "seltec", "handmatig")
 
 Eenheid = Literal["tijd", "afstand", "hoogte", "punten"]
 EENHEDEN: tuple[str, ...] = ("tijd", "afstand", "hoogte", "punten")
+
+
+MAX_WIND = 2.0  # m/s; bij meer rugwind telt een prestatie niet voor records
+
+
+def heeft_windmeting(naam: str) -> bool:
+    """Wordt bij dit onderdeel de wind gemeten? Sprints t/m 200 m, verspringen, hinkstapspringen.
+
+    Horden en estafettes tellen niet mee. Dezelfde regel staat in SQL in
+    db/migrations/prestaties/003_windmeting_per_onderdeel.sql; houd ze gelijk.
+    """
+    n = naam.strip().lower()
+    if "verspringen" in n or "hinkstap" in n:
+        return True
+    if "horden" in n or "hurdles" in n:
+        return False
+    m = re.match(r"(\d+)(.*)$", n)
+    if not m or "x" in n:                     # geen afstand, of een estafette (4x100m)
+        return False
+    rest = m.group(2).strip()
+    is_meters = rest in ("", "m", "meter") or rest.startswith(("m ", "meter "))
+    return is_meters and 1 <= int(m.group(1)) <= 200
 
 
 def _controleer_bron(bron: str | None) -> None:
@@ -35,10 +58,20 @@ class Onderdeel:
     lager_is_beter: bool            # True voor looponderdelen, False voor technische
     categorie: str | None = None    # sprint, horden, midden, springen, werpen, meerkamp
     id: int | None = None
+    windmeting: bool | None = None  # None = bepalen uit de naam (heeft_windmeting)
 
     def __post_init__(self) -> None:
         if self.eenheid not in EENHEDEN:
             raise ValueError(f"Onbekende eenheid {self.eenheid!r}; kies uit {EENHEDEN}.")
+        if self.windmeting is None:
+            self.windmeting = heeft_windmeting(self.naam)
+
+    def windlegaal(self, wind: float | None) -> bool:
+        """Telt een prestatie met deze wind voor een PR? Bij onderdelen met
+        windmeting moet de wind gemeten zijn en hoogstens +2,0 m/s."""
+        if not self.windmeting:
+            return True
+        return wind is not None and wind <= MAX_WIND
 
     def is_beter(self, a: float, b: float) -> bool:
         """Is waarde a beter dan waarde b op dit onderdeel?"""

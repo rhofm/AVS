@@ -130,19 +130,24 @@ def test_waarden_lezen_en_tonen():
 def test_handmatig_pr_historie_seizoensbesten():
     with opslag() as db:
         anna = beheer.nieuwe_atleet(db, "Anna", "Voorbeeld")
-        _, pr = prestaties.handmatig_toevoegen(db, anna.master_id, "100m", date(2025, 6, 1), "13,40")
+        _, pr = prestaties.handmatig_toevoegen(db, anna.master_id, "100m", date(2025, 6, 1), "13,40", wind=1.0)
         assert pr
-        _, pr = prestaties.handmatig_toevoegen(db, anna.master_id, "100m", date(2025, 7, 1), "13,60")
+        _, pr = prestaties.handmatig_toevoegen(db, anna.master_id, "100m", date(2025, 7, 1), "13,60", wind=0.5)
         assert not pr
         _, pr = prestaties.handmatig_toevoegen(db, anna.master_id, "100m", date(2026, 5, 1), "13,10", wind=2.6)
         assert not pr  # te veel rugwind
         _, pr = prestaties.handmatig_toevoegen(db, anna.master_id, "100m", date(2026, 6, 1), "13,20", wind=1.1)
         assert pr
+        _, pr = prestaties.handmatig_toevoegen(db, anna.master_id, "100m", date(2026, 6, 15), "13,00")
+        assert not pr  # sprint zonder windmeting
+        # Bij een onderdeel zonder windmeting is geen wind nodig.
+        _, pr = prestaties.handmatig_toevoegen(db, anna.master_id, "800m", date(2026, 6, 1), "2:20,50")
+        assert pr
         _verwacht(OpslagFout, lambda: prestaties.handmatig_toevoegen(db, anna.master_id, "Kogel", date(2026, 1, 1), 9))
 
         sprint = db.onderdeel("100m")
         assert [p.waarde for p in prestaties.pr_historie(db, anna.master_id, sprint.id)] == [13.4, 13.2]
-        assert [p.waarde for p in prestaties.pr_historie(db, anna.master_id, sprint.id, False)] == [13.4, 13.1]
+        assert [p.waarde for p in prestaties.pr_historie(db, anna.master_id, sprint.id, False)] == [13.4, 13.1, 13.0]
         assert prestaties.seizoensbesten(db, anna.master_id, 2025)[sprint.id].waarde == 13.4
         assert prestaties.seizoensbesten(db, anna.master_id, 2026)[sprint.id].waarde == 13.2
 
@@ -171,8 +176,8 @@ def test_testen():
 def test_profiel():
     with opslag() as db:
         anna = beheer.nieuwe_atleet(db, "Anna", "Voorbeeld", geboortedatum="2010-05-01")
-        prestaties.handmatig_toevoegen(db, anna.master_id, "100m", date(2026, 6, 1), "13,20")
-        prestaties.handmatig_toevoegen(db, anna.master_id, "Verspringen", date(2026, 6, 1), "4,80")
+        prestaties.handmatig_toevoegen(db, anna.master_id, "100m", date(2026, 6, 1), "13,20", wind=0.8)
+        prestaties.handmatig_toevoegen(db, anna.master_id, "Verspringen", date(2026, 6, 1), "4,80", wind=1.5)
         oud = db.wedstrijd_opslaan(Wedstrijd("Voorbij", date(2026, 6, 1)))
         straks = db.wedstrijd_opslaan(Wedstrijd("Straks", date(2026, 11, 1)))
         db.inschrijving_opslaan(Inschrijving(anna.master_id, oud.id))
