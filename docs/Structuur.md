@@ -8,6 +8,7 @@
 * PR's
 * Specialisatie (?)
 * Testresultaten
+* Geplande/verwachte prestaties (?) (eigen database?)
 
 
 
@@ -24,9 +25,14 @@
 
 ## Databases
 
-* Gemaakt voor SQL
-* Kijk wat waar precies staat
-* Functies die database kunnen initialiseren (want niet in github)
+* Gemaakt voor SQL, versleuteld met SQLCipher
+* Wat staat waar:
+  * personen.db: persoonsgegevens, groepen, trainingen, absentie, periodeplannen, leerlijnen, ploegen
+  * prestaties.db: onderdelen, wedstrijden, prestaties, PR's
+  * testen.db: testen en testresultaten
+* Elke atleet krijgt een willekeurige master\_id in personen.db; in prestaties.db en testen.db staat een eigen pseudoniem per database
+* Eén hoofdsleutel in de sleutelkluis van Windows, met herstelsleutel als back-up
+* ~~Functies die database kunnen initialiseren (want niet in github)~~ Gedaan: src/db/init\_db.py
 
 
 
@@ -64,4 +70,4 @@
 
 ## ?
 
-* 
+*
