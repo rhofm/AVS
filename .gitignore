@@ -34,3 +34,7 @@ venv/
 .env
 .vscode/
 .idea/
+
+#Specific files
+tests/diagnose_atletieknu.py
+tests/live_controle.py
