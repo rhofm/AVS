@@ -23,7 +23,8 @@ CREATE TABLE IF NOT EXISTS atleet (
                     DEFAULT (lower(hex(randomblob(16))))
                     CHECK (length(master_id) = 32),
     voornaam        TEXT NOT NULL,
-    achternaam      TEXT NOT NULL,
+    tussenvoegsel   TEXT,              -- bijv. 'de', 'van der'; NULL als er geen is
+    achternaam      TEXT NOT NULL,     -- zonder tussenvoegsel (sorteren gaat op achternaam)
     geslacht        TEXT CHECK (geslacht IN ('M', 'V', 'X')),
     geboortedatum   TEXT,              -- ISO 'YYYY-MM-DD' (of alleen jaar: 'YYYY')
     club            TEXT,

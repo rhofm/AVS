@@ -1,5 +1,9 @@
 """Dataclass Atleet: persoonsgegevens, specialisatie.
 
+De naam bestaat uit voornaam, tussenvoegsel (optioneel) en achternaam. `naam`
+geeft de volledige naam ('Jan de Vries'); sorteren gaat op achternaam zonder
+tussenvoegsel, zoals in Nederland gebruikelijk.
+
 Hoort bij de tabel `atleet` in personen.db. Een atleet wordt in de hele app
 aangeduid met zijn master_id. Het pseudoniem (atleet_ref) in prestaties.db en
 testen.db is een opslagdetail van db/ en komt in de modellen niet voor.
@@ -21,7 +25,7 @@ GESLACHTEN: tuple[str, ...] = ("M", "V", "X")
 @dataclass(slots=True)
 class Atleet:
     voornaam: str = field(repr=False)
-    achternaam: str = field(repr=False)
+    achternaam: str = field(repr=False)             # zonder tussenvoegsel
     geslacht: Geslacht | None = None
     geboortedatum: str | None = field(default=None, repr=False)  # 'YYYY-MM-DD' of alleen 'YYYY'
     club: str | None = None
@@ -29,10 +33,13 @@ class Atleet:
     specialisatie: str | None = None
     actief: bool = True
     notities: str | None = field(default=None, repr=False)
+    tussenvoegsel: str | None = field(default=None, repr=False)   # bv. 'de', 'van der'
     master_id: str | None = None        # None zolang nog niet opgeslagen; db/ maakt hem aan
     aangemaakt_op: str | None = None    # gezet door de database
 
     def __post_init__(self) -> None:
+        if self.tussenvoegsel is not None:
+            self.tussenvoegsel = " ".join(self.tussenvoegsel.split()) or None
         if self.geslacht is not None and self.geslacht not in GESLACHTEN:
             raise ValueError(f"Onbekend geslacht {self.geslacht!r}; kies uit {GESLACHTEN}.")
         if self.master_id is not None and len(self.master_id) != 32:
@@ -41,8 +48,14 @@ class Atleet:
             _controleer_geboortedatum(self.geboortedatum)
 
     @property
+    def volledige_achternaam(self) -> str:
+        """Achternaam met tussenvoegsel: 'de Vries'."""
+        return f"{self.tussenvoegsel} {self.achternaam}" if self.tussenvoegsel else self.achternaam
+
+    @property
     def naam(self) -> str:
-        return f"{self.voornaam} {self.achternaam}"
+        """Volledige naam: 'Jan de Vries'."""
+        return f"{self.voornaam} {self.volledige_achternaam}"
 
     @property
     def geboortejaar(self) -> int | None:

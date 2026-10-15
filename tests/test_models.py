@@ -34,6 +34,15 @@ def test_atleet_repr_bevat_geen_persoonsgegevens():
     assert a.naam == "Anna Voorbeeld"
 
 
+def test_atleet_tussenvoegsel():
+    a = Atleet("Jan", "Vries", tussenvoegsel=" de ")
+    assert a.tussenvoegsel == "de"
+    assert a.volledige_achternaam == "de Vries" and a.naam == "Jan de Vries"
+    assert "tussenvoegsel" not in repr(a)
+    assert Atleet("Jan", "Jansen", tussenvoegsel="  ").tussenvoegsel is None
+    assert Atleet("Jan", "Jansen").naam == "Jan Jansen"
+
+
 def test_atleet_leeftijd():
     a = Atleet("Anna", "Voorbeeld", geboortedatum="2010-05-01")
     assert a.leeftijd_op(date(2026, 4, 30)) == 15
