@@ -205,17 +205,23 @@ class Opslag:
     @staticmethod
     def _onderdeel(r) -> Onderdeel:
         return Onderdeel(naam=r["naam"], eenheid=r["eenheid"], lager_is_beter=bool(r["lager_is_beter"]),
-                         categorie=r["categorie"], id=r["id"])
+                         categorie=r["categorie"], id=r["id"], windmeting=bool(r["windmeting"]))
 
     def onderdeel_opslaan(self, o: Onderdeel) -> Onderdeel:
-        """Toevoegen of bijwerken. Bestaat de naam al, dan wordt die rij bijgewerkt."""
+        """Toevoegen of bijwerken. Bestaat de naam al, dan wordt die rij bijgewerkt.
+
+        windmeting (vanaf migratie prestaties/003) bepaalt of de wind moet
+        kloppen voor een PR; zonder opgave volgt hij uit de naam.
+        """
         with self.prestaties_db:
             r = self.prestaties_db.execute(
-                """INSERT INTO onderdeel (naam, categorie, eenheid, lager_is_beter) VALUES (?, ?, ?, ?)
+                """INSERT INTO onderdeel (naam, categorie, eenheid, lager_is_beter, windmeting)
+                   VALUES (?, ?, ?, ?, ?)
                    ON CONFLICT (naam) DO UPDATE SET categorie = excluded.categorie,
-                       eenheid = excluded.eenheid, lager_is_beter = excluded.lager_is_beter
+                       eenheid = excluded.eenheid, lager_is_beter = excluded.lager_is_beter,
+                       windmeting = excluded.windmeting
                    RETURNING id""",
-                (o.naam, o.categorie, o.eenheid, int(o.lager_is_beter)),
+                (o.naam, o.categorie, o.eenheid, int(o.lager_is_beter), int(bool(o.windmeting))),
             ).fetchone()
         o.id = r[0]
         return o
@@ -234,11 +240,15 @@ class Opslag:
     @staticmethod
     def _wedstrijd(r) -> Wedstrijd:
         return Wedstrijd(naam=r["naam"], datum=_naar_datum(r["datum"]), locatie=r["locatie"],
-                         bron=r["bron"], bron_url=r["bron_url"], id=r["id"])
+                         bron=r["bron"], bron_url=r["bron_url"], id=r["id"], indoor=bool(r["indoor"]))
 
     def wedstrijd_opslaan(self, w: Wedstrijd) -> Wedstrijd:
         """Toevoegen of bijwerken. Een wedstrijd met dezelfde bron_url wordt hergebruikt,
-        zodat dezelfde link twee keer importeren geen dubbele wedstrijd oplevert."""
+        zodat dezelfde link twee keer importeren geen dubbele wedstrijd oplevert.
+
+        `indoor` geldt voor alle prestaties op deze wedstrijd: ook prestaties die
+        er al stonden krijgen de nieuwe waarde (indoor telt altijd voor een PR).
+        """
         if w.id is None and w.bron_url:
             r = self.prestaties_db.execute(
                 "SELECT id FROM wedstrijd WHERE bron_url = ?", (w.bron_url,)
@@ -246,16 +256,20 @@ class Opslag:
             if r:
                 w.id = r[0]
         with self.prestaties_db:
-            waarden = (w.naam, _naar_tekst(w.datum), w.locatie, w.bron, w.bron_url)
+            waarden = (w.naam, _naar_tekst(w.datum), w.locatie, w.bron, w.bron_url, int(w.indoor))
             if w.id is None:
                 w.id = self.prestaties_db.execute(
-                    "INSERT INTO wedstrijd (naam, datum, locatie, bron, bron_url) VALUES (?, ?, ?, ?, ?)",
+                    "INSERT INTO wedstrijd (naam, datum, locatie, bron, bron_url, indoor) VALUES (?, ?, ?, ?, ?, ?)",
                     waarden,
                 ).lastrowid
             else:
                 self.prestaties_db.execute(
-                    "UPDATE wedstrijd SET naam = ?, datum = ?, locatie = ?, bron = ?, bron_url = ? WHERE id = ?",
+                    """UPDATE wedstrijd SET naam = ?, datum = ?, locatie = ?, bron = ?, bron_url = ?, indoor = ?
+                       WHERE id = ?""",
                     (*waarden, w.id),
+                )
+                self.prestaties_db.execute(
+                    "UPDATE prestatie SET indoor = ? WHERE wedstrijd_id = ?", (int(w.indoor), w.id)
                 )
         return w
 
@@ -281,7 +295,7 @@ class Opslag:
         return Prestatie(
             onderdeel=r["onderdeel_naam"], datum=_naar_datum(r["datum"]), waarde=r["waarde"],
             atleet_id=atleet_id, onderdeel_id=r["onderdeel_id"], wedstrijd_id=r["wedstrijd_id"],
-            wind=r["wind"], ronde=r["ronde"], bron=r["bron"], id=r["id"],
+            wind=r["wind"], ronde=r["ronde"], bron=r["bron"], id=r["id"], indoor=bool(r["indoor"]),
         )
 
     _PRESTATIE_SELECT = """SELECT p.*, o.naam AS onderdeel_naam
@@ -299,17 +313,20 @@ class Opslag:
             if o is None:
                 raise OpslagFout(f"Onbekend onderdeel {p.onderdeel!r}; voeg het eerst toe met onderdeel_opslaan().")
             p.onderdeel_id = o.id
-        if p.wedstrijd_id is not None and self.wedstrijd(p.wedstrijd_id) is None:
-            raise OpslagFout(f"Wedstrijd {p.wedstrijd_id} bestaat niet.")
+        if p.wedstrijd_id is not None:
+            w = self.wedstrijd(p.wedstrijd_id)
+            if w is None:
+                raise OpslagFout(f"Wedstrijd {p.wedstrijd_id} bestaat niet.")
+            p.indoor = w.indoor  # een prestatie op een indoorwedstrijd is indoor
 
         ref = self._ref(p.atleet_id, "prestaties")
         sleutel = (ref, p.onderdeel_id, _naar_tekst(p.datum), p.waarde, p.ronde or "")
         with self.prestaties_db:
             cur = self.prestaties_db.execute(
                 """INSERT OR IGNORE INTO prestatie
-                       (atleet_ref, onderdeel_id, datum, waarde, ronde, wedstrijd_id, wind, bron)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-                (*sleutel, p.wedstrijd_id, p.wind, p.bron),
+                       (atleet_ref, onderdeel_id, datum, waarde, ronde, wedstrijd_id, wind, bron, indoor)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (*sleutel, p.wedstrijd_id, p.wind, p.bron, int(p.indoor)),
             )
         nieuw = cur.rowcount == 1
         p.id = self.prestaties_db.execute(
