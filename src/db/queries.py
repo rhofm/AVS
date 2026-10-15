@@ -124,7 +124,8 @@ class Opslag:
     @staticmethod
     def _atleet(r) -> Atleet:
         return Atleet(
-            voornaam=r["voornaam"], achternaam=r["achternaam"], geslacht=r["geslacht"],
+            voornaam=r["voornaam"], tussenvoegsel=r["tussenvoegsel"], achternaam=r["achternaam"],
+            geslacht=r["geslacht"],
             geboortedatum=r["geboortedatum"], club=r["club"], atletieknu_id=r["atletieknu_id"],
             specialisatie=r["specialisatie"], actief=bool(r["actief"]), notities=r["notities"],
             master_id=r["master_id"], aangemaakt_op=r["aangemaakt_op"],
@@ -137,17 +138,18 @@ class Opslag:
             a.master_id = nieuw_master_id()
         with self.personen:
             self.personen.execute(
-                """INSERT INTO atleet (master_id, voornaam, achternaam, geslacht, geboortedatum,
-                                       club, atletieknu_id, specialisatie, actief, notities)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """INSERT INTO atleet (master_id, voornaam, tussenvoegsel, achternaam, geslacht,
+                                       geboortedatum, club, atletieknu_id, specialisatie, actief, notities)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                    ON CONFLICT (master_id) DO UPDATE SET
-                       voornaam = excluded.voornaam, achternaam = excluded.achternaam,
+                       voornaam = excluded.voornaam, tussenvoegsel = excluded.tussenvoegsel,
+                       achternaam = excluded.achternaam,
                        geslacht = excluded.geslacht, geboortedatum = excluded.geboortedatum,
                        club = excluded.club, atletieknu_id = excluded.atletieknu_id,
                        specialisatie = excluded.specialisatie, actief = excluded.actief,
                        notities = excluded.notities""",
-                (a.master_id, a.voornaam, a.achternaam, a.geslacht, a.geboortedatum, a.club,
-                 a.atletieknu_id, a.specialisatie, int(a.actief), a.notities),
+                (a.master_id, a.voornaam, a.tussenvoegsel, a.achternaam, a.geslacht, a.geboortedatum,
+                 a.club, a.atletieknu_id, a.specialisatie, int(a.actief), a.notities),
             )
         if nieuw:
             self._vergeet_pseudoniemen()
@@ -174,9 +176,10 @@ class Opslag:
         return [self._atleet(r) for r in self.personen.execute(sql)]
 
     def atleten_zoeken(self, tekst: str, alleen_actief: bool = False) -> list[Atleet]:
-        """Zoek op (een deel van) voor- of achternaam, hoofdletterongevoelig."""
+        """Zoek op (een deel van) de volledige naam, hoofdletterongevoelig."""
         patroon = f"%{tekst.strip()}%"
-        sql = "SELECT * FROM atleet WHERE (voornaam || ' ' || achternaam) LIKE ?"
+        sql = ("SELECT * FROM atleet "
+               "WHERE (voornaam || ' ' || COALESCE(tussenvoegsel || ' ', '') || achternaam) LIKE ?")
         if alleen_actief:
             sql += " AND actief = 1"
         sql += " ORDER BY achternaam, voornaam"

@@ -9,12 +9,13 @@ from .koppelen import normaliseer
 
 
 def mogelijke_dubbelen(db: Opslag, voornaam: str, achternaam: str,
-                       geboortedatum: str | None = None) -> list[Atleet]:
+                       geboortedatum: str | None = None, *,
+                       tussenvoegsel: str | None = None) -> list[Atleet]:
     """Bestaande atleten met dezelfde naam (en, als bekend, hetzelfde geboortejaar).
 
     Voor een waarschuwing in de UI voordat een nieuwe atleet wordt aangemaakt.
     """
-    doel = normaliseer(f"{voornaam} {achternaam}")
+    doel = normaliseer(Atleet(voornaam, achternaam, tussenvoegsel=tussenvoegsel).naam)
     jaar = int(geboortedatum[:4]) if geboortedatum else None
     return [a for a in db.atleten(alleen_actief=False)
             if normaliseer(a.naam) == doel and (jaar is None or a.geboortejaar in (None, jaar))]
@@ -26,13 +27,15 @@ def nieuwe_atleet(db: Opslag, voornaam: str, achternaam: str, *,
 
     Bestaat er al iemand met dezelfde naam (en hetzelfde geboortejaar), dan
     volgt een DubbeleAtleet-fout, tenzij toch_aanmaken=True.
-    Extra gegevens: geslacht, geboortedatum, club, atletieknu_id, specialisatie, notities.
+    Extra gegevens: tussenvoegsel, geslacht, geboortedatum, club, atletieknu_id,
+    specialisatie, notities.
     """
     voornaam, achternaam = voornaam.strip(), achternaam.strip()
     if not voornaam or not achternaam:
         raise ValueError("Voor- en achternaam zijn verplicht.")
     if not toch_aanmaken:
-        dubbel = mogelijke_dubbelen(db, voornaam, achternaam, gegevens.get("geboortedatum"))
+        dubbel = mogelijke_dubbelen(db, voornaam, achternaam, gegevens.get("geboortedatum"),
+                                    tussenvoegsel=gegevens.get("tussenvoegsel"))
         if dubbel:
             raise DubbeleAtleet(dubbel)
     return db.atleet_opslaan(Atleet(voornaam, achternaam, **gegevens))

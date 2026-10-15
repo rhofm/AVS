@@ -57,6 +57,17 @@ def test_atleten():
         assert db.atleet_op_atletieknu_id("123456").master_id == anna.master_id
         assert [a.voornaam for a in db.atleten_zoeken("proef")] == ["Tim"]
 
+        # Tussenvoegsel: aparte kolom, zoeken op de volledige naam, sorteren op achternaam.
+        jan = db.atleet_opslaan(Atleet("Jan", "Vries", tussenvoegsel="de"))
+        terug = db.atleet(jan.master_id)
+        assert (terug.tussenvoegsel, terug.achternaam, terug.naam) == ("de", "Vries", "Jan de Vries")
+        assert [a.voornaam for a in db.atleten_zoeken("jan de vr")] == ["Jan"]
+        assert [a.voornaam for a in db.atleten()] == ["Tim", "Anna", "Jan"]
+        terug.tussenvoegsel = None
+        db.atleet_opslaan(terug)
+        assert db.atleet(jan.master_id).naam == "Jan Vries"
+        db.atleet_verwijderen(jan.master_id)
+
         tim.actief = False
         tim.specialisatie = "sprint"
         db.atleet_opslaan(tim)
