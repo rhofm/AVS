@@ -3,7 +3,7 @@
 ## Ideeën \& Features
 
 * Volgt atleten (PRs, prestaties, geplande wedstrijden, test resultaten, plaats in leerlijnen/ontwikkeling, ...)
-* Iets dat de resultaten en prs van atletiek.nu en seltec importeerd
+* Iets dat de resultaten en prs van atletiek.nu en seltec importeert
 * Feature voor het maken van competitieploegen
 * Absentie feature voor groepen
 * Ruimte voor plannen trainingsperiodes en trainingen
@@ -15,7 +15,7 @@
 
 \--
 
-(Bouw elke feature in een losse branch, merge die in dev branch (develepment), merge die in staging (generale auditie), merge die in main (productie/gepubliceerd).
+(Bouw elke feature in een losse branch, merge die in dev branch (development), merge die in staging (generale auditie), merge die in main (productie/gepubliceerd).
 ### Structuur
 Dit staat in het [Structuur](docs/Structuur.md) bestand.
 
@@ -25,7 +25,8 @@ Dit staat in het [Structuur](docs/Structuur.md) bestand.
 ## Opmerkingen
 
 * Database management in SQL, verwerking in python
+* Databases zijn versleuteld (SQLCipher) en gesplitst in drie bestanden: personen, prestaties en testen
+* Alleen in de personen-database staan namen; in de andere twee staat een atleet onder een pseudoniem
+* **Bewaar de herstelsleutel!** (`python src/db/init_db.py --herstelsleutel`) Zonder die sleutel is alle data weg, bijv. na een nieuwe computer of herinstallatie van Windows
 * Makkelijke User Interface (moet zonder terminal kunnen worden gebruikt) (bouwen in C++? of iets met HTML?)
 * Het liefst met 1 command te compilen en dan als een .exe te runnen op locale machine
-
-
