@@ -28,21 +28,21 @@ MAX_WIND = 2.0  # m/s; bij meer rugwind telt een prestatie niet voor records
 
 
 def heeft_windmeting(naam: str) -> bool:
-    """Wordt bij dit onderdeel de wind gemeten? Sprints t/m 200 m, verspringen, hinkstapspringen.
+    """Wordt bij dit onderdeel de wind gemeten?
 
-    Horden en estafettes tellen niet mee. Dezelfde regel staat in SQL in
-    db/migrations/prestaties/003_windmeting_per_onderdeel.sql; houd ze gelijk.
+    Ja voor sprints en horden t/m 200 m, verspringen en hinkstapspringen.
+    Nee voor estafettes en al het andere. Dezelfde regel staat in SQL in
+    db/migrations/prestaties/003_*.sql en 004_*.sql; houd ze gelijk
+    (tests/test_queries.py controleert dat).
     """
     n = naam.strip().lower()
     if "verspringen" in n or "hinkstap" in n:
         return True
-    if "horden" in n or "hurdles" in n:
-        return False
     m = re.match(r"(\d+)(.*)$", n)
     if not m or "x" in n:                     # geen afstand, of een estafette (4x100m)
         return False
     rest = m.group(2).strip()
-    is_meters = rest in ("", "m", "meter") or rest.startswith(("m ", "meter "))
+    is_meters = rest in ("", "m", "meter", "mh") or rest.startswith(("m ", "meter ", "mh "))
     return is_meters and 1 <= int(m.group(1)) <= 200
 
 
@@ -66,10 +66,11 @@ class Onderdeel:
         if self.windmeting is None:
             self.windmeting = heeft_windmeting(self.naam)
 
-    def windlegaal(self, wind: float | None) -> bool:
+    def windlegaal(self, wind: float | None, indoor: bool = False) -> bool:
         """Telt een prestatie met deze wind voor een PR? Bij onderdelen met
-        windmeting moet de wind gemeten zijn en hoogstens +2,0 m/s."""
-        if not self.windmeting:
+        windmeting moet de wind gemeten zijn en hoogstens +2,0 m/s.
+        Indoor wordt geen wind gemeten: daar telt alles."""
+        if not self.windmeting or indoor:
             return True
         return wind is not None and wind <= MAX_WIND
 
@@ -92,6 +93,7 @@ class Wedstrijd:
     bron: Bron | None = None
     bron_url: str | None = None     # uitslagpagina van de wedstrijd, nooit van een atleet
     id: int | None = None
+    indoor: bool = False            # alle prestaties op deze wedstrijd zijn dan indoor
 
     def __post_init__(self) -> None:
         _controleer_bron(self.bron)
@@ -109,6 +111,7 @@ class Prestatie:
     ronde: str = ""                 # serie, finale, ... ('' en niet None, zie schema)
     bron: Bron | None = None
     id: int | None = None
+    indoor: bool = False            # indoor: geen windmeting, telt altijd voor een PR
 
     # Alleen voor importers, om de atleet te vinden (atleten/koppelen.py). Nooit opslaan.
     bron_naam: str | None = field(default=None, repr=False)

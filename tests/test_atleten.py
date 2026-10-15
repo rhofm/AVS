@@ -31,6 +31,7 @@ def opslag():
         with Opslag(map=Path(tmp), hoofd=TESTSLEUTEL) as db:
             db.onderdeel_opslaan(Onderdeel("100m", "tijd", True, "sprint"))
             db.onderdeel_opslaan(Onderdeel("800m", "tijd", True, "midden"))
+            db.onderdeel_opslaan(Onderdeel("60m", "tijd", True, "sprint"))
             db.onderdeel_opslaan(Onderdeel("Verspringen", "afstand", False, "springen"))
             yield db
 
@@ -140,6 +141,8 @@ def test_handmatig_pr_historie_seizoensbesten():
         assert pr
         _, pr = prestaties.handmatig_toevoegen(db, anna.master_id, "100m", date(2026, 6, 15), "13,00")
         assert not pr  # sprint zonder windmeting
+        _, pr = prestaties.handmatig_toevoegen(db, anna.master_id, "60m", date(2026, 2, 1), "8,40", indoor=True)
+        assert pr  # indoor: geen wind nodig
         # Bij een onderdeel zonder windmeting is geen wind nodig.
         _, pr = prestaties.handmatig_toevoegen(db, anna.master_id, "800m", date(2026, 6, 1), "2:20,50")
         assert pr

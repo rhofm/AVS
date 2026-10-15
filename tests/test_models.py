@@ -62,17 +62,19 @@ def test_onderdeel_beter_en_beste():
 
 
 def test_windmeting_en_windlegaal():
-    for naam in ("60m", "100m", "150 m", "200 meter", "Verspringen", "Hinkstapspringen"):
+    for naam in ("60m", "100m", "150 m", "200 meter", "Verspringen", "Hinkstapspringen",
+                 "80m horden", "110m Hurdles", "60mH", "200m horden", "60m horden 76,2cm"):
         assert heeft_windmeting(naam), naam
-    for naam in ("300m", "400m", "80m horden", "4x100m", "1 mijl", "Hoogspringen", "Kogelstoten"):
+    for naam in ("300m", "400m", "300m horden", "400mH", "4x100m", "1 mijl", "Hoogspringen", "Kogelstoten"):
         assert not heeft_windmeting(naam), naam
     sprint = Onderdeel("100m", "tijd", True)
     assert sprint.windmeting
     assert sprint.windlegaal(2.0) and sprint.windlegaal(-1.5)
     assert not sprint.windlegaal(2.1) and not sprint.windlegaal(None)
+    assert sprint.windlegaal(None, indoor=True) and sprint.windlegaal(3.0, indoor=True)
     acht = Onderdeel("800m", "tijd", True)
     assert acht.windlegaal(None) and acht.windlegaal(5.0)
-    assert Onderdeel("100m horden", "tijd", True, windmeting=True).windmeting  # handmatig te overrulen
+    assert not Onderdeel("100m horden", "tijd", True, windmeting=False).windmeting  # handmatig te overrulen
 
 
 def test_prestatie_koppelen_wist_brongegevens():

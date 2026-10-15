@@ -136,21 +136,44 @@ def test_pr_alleen_windlegaal():
 def test_windmeting_handmatig_aan_te_passen():
     with opslag() as db:
         o = db.onderdeel_opslaan(Onderdeel("100m horden", "tijd", True, "horden"))
-        assert not o.windmeting
-        o.windmeting = True
+        assert o.windmeting
+        o.windmeting = False
         db.onderdeel_opslaan(o)
-        assert db.onderdeel("100m horden").windmeting
+        assert not db.onderdeel("100m horden").windmeting
+
+
+def test_indoor_telt_altijd():
+    with opslag() as db:
+        anna, _, sprint, ver = _basis(db)
+        zestig = db.onderdeel_opslaan(Onderdeel("60m", "tijd", True, "sprint"))
+        hal = db.wedstrijd_opslaan(Wedstrijd("Indoor Apeldoorn", date(2026, 1, 10), indoor=True))
+        baan = db.wedstrijd_opslaan(Wedstrijd("Baan", date(2026, 5, 10)))
+        db.prestatie_opslaan(Prestatie("60m", date(2026, 1, 10), 8.10, wedstrijd_id=hal.id).gekoppeld(anna.master_id))
+        db.prestatie_opslaan(Prestatie("60m", date(2026, 5, 10), 8.00, wedstrijd_id=baan.id).gekoppeld(anna.master_id))
+        assert db.prestaties(anna.master_id, zestig.id)[1].indoor            # overgenomen van de wedstrijd
+        assert {pr.onderdeel_id: pr.waarde for pr in db.prs(anna.master_id)} == {zestig.id: 8.10}
+
+        # Wedstrijd achteraf als indoor markeren: bestaande prestaties volgen.
+        baan.indoor = True
+        db.wedstrijd_opslaan(baan)
+        assert db.wedstrijd(baan.id).indoor
+        assert {pr.onderdeel_id: pr.waarde for pr in db.prs(anna.master_id)} == {zestig.id: 8.00}
+
+        # Losse indoorprestatie zonder wedstrijd (bijv. handmatig).
+        db.prestatie_opslaan(Prestatie("Verspringen", date(2026, 2, 1), 5.0, indoor=True).gekoppeld(anna.master_id))
+        assert db.prs_van_groep([anna.master_id], ver.id)[0].waarde == 5.0
 
 
 WINDNAMEN = [
     "60m", "100m", "150 m", "200m", "200 meter", "100m sprint", "Verspringen", "Hinkstapspringen",
     "verspringen (zone)", "300m", "400m", "1000m", "80m horden", "100m Hurdles", "4x100m",
     "4 x 60m", "1 mijl", "Hoogspringen", "Kogelstoten", "Speerwerpen 600g", "60m horden 76,2cm",
+    "60mH", "110 meter horden", "200m horden", "300m horden", "400mH", "100mh", "4x80m horden",
 ]
 
 
 def test_migratie_op_bestaande_database():
-    """Een database op versie 1 krijgt migratie 002 en 003 bij de volgende init_db().
+    """Een database op versie 1 krijgt migratie 002 t/m 004 bij de volgende init_db().
     De SQL-indeling van bestaande onderdelen moet gelijk zijn aan heeft_windmeting()."""
     import db.init_db as init_mod
     with tempfile.TemporaryDirectory() as tmp:
@@ -171,15 +194,18 @@ def test_migratie_op_bestaande_database():
                 )
             honderd = db.prestaties_db.execute("SELECT id FROM onderdeel WHERE naam = '100m'").fetchone()[0]
             anna = db.atleet_opslaan(Atleet("Anna", "Voorbeeld"))
-            db.prestatie_opslaan(Prestatie("100m", date(2026, 6, 1), 12.9, wind=2.6, onderdeel_id=honderd)
-                                 .gekoppeld(anna.master_id))
-            db.prestatie_opslaan(Prestatie("100m", date(2026, 6, 2), 13.1, onderdeel_id=honderd)
-                                 .gekoppeld(anna.master_id))
+            # Ook prestaties rechtstreeks: versie 1 kent de kolom indoor nog niet.
+            ref = pseudoniem(anna.master_id, "prestaties", TESTSLEUTEL)
+            with db.prestaties_db:
+                db.prestaties_db.executemany(
+                    "INSERT INTO prestatie (atleet_ref, onderdeel_id, datum, waarde, wind) VALUES (?, ?, ?, ?, ?)",
+                    [(ref, honderd, "2026-06-01", 12.9, 2.6), (ref, honderd, "2026-06-02", 13.1, None)],
+                )
             assert db.prs(anna.master_id)[0].waarde == 12.9  # oude view telt alles mee
         with contextlib.redirect_stdout(io.StringIO()):
             init_db(Path(tmp), hoofd=TESTSLEUTEL)
         with Opslag(map=Path(tmp), hoofd=TESTSLEUTEL) as db:
-            assert db.prestaties_db.execute("SELECT MAX(versie) FROM schema_version").fetchone()[0] == 3
+            assert db.prestaties_db.execute("SELECT MAX(versie) FROM schema_version").fetchone()[0] == 4
             assert db.prs(anna.master_id) == []                  # te veel wind / geen meting
             assert len(db.prestaties(anna.master_id)) == 2       # de prestaties zelf zijn er nog
             sql = {o.naam: o.windmeting for o in db.onderdelen()}

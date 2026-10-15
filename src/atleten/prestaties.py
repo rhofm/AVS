@@ -49,7 +49,7 @@ def toon_waarde(waarde: float, eenheid: str) -> str:
 
 def windlegaal(p: Prestatie, onderdeel: Onderdeel) -> bool:
     """Telt deze prestatie voor een PR? Zie Onderdeel.windlegaal()."""
-    return onderdeel.windlegaal(p.wind)
+    return onderdeel.windlegaal(p.wind, p.indoor)
 
 
 # ============================================================
@@ -57,10 +57,12 @@ def windlegaal(p: Prestatie, onderdeel: Onderdeel) -> bool:
 # ============================================================
 def handmatig_toevoegen(db: Opslag, master_id: str, onderdeel: str | int, datum: date,
                         waarde: float | str, *, wind: float | None = None,
-                        wedstrijd_id: int | None = None, ronde: str = "") -> tuple[Prestatie, bool]:
+                        wedstrijd_id: int | None = None, ronde: str = "",
+                        indoor: bool = False) -> tuple[Prestatie, bool]:
     """Voeg een prestatie toe die niet uit een import komt.
 
     `waarde` mag tekst zijn ('1:58,21'). Geeft (prestatie, is_nieuw_pr).
+    Bij een wedstrijd_id bepaalt de wedstrijd of de prestatie indoor is.
     """
     o = db.onderdeel(onderdeel)
     if o is None:
@@ -74,7 +76,8 @@ def handmatig_toevoegen(db: Opslag, master_id: str, onderdeel: str | int, datum:
     historie = pr_historie(db, master_id, o.id, alleen_windlegaal=True)
     oud_pr = historie[-1].waarde if historie else None
     p = Prestatie(o.naam, datum, waarde, atleet_id=master_id, onderdeel_id=o.id,
-                  wedstrijd_id=wedstrijd_id, wind=wind, ronde=ronde, bron="handmatig")
+                  wedstrijd_id=wedstrijd_id, wind=wind, ronde=ronde, bron="handmatig",
+                  indoor=indoor)
     db.prestatie_opslaan(p)
     nieuw_pr = windlegaal(p, o) and (oud_pr is None or o.is_beter(waarde, oud_pr))
     return p, nieuw_pr
