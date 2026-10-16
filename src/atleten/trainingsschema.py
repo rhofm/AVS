@@ -48,13 +48,21 @@ class SchemaFormulier:
 
 
 def groepsdagen(db: Opslag, master_id: str, peildatum: date | None = None) -> dict[str, list[str]]:
-    """Per weekdag de groepen van de atleet met een training op die dag (rond de peildatum)."""
+    """Per weekdag de groepen van de atleet die dan trainen.
+
+    Bron: de vaste starttijden van de groep ('Sprint 18:30'), aangevuld met de
+    weekdagen van geplande trainingen rond de peildatum (voor groepen zonder
+    vaste tijden of met een extra training).
+    """
     vandaag = peildatum or date.today()
     van, tot = vandaag - timedelta(days=GROEPSVENSTER), vandaag + timedelta(days=GROEPSVENSTER)
     uit: dict[str, list[str]] = {d: [] for d in DAGEN}
     for g in db.groepen_van_atleet(master_id):
-        for dag in sorted({t.datum.weekday() for t in db.trainingen(g.id, van=van, tot=tot)}):
-            uit[DAGEN[dag]].append(g.naam)
+        dagen = set(g.starttijden) | {DAGEN[t.datum.weekday()] for t in db.trainingen(g.id, van=van, tot=tot)}
+        for dag in DAGEN:
+            if dag in dagen:
+                tijd = g.starttijd(dag)
+                uit[dag].append(f"{g.naam} {tijd}" if tijd else g.naam)
     return uit
 
 

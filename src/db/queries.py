@@ -575,15 +575,23 @@ class Opslag:
     # Groepen, periodeplannen, trainingen, absentie (personen.db)
     # ============================================================
     def groep_opslaan(self, g: Groep) -> Groep:
-        """Groep en ledenlijst opslaan. De leden in de database worden precies g.leden."""
+        """Groep, starttijden en ledenlijst opslaan. De leden in de database worden precies g.leden.
+
+        Starttijden: één kolom per weekdag (migratie personen/003); een dag
+        zonder tijd wordt NULL.
+        """
+        tijden = [g.starttijden.get(d) for d in DAGEN]
+        kolommen = ", ".join(DAGEN)                                   # DAGEN zijn vaste namen
         with self.personen:
             if g.id is None:
                 g.id = self.personen.execute(
-                    "INSERT INTO groep (naam, seizoen) VALUES (?, ?)", (g.naam, g.seizoen)
+                    f"INSERT INTO groep (naam, seizoen, {kolommen}) VALUES (?, ?, {_vraagtekens(len(DAGEN))})",
+                    (g.naam, g.seizoen, *tijden),
                 ).lastrowid
             else:
-                self.personen.execute("UPDATE groep SET naam = ?, seizoen = ? WHERE id = ?",
-                                      (g.naam, g.seizoen, g.id))
+                zet = ", ".join(f"{d} = ?" for d in DAGEN)
+                self.personen.execute(f"UPDATE groep SET naam = ?, seizoen = ?, {zet} WHERE id = ?",
+                                      (g.naam, g.seizoen, *tijden, g.id))
             self.personen.execute("DELETE FROM groep_lid WHERE groep_id = ?", (g.id,))
             self.personen.executemany("INSERT INTO groep_lid (groep_id, atleet_id) VALUES (?, ?)",
                                       [(g.id, m) for m in g.leden])
@@ -593,7 +601,7 @@ class Opslag:
         leden = [x[0] for x in self.personen.execute(
             """SELECT gl.atleet_id FROM groep_lid gl JOIN atleet a ON a.master_id = gl.atleet_id
                WHERE gl.groep_id = ? ORDER BY a.achternaam, a.voornaam""", (r["id"],))]
-        return Groep(r["naam"], r["seizoen"], leden, r["id"])
+        return Groep(r["naam"], r["seizoen"], leden, r["id"], {d: r[d] for d in DAGEN if r[d]})
 
     def groep(self, groep_id: int) -> Groep | None:
         r = self.personen.execute("SELECT * FROM groep WHERE id = ?", (groep_id,)).fetchone()
