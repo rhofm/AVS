@@ -58,6 +58,7 @@ def test_aanwezigheid():
         assert okt[date(2026, 10, 13)].status == aanwezigheid.NIET_INGEVULD   # twee trainingen: de "ergste" telt
         assert okt[date(2026, 9, 29)].regels == []                       # opvuldag uit september
         assert okt[VANDAAG].vandaag
+        assert max(okt) == date(2026, 10, 18)                           # week na vandaag valt weg
         assert landingspagina.landingspagina(db, mid, peildatum=VANDAAG).aanwezig_pct == 25.0
 
 

@@ -3,6 +3,7 @@
   Context:
     pagina  – atleten.landingspagina.AtleetLandingspagina
     fases   – atleten.landingspagina.FASES
+    melding – optioneel, bijv. na het opslaan van het trainingsschema
   Filters uit ui/opmaak.py (registreer_filters).
 #}
 {% extends "basis.html" %}
@@ -42,6 +43,8 @@
       {% endfor %}
     </ol>
   {% endif %}
+
+  {% if melding %}<p class="melding" role="status">{{ melding }}</p>{% endif %}
 
   {# ---------------- Trainingsschema ---------------- #}
   <section class="blok" aria-labelledby="kop-schema">

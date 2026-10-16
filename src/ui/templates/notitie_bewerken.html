@@ -1,0 +1,51 @@
+{#
+  Eén notitie aanpassen of verwijderen.
+  Context:
+    a          – de atleet (models.Atleet)
+    n          – de notitie (models.Notitie)
+    basis_url  – '/atleet/<master_id>'
+    concept    – optioneel {datum, inhoud}: wat er ingevuld was als opslaan mislukte
+    fout       – optioneel, foutmelding
+  POST naar {{ basis_url }}/notities/<id> met actie=opslaan (datum, inhoud)
+  of actie=verwijderen (alleen met het vinkje 'zeker').
+#}
+{% extends "basis.html" %}
+{% block titel %}Notitie {{ a.naam }}{% endblock %}
+
+{% block inhoud %}
+<article class="vel">
+  <header class="blok">
+    <a class="terug" href="{{ basis_url }}/notities">&larr; Notities {{ a.naam }}</a>
+    <h1 class="kop kop--pagina">Notitie bewerken</h1>
+    <p class="subkop">Geschreven op {{ n.aangemaakt_op | tekstdatum or "?" }}{% if n.bijgewerkt_op %} · aangepast op {{ n.bijgewerkt_op | tekstdatum }}{% endif %}</p>
+  </header>
+
+  {% if fout %}<p class="melding melding--fout" role="alert">{{ fout }}</p>{% endif %}
+
+  <form class="blok notitieform" method="post" action="{{ basis_url }}/notities/{{ n.id }}">
+    <input type="hidden" name="actie" value="opslaan">
+    <div class="notitieform__datum">
+      <label for="notitie-datum">Datum</label>
+      <input type="date" id="notitie-datum" name="datum" required max="{{ vandaag.isoformat() }}"
+             value="{{ concept.datum if concept else n.datum.isoformat() }}">
+    </div>
+    <label class="verborgen" for="notitie-inhoud">Notitie</label>
+    <textarea id="notitie-inhoud" name="inhoud" rows="8" required autofocus>{{ concept.inhoud if concept else n.inhoud }}</textarea>
+    <p class="zacht uitleg">Houd het feitelijk: geen diagnoses en geen namen van andere atleten.</p>
+    <div class="opslaan opslaan--onder">
+      <a class="knop" href="{{ basis_url }}/notities">Annuleren</a>
+      <button class="knop knop--vol" type="submit">Opslaan</button>
+    </div>
+  </form>
+
+  <form class="blok verwijderen" method="post" action="{{ basis_url }}/notities/{{ n.id }}">
+    <input type="hidden" name="actie" value="verwijderen">
+    <h2 class="kop">Verwijderen</h2>
+    <label class="vinkje" for="zeker"><input type="checkbox" id="zeker" name="zeker" value="1" required>
+      Ja, deze notitie definitief verwijderen</label>
+    <div><button class="knop knop--gevaar" type="submit">Verwijderen</button></div>
+  </form>
+
+  <footer class="vel__voet">Atleet Volg Systeem<br>Notities {{ a.naam }}</footer>
+</article>
+{% endblock %}

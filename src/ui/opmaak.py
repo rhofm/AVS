@@ -53,7 +53,18 @@ def getal(x: float | None) -> str:
     return tekst.replace(".", ",")
 
 
+def tekstdatum(tekst: str | None) -> str:
+    """'2026-10-16 14:03:00' (zoals de database tijdstempels geeft) -> '16 okt 2026'."""
+    if not tekst:
+        return ""
+    try:
+        return datum_lang(date.fromisoformat(str(tekst)[:10]))
+    except ValueError:
+        return str(tekst)
+
+
 def registreer_filters(env) -> None:
+    env.filters["tekstdatum"] = tekstdatum
     env.filters["getal"] = getal
     env.filters["datum_kort"] = datum_kort
     env.filters["datum_lang"] = datum_lang
