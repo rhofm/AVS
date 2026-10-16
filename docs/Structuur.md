@@ -8,6 +8,7 @@
 * PR's
 * Specialisatie (?)
 * Testresultaten
+* Trainingsschema: op welke dagen van de week de atleet traint
 * Geplande/verwachte prestaties (?) (eigen database?)
 
 
@@ -30,7 +31,8 @@
   * personen.db: persoonsgegevens, groepen, trainingen, absentie, periodeplannen, leerlijnen, ploegen
   * prestaties.db: onderdelen, wedstrijden, prestaties, PR's
   * testen.db: testen en testresultaten
-* Elke atleet krijgt een willekeurige master\_id in personen.db; in prestaties.db en testen.db staat een eigen pseudoniem per database
+  * trainingsschema.db: per atleet een kolom per weekdag (maandag t/m zondag) of hij/zij die dag traint
+* Elke atleet krijgt een willekeurige master\_id in personen.db; in prestaties.db, testen.db en trainingsschema.db staat een eigen pseudoniem per database
 * Eén hoofdsleutel in de sleutelkluis van Windows, met herstelsleutel als back-up
 * ~~Functies die database kunnen initialiseren (want niet in github)~~ Gedaan: src/db/init\_db.py
 
@@ -70,4 +72,4 @@
 
 ## ?
 
-*
+*

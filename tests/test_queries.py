@@ -18,7 +18,7 @@ from db.init_db import init_db, pseudoniem  # noqa: E402
 from db.queries import Opslag, OpslagFout  # noqa: E402
 from models import (  # noqa: E402
     PR, heeft_windmeting, Absentie, Atleet, Groep, Inschrijving, Leerlijn, LeerlijnStap, LeerlijnVoortgang,
-    Onderdeel, Periodeplan, Prestatie, Test, Testresultaat, Training, Wedstrijd,
+    Onderdeel, Periodeplan, Prestatie, Test, Testresultaat, Training, Trainingsschema, Wedstrijd,
 )
 
 TESTSLEUTEL = "11" * 32
@@ -258,6 +258,49 @@ def test_testen():
         assert rij[0] != pseudoniem(anna.master_id, "prestaties", TESTSLEUTEL)
 
 
+def test_trainingsschema():
+    with opslag() as db:
+        anna, tim, _, _ = _basis(db)
+        # Zonder opgeslagen schema: geen trainingsdagen.
+        assert db.trainingsschema(anna.master_id).dagen == []
+
+        db.trainingsschema_opslaan(Trainingsschema.met_dagen(anna.master_id, ["dinsdag", "donderdag"]))
+        db.trainingsschema_opslaan(Trainingsschema.met_dagen(tim.master_id, ["donderdag", "zaterdag"]))
+        assert db.trainingsschema(anna.master_id).dagen == ["dinsdag", "donderdag"]
+
+        # Overschrijven, niet een tweede rij.
+        db.trainingsschema_opslaan(Trainingsschema.met_dagen(anna.master_id, ["maandag", "donderdag"]))
+        assert db.trainingsschema(anna.master_id).dagen == ["maandag", "donderdag"]
+        assert db.trainingsschema_db.execute("SELECT count(*) FROM trainingsschema").fetchone()[0] == 2
+
+        assert sorted(db.atleten_op_dag("Donderdag")) == sorted([anna.master_id, tim.master_id])
+        assert db.atleten_op_dag("zaterdag") == [tim.master_id]
+        assert db.atleten_op_dag("donderdag", master_ids=[anna.master_id]) == [anna.master_id]
+        assert db.atleten_op_dag("zondag") == []
+        _verwacht(OpslagFout, lambda: db.atleten_op_dag("maandag; DROP TABLE trainingsschema"))
+        _verwacht(OpslagFout, lambda: db.trainingsschema_opslaan(Trainingsschema("0" * 32, maandag=True)))
+
+        # Eigen pseudoniem, anders dan in prestaties.db en testen.db.
+        refs = {r[0] for r in db.trainingsschema_db.execute("SELECT atleet_ref FROM trainingsschema")}
+        assert pseudoniem(anna.master_id, "trainingsschema", TESTSLEUTEL) in refs
+        assert anna.master_id not in refs
+        assert pseudoniem(anna.master_id, "prestaties", TESTSLEUTEL) not in refs
+        assert pseudoniem(anna.master_id, "testen", TESTSLEUTEL) not in refs
+
+
+def test_bestaande_installatie_krijgt_trainingsschema():
+    """Wie al drie databases heeft, krijgt trainingsschema.db erbij met dezelfde sleutel."""
+    with tempfile.TemporaryDirectory() as tmp:
+        with contextlib.redirect_stdout(io.StringIO()):
+            init_db(Path(tmp), hoofd=TESTSLEUTEL)
+            (Path(tmp) / "trainingsschema.db").unlink()   # zoals vóór deze database bestond
+            init_db(Path(tmp), hoofd=TESTSLEUTEL)
+        with Opslag(map=Path(tmp), hoofd=TESTSLEUTEL) as db:
+            anna = db.atleet_opslaan(Atleet("Anna", "Voorbeeld"))
+            db.trainingsschema_opslaan(Trainingsschema.met_dagen(anna.master_id, ["woensdag"]))
+            assert db.trainingsschema(anna.master_id).woensdag
+
+
 def test_groepen_trainingen_absentie():
     with opslag() as db:
         anna, tim, _, _ = _basis(db)
@@ -297,11 +340,15 @@ def test_atleet_verwijderen_wist_alles():
         t = db.test_opslaan(Test("30m vliegend", "s", True))
         db.testresultaat_opslaan(Testresultaat(anna.master_id, t.id, date(2026, 10, 1), 3.9))
         g = db.groep_opslaan(Groep("C", leden=[anna.master_id, tim.master_id]))
+        db.trainingsschema_opslaan(Trainingsschema.met_dagen(anna.master_id, ["dinsdag"]))
+        db.trainingsschema_opslaan(Trainingsschema.met_dagen(tim.master_id, ["dinsdag"]))
 
         db.atleet_verwijderen(anna.master_id)
         assert db.atleet(anna.master_id) is None
         assert db.prestaties(anna.master_id) == []
         assert db.testresultaten(anna.master_id) == []
+        assert db.trainingsschema(anna.master_id).dagen == []
+        assert db.atleten_op_dag("dinsdag") == [tim.master_id]
         assert db.groep(g.id).leden == [tim.master_id]
         assert len(db.prestaties(tim.master_id)) == 1  # Tim blijft
 

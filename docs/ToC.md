@@ -40,6 +40,7 @@ AVS/
 │   ├── personen.db               🔒 created by init_db.py
 │   ├── prestaties.db             🔒 created by init_db.py
 │   ├── testen.db                 🔒 created by init_db.py
+│   ├── trainingsschema.db        🔒 created by init_db.py
 │   ├── vervangingen.txt          🔒 real name → fake name, for anonymising fixtures
 │   └── live_controle/            🔒 live checks of the importers against the real sites
 │
@@ -47,11 +48,12 @@ AVS/
 │   ├── __main__.py               📝 starts the app and opens the browser
 │   │
 │   ├── db/
-│   │   ├── init_db.py            ✅ keys, verbind(), create + migrate the 3 databases
+│   │   ├── init_db.py            ✅ keys, verbind(), create + migrate the 4 databases
 │   │   ├── queries.py            ✅ class Opslag: all SQL, models in → models out
 │   │   ├── schema_personen.sql   ✅ v1 (frozen): athletes, groups, absence, leerlijnen, ploegen
 │   │   ├── schema_prestaties.sql ✅ v1 (frozen): onderdelen, wedstrijden, prestaties, pr view
 │   │   ├── schema_testen.sql     ✅ v1 (frozen): tests, test results
+│   │   ├── schema_trainingsschema.sql ✅ v1 (frozen): training days per athlete (one column per weekday)
 │   │   ├── schema.sql            ⚠️ old single-database schema, no longer used
 │   │   └── migrations/
 │   │       └── prestaties/
@@ -62,14 +64,15 @@ AVS/
 │   │   ├── atleet.py             Atleet (names hidden from repr)
 │   │   ├── prestatie.py          Onderdeel, Wedstrijd, Prestatie, Inschrijving, PR, Test, Testresultaat
 │   │   ├── groep.py              Groep, Training, Absentie, Periodeplan
-│   │   └── leerlijn.py           Leerlijn, LeerlijnStap, LeerlijnVoortgang
+│   │   ├── leerlijn.py           Leerlijn, LeerlijnStap, LeerlijnVoortgang
+│   │   └── trainingsschema.py    Trainingsschema (training days), DAGEN
 │   │
 │   ├── atleten/                  ✅ everything around one athlete
 │   │   ├── beheer.py             add, edit, search, (de)activate, delete; duplicate check
 │   │   ├── koppelen.py           link imported results to an athlete (master_id)
 │   │   ├── prestaties.py         manual entry, PR history, season bests, 12,93 / 1:58,21 notation
 │   │   ├── testen.py             test results, progress over time
-│   │   └── profiel.py            full athlete profile from all 3 databases
+│   │   └── profiel.py            full athlete profile from personen, prestaties and testen
 │   │
 │   ├── importers/                📝 on this branch (see feature/importers)
 │   │   ├── base.py               common interface: can_handle(url), parse(url)
@@ -97,8 +100,8 @@ AVS/
 │       └── static/
 │
 └── tests/                        fake data only; run with `python tests/test_<naam>.py`
-    ├── test_models.py            ✅ 10 tests
-    ├── test_queries.py           ✅ 13 tests (real encrypted databases in a temp folder)
+    ├── test_models.py            ✅ 12 tests
+    ├── test_queries.py           ✅ 15 tests (real encrypted databases in a temp folder)
     ├── test_atleten.py           ✅ 7 tests
     ├── test_importers.py         📝 on this branch
     ├── test_opstelling.py        📝
@@ -107,15 +110,16 @@ AVS/
 
 ---
 
-## The three databases
+## The four databases
 
-The data is split over three encrypted files (SQLCipher). Only `personen.db` contains names; in the other two an athlete appears under a pseudonym that differs per database.
+The data is split over four encrypted files (SQLCipher). Only `personen.db` contains names; in the other three an athlete appears under a pseudonym that differs per database.
 
 | File | Contents | Athlete identified by |
 |------|----------|-----------------------|
 | `personen.db` | athletes, groups, trainings, absence, period plans, leerlijnen, ploegen | `master_id` |
 | `prestaties.db` | onderdelen, wedstrijden, prestaties, inschrijvingen, `pr` view | pseudonym |
 | `testen.db` | tests and test results | pseudonym |
+| `trainingsschema.db` | per athlete, one column per weekday (`maandag` … `zondag`, 0/1): on which days they train | pseudonym |
 
 ```
 python src/db/init_db.py                      # create/update data/*.db (also runs new migrations)
@@ -123,7 +127,7 @@ python src/db/init_db.py --herstelsleutel     # show the recovery key (keep it s
 python src/db/init_db.py --herstel <sleutel>  # restore the key on a new computer
 ```
 
-Schema versions: `personen` 1 · `prestaties` 4 · `testen` 1.
+Schema versions: `personen` 1 · `prestaties` 2 · `testen` 1 · `trainingsschema` 1.
 
 ### When does a performance count as a PR?
 
@@ -143,7 +147,7 @@ A competition marked `indoor` passes that on to all its performances.
 ui/  ──►  atleten/ · ploeg/ · groepen/ · leerlijnen/ · importers/
                               │
                               ▼
-                     db/queries.py  (Opslag)  ──►  personen.db · prestaties.db · testen.db
+                     db/queries.py  (Opslag)  ──►  personen.db · prestaties.db · testen.db · trainingsschema.db
                               │
                          models/ (shared dataclasses)
 ```
@@ -161,8 +165,9 @@ ui/  ──►  atleten/ · ploeg/ · groepen/ · leerlijnen/ · importers/
 - [ ] Importers: fill `bron_naam` / `bron_atletieknu_id` / `bron_geboortejaar` / `bron_club`, set `Wedstrijd.indoor`, and use `atleten/koppelen.py`.
 - [ ] Merge `feature/importers` and `feature/atleten` into `dev`.
 - [ ] `pyproject.toml`: replace the placeholder text with a real config (dependencies: `sqlcipher3-wheels`, `keyring`, …).
-- [ ] `src/db/schema.sql`: remove it; it has been replaced by the three `schema_*.sql` files.
+- [ ] `src/db/schema.sql`: remove it; it has been replaced by the four `schema_*.sql` files.
 - [ ] Model + queries for `ploeg` / `ploeg_opstelling` (tables exist, no model yet).
+- [ ] Use the training schedule: show it in `atleten/profiel.py`, and use `Opslag.atleten_op_dag()` to pre-fill attendance lists.
 - [ ] `build.py`: PyInstaller command (remember `--hidden-import keyring.backends.Windows`).
 - [ ] Choose a UI framework (Flask or FastAPI) and a test runner (the tests are written so pytest can run them too).
 
