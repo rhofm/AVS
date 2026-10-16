@@ -121,7 +121,8 @@ def _maanden(regels: list[AanwezigheidRegel], van: date, tot: date, vandaag: dat
     uit = []
     while (jaar, maand) >= (van.year, van.month):
         weken = [[AanwezigheidDag(d, d.month == maand, d == vandaag, per_dag.get(d, []) if d.month == maand else [])
-                  for d in week] for week in kal.monthdatescalendar(jaar, maand)]
+                  for d in week] for week in kal.monthdatescalendar(jaar, maand)
+                 if week[0] <= tot]                      # geen weken die helemaal na `tot` vallen
         in_maand = [r for r in regels if (r.training.datum.year, r.training.datum.month) == (jaar, maand)]
         uit.append(AanwezigheidMaand(jaar, maand, weken, _telling(in_maand)))
         jaar, maand = (jaar - 1, 12) if maand == 1 else (jaar, maand - 1)

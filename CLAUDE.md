@@ -86,7 +86,7 @@ when run from source, next to the `.exe` when frozen):
 
 | File             | Contents | Athlete identified by |
 |------------------|----------|-----------------------|
-| `personen.db`    | `atleet` (personal details), groups, trainings, `periodeplan`, leerlijnen, `ploeg`, `ploeg_opstelling` | `master_id` |
+| `personen.db`    | `atleet` (personal details), `groep` (with columns `maandag` … `zondag`: start time 'HH:MM' or NULL), `groep_lid` (long: one row per athlete per group; an athlete can be in several groups), trainings, `periodeplan`, leerlijnen, `ploeg`, `ploeg_opstelling` | `master_id` |
 | `prestaties.db`  | `onderdeel`, `wedstrijd`, `prestatie`, `inschrijving`, `pr` view | `atleet_ref` (pseudonym) |
 | `testen.db`      | `test`, `testresultaat` | `atleet_ref` (pseudonym) |
 | `trainingsschema.db` | `trainingsschema`: one row per athlete, columns `maandag` … `zondag` (0/1) | `atleet_ref` (pseudonym) |
@@ -134,6 +134,10 @@ python src/db/init_db.py --herstel <sleutel>  # restore the key (e.g. new comput
   athlete, but not what is written in the text. Only the encryption protects
   that. Keep notes factual, no diagnoses, and don't name other athletes.
   `Notitie.inhoud` is hidden from `repr()`; never log note text.
+- Group start times live once per group (`groep`), never per athlete. Joining
+  a group or adding a training day to a group only ADDS days to the members'
+  `trainingsschema` (`groepen.groep.schema_aanvullen`); nothing removes days
+  automatically, since that can differ per athlete.
 - Absence stores every status explicitly, `aanwezig` included: no row means
   "not filled in yet". `blessure` is health data — keep `reden` short and
   factual, never a diagnosis.

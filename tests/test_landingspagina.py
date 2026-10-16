@@ -86,6 +86,12 @@ def test_leeftijdscategorie():
     assert landingspagina.geslacht_tekst(None, "U16") is None
     assert landingspagina.categorie_groep("U16", "V") == "meisjes"
     assert landingspagina.categorie_groep("Senior", "M") == "mannen"
+    assert landingspagina.categorie_groep("U16", "M") == "jongens"
+    assert landingspagina.categorie_groep("U18", "V") == "vrouwen"
+    assert landingspagina.categorie_groep("U20", "M") == "mannen"
+    assert landingspagina.geslacht_tekst("V", "U18") == "Vrouw"
+    assert landingspagina.geslacht_tekst("M", "U20") == "Man"
+    assert landingspagina.categorie_code("U18", "V") == "U18V"
     assert landingspagina.fase_van("U12") == "BMO"
     assert landingspagina.fase_van("U16") == "Wedstrijdgericht"
     assert landingspagina.fase_van("U18") == "Specialisatie"

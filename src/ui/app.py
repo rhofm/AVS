@@ -28,6 +28,8 @@ if __package__ in (None, ""):          # los gestart: src/ op het pad zetten
 from flask import Flask, abort, flash, g, get_flashed_messages, redirect, render_template, request, url_for
 
 from atleten import beheer, landingspagina
+from atleten import notities as notitiebeheer
+from atleten import trainingsschema as schemabeheer
 from atleten.aanwezigheid import aanwezigheid
 from db.init_db import SleutelFout, init_db
 from db.queries import Opslag, OpslagFout
@@ -51,9 +53,6 @@ BINNENKORT = {
     "instellingen": "Instellingen",
 }
 ATLEET_BINNENKORT = {
-    "trainingsschema": "Trainingsschema aanpassen",
-    "notities": "Notities",
-    "notities/nieuw": "Nieuwe notitie",
     "inschrijven": "Inschrijven voor een wedstrijd",
 }
 
@@ -127,7 +126,9 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
         pagina = landingspagina.landingspagina(db(), master_id)
         if pagina is None:
             abort(404)
-        return render_template("atleet.html", pagina=pagina, fases=landingspagina.FASES, actief_menu="atleten")
+        meldingen = get_flashed_messages()
+        return render_template("atleet.html", pagina=pagina, fases=landingspagina.FASES,
+                               melding=meldingen[0] if meldingen else None, actief_menu="atleten")
 
     @app.get("/atleet/<master_id>/wedstrijden")
     def atleet_wedstrijden(master_id: str):
@@ -284,6 +285,94 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
             return _invullen(training_id, fout=f"Niet opgeslagen: {e}", status=400)
         flash("Niets opgeslagen." if aantal == 0 else f"Aanwezigheid van {aantal} {'atleten' if aantal != 1 else 'atleet'} opgeslagen.")
         return redirect(url_for("training", training_id=training_id))
+
+    # ---------------- trainingsschema van een atleet ----------------
+    def _schema(master_id: str, fout: str | None = None, status: int = 200):
+        f = schemabeheer.schemaformulier(db(), master_id)
+        if f is None:
+            abort(404)
+        return render_template("trainingsschema.html", f=f, basis_url=url_for("atleet", master_id=master_id),
+                               fout=fout, actief_menu="atleten"), status
+
+    @app.get("/atleet/<master_id>/trainingsschema")
+    def atleet_trainingsschema(master_id: str):
+        return _schema(master_id)
+
+    @app.post("/atleet/<master_id>/trainingsschema")
+    def atleet_trainingsschema_opslaan(master_id: str):
+        haal_atleet(master_id)
+        try:
+            w = schemabeheer.schema_opslaan(db(), master_id, request.form.getlist("dag"))
+        except (OpslagFout, ValueError) as e:
+            return _schema(master_id, fout=f"Niet opgeslagen: {e}", status=400)
+        flash(w.tekst)
+        return redirect(url_for("atleet", master_id=master_id) + "#kop-schema")
+
+    # ---------------- notities van een atleet ----------------
+    def _notities(master_id: str, *, nieuw: bool = False, concept: dict | None = None,
+                  fout: str | None = None, status: int = 200):
+        np_ = notitiebeheer.notitiespagina(db(), master_id, zoek=request.args.get("zoek", ""))
+        if np_ is None:
+            abort(404)
+        meldingen = get_flashed_messages()
+        return render_template("notities.html", np=np_, basis_url=url_for("atleet", master_id=master_id),
+                               nieuw=nieuw, concept=concept, fout=fout,
+                               melding=meldingen[0] if meldingen else None, actief_menu="atleten"), status
+
+    @app.get("/atleet/<master_id>/notities")
+    def atleet_notities(master_id: str):
+        return _notities(master_id)
+
+    @app.get("/atleet/<master_id>/notities/nieuw")
+    def atleet_notitie_nieuw(master_id: str):
+        return _notities(master_id, nieuw=True)
+
+    @app.post("/atleet/<master_id>/notities")
+    def atleet_notitie_toevoegen(master_id: str):
+        haal_atleet(master_id)
+        concept = {"datum": request.form.get("datum", ""), "inhoud": request.form.get("inhoud", "")}
+        try:
+            datum = notitiebeheer.lees_datum(concept["datum"])
+            n = notitiebeheer.toevoegen(db(), master_id, datum, concept["inhoud"])
+        except (OpslagFout, ValueError) as e:
+            return _notities(master_id, concept=concept, fout=f"Niet opgeslagen: {e}", status=400)
+        flash(f"Notitie van {n.datum.strftime('%d-%m-%Y')} opgeslagen.")
+        return redirect(url_for("atleet_notities", master_id=master_id) + f"#notitie-{n.id}")
+
+    def _notitie_bewerken(master_id: str, notitie_id: int, *, concept: dict | None = None,
+                          fout: str | None = None, status: int = 200):
+        a = haal_atleet(master_id)
+        n = notitiebeheer.haal_notitie(db(), master_id, notitie_id)
+        if n is None:
+            abort(404)
+        return render_template("notitie_bewerken.html", a=a, n=n, basis_url=url_for("atleet", master_id=master_id),
+                               vandaag=date.today(), concept=concept, fout=fout, actief_menu="atleten"), status
+
+    @app.get("/atleet/<master_id>/notities/<int:notitie_id>")
+    def atleet_notitie(master_id: str, notitie_id: int):
+        return _notitie_bewerken(master_id, notitie_id)
+
+    @app.post("/atleet/<master_id>/notities/<int:notitie_id>")
+    def atleet_notitie_opslaan(master_id: str, notitie_id: int):
+        haal_atleet(master_id)
+        if notitiebeheer.haal_notitie(db(), master_id, notitie_id) is None:
+            abort(404)
+        terug = url_for("atleet_notities", master_id=master_id)
+        if request.form.get("actie") == "verwijderen":
+            if request.form.get("zeker") != "1":
+                return _notitie_bewerken(master_id, notitie_id, fout="Vink eerst aan dat je de notitie wilt verwijderen.",
+                                         status=400)
+            n = notitiebeheer.verwijderen(db(), master_id, notitie_id)
+            flash(f"Notitie van {n.datum.strftime('%d-%m-%Y')} verwijderd.")
+            return redirect(terug)
+        concept = {"datum": request.form.get("datum", ""), "inhoud": request.form.get("inhoud", "")}
+        try:
+            datum = notitiebeheer.lees_datum(concept["datum"])
+            n = notitiebeheer.bijwerken(db(), master_id, notitie_id, datum, concept["inhoud"])
+        except (OpslagFout, ValueError) as e:
+            return _notitie_bewerken(master_id, notitie_id, concept=concept, fout=f"Niet opgeslagen: {e}", status=400)
+        flash("Notitie opgeslagen.")
+        return redirect(terug + f"#notitie-{n.id}")
 
     # ---------------- leerdoelen van een atleet ----------------
     def _leerdoelen(master_id: str, *, modus: str, fout: str | None = None, status: int = 200):

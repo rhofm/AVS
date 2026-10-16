@@ -122,6 +122,8 @@ _GESLACHT_JEUGD = {"M": "Jongen", "V": "Meisje", "X": "X"}
 _GESLACHT_SENIOR = {"M": "Man", "V": "Vrouw", "X": "X"}
 _GROEP_JEUGD = {"M": "jongens", "V": "meisjes"}
 _GROEP_SENIOR = {"M": "mannen", "V": "vrouwen"}
+#: Vanaf deze categorieën heet het mannen/vrouwen in plaats van jongens/meisjes.
+VOLWASSEN = ("U18", "U20", "Senior")
 
 
 def categorie_code(categorie: str | None, geslacht: str | None) -> str | None:
@@ -137,18 +139,18 @@ def categorie_code(categorie: str | None, geslacht: str | None) -> str | None:
 
 
 def geslacht_tekst(geslacht: str | None, categorie: str | None) -> str | None:
-    """'Meisje' / 'Jongen' bij jeugd, 'Vrouw' / 'Man' bij senioren (en zonder bekende leeftijd), 'X'."""
+    """'Meisje' / 'Jongen' t/m U16, 'Vrouw' / 'Man' vanaf U18 (en zonder bekende leeftijd), 'X'."""
     if geslacht is None:
         return None
-    jeugd = categorie is not None and categorie != "Senior"
+    jeugd = categorie is not None and categorie not in VOLWASSEN
     return (_GESLACHT_JEUGD if jeugd else _GESLACHT_SENIOR)[geslacht]
 
 
 def categorie_groep(categorie: str | None, geslacht: str | None) -> str | None:
-    """Wedstrijdgroep onder de code: 'meisjes', 'jongens', 'vrouwen', 'mannen' (None bij X/onbekend)."""
+    """Groep onder de code: 'meisjes'/'jongens' t/m U16, 'vrouwen'/'mannen' vanaf U18 (None bij X/onbekend)."""
     if categorie is None or geslacht not in ("M", "V"):
         return None
-    return (_GROEP_SENIOR if categorie == "Senior" else _GROEP_JEUGD)[geslacht]
+    return (_GROEP_SENIOR if categorie in VOLWASSEN else _GROEP_JEUGD)[geslacht]
 
 
 def fase_van(categorie: str | None) -> str | None:

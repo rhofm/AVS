@@ -9,7 +9,7 @@ blijven binnen db/.
 """
 
 from .atleet import GESLACHTEN, Atleet, Geslacht
-from .groep import ABSENTIE_STATUSSEN, Absentie, AbsentieStatus, Groep, Periodeplan, Training
+from .groep import ABSENTIE_STATUSSEN, Absentie, AbsentieStatus, Groep, Periodeplan, Training, normaliseer_tijd
 from .leerdoel import CATEGORIEEN, LEERDOEL_BRONNEN, Categorie, Leerdoel, LeerdoelScore
 from .leerlijn import Leerlijn, LeerlijnStap, LeerlijnVoortgang
 from .notitie import Notitie
@@ -34,7 +34,7 @@ __all__ = [
     "Atleet", "Geslacht", "GESLACHTEN",
     "Onderdeel", "Wedstrijd", "Prestatie", "Inschrijving", "PR", "Test", "Testresultaat",
     "Bron", "BRONNEN", "Eenheid", "EENHEDEN", "MAX_WIND", "heeft_windmeting",
-    "Groep", "Training", "Absentie", "AbsentieStatus", "ABSENTIE_STATUSSEN", "Periodeplan",
+    "Groep", "normaliseer_tijd", "Training", "Absentie", "AbsentieStatus", "ABSENTIE_STATUSSEN", "Periodeplan",
     "Leerlijn", "LeerlijnStap", "LeerlijnVoortgang",
     "Leerdoel", "LeerdoelScore", "Categorie", "CATEGORIEEN", "LEERDOEL_BRONNEN",
     "Trainingsschema", "DAGEN",

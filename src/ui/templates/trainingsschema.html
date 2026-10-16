@@ -1,0 +1,53 @@
+{#
+  Trainingsschema van één atleet aanpassen.
+  Context:
+    f         – atleten.trainingsschema.SchemaFormulier
+    basis_url – '/atleet/<master_id>'
+    fout      – optioneel, foutmelding na opslaan
+  POST naar {{ basis_url }}/trainingsschema met één veld 'dag' per aangevinkte dag.
+#}
+{% extends "basis.html" %}
+{% block titel %}Trainingsschema {{ f.atleet.naam }}{% endblock %}
+
+{% block inhoud %}
+<article class="vel">
+  <header class="blok">
+    <a class="terug" href="{{ basis_url }}">&larr; {{ f.atleet.naam }}</a>
+    <h1 class="kop kop--pagina">Trainingsschema</h1>
+    <p class="subkop">Op welke dagen traint {{ f.atleet.voornaam }}? Nu {{ f.aantal }}× per week.</p>
+  </header>
+
+  {% if fout %}<p class="melding melding--fout" role="alert">{{ fout }}</p>{% endif %}
+
+  <form class="blok schemaform" method="post" action="{{ basis_url }}/trainingsschema">
+    <fieldset class="dagkeuze">
+      <legend class="verborgen">Trainingsdagen</legend>
+      {% for d in f.dagen %}
+        <div class="dagkeuze__dag">
+          <input type="checkbox" id="dag-{{ d.dag }}" name="dag" value="{{ d.dag }}"{% if d.traint %} checked{% endif %}>
+          <label for="dag-{{ d.dag }}">
+            <span class="dagkeuze__kort">{{ d.kort }}</span>
+            <span class="dagkeuze__vink" aria-hidden="true"></span>
+            <span class="verborgen">{{ d.dag }}</span>
+          </label>
+          <span class="dagkeuze__groepen">
+            {% for g in d.groepen %}<span>{{ g }}</span>{% endfor %}
+          </span>
+        </div>
+      {% endfor %}
+    </fieldset>
+
+    {% if f.heeft_groepsdagen %}
+      <p class="zacht uitleg">Onder elke dag staan de groepen van {{ f.atleet.voornaam }} die dan trainen (uit de geplande trainingen rond vandaag).</p>
+    {% endif %}
+    <p class="zacht uitleg">Op de absentielijst van een training staat {{ f.atleet.voornaam }} alleen vooraf op &lsquo;aanwezig&rsquo; als die dag hier is aangevinkt.</p>
+
+    <div class="opslaan opslaan--onder">
+      <a class="knop" href="{{ basis_url }}">Annuleren</a>
+      <button class="knop knop--vol" type="submit">Opslaan</button>
+    </div>
+  </form>
+
+  <footer class="vel__voet">Atleet Volg Systeem<br>Trainingsschema {{ f.atleet.naam }}</footer>
+</article>
+{% endblock %}

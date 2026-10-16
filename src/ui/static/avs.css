@@ -485,6 +485,45 @@ th[aria-sort="descending"] .sorteer__naam::after { content: " \2193"; opacity: 1
   border: 1px solid var(--rand); background: var(--papier); color: var(--tekst); }
 .redenveld:focus-visible { outline: 2px solid var(--rood); outline-offset: 1px; }
 
+/* ---------- trainingsschema aanpassen ---------- */
+.dagkeuze { border: 0; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; }
+.dagkeuze__dag { display: grid; align-content: start; gap: 2px; min-width: 0; }
+.dagkeuze__dag input { position: absolute; opacity: 0; pointer-events: none; }
+.dagkeuze__dag label { display: grid; cursor: pointer; text-align: center; }
+.dagkeuze__kort { background: var(--zalm); color: var(--op-zalm); font-weight: 700; padding: .45rem .2rem; }
+.dagkeuze__vink {
+  display: grid; place-items: center; height: 3.5rem; font-size: 1.4rem; line-height: 1;
+  background: var(--papier); border: 1px solid var(--rand); color: var(--tekst-zacht);
+}
+.dagkeuze__vink::before { content: "\2013"; }
+.dagkeuze__dag input:checked + label .dagkeuze__vink { background: var(--roze); border-color: var(--roze); color: var(--tekst); }
+.dagkeuze__dag input:checked + label .dagkeuze__vink::before { content: "\25A0"; }
+.dagkeuze__dag label:hover .dagkeuze__vink { border-color: var(--rood); }
+.dagkeuze__dag input:focus-visible + label { outline: 2px solid var(--rood); outline-offset: 2px; }
+.dagkeuze__groepen { display: grid; gap: .15rem; font-size: var(--maat-xs); line-height: 1.25; text-align: center; color: var(--tekst-zacht); hyphens: auto; overflow-wrap: anywhere; }
+.uitleg { margin: 0; font-size: var(--maat-s); max-width: 65ch; }
+
+/* ---------- notities ---------- */
+.notitieform { display: grid; gap: .6rem; max-width: 48rem; }
+.notitieform__datum { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem .75rem; font-size: var(--maat-s); }
+.notitieform input[type="date"], .notitieform textarea {
+  font: inherit; color: var(--tekst); background: var(--papier); border: 1px solid var(--rand); padding: .4rem .55rem;
+}
+.notitieform textarea { width: 100%; min-height: 7rem; resize: vertical; line-height: 1.5; }
+.notitieform input:focus-visible, .notitieform textarea:focus-visible { outline: 2px solid var(--rood); outline-offset: 1px; }
+.notitielijst { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; max-width: 48rem; }
+.notitielijst li { background: var(--roze-licht); padding: .7rem .9rem; display: grid; gap: .3rem; }
+.notitielijst li:nth-child(odd) { background: var(--roze); }
+.notitielijst li:target { outline: 2px solid var(--rood); }
+.notitielijst__kop { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; font-size: var(--maat-s); }
+.notitielijst__kop time { font-weight: 700; }
+.notitielijst__tekst { margin: 0; white-space: pre-line; overflow-wrap: anywhere; }
+.notitielijst__meta { font-size: var(--maat-xs); }
+.zoekbalk--smal { max-width: 48rem; }
+.verwijderen { border-top: 1px solid var(--rand); padding-top: 1.25rem; justify-items: start; }
+.knop--gevaar { border-color: var(--afwezig); color: var(--afwezig); }
+.knop--gevaar:hover { background: var(--afwezig); color: var(--op-zalm); }
+
 @media (max-width: 40rem) {
   .invultabel, .invultabel tbody, .invultabel tr, .invultabel th, .invultabel td { display: block; width: auto; }
   .invultabel thead { display: none; }

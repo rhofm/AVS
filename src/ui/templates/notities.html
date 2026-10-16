@@ -1,0 +1,88 @@
+{#
+  Notities van één atleet: nieuwe notitie schrijven, zoeken en alle notities per maand.
+  Context:
+    np         – atleten.notities.NotitiesPagina
+    basis_url  – '/atleet/<master_id>'
+    nieuw      – True als de pagina via '+ Notitie' geopend is (tekstvak krijgt de focus)
+    concept    – optioneel {datum, inhoud}: wat er al ingevuld was als opslaan mislukte
+    melding    – optioneel, na opslaan of verwijderen
+    fout       – optioneel, foutmelding bij een nieuwe notitie
+  Nieuwe notitie: POST naar {{ basis_url }}/notities met 'datum' en 'inhoud'.
+#}
+{% extends "basis.html" %}
+{% set a = np.atleet %}
+{% block titel %}Notities {{ a.naam }}{% endblock %}
+
+{% block inhoud %}
+<article class="vel">
+  <header class="blok">
+    <a class="terug" href="{{ basis_url }}">&larr; {{ a.naam }}</a>
+    <h1 class="kop kop--pagina">Notities</h1>
+    <p class="subkop">{{ np.totaal }} notitie{{ "s" if np.totaal != 1 }} over {{ a.voornaam }}</p>
+  </header>
+
+  {% if melding %}<p class="melding" role="status">{{ melding }}</p>{% endif %}
+
+  {# ---------------- nieuwe notitie ---------------- #}
+  <section class="blok" aria-labelledby="kop-nieuw" id="nieuw">
+    <h2 class="kop" id="kop-nieuw">Nieuwe notitie</h2>
+    {% if fout %}<p class="melding melding--fout" role="alert">{{ fout }}</p>{% endif %}
+    <form class="notitieform" method="post" action="{{ basis_url }}/notities">
+      <div class="notitieform__datum">
+        <label for="nieuw-datum">Datum</label>
+        <input type="date" id="nieuw-datum" name="datum" required max="{{ np.vandaag.isoformat() }}"
+               value="{{ concept.datum if concept else np.vandaag.isoformat() }}">
+        <span class="zacht">van de training of wedstrijd</span>
+      </div>
+      <label class="verborgen" for="nieuw-inhoud">Notitie</label>
+      <textarea id="nieuw-inhoud" name="inhoud" rows="5" required
+                placeholder="Wat viel je op? Bijv. techniek, inzet, vorderingen."{% if nieuw or fout %} autofocus{% endif %}>{{ concept.inhoud if concept else "" }}</textarea>
+      <p class="zacht uitleg">Houd het feitelijk: geen diagnoses en geen namen van andere atleten.</p>
+      <div class="opslaan opslaan--onder">
+        <button class="knop knop--vol" type="submit">Notitie opslaan</button>
+      </div>
+    </form>
+  </section>
+
+  {# ---------------- alle notities ---------------- #}
+  <section class="blok" aria-labelledby="kop-alle">
+    <h2 class="kop" id="kop-alle">Alle notities</h2>
+    {% if np.totaal %}
+      <form class="zoekbalk zoekbalk--smal" method="get" action="{{ basis_url }}/notities">
+        <label class="verborgen" for="zoek-notitie">Zoek in de notities</label>
+        <input type="search" id="zoek-notitie" name="zoek" value="{{ np.zoek }}" placeholder="Zoek in de notities">
+        <button class="knop" type="submit">Zoeken</button>
+        {% if np.zoek %}<a class="terug" href="{{ basis_url }}/notities">Alles tonen</a>{% endif %}
+      </form>
+    {% endif %}
+
+    {% if np.zoek %}
+      <p class="zacht" style="margin: 0">{{ np.aantal }} van {{ np.totaal }} notities met &lsquo;{{ np.zoek }}&rsquo;</p>
+    {% endif %}
+
+    {% for m in np.maanden %}
+      <h3 class="subkop">{{ m.naam }}</h3>
+      <ul class="notitielijst">
+        {% for n in m.notities %}
+          <li id="notitie-{{ n.id }}">
+            <div class="notitielijst__kop">
+              <time datetime="{{ n.datum }}">{{ n.datum | datum_kort }}</time>
+              <a class="terug" href="{{ basis_url }}/notities/{{ n.id }}">Bewerken</a>
+            </div>
+            <p class="notitielijst__tekst">{{ n.inhoud }}</p>
+            {% if n.bijgewerkt_op %}<span class="zacht notitielijst__meta">aangepast op {{ n.bijgewerkt_op | tekstdatum }}</span>{% endif %}
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      {% if np.zoek %}
+        <p class="leeg">Geen notities gevonden met &lsquo;{{ np.zoek }}&rsquo;.</p>
+      {% else %}
+        <p class="leeg">Nog geen notities over {{ a.voornaam }}.</p>
+      {% endif %}
+    {% endfor %}
+  </section>
+
+  <footer class="vel__voet">Atleet Volg Systeem<br>Notities {{ a.naam }}</footer>
+</article>
+{% endblock %}
