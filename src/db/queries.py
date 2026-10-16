@@ -422,6 +422,41 @@ class Opslag:
                     (ref, i.wedstrijd_id, i.onderdeel_id),
                 )
 
+    def inschrijving_verwijderen(self, i: Inschrijving) -> None:
+        """Afmelden. Met onderdeel_id=None verdwijnen ALLE inschrijvingen van deze atleet voor deze wedstrijd."""
+        ref = self._ref(i.atleet_id, "prestaties")
+        with self.prestaties_db:
+            if i.onderdeel_id is None:
+                self.prestaties_db.execute(
+                    "DELETE FROM inschrijving WHERE atleet_ref = ? AND wedstrijd_id = ?", (ref, i.wedstrijd_id))
+            else:
+                self.prestaties_db.execute(
+                    "DELETE FROM inschrijving WHERE atleet_ref = ? AND wedstrijd_id = ? AND onderdeel_id = ?",
+                    (ref, i.wedstrijd_id, i.onderdeel_id))
+
+    def deelnemers(self, wedstrijd_id: int) -> list[Inschrijving]:
+        """Alle inschrijvingen voor één wedstrijd (atleten die niet meer bestaan worden overgeslagen)."""
+        uit = []
+        for r in self.prestaties_db.execute(
+            "SELECT atleet_ref, onderdeel_id FROM inschrijving WHERE wedstrijd_id = ?", (wedstrijd_id,)
+        ):
+            master_id = self._master_id(r["atleet_ref"], "prestaties")
+            if master_id is not None:
+                uit.append(Inschrijving(master_id, wedstrijd_id, r["onderdeel_id"]))
+        return uit
+
+    def wedstrijd_verwijderen(self, wedstrijd_id: int) -> None:
+        """Een (afgelaste) geplande wedstrijd weghalen, met zijn inschrijvingen.
+
+        Weigert als er al prestaties aan hangen: dan is hij gewoon gehouden.
+        """
+        if self.prestaties_db.execute(
+            "SELECT 1 FROM prestatie WHERE wedstrijd_id = ? LIMIT 1", (wedstrijd_id,)
+        ).fetchone():
+            raise OpslagFout(f"Wedstrijd {wedstrijd_id} heeft al prestaties en wordt niet verwijderd.")
+        with self.prestaties_db:   # inschrijvingen gaan mee (ON DELETE CASCADE)
+            self.prestaties_db.execute("DELETE FROM wedstrijd WHERE id = ?", (wedstrijd_id,))
+
     def inschrijvingen(self, master_id: str) -> list[Inschrijving]:
         rijen = self.prestaties_db.execute(
             """SELECT i.wedstrijd_id, i.onderdeel_id FROM inschrijving i
