@@ -28,6 +28,8 @@ if __package__ in (None, ""):          # los gestart: src/ op het pad zetten
 from flask import Flask, abort, flash, g, get_flashed_messages, redirect, render_template, request, url_for
 
 from atleten import beheer, landingspagina
+from atleten import aanpassen as atleetbeheer
+from atleten import nieuw as nieuwe_atleten
 from atleten import notities as notitiebeheer
 from atleten import trainingsschema as schemabeheer
 from atleten.aanwezigheid import aanwezigheid
@@ -118,8 +120,69 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
                 "categorie": landingspagina.categorie_code(landingspagina.leeftijdscategorie(a, vandaag), a.geslacht),
                 "groepen": db().groepen_van_atleet(a.master_id),
             })
+        meldingen = get_flashed_messages()
         return render_template("atleten.html", rijen=rijen, zoek=zoek, ook_inactief=ook_inactief,
-                               actief_menu="atleten")
+                               melding=meldingen[0] if meldingen else None, actief_menu="atleten")
+
+    # ---------------- nieuwe atleet ----------------
+    def _nieuw(ingevuld=None, *, fouten: dict | None = None, dubbelen=None, status: int = 200):
+        return render_template("atleet_nieuw.html", f=nieuwe_atleten.formulier(db(), ingevuld),
+                               fouten=fouten or {}, dubbelen=dubbelen, actief_menu="atleten"), status
+
+    @app.get("/atleten/nieuw")
+    def atleet_nieuw():
+        return _nieuw()
+
+    @app.post("/atleten/nieuw")
+    def atleet_nieuw_opslaan():
+        try:
+            invoer = nieuwe_atleten.lees_formulier(db(), request.form)
+        except nieuwe_atleten.InvoerFout as e:
+            return _nieuw(request.form, fouten=e.fouten, status=400)
+        try:
+            a = nieuwe_atleten.aanmaken(db(), invoer, toch_aanmaken=request.form.get("toch") == "1")
+        except beheer.DubbeleAtleet as e:
+            return _nieuw(request.form, dubbelen=e.bestaande, status=409)
+        except (OpslagFout, ValueError) as e:
+            return _nieuw(request.form, fouten={"algemeen": str(e)}, status=400)
+        flash(f"{a.naam} is toegevoegd.")
+        return redirect(url_for("atleet", master_id=a.master_id))
+
+    # ---------------- atleet aanpassen / verwijderen ----------------
+    def _aanpassen(master_id: str, ingevuld=None, *, fouten: dict | None = None,
+                   verwijder_fout: str | None = None, status: int = 200):
+        r = atleetbeheer.aanpasformulier(db(), master_id, ingevuld)
+        if r is None:
+            abort(404)
+        a, f, actief = r
+        return render_template("atleet_aanpassen.html", a=a, f=f, actief=actief, fouten=fouten or {},
+                               verwijder_fout=verwijder_fout, actief_menu="atleten"), status
+
+    @app.get("/atleet/<master_id>/aanpassen")
+    def atleet_aanpassen(master_id: str):
+        return _aanpassen(master_id)
+
+    @app.post("/atleet/<master_id>/aanpassen")
+    def atleet_aanpassen_opslaan(master_id: str):
+        haal_atleet(master_id)
+        try:
+            w = atleetbeheer.lees_en_opslaan(db(), master_id, request.form)
+        except nieuwe_atleten.InvoerFout as e:
+            return _aanpassen(master_id, request.form, fouten=e.fouten, status=400)
+        except (OpslagFout, ValueError) as e:
+            return _aanpassen(master_id, request.form, fouten={"algemeen": str(e)}, status=400)
+        flash(w.tekst)
+        return redirect(url_for("atleet", master_id=master_id))
+
+    @app.post("/atleet/<master_id>/verwijderen")
+    def atleet_verwijderen(master_id: str):
+        haal_atleet(master_id)
+        try:
+            a = atleetbeheer.verwijderen(db(), master_id, request.form.get("bevestiging", ""))
+        except (OpslagFout, ValueError) as e:
+            return _aanpassen(master_id, verwijder_fout=str(e), status=400)
+        flash(f"{a.naam} en alle gegevens zijn verwijderd.")
+        return redirect(url_for("atleten"))
 
     @app.get("/atleet/<master_id>")
     def atleet(master_id: str):

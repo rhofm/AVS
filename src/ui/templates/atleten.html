@@ -4,6 +4,7 @@
     rijen         – lijst van {atleet, categorie, groepen (Groep-objecten)}
     zoek          – zoektekst
     ook_inactief  – ook niet-actieve atleten tonen
+    melding       – optioneel, bijv. na het verwijderen van een atleet
 #}
 {% extends "basis.html" %}
 {% block titel %}Atleten{% endblock %}
@@ -15,7 +16,10 @@
       <h1 class="kop kop--pagina">Atleten</h1>
       <p class="subkop">{{ rijen | length }} {{ "atleten" if rijen | length != 1 else "atleet" }}{% if zoek %} met &lsquo;{{ zoek }}&rsquo;{% endif %}</p>
     </div>
+    <a class="knop knop--vol" href="{{ url_for('atleet_nieuw') }}">+ Nieuwe atleet</a>
   </header>
+
+  {% if melding %}<p class="melding" role="status">{{ melding }}</p>{% endif %}
 
   <form class="zoekbalk" method="get" action="">
     <label class="verborgen" for="zoek-q">Zoek op naam</label>
@@ -46,7 +50,7 @@
   {% elif zoek %}
     <p class="leeg">Geen atleten gevonden met &lsquo;{{ zoek }}&rsquo;.</p>
   {% else %}
-    <p class="leeg">Nog geen atleten. Voeg ze toe via Importeren (atletiek.nu) of met een CSV-bestand.</p>
+    <p class="leeg">Nog geen atleten. Voeg ze toe met &lsquo;+ Nieuwe atleet&rsquo;, via Importeren (atletiek.nu) of met een CSV-bestand.</p>
   {% endif %}
 
   <footer class="vel__voet">Atleet Volg Systeem</footer>

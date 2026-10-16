@@ -1,0 +1,75 @@
+{#
+  Gedeelde velden van 'Nieuwe atleet' en 'Atleet aanpassen': persoonsgegevens, atletiek en groepen.
+  Wordt met {% include %} in een <form> gezet en gebruikt uit de context:
+    f       – atleten.nieuw.NieuwFormulier (waarden, groepen, specialisaties, vandaag)
+    fouten  – {veld: melding}
+#}
+{% macro fout(veld) -%}
+  {% if fouten[veld] %}<span class="veld__fout" id="fout-{{ veld }}">{{ fouten[veld] }}</span>{% endif %}
+{%- endmacro %}
+{% macro tekstveld(veld, label, verplicht=false, extra="", hint="") -%}
+  <div class="veld{{ ' veld--fout' if fouten[veld] }}">
+    <label for="veld-{{ veld }}">{{ label }}{% if verplicht %} <span aria-hidden="true">*</span>{% endif %}</label>
+    <input type="text" id="veld-{{ veld }}" name="{{ veld }}" value="{{ f.waarden[veld] }}"{% if verplicht %} required{% endif %}
+           {%- if fouten[veld] %} aria-invalid="true" aria-describedby="fout-{{ veld }}"{% endif %} {{ extra | safe }}>
+    {% if hint %}<span class="zacht veld__hint">{{ hint }}</span>{% endif %}
+    {{ fout(veld) }}
+  </div>
+{%- endmacro %}
+
+    <section class="blok" aria-labelledby="kop-persoon">
+      <h2 class="subkop" id="kop-persoon">Persoonsgegevens</h2>
+      <div class="velden">
+        {{ tekstveld("voornaam", "Voornaam", verplicht=true, extra='autocomplete="off" autofocus') }}
+        {{ tekstveld("tussenvoegsel", "Tussenvoegsel", extra='autocomplete="off" placeholder="bijv. van der"') }}
+        {{ tekstveld("achternaam", "Achternaam", verplicht=true, extra='autocomplete="off"') }}
+      </div>
+      <div class="velden">
+        <fieldset class="veld keuzerij{{ ' veld--fout' if fouten.geslacht }}">
+          <legend>Geslacht</legend>
+          {% for code, tekst in [("V", "Vrouw / meisje"), ("M", "Man / jongen"), ("X", "X"), ("", "Onbekend")] %}
+            <label class="vinkje" for="geslacht-{{ code or 'leeg' }}">
+              <input type="radio" id="geslacht-{{ code or 'leeg' }}" name="geslacht" value="{{ code }}"{% if f.waarden.geslacht == code %} checked{% endif %}> {{ tekst }}</label>
+          {% endfor %}
+          {{ fout("geslacht") }}
+        </fieldset>
+        <div class="veld{{ ' veld--fout' if fouten.geboortedatum }}">
+          <label for="veld-geboortedatum">Geboortedatum</label>
+          <input type="date" id="veld-geboortedatum" name="geboortedatum" value="{{ f.waarden.geboortedatum }}" max="{{ f.vandaag.isoformat() }}">
+          {{ fout("geboortedatum") }}
+        </div>
+        <div class="veld{{ ' veld--fout' if fouten.geboortejaar }}">
+          <label for="veld-geboortejaar">of alleen geboortejaar</label>
+          <input type="text" inputmode="numeric" id="veld-geboortejaar" name="geboortejaar" value="{{ f.waarden.geboortejaar }}"
+                 placeholder="bijv. {{ f.vandaag.year - 14 }}" maxlength="4" size="6">
+          <span class="zacht veld__hint">genoeg voor de categorie</span>
+          {{ fout("geboortejaar") }}
+        </div>
+      </div>
+    </section>
+
+    <section class="blok" aria-labelledby="kop-atletiek">
+      <h2 class="subkop" id="kop-atletiek">Atletiek</h2>
+      <div class="velden">
+        {{ tekstveld("specialisatie", "Specialisatie", extra='list="specialisaties" autocomplete="off"', hint="kies of typ zelf") }}
+        <datalist id="specialisaties">{% for s in f.specialisaties %}<option value="{{ s }}">{% endfor %}</datalist>
+        {{ tekstveld("atletieknu_id", "atletiek.nu-id", extra='inputmode="numeric" autocomplete="off"', hint="het nummer uit de link van het atletenprofiel; voor het koppelen van uitslagen") }}
+        {{ tekstveld("club", "Club", extra='autocomplete="off"', hint="alleen als het een andere club is") }}
+      </div>
+    </section>
+
+    <section class="blok" aria-labelledby="kop-groepen">
+      <h2 class="subkop" id="kop-groepen">Groepen</h2>
+      {% if f.groepen %}
+        <div class="groepkeuze">
+          {% for k in f.groepen %}
+            <label class="vinkje" for="groep-{{ k.groep.id }}">
+              <input type="checkbox" id="groep-{{ k.groep.id }}" name="groep" value="{{ k.groep.id }}"{% if k.gekozen %} checked{% endif %}>
+              {{ k.groep.naam }}{% if k.groep.seizoen %} <span class="zacht">{{ k.groep.seizoen }}</span>{% endif %}</label>
+          {% endfor %}
+        </div>
+        {{ fout("groep") }}
+      {% else %}
+        <p class="leeg">Er zijn nog geen groepen. Je kunt de atleet later aan een groep toevoegen.</p>
+      {% endif %}
+    </section>

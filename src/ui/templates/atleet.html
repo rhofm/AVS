@@ -30,6 +30,10 @@
         {% if p.groepen %}<span>{% for g in p.groepen %}<a href="/groep/{{ g.id }}">{{ g.naam }}</a>{{ ", " if not loop.last }}{% endfor %}</span>{% endif %}
         {% if not atleet.actief %}<span>niet actief</span>{% endif %}
       </p>
+      <a class="knop atleetkop__aanpassen" href="{{ basis }}/aanpassen">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M11.7 1.3a1 1 0 0 1 1.4 0l1.6 1.6a1 1 0 0 1 0 1.4L5.4 13.6 1.5 14.5l.9-3.9z"/></svg>
+        Gegevens aanpassen
+      </a>
     </div>
     {% if pagina.categorie %}
       <div class="categorie" title="Categorie dit jaar">{{ pagina.categorie_code }}{% if pagina.categorie_groep %}<small>{{ pagina.categorie_groep }}</small>{% endif %}</div>
