@@ -28,11 +28,12 @@
 
 * Gemaakt voor SQL, versleuteld met SQLCipher
 * Wat staat waar:
-  * personen.db: persoonsgegevens, groepen, trainingen, absentie, periodeplannen, leerlijnen, ploegen
+  * personen.db: persoonsgegevens, groepen, trainingen, periodeplannen, leerlijnen, ploegen
   * prestaties.db: onderdelen, wedstrijden, prestaties, PR's
   * testen.db: testen en testresultaten
   * trainingsschema.db: per atleet een kolom per weekdag (maandag t/m zondag) of hij/zij die dag traint
-* Elke atleet krijgt een willekeurige master\_id in personen.db; in prestaties.db, testen.db en trainingsschema.db staat een eigen pseudoniem per database
+  * absentie.db: lang formaat, één rij per atleet per training met status (aanwezig, afgemeld, afwezig, blessure) en korte reden. Apart omdat blessures gezondheidsgegevens zijn
+* Elke atleet krijgt een willekeurige master\_id in personen.db; in de andere databases staat een eigen pseudoniem per database
 * Eén hoofdsleutel in de sleutelkluis van Windows, met herstelsleutel als back-up
 * ~~Functies die database kunnen initialiseren (want niet in github)~~ Gedaan: src/db/init\_db.py
 
@@ -51,7 +52,7 @@
 ## Groepen
 
 * Functionaliteit om atleten te combineren tot groep
-* Absentie tool
+* Absentie tool: lijst per training, vooraf ingevuld met 'aanwezig' volgens het trainingsschema; trainer past alleen de uitzonderingen aan
 * Tool voor opstellen periodeplannen en dergelijke op basis van tijd in jaar en leerlijnen
 
 
