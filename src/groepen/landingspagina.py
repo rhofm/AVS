@@ -32,7 +32,7 @@ from models import ABSENTIE_STATUSSEN, DAGEN, Atleet, Groep, Periodeplan, Traini
 from wedstrijden.kalender import PlanningRegel, wedstrijdplanning
 
 #: Waar de trainingsdagen vandaan komen.
-BRON_VAST = "vast"                    # ingesteld bij de groep (tabel groep_trainingsdag)
+BRON_VAST = "vast"                    # ingesteld bij de groep (tabel groep_trainingstijden)
 BRON_TRAININGEN = "trainingen"
 BRON_SCHEMA = "schema"
 

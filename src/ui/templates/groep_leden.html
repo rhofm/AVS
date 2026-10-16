@@ -6,7 +6,7 @@
   Context:
     f    – groepen.groep.LedenFormulier
     fout – foutmelding (optioneel)
-  In beide standen de vaste trainingsdagen met (optioneel) een begintijd
+  In beide standen de vaste trainingsdagen, elk met een begintijd (verplicht)
   (velden dag-<dag> en tijd-<dag>, zie groepen.groep.lees_trainingsdagen).
   Zoeken werkt op naam en categorie (bijv. 'U14'); 'Zichtbare aanvinken' vinkt
   alle gevonden atleten in één keer aan. Werkt zonder JavaScript; het script
@@ -39,9 +39,9 @@
 {% macro dagkeuze() %}
   <fieldset class="dagkeuze">
     {% if f.nieuw %}
-      <legend><strong>Trainingsdagen</strong> <span class="zacht">— vink de dagen aan en vul eventueel de begintijd in</span></legend>
+      <legend><strong>Trainingsdagen</strong> <span class="zacht">— vul per trainingsdag de begintijd in</span></legend>
     {% else %}
-      <legend><span class="verborgen">Trainingsdagen</span><span class="zacht">Vink de dagen aan en vul eventueel de begintijd in.</span></legend>
+      <legend><span class="verborgen">Trainingsdagen</span><span class="zacht">Vul per trainingsdag de begintijd in.</span></legend>
     {% endif %}
     <div class="dagkeuze__dagen">
       {% for dag, kort, aan, tijd in f.dagen %}

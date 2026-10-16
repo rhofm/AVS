@@ -1,4 +1,4 @@
-"""Atleten combineren tot groepen: leden, starttijden per weekdag en het weekrooster.
+"""Atleten combineren tot groepen: leden, trainingstijden per weekdag en het weekrooster.
 
 Pagina's:
   * 'Nieuwe groep' (knop op de pagina Groepen): naam, seizoen en de atleten in
@@ -11,9 +11,10 @@ Pagina's:
 Een atleet uit de groep halen verwijdert niets anders: aanwezigheid, PR's en
 leerdoelscores blijven bij de atleet bewaard. Geen SQL: alles via `Opslag`.
 
-Starttijden en trainingsschema
-------------------------------
-Een groep heeft per weekdag een starttijd of niets (`Groep.starttijden`). Een
+Trainingstijden en trainingsschema
+---------------------------------
+Een groep heeft per weekdag een begintijd of niets (`Groep.trainingsdagen`,
+tabel groep_trainingstijden). Een
 atleet kan in meerdere groepen zitten. Komt een atleet in een groep, of krijgt
 een groep een extra trainingsdag, dan worden die dagen AANGEVULD in het
 trainingsschema van de atleet (dat bepaalt de absentielijst). Er wordt nooit
@@ -30,7 +31,7 @@ from typing import Iterable, Mapping
 
 from atleten.landingspagina import DAG_KORT, categorie_code, leeftijdscategorie
 from db.queries import Opslag, OpslagFout
-from models import DAGEN, Atleet, Groep
+from models import DAGEN, Atleet, Groep, Trainingsschema
 
 from .landingspagina import trainingsdagen as afgeleide_trainingsdagen
 
@@ -83,8 +84,10 @@ def lees_trainingsdagen(formulier: Mapping[str, str], *, streng: bool = True) ->
     """Trainingsdagen uit het formulier: {'dinsdag': '18:30', 'donderdag': None}.
 
     Een dag telt mee als het vinkje aan staat óf er een begintijd is ingevuld.
-    Tijden als '18:30' of '9:00' (wordt '09:00'). Een ongeldige tijd geeft een fout
-    (met streng=False wordt die genegeerd, voor het opnieuw tonen van het formulier).
+    Tijden als '18:30' of '9:00' (wordt '09:00'). Elke trainingsdag heeft een
+    begintijd nodig: een vinkje zonder tijd of een ongeldige tijd geeft een fout.
+    Met streng=False wordt zo'n dag als {'dag': None} teruggegeven, alleen om het
+    formulier na een fout opnieuw te tonen (niet om op te slaan).
     """
     uit: dict[str, str | None] = {}
     for d in DAGEN:
@@ -92,6 +95,8 @@ def lees_trainingsdagen(formulier: Mapping[str, str], *, streng: bool = True) ->
         if not formulier.get(DAG_VELD + d) and not tijd:
             continue
         if not tijd:
+            if streng:
+                raise OpslagFout(f"Geef een begintijd op voor {d}.")
             uit[d] = None
             continue
         m = _TIJD.match(tijd.replace(".", ":"))
@@ -127,14 +132,21 @@ def _atleten_uit_keuze(db: Opslag, gekozen: Iterable[str]) -> dict[str, Atleet]:
     return uit
 
 
-def _controleer_dagen(trainingsdagen: dict[str, str | None]) -> dict[str, str | None]:
-    """Controleer dagen en tijden en zet ze in weekvolgorde met tijden als 'HH:MM'."""
-    dagen: dict[str, str | None] = {}
+def _controleer_dagen(trainingsdagen: dict[str, str | None]) -> dict[str, str]:
+    """Controleer dagen en tijden en zet ze in weekvolgorde met tijden als 'HH:MM'.
+
+    Elke dag heeft een begintijd nodig (leeg = geen training, dan staat de dag er niet in).
+    """
+    dagen: dict[str, str] = {}
     for d, t in trainingsdagen.items():
-        m = _TIJD.match(t) if t else None
-        if d not in DAGEN or (t and m is None):
+        if d not in DAGEN:
             raise OpslagFout("Ongeldige trainingsdagen.")
-        dagen[d] = f"{int(m.group(1)):02d}:{m.group(2)}" if m else None
+        if not t:
+            raise OpslagFout(f"Geef een begintijd op voor {d}.")
+        m = _TIJD.match(t.replace(".", ":"))
+        if m is None:
+            raise OpslagFout(f"Ongeldige begintijd {t!r} op {d}; gebruik bijv. 18:30.")
+        dagen[d] = f"{int(m.group(1)):02d}:{m.group(2)}"
     return {d: dagen[d] for d in DAGEN if d in dagen}
 
 
@@ -162,7 +174,9 @@ def groep_aanmaken(db: Opslag, naam: str, seizoen: str | None, gekozen: Iterable
     g = db.groep_opslaan(Groep(naam, seizoen, list(atleten)))
     if dagen:
         db.groep_trainingsdagen_opslaan(g.id, dagen)
-        g.trainingsdagen = {d: dagen[d] for d in DAGEN if d in dagen}
+        g.trainingsdagen = dagen
+        for m in g.leden:
+            schema_aanvullen(db, m, dagen)
     return g
 
 
@@ -201,6 +215,7 @@ def ledenformulier(db: Opslag, groep_id: int, *, peildatum: date | None = None,
 class Wijziging:
     toegevoegd: list[Atleet]
     verwijderd: list[Atleet]
+    dagen: dict[str, str] | None = None                            # nieuwe trainingstijden; None = niet gewijzigd
     schema_aangevuld: list[Atleet] = field(default_factory=list)   # trainingsschema kreeg dagen van de groep erbij
 
     @property
@@ -245,15 +260,27 @@ def leden_opslaan(db: Opslag, groep_id: int, gekozen: Iterable[str],
     if toegevoegd or verwijderd:
         groep.leden = nieuw
         db.groep_opslaan(groep)
-    dagen_gewijzigd = dagen is not None and dagen != groep.trainingsdagen
+    oude_dagen = dict(groep.trainingsdagen)
+    dagen_gewijzigd = dagen is not None and dagen != oude_dagen
     if dagen_gewijzigd:
         db.groep_trainingsdagen_opslaan(groep.id, dagen)
+    huidige_dagen = dagen if dagen_gewijzigd else oude_dagen
+
+    # Trainingsschema aanvullen (nooit iets weghalen): nieuwe leden krijgen alle
+    # dagen van de groep, bestaande leden alleen de dagen die er nu bij kwamen.
+    erbij = [d for d in huidige_dagen if d not in oude_dagen]
+    aangevuld = []
+    for m in nieuw:
+        if schema_aanvullen(db, m, huidige_dagen if m not in oud else erbij):
+            aangevuld.append(atleten[m])
+
     sorteer = lambda a: (a.achternaam.lower(), a.voornaam.lower())   # noqa: E731
-    return Wijziging(sorted(toegevoegd, key=sorteer), sorted(verwijderd, key=sorteer), sorted(aangevuld, key=sorteer))
+    return Wijziging(sorted(toegevoegd, key=sorteer), sorted(verwijderd, key=sorteer),
+                     dagen if dagen_gewijzigd else None, sorted(aangevuld, key=sorteer))
 
 
 # ============================================================
-# Starttijden per weekdag
+# Trainingsschema aanvullen vanuit de groep
 # ============================================================
 def schema_aanvullen(db: Opslag, master_id: str, dagen: Iterable[str]) -> list[str]:
     """Zet `dagen` aan in het trainingsschema van de atleet (er gaat niets uit). Geeft de nieuwe dagen."""
@@ -262,57 +289,6 @@ def schema_aanvullen(db: Opslag, master_id: str, dagen: Iterable[str]) -> list[s
     if erbij:
         db.trainingsschema_opslaan(Trainingsschema.met_dagen(master_id, schema.dagen + erbij))
     return erbij
-
-
-@dataclass
-class TijdenWijziging:
-    erbij: list[str]                  # dagen waarop de groep nu ook traint
-    eraf: list[str]                   # dagen die vervielen
-    gewijzigd: list[str]              # zelfde dag, andere tijd
-    schema_aangevuld: int = 0         # aantal leden dat dagen in het trainingsschema bijkreeg
-
-    @property
-    def leeg(self) -> bool:
-        return not (self.erbij or self.eraf or self.gewijzigd)
-
-    @property
-    def tekst(self) -> str:
-        if self.leeg:
-            return "Trainingstijden niet gewijzigd."
-        tekst = "Trainingstijden opgeslagen."
-        if self.schema_aangevuld:
-            tekst += f" Trainingsschema aangevuld voor {self.schema_aangevuld} atleet/atleten."
-        if self.eraf:
-            tekst += (f" Let op: {', '.join(self.eraf)} vervalt voor de groep; pas zo nodig het "
-                      "trainingsschema van de atleten aan.")
-        return tekst
-
-
-def starttijden_opslaan(db: Opslag, groep_id: int, tijden: Mapping[str, str | None],
-                        leden_bijwerken: bool = True) -> TijdenWijziging:
-    """Zet de starttijden van een groep, bijv. {'dinsdag': '18:30', 'donderdag': '19:00'}.
-
-    Dagen die niet in `tijden` staan of leeg zijn: geen training. Ongeldige tijd
-    of dag geeft OpslagFout (en er wordt niets opgeslagen). Met leden_bijwerken
-    krijgen alle leden de nieuwe trainingsdagen in hun trainingsschema.
-    """
-    groep = db.groep(groep_id)
-    if groep is None:
-        raise OpslagFout(f"Groep {groep_id} bestaat niet.")
-    oud = dict(groep.starttijden)
-    try:
-        groep.zet_starttijden(dict(tijden))
-    except ValueError as e:
-        raise OpslagFout(str(e)) from None
-    nieuw = groep.starttijden
-    w = TijdenWijziging([d for d in nieuw if d not in oud], [d for d in oud if d not in nieuw],
-                        [d for d in nieuw if d in oud and oud[d] != nieuw[d]])
-    if w.leeg:
-        return w
-    db.groep_opslaan(groep)
-    if leden_bijwerken and w.erbij:
-        w.schema_aangevuld = sum(1 for m in groep.leden if schema_aanvullen(db, m, w.erbij))
-    return w
 
 
 # ============================================================
@@ -329,5 +305,5 @@ class RoosterRegel:
 def rooster(db: Opslag, master_id: str) -> list[RoosterRegel]:
     """Alle groepstrainingen van de atleet in een week, op dag en tijd gesorteerd."""
     regels = [RoosterRegel(d, t, g.id, g.naam)
-              for g in db.groepen_van_atleet(master_id) for d, t in g.starttijden.items()]
+              for g in db.groepen_van_atleet(master_id) for d, t in g.trainingsdagen.items()]
     return sorted(regels, key=lambda r: (DAGEN.index(r.dag), r.tijd, r.groep.lower()))

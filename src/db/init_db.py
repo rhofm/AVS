@@ -228,7 +228,16 @@ def _migraties(database: str) -> list[tuple[int, Path]]:
         m = _MIGRATIE_NAAM.match(f.name)
         if m:
             gevonden.append((int(m.group(1)), f))
-    return sorted(gevonden)
+    gevonden.sort()
+    # Twee migraties met hetzelfde nummer (bijv. na het samenvoegen van twee
+    # branches) zou er stil één overslaan. Dan liever niet starten.
+    nummers = [n for n, _ in gevonden]
+    dubbel = sorted({n for n in nummers if nummers.count(n) > 1})
+    if dubbel:
+        namen = ", ".join(f.name for n, f in gevonden if n in dubbel)
+        raise RuntimeError(f"Migraties in migrations/{database}/ met hetzelfde nummer: {namen}. "
+                           "Geef elke migratie een eigen nummer.")
+    return gevonden
 
 
 def _init_een(database: str, map: Path | None, hoofd: bytes) -> int:
@@ -283,6 +292,57 @@ def _verplaats_absentie(map: Path | None, hoofd: bytes) -> int:
     return len(rijen)
 
 
+_DAGEN = ("maandag", "dinsdag", "woensdag", "donderdag", "vrijdag", "zaterdag", "zondag")
+
+
+def _groep_trainingstijden_samenvoegen(map: Path | None, hoofd: bytes) -> int:
+    """Eenmalig: tijden uit de twee oude varianten naar groep_trainingstijden. Geeft het aantal groepen.
+
+    Oude varianten (allebei ooit migratie 003): kolommen maandag..zondag op
+    `groep`, of de tabel `groep_trainingsdag` (één rij per groep per dag, tijd
+    mocht leeg zijn). Een dag zonder begintijd kan niet mee: in de nieuwe tabel
+    betekent leeg 'geen training'. Dat wordt gemeld.
+    """
+    with verbind("personen", map, hoofd) as c:
+        tabellen = {r[0] for r in c.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
+        if "groep_trainingstijden" not in tabellen:
+            return 0
+        kolommen = {r[1] for r in c.execute("PRAGMA table_info(groep)")}
+        tijden: dict[int, dict[str, str]] = {}
+        zonder_tijd = 0
+        if "groep_trainingsdag" in tabellen:
+            for gid, dag, tijd in c.execute("SELECT groep_id, dag, starttijd FROM groep_trainingsdag"):
+                if tijd:
+                    tijden.setdefault(gid, {})[dag] = tijd
+                else:
+                    zonder_tijd += 1
+        oude_kolommen = [d for d in _DAGEN if d in kolommen]
+        if oude_kolommen:
+            for r in c.execute(f"SELECT id, {', '.join(oude_kolommen)} FROM groep"):
+                for i, d in enumerate(oude_kolommen, start=1):
+                    if r[i]:
+                        tijden.setdefault(r[0], {}).setdefault(d, r[i])
+        if "groep_trainingsdag" not in tabellen and not oude_kolommen:
+            return 0
+        with c:
+            for gid, per_dag in tijden.items():
+                bestaat = c.execute("SELECT 1 FROM groep_trainingstijden WHERE groep_id = ?", (gid,)).fetchone()
+                if bestaat:
+                    continue   # al overgezet (bijv. bij een eerdere, onderbroken poging)
+                c.execute(f"INSERT INTO groep_trainingstijden (groep_id, {', '.join(_DAGEN)}) "
+                          f"VALUES (?, {', '.join('?' * len(_DAGEN))})",
+                          (gid, *[per_dag.get(d) for d in _DAGEN]))
+            if "groep_trainingsdag" in tabellen:
+                c.execute("DROP TABLE groep_trainingsdag")
+            for d in oude_kolommen:
+                c.execute(f"ALTER TABLE groep DROP COLUMN {d}")   # d komt uit _DAGEN, vaste namen
+    print(f"Trainingstijden van {len(tijden)} groep(en) overgezet naar groep_trainingstijden.")
+    if zonder_tijd:
+        print(f"Let op: {zonder_tijd} trainingsdag(en) zonder begintijd konden niet mee; "
+              "vul die tijden opnieuw in bij de groep.")
+    return len(tijden)
+
+
 def init_db(map: Path | None = None, hoofd: str | bytes | None = None) -> Path:
     """Maak de databases aan en/of breng ze naar de nieuwste versie. Geeft de map terug.
 
@@ -308,6 +368,7 @@ def init_db(map: Path | None = None, hoofd: str | bytes | None = None) -> Path:
         versie = _init_een(database, map, hoofd)
         print(f"{database}.db up-to-date: versie {versie}")
     _verplaats_absentie(map, hoofd)
+    _groep_trainingstijden_samenvoegen(map, hoofd)
     return map
 
 
@@ -348,7 +409,7 @@ def _main(argv: list[str] | None = None) -> int:
             herstel(args.herstel)
             print("Herstelsleutel teruggezet.")
         init_db(args.map)
-    except SleutelFout as fout:
+    except (SleutelFout, RuntimeError) as fout:
         print(f"Fout: {fout}", file=sys.stderr)
         return 1
     return 0

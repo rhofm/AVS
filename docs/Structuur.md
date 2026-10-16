@@ -66,10 +66,11 @@
 ## Groepen
 
 * Functionaliteit om atleten te combineren tot groep; een atleet kan in meerdere groepen zitten (groep_lid: één rij per atleet per groep)
-* Per groep een starttijd per weekdag (bijv. di 18:30, do 18:30), één keer per groep opgeslagen. De id is intern, de naam is wat de app toont
+* Trainingstijden per groep (tabel groep_trainingstijden): één rij per groep met de groep-id en per weekdag een begintijd of leeg (= geen training). Elke trainingsdag heeft een begintijd. De id is intern, de naam is wat de app toont
 * Lid worden van een groep vult de trainingsdagen van de groep aan in het trainingsschema van de atleet; per atleet blijft het aan te passen
 * Weekrooster per atleet over al zijn groepen (dag, tijd, groep)
-* Nog te doen: scherm om de starttijden van een groep in te vullen, rooster tonen op de atleetpagina
+* Tijden invullen: bij 'Nieuwe groep' en 'Wijzigen' op de groepspagina
+* Nog te doen: weekrooster tonen op de atleetpagina
 * Absentie tool: lijst per training, vooraf ingevuld met 'aanwezig' volgens het trainingsschema; trainer past alleen de uitzonderingen aan
 * Tool voor opstellen periodeplannen en dergelijke op basis van tijd in jaar en leerlijnen
 

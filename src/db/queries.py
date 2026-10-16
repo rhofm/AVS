@@ -60,6 +60,7 @@ from models import (
     Test,
     Testresultaat,
     Training,
+    normaliseer_tijd,
     Trainingsschema,
     Wedstrijd,
 )
@@ -575,23 +576,19 @@ class Opslag:
     # Groepen, periodeplannen, trainingen, absentie (personen.db)
     # ============================================================
     def groep_opslaan(self, g: Groep) -> Groep:
-        """Groep, starttijden en ledenlijst opslaan. De leden in de database worden precies g.leden.
+        """Groep en ledenlijst opslaan. De leden in de database worden precies g.leden.
 
-        Starttijden: één kolom per weekdag (migratie personen/003); een dag
-        zonder tijd wordt NULL.
+        De trainingstijden worden hier NIET opgeslagen (zie groep_trainingsdagen_opslaan),
+        zodat alleen de leden opslaan (bijv. bij een CSV-import) de tijden niet wist.
         """
-        tijden = [g.starttijden.get(d) for d in DAGEN]
-        kolommen = ", ".join(DAGEN)                                   # DAGEN zijn vaste namen
         with self.personen:
             if g.id is None:
                 g.id = self.personen.execute(
-                    f"INSERT INTO groep (naam, seizoen, {kolommen}) VALUES (?, ?, {_vraagtekens(len(DAGEN))})",
-                    (g.naam, g.seizoen, *tijden),
+                    "INSERT INTO groep (naam, seizoen) VALUES (?, ?)", (g.naam, g.seizoen)
                 ).lastrowid
             else:
-                zet = ", ".join(f"{d} = ?" for d in DAGEN)
-                self.personen.execute(f"UPDATE groep SET naam = ?, seizoen = ?, {zet} WHERE id = ?",
-                                      (g.naam, g.seizoen, *tijden, g.id))
+                self.personen.execute("UPDATE groep SET naam = ?, seizoen = ? WHERE id = ?",
+                                      (g.naam, g.seizoen, g.id))
             self.personen.execute("DELETE FROM groep_lid WHERE groep_id = ?", (g.id,))
             self.personen.executemany("INSERT INTO groep_lid (groep_id, atleet_id) VALUES (?, ?)",
                                       [(g.id, m) for m in g.leden])
@@ -601,24 +598,40 @@ class Opslag:
         leden = [x[0] for x in self.personen.execute(
             """SELECT gl.atleet_id FROM groep_lid gl JOIN atleet a ON a.master_id = gl.atleet_id
                WHERE gl.groep_id = ? ORDER BY a.achternaam, a.voornaam""", (r["id"],))]
-        tijden = {d: t for d, t in self.personen.execute(
-            "SELECT dag, starttijd FROM groep_trainingsdag WHERE groep_id = ?", (r["id"],))}
-        return Groep(r["naam"], r["seizoen"], leden, r["id"], {d: r[d] for d in DAGEN if r[d]}, {d: tijden[d] for d in DAGEN if d in tijden})
+        t = self.personen.execute("SELECT * FROM groep_trainingstijden WHERE groep_id = ?", (r["id"],)).fetchone()
+        tijden = {d: t[d] for d in DAGEN if t[d]} if t else {}
+        return Groep(r["naam"], r["seizoen"], leden, r["id"], trainingsdagen=tijden)
 
-    def groep_trainingsdagen_opslaan(self, groep_id: int, dagen: dict[str, str | None]) -> None:
-        """Vaste trainingsdagen van een groep opslaan; de bestaande worden precies `dagen`.
+    def groep_trainingsdagen_opslaan(self, groep_id: int, dagen: dict[str, str]) -> None:
+        """Trainingstijden van een groep opslaan (tabel groep_trainingstijden: één rij per groep).
 
-        dagen: {'dinsdag': '18:30', 'donderdag': None}. Los van groep_opslaan(), zodat
-        het opslaan van alleen de leden (bijv. bij een CSV-import) de dagen niet wist.
+        dagen: {'dinsdag': '18:30', 'donderdag': '19:00'}; elke dag heeft een begintijd.
+        Dagen die er niet in staan: geen training. {} = geen vaste dagen (rij weg).
         """
-        onbekend = [d for d in dagen if d not in DAGEN]
-        if onbekend:
-            raise OpslagFout(f"Onbekende dag(en) {onbekend}; kies uit {DAGEN}.")
+        tijden: dict[str, str] = {}
+        for d, t in dagen.items():
+            if d not in DAGEN:
+                raise OpslagFout(f"Onbekende dag {d!r}; kies uit {DAGEN}.")
+            try:
+                tijd = normaliseer_tijd(t)
+            except ValueError as e:
+                raise OpslagFout(str(e)) from None
+            if tijd is None:
+                raise OpslagFout(f"Geef een begintijd op voor {d}.")
+            tijden[d] = tijd
+        if self.groep(groep_id) is None:
+            raise OpslagFout(f"Groep {groep_id} bestaat niet.")
         with self.personen:
-            self.personen.execute("DELETE FROM groep_trainingsdag WHERE groep_id = ?", (groep_id,))
-            self.personen.executemany(
-                "INSERT INTO groep_trainingsdag (groep_id, dag, starttijd) VALUES (?, ?, ?)",
-                [(groep_id, d, dagen[d]) for d in DAGEN if d in dagen])
+            if not tijden:
+                self.personen.execute("DELETE FROM groep_trainingstijden WHERE groep_id = ?", (groep_id,))
+                return
+            kolommen = ", ".join(DAGEN)                                   # DAGEN zijn vaste namen
+            self.personen.execute(
+                f"""INSERT INTO groep_trainingstijden (groep_id, {kolommen})
+                    VALUES (?, {_vraagtekens(len(DAGEN))})
+                    ON CONFLICT (groep_id) DO UPDATE SET {", ".join(f"{d} = excluded.{d}" for d in DAGEN)}""",
+                (groep_id, *[tijden.get(d) for d in DAGEN]),
+            )
 
     def groep(self, groep_id: int) -> Groep | None:
         r = self.personen.execute("SELECT * FROM groep WHERE id = ?", (groep_id,)).fetchone()

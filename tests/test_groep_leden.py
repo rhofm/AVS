@@ -101,7 +101,15 @@ def test_trainingsdagen_lezen():
     lees = groepsbeheer.lees_trainingsdagen
     form = {"dag-dinsdag": "1", "tijd-dinsdag": "18:30", "dag-donderdag": "1", "tijd-zaterdag": "9.00",
             "tijd-maandag": "", "dag-zondag": ""}
-    assert lees(form) == {"dinsdag": "18:30", "donderdag": None, "zaterdag": "09:00"}   # tijd zonder vinkje telt
+    # Vinkje zonder tijd: elke trainingsdag heeft een begintijd nodig.
+    try:
+        lees(form)
+        assert False
+    except OpslagFout as e:
+        assert "begintijd" in str(e) and "donderdag" in str(e)
+    assert lees(form, streng=False) == {"dinsdag": "18:30", "donderdag": None, "zaterdag": "09:00"}  # tonen na fout
+    form["tijd-donderdag"] = "19:00"
+    assert lees(form) == {"dinsdag": "18:30", "donderdag": "19:00", "zaterdag": "09:00"}   # tijd zonder vinkje telt
     assert lees({}) == {}
     for fout in ("25:00", "18:75", "half zeven"):
         try:
@@ -117,9 +125,9 @@ def test_groep_met_trainingsdagen():
     with opslag() as (db, _):
         ids = voorbeeldgroep(db)
         g = groepsbeheer.groep_aanmaken(db, "Avondgroep", "2026-2027", [ids["anna"], ids["bram"]],
-                                        {"donderdag": "19:00", "dinsdag": "9:15", "zaterdag": None})
+                                        {"donderdag": "19:00", "dinsdag": "9:15", "zaterdag": "9.00"})
         opnieuw = db.groep(g.id)
-        assert opnieuw.trainingsdagen == {"dinsdag": "09:15", "donderdag": "19:00", "zaterdag": None}
+        assert opnieuw.trainingsdagen == {"dinsdag": "09:15", "donderdag": "19:00", "zaterdag": "09:00"}
         assert list(opnieuw.trainingsdagen) == ["dinsdag", "donderdag", "zaterdag"]          # op weekvolgorde
 
         # Leden wijzigen (groep_opslaan) laat de trainingsdagen staan.
@@ -129,27 +137,27 @@ def test_groep_met_trainingsdagen():
         # De landingspagina gebruikt de vaste dagen, ook zonder trainingen.
         lp = landingspagina.landingspagina(db, g.id, peildatum=VANDAAG)
         assert lp.dagen_bron == landingspagina.BRON_VAST
-        assert [(d.kort, d.starttijd) for d in lp.trainingsdagen] == [("Di", "09:15"), ("Do", "19:00"), ("Za", None)]
+        assert [(d.kort, d.starttijd) for d in lp.trainingsdagen] == [("Di", "09:15"), ("Do", "19:00"), ("Za", "09:00")]
         anna = lp.leden[0]                       # Anna traint di, do, za: alle drie met de groep
         assert [d.soort for d in anna.dagen] == [None, "groep", None, "groep", None, "groep", None]
         assert dict((gr.naam, dagen) for gr, dagen in landingspagina.overzicht(db, peildatum=VANDAAG))["Avondgroep"] \
-            == ["Di 09:15", "Do 19:00", "Za"]
+            == ["Di 09:15", "Do 19:00", "Za 09:00"]
 
         # Ongeldige dagen/tijden: niets aangemaakt.
         aantal = len(db.groepen())
-        for dagen in ({"feestdag": None}, {"dinsdag": "25:00"}):
+        for dagen in ({"feestdag": "18:00"}, {"dinsdag": "25:00"}, {"zaterdag": None}):   # dag zonder tijd mag niet
             try:
                 groepsbeheer.groep_aanmaken(db, "Fout", None, [], dagen)
                 assert False
             except OpslagFout:
                 pass
         assert len(db.groepen()) == aantal
-        # Ook de database zelf weigert een verkeerde dag of tijd.
-        for dag, tijd in (("feestdag", None), ("dinsdag", "9:00")):
+        # Ook de database zelf weigert een verkeerde tijd (tabel groep_trainingstijden).
+        for tijd in ("9:00", "25:00", "18.30"):
             try:
                 with db.personen:
-                    db.personen.execute("INSERT INTO groep_trainingsdag VALUES (?, ?, ?)", (g.id, dag, tijd))
-                assert False, (dag, tijd)
+                    db.personen.execute("UPDATE groep_trainingstijden SET maandag = ? WHERE groep_id = ?", (tijd, g.id))
+                assert False, tijd
             except Exception as e:
                 assert "CHECK" in str(e) or "constraint" in str(e).lower()
 

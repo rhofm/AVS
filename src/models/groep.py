@@ -35,40 +35,14 @@ class Groep:
     seizoen: str | None = None                       # bijv. '2026-2027'
     leden: list[str] = field(default_factory=list)   # master_ids (tabel groep_lid)
     id: int | None = None
-    # Starttijd per weekdag, bijv. {'dinsdag': '18:30', 'donderdag': '18:30'}.
-    # Een dag die er niet in staat = geen training. De tijden horen bij de groep,
-    # niet bij de atleet: iedereen in de groep heeft dezelfde tijden.
-    starttijden: dict[str, str] = field(default_factory=dict)
-
-    def __post_init__(self) -> None:
-        self.starttijden = self._controleer(self.starttijden)
-
-    @staticmethod
-    def _controleer(tijden: dict[str, str | None]) -> dict[str, str]:
-        uit = {}
-        for dag, tijd in (tijden or {}).items():
-            dag = dag.strip().lower()
-            if dag not in DAGEN:
-                raise ValueError(f"Onbekende dag {dag!r}; kies uit {DAGEN}.")
-            t = normaliseer_tijd(tijd)
-            if t is not None:
-                uit[dag] = t
-        return {d: uit[d] for d in DAGEN if d in uit}          # vaste volgorde maandag -> zondag
-
-    def zet_starttijden(self, tijden: dict[str, str | None]) -> None:
-        """Vervang alle starttijden (gecontroleerd en genormaliseerd)."""
-        self.starttijden = self._controleer(tijden)
-
-    @property
-    def trainingsdagen(self) -> list[str]:
-        """De weekdagen waarop de groep traint, van maandag tot zondag."""
-        return list(self.starttijden)
+    # Vaste trainingstijden (tabel groep_trainingstijden): {'dinsdag': '18:30', 'donderdag': '19:00'}.
+    # Een dag die er niet in staat = geen training. Leeg = geen vaste dagen ingesteld.
+    # De tijden horen bij de groep, niet bij de atleet. Opslaan via
+    # Opslag.groep_trainingsdagen_opslaan() (los van groep_opslaan()).
+    trainingsdagen: dict[str, str] = field(default_factory=dict)
 
     def starttijd(self, dag: str) -> str | None:
-        return self.starttijden.get(dag.lower())
-    # Vaste trainingsdagen: {'dinsdag': '18:30', 'donderdag': None} (tabel groep_trainingsdag).
-    # Leeg = geen vaste dagen. Opslaan via Opslag.groep_trainingsdagen_opslaan().
-    trainingsdagen: dict[str, str | None] = field(default_factory=dict)
+        return self.trainingsdagen.get(dag.lower())
 
     def voeg_toe(self, master_id: str) -> None:
         if master_id not in self.leden:
