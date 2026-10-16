@@ -42,6 +42,9 @@ AVS/
 │   ├── testen.db                 🔒 created by init_db.py
 │   ├── trainingsschema.db        🔒 created by init_db.py
 │   ├── absentie.db               🔒 created by init_db.py
+│   ├── leerlijnen.db             🔒 created by init_db.py
+│   ├── leerdoelscores.db         🔒 created by init_db.py
+│   ├── notities.db               🔒 created by init_db.py
 │   ├── vervangingen.txt          🔒 real name → fake name, for anonymising fixtures
 │   └── live_controle/            🔒 live checks of the importers against the real sites
 │
@@ -56,6 +59,9 @@ AVS/
 │   │   ├── schema_testen.sql     ✅ v1 (frozen): tests, test results
 │   │   ├── schema_trainingsschema.sql ✅ v1 (frozen): training days per athlete (one column per weekday)
 │   │   ├── schema_absentie.sql   ✅ v1 (frozen): attendance per training, long format
+│   │   ├── schema_leerlijnen.sql ✅ v1 (frozen): leerlijnen + leerdoelen catalogue (U10–U20), no personal data
+│   │   ├── schema_leerdoelscores.sql ✅ v1 (frozen): score 1–5 per athlete per leerdoel per date, long format
+│   │   ├── schema_notities.sql   ✅ v1 (frozen): free-text notes per athlete per date
 │   │   ├── schema.sql            ⚠️ old single-database schema, no longer used
 │   │   └── migrations/
 │   │       ├── personen/
@@ -69,6 +75,8 @@ AVS/
 │   │   ├── prestatie.py          Onderdeel, Wedstrijd, Prestatie, Inschrijving, PR, Test, Testresultaat
 │   │   ├── groep.py              Groep, Training, Absentie, Periodeplan
 │   │   ├── leerlijn.py           Leerlijn, LeerlijnStap, LeerlijnVoortgang
+│   │   ├── leerdoel.py           Leerdoel, LeerdoelScore, CATEGORIEEN
+│   │   ├── notitie.py            Notitie (text hidden from repr)
 │   │   └── trainingsschema.py    Trainingsschema (training days), DAGEN
 │   │
 │   ├── atleten/                  ✅ everything around one athlete
@@ -109,11 +117,12 @@ AVS/
 │       └── static/
 │
 └── tests/                        fake data only; run with `python tests/test_<naam>.py`
-    ├── test_models.py            ✅ 12 tests
-    ├── test_queries.py           ✅ 17 tests (real encrypted databases in a temp folder)
+    ├── test_models.py            ✅ 13 tests
+    ├── test_queries.py           ✅ 18 tests (real encrypted databases in a temp folder)
     ├── test_atleten.py           ✅ 7 tests
     ├── test_absentie.py          ✅ 3 tests
     ├── test_wedstrijden.py       ✅ 5 tests
+    ├── test_leerdoelen.py        ✅ 10 tests
     ├── test_importers.py         📝 on this branch
     ├── test_opstelling.py        📝
     └── fixtures/                 saved, anonymised atletiek.nu/Seltec pages
@@ -121,9 +130,9 @@ AVS/
 
 ---
 
-## The five databases
+## The eight databases
 
-The data is split over five encrypted files (SQLCipher). Only `personen.db` contains names; in the other four an athlete appears under a pseudonym that differs per database.
+The data is split over eight encrypted files (SQLCipher). Only `personen.db` contains names; `leerlijnen.db` is a catalogue without personal data; in the other six an athlete appears under a pseudonym that differs per database.
 
 | File | Contents | Athlete identified by |
 |------|----------|-----------------------|
@@ -132,6 +141,9 @@ The data is split over five encrypted files (SQLCipher). Only `personen.db` cont
 | `testen.db` | tests and test results | pseudonym |
 | `trainingsschema.db` | per athlete, one column per weekday (`maandag` … `zondag`, 0/1): on which days they train | pseudonym |
 | `absentie.db` | attendance in long format: one row per athlete per training, status `aanwezig` / `afgemeld` / `afwezig` / `blessure` | pseudonym |
+| `leerlijnen.db` | catalogue: leerlijnen, leerdoelen (fixed ids such as `SPR-U10-01`, per category U10–U20), score scale. No personal data | — |
+| `leerdoelscores.db` | score 1–5 per athlete per leerdoel per date, long format; `laatste_leerdoelscore` view | pseudonym |
+| `notities.db` | free-text notes: athlete, date, text (no length limit) | pseudonym |
 
 ```
 python src/db/init_db.py                      # create/update data/*.db (also runs new migrations)
@@ -139,7 +151,7 @@ python src/db/init_db.py --herstelsleutel     # show the recovery key (keep it s
 python src/db/init_db.py --herstel <sleutel>  # restore the key on a new computer
 ```
 
-Schema versions: `personen` 2 · `prestaties` 2 · `testen` 1 · `trainingsschema` 1 · `absentie` 1.
+Schema versions: `personen` 2 · `prestaties` 2 · `testen` 1 · `trainingsschema` 1 · `absentie` 1 · `leerlijnen` 1 · `leerdoelscores` 1 · `notities` 1.
 
 Absence used to live in `personen.db`. Because `blessure` is health data, it moved to its own pseudonymised file. On an existing installation `init_db.py` moves the old rows automatically, once (`personen` migration 002).
 
@@ -161,7 +173,8 @@ A competition marked `indoor` passes that on to all its performances.
 ui/  ──►  atleten/ · wedstrijden/ · ploeg/ · groepen/ · leerlijnen/ · importers/
                               │
                               ▼
-                     db/queries.py  (Opslag)  ──►  personen.db · prestaties.db · testen.db · trainingsschema.db · absentie.db
+                     db/queries.py  (Opslag)  ──►  personen.db · prestaties.db · testen.db · trainingsschema.db · absentie.db ·
+                                                    leerlijnen.db · leerdoelscores.db · notities.db
                               │
                          models/ (shared dataclasses)
 ```
@@ -179,7 +192,7 @@ ui/  ──►  atleten/ · wedstrijden/ · ploeg/ · groepen/ · leerlijnen/ ·
 - [ ] Importers: fill `bron_naam` / `bron_atletieknu_id` / `bron_geboortejaar` / `bron_club`, set `Wedstrijd.indoor`, and use `atleten/koppelen.py`. Save meets with `wedstrijden.planning.normaliseer_link()` so results land on the planned meet.
 - [ ] Merge `feature/importers` and `feature/atleten` into `dev`.
 - [ ] `pyproject.toml`: replace the placeholder text with a real config (dependencies: `sqlcipher3-wheels`, `keyring`, …).
-- [ ] `src/db/schema.sql`: remove it; it has been replaced by the five `schema_*.sql` files.
+- [ ] `src/db/schema.sql`: remove it; it has been replaced by the eight `schema_*.sql` files.
 - [ ] Model + queries for `ploeg` / `ploeg_opstelling` (tables exist, no model yet).
 - [x] Use the training schedule to pre-fill attendance lists (`groepen/absentie.py`).
 - [ ] Show the training schedule and attendance overview in `atleten/profiel.py`.

@@ -1,6 +1,6 @@
 """Initialiseert de versleutelde AVS-databases.
 
-De databases staan NIET in git (privacy). De gegevens zijn verdeeld over zeven
+De databases staan NIET in git (privacy). De gegevens zijn verdeeld over acht
 bestanden, elk met SQLCipher versleuteld met een eigen sleutel:
 
     data/personen.db         persoonsgegevens, groepen, trainingen, leerlijnen, ploegen
@@ -10,6 +10,7 @@ bestanden, elk met SQLCipher versleuteld met een eigen sleutel:
     data/absentie.db         aanwezigheid per training (aanwezig/afgemeld/afwezig/blessure)
     data/leerlijnen.db       leerlijnen en leerdoelen per leeftijdscategorie (geen persoonsgegevens)
     data/leerdoelscores.db   score 1-5 per atleet per leerdoel per datum
+    data/notities.db         vrije notities per atleet per datum (training/wedstrijd)
 
 Sleutels
 --------
@@ -70,9 +71,10 @@ DB_DIR = Path(__file__).resolve().parent
 MIGRATIONS_DIR = DB_DIR / "migrations"
 _MIGRATIE_NAAM = re.compile(r"^(\d+)_.*\.sql$")
 
-DATABASES = ("personen", "prestaties", "testen", "trainingsschema", "absentie", "leerlijnen", "leerdoelscores")
+DATABASES = ("personen", "prestaties", "testen", "trainingsschema", "absentie", "leerlijnen", "leerdoelscores",
+             "notities")
 # Databases waarin een atleet als pseudoniem staat (personen.db gebruikt master_id).
-GEPSEUDONIMISEERD = ("prestaties", "testen", "trainingsschema", "absentie", "leerdoelscores")
+GEPSEUDONIMISEERD = ("prestaties", "testen", "trainingsschema", "absentie", "leerdoelscores", "notities")
 
 KEYRING_DIENST = "AVS"
 KEYRING_NAAM = "hoofdsleutel"

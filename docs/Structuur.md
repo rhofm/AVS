@@ -9,6 +9,7 @@
 * Specialisatie (?)
 * Testresultaten
 * Trainingsschema: op welke dagen van de week de atleet traint
+* Notities: vrije tekst per atleet per datum (wat opviel op training of wedstrijd), zoekbaar op tekst en datum
 * Geplande/verwachte prestaties (?) (eigen database?)
 
 
@@ -34,6 +35,7 @@
   * trainingsschema.db: per atleet een kolom per weekdag (maandag t/m zondag) of hij/zij die dag traint
   * leerlijnen.db: leerlijnen en leerdoelen van de club (Leerlijn baanatletiek jeugd NA), aangevuld met de Atletiekunie-leerlijnen (dec 2013), per categorie U10 t/m U20, elk met een vaste id (bijv. SPR-U10-01). Geen persoonsgegevens
   * leerdoelscores.db: lang formaat, één rij per atleet per leerdoel per datum met een score 1-5. Het overzicht atleten x leerdoelen (breed) wordt berekend, niet opgeslagen
+  * notities.db: één rij per notitie (atleet, datum, tekst zonder lengtegrens). Feitelijk houden: de tekst zelf is alleen versleuteld, niet gepseudonimiseerd
   * absentie.db: lang formaat, één rij per atleet per training met status (aanwezig, afgemeld, afwezig, blessure) en korte reden. Apart omdat blessures gezondheidsgegevens zijn
 * Elke atleet krijgt een willekeurige master\_id in personen.db; in de andere databases staat een eigen pseudoniem per database
 * Eén hoofdsleutel in de sleutelkluis van Windows, met herstelsleutel als back-up

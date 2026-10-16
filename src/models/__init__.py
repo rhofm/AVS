@@ -12,6 +12,7 @@ from .atleet import GESLACHTEN, Atleet, Geslacht
 from .groep import ABSENTIE_STATUSSEN, Absentie, AbsentieStatus, Groep, Periodeplan, Training
 from .leerdoel import CATEGORIEEN, LEERDOEL_BRONNEN, Categorie, Leerdoel, LeerdoelScore
 from .leerlijn import Leerlijn, LeerlijnStap, LeerlijnVoortgang
+from .notitie import Notitie
 from .prestatie import (
     BRONNEN,
     EENHEDEN,
@@ -37,4 +38,5 @@ __all__ = [
     "Leerlijn", "LeerlijnStap", "LeerlijnVoortgang",
     "Leerdoel", "LeerdoelScore", "Categorie", "CATEGORIEEN", "LEERDOEL_BRONNEN",
     "Trainingsschema", "DAGEN",
+    "Notitie",
 ]
