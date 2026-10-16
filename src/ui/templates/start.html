@@ -1,0 +1,56 @@
+{#
+  Startpagina: opent als AVS start. Grote tegels naar de hoofdonderdelen;
+  bovenin alleen Importeren en Instellingen.
+  Context:
+    tegels  – lijst van ui.startpagina.Tegel
+    vandaag – date
+#}
+{% extends "basis.html" %}
+{% block titel %}Start{% endblock %}
+
+{% block menu %}
+  <nav class="appbalk__hulp" aria-label="Hulpmenu">
+    <a class="appbalk__knop" href="/importeren">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M12 4v11m-4.5-4.5L12 15l4.5-4.5M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>
+      Importeren
+    </a>
+  </nav>
+{% endblock %}
+
+{% block inhoud %}
+<article class="vel startvel">
+  <header class="startkop">
+    <p class="label">{{ vandaag | datum_kort }}</p>
+    <h1 class="startkop__titel">Atleet Volg Systeem</h1>
+    <p class="subkop">Waar wil je naartoe?</p>
+  </header>
+
+  <nav class="tegels" aria-label="Hoofdonderdelen">
+    {% for t in tegels %}
+      <a class="tegel{% if t.cijfer is none %} tegel--binnenkort{% endif %}" href="/{{ t.sleutel }}">
+        <span class="tegel__icoon" aria-hidden="true">
+          {% if t.sleutel == "atleten" %}
+            <svg viewBox="0 0 48 48"><g fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><circle cx="29" cy="8" r="4"/><path d="M14 20l8-5 7 3 4 8 6 2M22 15l-3 12 8 5-2 11M19 27l-6 8-7 1"/></g></svg>
+          {% elif t.sleutel == "groepen" %}
+            <svg viewBox="0 0 48 48"><g fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><circle cx="24" cy="14" r="6"/><path d="M12 40v-4a12 12 0 0 1 24 0v4"/><circle cx="10" cy="18" r="4"/><path d="M3 36v-2a8 8 0 0 1 9-8"/><circle cx="38" cy="18" r="4"/><path d="M45 36v-2a8 8 0 0 0-9-8"/></g></svg>
+          {% elif t.sleutel == "ploegen" %}
+            <svg viewBox="0 0 48 48"><g fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"><path d="M17 42V20h14v22M4 42V28h13M31 32h13v10M2 42h44"/><path stroke-linecap="round" d="M24 6l2.2 4.4 4.8.7-3.5 3.4.8 4.8-4.3-2.3-4.3 2.3.8-4.8-3.5-3.4 4.8-.7z"/></g></svg>
+          {% else %}
+            <svg viewBox="0 0 48 48"><g fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="9" width="38" height="33" rx="2"/><path d="M5 19h38M15 4v9M33 4v9"/><path d="M19 37V25l9 3.5-9 3.5"/></g></svg>
+          {% endif %}
+        </span>
+        <span class="tegel__titel">{{ t.titel }}</span>
+        <span class="tegel__uitleg">{{ t.uitleg }}</span>
+        <span class="tegel__voet">
+          {% if t.cijfer is not none %}<span class="tegel__cijfer">{{ t.cijfer }}</span>{% endif %}
+          <span class="tegel__label">{{ t.cijfer_label }}</span>
+          {% if t.extra %}<span class="tegel__extra">{{ t.extra }}</span>{% endif %}
+        </span>
+        <span class="tegel__pijl" aria-hidden="true">&rarr;</span>
+      </a>
+    {% endfor %}
+  </nav>
+
+  <footer class="vel__voet">Atleet Volg Systeem</footer>
+</article>
+{% endblock %}

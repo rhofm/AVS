@@ -42,6 +42,7 @@ from groepen import overzichten as groep_overzichten
 from groepen import trainingen as trainingsbeheer
 from leerlijnen import voortgang
 from ui import export as trainingsexport
+from ui import startpagina
 from ui.opmaak import registreer_filters
 from wedstrijden import kalender
 
@@ -118,7 +119,8 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
     # ---------------- pagina's ----------------
     @app.get("/")
     def start():
-        return redirect(url_for("atleten"))
+        vandaag = date.today()
+        return render_template("start.html", tegels=startpagina.tegels(db(), vandaag), vandaag=vandaag)
 
     @app.get("/atleten")
     def atleten():
@@ -596,8 +598,8 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
     # ---------------- nog te bouwen ----------------
     @app.get("/<any(" + ", ".join(BINNENKORT) + "):onderdeel>")
     def binnenkort(onderdeel: str):
-        return render_template("binnenkort.html", titel=BINNENKORT[onderdeel], terug_url=url_for("atleten"),
-                               actief_menu=onderdeel)
+        return render_template("binnenkort.html", titel=BINNENKORT[onderdeel], terug_url=url_for("start"),
+                               terug_naam="Start", actief_menu=onderdeel)
 
     @app.get("/atleet/<master_id>/<path:onderdeel>")
     def atleet_binnenkort(master_id: str, onderdeel: str):

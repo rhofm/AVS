@@ -43,7 +43,7 @@ def tekst(r) -> str:
 
 def test_paginas():
     with client() as (c, mid, _):
-        assert c.get("/").headers["Location"].endswith("/atleten")
+        assert c.get("/").status_code == 200                           # startpagina (zie test_startpagina.py)
         r = c.get("/atleten")
         assert r.status_code == 200 and "Anna Voorbeeld" in tekst(r) and "U16 sprint" in tekst(r)
         assert "<td>U16V</td>" in tekst(r)
