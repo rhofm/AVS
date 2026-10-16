@@ -2,7 +2,7 @@
 
 De rest van de app praat alleen met `Opslag` en krijgt/geeft modellen uit
 models/. Buiten dit bestand is geen SQL nodig, en niemand buiten db/ hoeft te
-weten dat de gegevens over vijf versleutelde bestanden verdeeld zijn.
+weten dat de gegevens over zeven versleutelde bestanden verdeeld zijn.
 
 Pseudoniemen
 ------------
@@ -47,6 +47,9 @@ from models import (
     Atleet,
     Groep,
     Inschrijving,
+    CATEGORIEEN,
+    Leerdoel,
+    LeerdoelScore,
     Leerlijn,
     LeerlijnStap,
     LeerlijnVoortgang,
@@ -84,7 +87,7 @@ def _vraagtekens(n: int) -> str:
 
 
 class Opslag:
-    """Toegang tot de vijf AVS-databases met modellen in en modellen uit."""
+    """Toegang tot de zeven AVS-databases met modellen in en modellen uit."""
 
     def __init__(self, map: Path | None = None, hoofd: str | bytes | None = None) -> None:
         self._map = Path(map) if map else None
@@ -95,11 +98,14 @@ class Opslag:
         self.testen_db = verbind("testen", self._map, self._hoofd)
         self.trainingsschema_db = verbind("trainingsschema", self._map, self._hoofd)
         self.absentie_db = verbind("absentie", self._map, self._hoofd)
+        self.leerlijnen_db = verbind("leerlijnen", self._map, self._hoofd)
+        self.leerdoelscores_db = verbind("leerdoelscores", self._map, self._hoofd)
         self._terug: dict[str, dict[str, str]] = {}
 
     # ---------- openen / sluiten ----------
     def sluit(self) -> None:
-        for conn in (self.personen, self.prestaties_db, self.testen_db, self.trainingsschema_db, self.absentie_db):
+        for conn in (self.personen, self.prestaties_db, self.testen_db, self.trainingsschema_db, self.absentie_db,
+                     self.leerlijnen_db, self.leerdoelscores_db):
             conn.close()
 
     def __enter__(self) -> Opslag:
@@ -190,7 +196,7 @@ class Opslag:
         return [self._atleet(r) for r in self.personen.execute(sql, (patroon,))]
 
     def atleet_verwijderen(self, master_id: str) -> None:
-        """Verwijdert een atleet en AL zijn gegevens uit alle vijf de databases.
+        """Verwijdert een atleet en AL zijn gegevens uit alle databases.
 
         Bedoeld voor een verzoek tot verwijdering (AVG). Wie alleen niet meer
         traint: zet `actief = False` en sla op.
@@ -199,6 +205,7 @@ class Opslag:
         ref_t = self._ref(master_id, "testen")
         ref_s = self._ref(master_id, "trainingsschema")
         ref_a = self._ref(master_id, "absentie")
+        ref_l = self._ref(master_id, "leerdoelscores")
         with self.prestaties_db:
             self.prestaties_db.execute("DELETE FROM prestatie WHERE atleet_ref = ?", (ref_p,))
             self.prestaties_db.execute("DELETE FROM inschrijving WHERE atleet_ref = ?", (ref_p,))
@@ -208,6 +215,8 @@ class Opslag:
             self.trainingsschema_db.execute("DELETE FROM trainingsschema WHERE atleet_ref = ?", (ref_s,))
         with self.absentie_db:
             self.absentie_db.execute("DELETE FROM absentie WHERE atleet_ref = ?", (ref_a,))
+        with self.leerdoelscores_db:
+            self.leerdoelscores_db.execute("DELETE FROM leerdoelscore WHERE atleet_ref = ?", (ref_l,))
         with self.personen:  # groep_lid, voortgang, opstellingen gaan mee (CASCADE)
             self.personen.execute("DELETE FROM atleet WHERE master_id = ?", (master_id,))
         self._vergeet_pseudoniemen()
@@ -764,3 +773,120 @@ class Opslag:
         return [LeerlijnVoortgang(r["atleet_id"], r["stap_id"], _naar_datum(r["behaald_op"]), r["notities"])
                 for r in self.personen.execute(
                     "SELECT * FROM atleet_leerlijn WHERE atleet_id = ?", (master_id,))]
+
+    # ============================================================
+    # Leerdoelen (leerlijnen.db): de catalogus, zonder persoonsgegevens
+    # ============================================================
+    @staticmethod
+    def _leerdoel(r) -> Leerdoel:
+        return Leerdoel(r["id"], r["leerlijn"], r["categorie"], r["volgorde"], r["omschrijving"],
+                        r["bron"], r["fase"], bool(r["alleen_specialisten"]), bool(r["actief"]))
+
+    def leerdoel_leerlijnen(self) -> list[tuple[str, str]]:
+        """Alle leerlijnen als (code, naam), in vaste volgorde. Bijv. ('SPR', 'Sprint')."""
+        return [(r["code"], r["naam"]) for r in self.leerlijnen_db.execute(
+            "SELECT code, naam FROM leerlijn ORDER BY volgorde")]
+
+    def scoreschaal(self) -> dict[int, str]:
+        """Betekenis van de scores: {1: 'Nog niet', ..., 5: 'Beheerst'}."""
+        return {r["score"]: r["label"] for r in self.leerlijnen_db.execute(
+            "SELECT score, label FROM scoreschaal ORDER BY score")}
+
+    def leerdoel(self, leerdoel_id: str) -> Leerdoel | None:
+        r = self.leerlijnen_db.execute("SELECT * FROM leerdoel WHERE id = ?", (leerdoel_id,)).fetchone()
+        return self._leerdoel(r) if r else None
+
+    def leerdoelen(self, categorie: str | None = None, leerlijn: str | None = None,
+                   doorlopend: bool = False, alleen_actief: bool = True) -> list[Leerdoel]:
+        """Leerdoelen gesorteerd op categorie, leerlijn en volgorde.
+
+        categorie:  alleen de doelen die in die categorie beginnen, bijv. 'U12'.
+        doorlopend: met categorie: ook de doelen uit eerdere categorieën (wat een
+                    atleet in die categorie allemaal zou moeten kunnen).
+        leerlijn:   alleen één leerlijn, bijv. 'SPR'.
+        """
+        sql = ("SELECT d.* FROM leerdoel d JOIN categorie c ON c.code = d.categorie "
+               "JOIN leerlijn l ON l.code = d.leerlijn WHERE 1 = 1")
+        param: list = []
+        if categorie is not None:
+            if categorie not in CATEGORIEEN:
+                raise OpslagFout(f"Onbekende categorie {categorie!r}; kies uit {CATEGORIEEN}.")
+            sql += " AND c.volgorde <= (SELECT volgorde FROM categorie WHERE code = ?)" if doorlopend \
+                else " AND d.categorie = ?"
+            param.append(categorie)
+        if leerlijn is not None:
+            sql += " AND d.leerlijn = ?"
+            param.append(leerlijn)
+        if alleen_actief:
+            sql += " AND d.actief = 1"
+        sql += " ORDER BY c.volgorde, l.volgorde, d.volgorde"
+        return [self._leerdoel(r) for r in self.leerlijnen_db.execute(sql, param)]
+
+    # ============================================================
+    # Leerdoelscores (leerdoelscores.db), lang formaat:
+    # één rij per atleet per leerdoel per datum
+    # ============================================================
+    def leerdoelscore_opslaan(self, s: LeerdoelScore) -> None:
+        """Eén score opslaan. Op dezelfde dag opnieuw scoren overschrijft die dag."""
+        self.leerdoelscores_opslaan([s])
+
+    def leerdoelscores_opslaan(self, scores: Iterable[LeerdoelScore]) -> None:
+        """Meerdere scores in één transactie, bijv. een hele groep na een training."""
+        scores = list(scores)
+        bekend = {r[0] for r in self.leerlijnen_db.execute("SELECT id FROM leerdoel")}
+        for lid in {s.leerdoel_id for s in scores}:
+            if lid not in bekend:
+                raise OpslagFout(f"Leerdoel {lid!r} bestaat niet.")
+        for mid in {s.atleet_id for s in scores}:
+            if self.atleet(mid) is None:
+                raise OpslagFout(f"Atleet {mid} bestaat niet.")
+        with self.leerdoelscores_db:
+            self.leerdoelscores_db.executemany(
+                """INSERT INTO leerdoelscore (atleet_ref, leerdoel_id, score, datum, notities)
+                   VALUES (?, ?, ?, ?, ?)
+                   ON CONFLICT (atleet_ref, leerdoel_id, datum) DO UPDATE SET
+                       score = excluded.score, notities = excluded.notities""",
+                [(self._ref(s.atleet_id, "leerdoelscores"), s.leerdoel_id, s.score,
+                  _naar_tekst(s.datum), s.notities) for s in scores],
+            )
+
+    def leerdoelscore_verwijderen(self, master_id: str, leerdoel_id: str, datum: date) -> None:
+        with self.leerdoelscores_db:
+            self.leerdoelscores_db.execute(
+                "DELETE FROM leerdoelscore WHERE atleet_ref = ? AND leerdoel_id = ? AND datum = ?",
+                (self._ref(master_id, "leerdoelscores"), leerdoel_id, _naar_tekst(datum)))
+
+    def leerdoelscores(self, master_id: str, leerdoel_id: str | None = None) -> list[LeerdoelScore]:
+        """De hele geschiedenis van één atleet (oudste eerst), eventueel voor één leerdoel."""
+        sql = "SELECT * FROM leerdoelscore WHERE atleet_ref = ?"
+        param: list = [self._ref(master_id, "leerdoelscores")]
+        if leerdoel_id is not None:
+            sql += " AND leerdoel_id = ?"
+            param.append(leerdoel_id)
+        sql += " ORDER BY datum, leerdoel_id"
+        return [LeerdoelScore(master_id, r["leerdoel_id"], r["score"], _naar_datum(r["datum"]), r["notities"])
+                for r in self.leerdoelscores_db.execute(sql, param)]
+
+    def laatste_leerdoelscores(self, master_id: str) -> dict[str, LeerdoelScore]:
+        """De meest recente score per leerdoel van één atleet: {leerdoel_id: LeerdoelScore}."""
+        return {r["leerdoel_id"]: LeerdoelScore(master_id, r["leerdoel_id"], r["score"],
+                                                _naar_datum(r["datum"]), r["notities"])
+                for r in self.leerdoelscores_db.execute(
+                    "SELECT * FROM laatste_leerdoelscore WHERE atleet_ref = ?",
+                    (self._ref(master_id, "leerdoelscores"),))}
+
+    def leerdoelscores_breed(self, master_ids: Iterable[str], leerdoel_ids: Iterable[str] | None = None,
+                             ) -> dict[str, dict[str, int | None]]:
+        """Overzicht in breed formaat voor het scherm: per atleet per leerdoel de laatste score.
+
+        Geeft {master_id: {leerdoel_id: score of None}}. Zonder leerdoel_ids: alle
+        leerdoelen die minstens één van deze atleten een score heeft. Wordt alleen
+        berekend, nooit opgeslagen.
+        """
+        master_ids = list(master_ids)
+        laatste = {m: self.laatste_leerdoelscores(m) for m in master_ids}
+        if leerdoel_ids is None:
+            leerdoel_ids = sorted({lid for scores in laatste.values() for lid in scores})
+        leerdoel_ids = list(leerdoel_ids)
+        return {m: {lid: (laatste[m][lid].score if lid in laatste[m] else None) for lid in leerdoel_ids}
+                for m in master_ids}
