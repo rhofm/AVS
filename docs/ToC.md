@@ -118,6 +118,7 @@ AVS/
 │   └── ui/                       📝 local web UI (Flask or FastAPI, not yet chosen)
 │       ├── app.py
 │       ├── markdown.py           ✅ safe markdown subset for training texts (Jinja filter `markdown`)
+│       ├── startpagina.py        ✅ start page: big tiles to Atleten, Groepen, Ploegen, Wedstrijden (counts only, no names)
 │       ├── templates/
 │       └── static/
 │
@@ -128,6 +129,7 @@ AVS/
     ├── test_absentie.py          ✅ 3 tests
     ├── test_wedstrijden.py       ✅ 5 tests
     ├── test_groep_starttijden.py ✅ 7 tests (training times, moving old data, duplicate migration numbers)
+    ├── test_startpagina.py       ✅ 3 tests (tiles, counts, top bar with only Importeren + Instellingen)
     ├── test_trainingen_inhoud.py ✅ 5 tests (training parts, variants, markdown, old `inhoud` → `notities`)
     ├── test_leerdoelen.py        ✅ 10 tests
     ├── test_importers.py         📝 on this branch
