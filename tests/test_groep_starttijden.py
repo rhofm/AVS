@@ -126,7 +126,7 @@ def test_rooster_en_schemapagina():
 
 def _oude_personen_db(map_: Path, extra_sql: str) -> None:
     """personen.db zoals hij na een van de oude migraties 003 kon zijn (versie 3)."""
-    with verbind("personen", map_, TESTSLEUTEL) as c:
+    with contextlib.closing(verbind("personen", map_, TESTSLEUTEL)) as c:   # sluiten: anders vergrendeld op Windows
         c.executescript((DB_DIR / "schema_personen.sql").read_text(encoding="utf-8"))
         c.executescript((DB_DIR / "migrations" / "personen" / "002_absentie_naar_eigen_database.sql")
                         .read_text(encoding="utf-8"))

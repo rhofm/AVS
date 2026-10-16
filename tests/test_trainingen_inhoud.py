@@ -155,7 +155,9 @@ def test_markdown_veilig_en_beperkt():
 def test_oude_inhoud_wordt_notities():
     """Een personen.db van vóór migratie 005: `inhoud` gaat naar `notities`, niets gaat verloren."""
     with tempfile.TemporaryDirectory() as tmp:
-        with verbind("personen", Path(tmp), TESTSLEUTEL) as c:
+        # closing(): `with conn` alleen commit, maar sluit niet; op Windows blijft het bestand
+        # dan vergrendeld en kan de tijdelijke map niet worden opgeruimd.
+        with contextlib.closing(verbind("personen", Path(tmp), TESTSLEUTEL)) as c:
             c.executescript((DB_DIR / "schema_personen.sql").read_text(encoding="utf-8"))
             c.execute("INSERT INTO groep (id, naam) VALUES (1, 'Oud')")
             c.execute("INSERT INTO training (groep_id, datum, onderwerp, inhoud) "
