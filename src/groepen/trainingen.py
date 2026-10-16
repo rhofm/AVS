@@ -37,7 +37,7 @@ from typing import Iterable, Mapping
 from atleten.aanwezigheid import NIET_INGEVULD, STATUS_TEKST
 from atleten.landingspagina import categorie_code, leeftijdscategorie
 from db.queries import Opslag, OpslagFout
-from models import ABSENTIE_STATUSSEN, DAGEN, Absentie, Atleet, Groep, Periodeplan, Training
+from models import ABSENTIE_STATUSSEN, DAGEN, TRAININGSONDERDELEN, Absentie, Atleet, Groep, Periodeplan, Training
 
 from .absentie import absentielijst
 
@@ -193,6 +193,11 @@ class TrainingPagina:
     varianten: list[tuple[Training, list[Atleet]]] = field(default_factory=list)   # afwijkend: (training, atleten)
 
     @property
+    def starttijd(self) -> str | None:
+        """Begintijd uit de vaste trainingsdagen van de groep ('18:30'), als die er is."""
+        return self.groep.trainingsdagen.get(DAGEN[self.training.datum.weekday()])
+
+    @property
     def telling(self) -> dict[str, int]:
         c = Counter(d.status for d in self.deelnemers)
         return {s: c.get(s, 0) for s in (*ABSENTIE_STATUSSEN, NIET_INGEVULD)}
@@ -222,6 +227,139 @@ def trainingpagina(db: Opslag, training_id: int, *, peildatum: date | None = Non
     varianten = [(v, [a for a in (db.atleet(m) for m in v.atleten) if a is not None]) for v in db.varianten(t.id)]
     return TrainingPagina(t, groep, periode, (t.datum - vandaag).days, deelnemers, _stand(db, groep, t),
                           alle[i - 1] if i > 0 else None, alle[i + 1] if i + 1 < len(alle) else None, varianten)
+
+
+# ============================================================
+# Training bewerken: onderdelen en afwijkende trainingen (varianten)
+# ============================================================
+#: Velden van het bewerkformulier, in volgorde: (veldnaam, titel, maximale lengte).
+TEKSTVELDEN: tuple[tuple[str, str, int], ...] = (
+    ("onderwerp", "Onderwerp", 120),
+    *((veld, titel, 10_000) for veld, titel in TRAININGSONDERDELEN),
+    ("notities", "Notities", 10_000),
+)
+ATLEET_VELD = "atleet"
+
+
+@dataclass
+class Keuzeatleet:
+    """Een lid van de groep in de keuze 'voor wie is deze afwijkende training'."""
+    atleet: Atleet
+    gekozen: bool
+    elders: str | None = None         # staat al in een andere variant (onderwerp of 'een andere afwijkende training')
+
+
+@dataclass
+class Bewerkformulier:
+    hoofd: Training                   # de gewone training van die dag
+    groep: Groep
+    waarden: dict[str, str]           # veldnaam -> tekst zoals in het formulier
+    variant: Training | None = None   # bestaande variant die bewerkt wordt
+    is_variant: bool = False          # variant: bestaand of nieuw
+    atleten: list[Keuzeatleet] = field(default_factory=list)
+
+    @property
+    def nieuw(self) -> bool:
+        return self.is_variant and self.variant is None
+
+    @property
+    def starttijd(self) -> str | None:
+        return self.groep.trainingsdagen.get(DAGEN[self.hoofd.datum.weekday()])
+
+    @property
+    def velden(self) -> list[tuple[str, str, int, str]]:
+        """(veld, titel, maxlengte, waarde) voor het template."""
+        return [(v, titel, n, self.waarden.get(v, "")) for v, titel, n in TEKSTVELDEN]
+
+
+def _waarden(t: Training) -> dict[str, str]:
+    return {v: getattr(t, v) or "" for v, _, _ in TEKSTVELDEN}
+
+
+def _keuze(db: Opslag, groep: Groep, hoofd: Training, variant: Training | None,
+           gekozen: Iterable[str]) -> list[Keuzeatleet]:
+    gekozen = set(gekozen)
+    elders = {m: (v.onderwerp or "een andere afwijkende training")
+              for v in db.varianten(hoofd.id) if variant is None or v.id != variant.id for m in v.atleten}
+    uit = []
+    for mid in groep.leden:
+        a = db.atleet(mid)
+        if a is not None:
+            uit.append(Keuzeatleet(a, mid in gekozen, elders.get(mid)))
+    return uit
+
+
+def bewerkformulier(db: Opslag, training_id: int, *, formulier: Mapping[str, str] | None = None,
+                    gekozen: Iterable[str] | None = None) -> Bewerkformulier | None:
+    """Formulier voor een gewone training of een bestaande variant. formulier/gekozen: opnieuw tonen na een fout."""
+    t = db.training(training_id)
+    if t is None:
+        return None
+    hoofd = db.training(t.hoofdtraining_id) if t.is_afwijkend else t
+    groep = db.groep(hoofd.groep_id)
+    waarden = {v: str(formulier.get(v, "")) for v, _, _ in TEKSTVELDEN} if formulier is not None else _waarden(t)
+    if not t.is_afwijkend:
+        return Bewerkformulier(hoofd, groep, waarden)
+    keuze = _keuze(db, groep, hoofd, t, t.atleten if gekozen is None else gekozen)
+    return Bewerkformulier(hoofd, groep, waarden, variant=t, is_variant=True, atleten=keuze)
+
+
+def variantformulier(db: Opslag, hoofd_id: int, *, formulier: Mapping[str, str] | None = None,
+                     gekozen: Iterable[str] = ()) -> Bewerkformulier | None:
+    """Formulier voor een nieuwe afwijkende training, ingevuld met de gewone training als begin."""
+    hoofd = db.training(hoofd_id)
+    if hoofd is None or hoofd.is_afwijkend:
+        return None
+    groep = db.groep(hoofd.groep_id)
+    if formulier is not None:
+        waarden = {v: str(formulier.get(v, "")) for v, _, _ in TEKSTVELDEN}
+    else:
+        waarden = _waarden(hoofd)
+        waarden["onderwerp"] = ""                     # een eigen naam, bijv. 'Revalidatie' of 'Meerkamp'
+    return Bewerkformulier(hoofd, groep, waarden, is_variant=True,
+                           atleten=_keuze(db, groep, hoofd, None, gekozen))
+
+
+def _lees(formulier: Mapping[str, str]) -> dict[str, str | None]:
+    uit = {}
+    for veld, titel, maximaal in TEKSTVELDEN:
+        tekst = str(formulier.get(veld, "") or "").replace("\r\n", "\n").strip()
+        if len(tekst) > maximaal:
+            raise OpslagFout(f"{titel} is te lang (maximaal {maximaal} tekens).")
+        uit[veld] = tekst or None
+    return uit
+
+
+def training_bewerken(db: Opslag, training_id: int, formulier: Mapping[str, str],
+                      gekozen: Iterable[str] | None = None) -> Training:
+    """Sla de teksten van een gewone training of variant op; bij een variant ook de atleten (`gekozen`)."""
+    t = db.training(training_id)
+    if t is None:
+        raise OpslagFout(f"Training {training_id} bestaat niet.")
+    for veld, tekst in _lees(formulier).items():
+        setattr(t, veld, tekst)
+    if t.is_afwijkend:
+        t.atleten = [m for m in (gekozen or []) if m]
+    return db.training_opslaan(t)        # controleert varianten: groep, minstens één atleet, niet dubbel
+
+
+def variant_toevoegen(db: Opslag, hoofd_id: int, formulier: Mapping[str, str], gekozen: Iterable[str]) -> Training:
+    """Nieuwe afwijkende training bij een gewone training, voor de gekozen atleten."""
+    hoofd = db.training(hoofd_id)
+    if hoofd is None or hoofd.is_afwijkend:
+        raise OpslagFout("Een afwijkende training hoort bij een gewone training.")
+    velden = _lees(formulier)
+    return db.training_opslaan(Training(hoofd.groep_id, hoofd.datum, hoofdtraining_id=hoofd.id,
+                                        atleten=[m for m in gekozen if m], **velden))
+
+
+def variant_verwijderen(db: Opslag, variant_id: int) -> Training:
+    """Haal een afwijkende training weg (de atleten volgen dan weer de gewone). Geeft de gewone training."""
+    v = db.training(variant_id)
+    if v is None or not v.is_afwijkend:
+        raise OpslagFout("Alleen een afwijkende training kan hier worden verwijderd.")
+    db.training_verwijderen(v.id)
+    return db.training(v.hoofdtraining_id)
 
 
 # ============================================================

@@ -1,0 +1,84 @@
+{#
+  Een training bewerken (warming-up, kern A, kern B, cooling-down, notities), of een
+  afwijkende training (variant) voor enkele atleten toevoegen of bewerken.
+  Context:
+    f    – groepen.trainingen.Bewerkformulier
+    fout – foutmelding (optioneel); dan staat er nog wat er was ingevuld
+  Velden: onderwerp, warming_up, kern_a, kern_b, cooling_down, notities (markdown mag)
+  en bij een variant 'atleet' (één per aangevinkt lid van de groep).
+#}
+{% extends "basis.html" %}
+{% set h = f.hoofd %}
+{% block titel %}{% if f.nieuw %}Afwijkende training{% elif f.is_variant %}Afwijkende training bewerken{% else %}Training bewerken{% endif %} {{ h.datum | datum_kort }}{% endblock %}
+
+{% block inhoud %}
+<article class="vel">
+  <header class="blok__kop">
+    <div>
+      <a class="terug" href="{{ url_for('training', training_id=h.id) }}">&larr; Training {{ h.datum | datum_kort }}</a>
+      <h1 class="kop kop--pagina">{% if f.nieuw %}Afwijkende training{% elif f.is_variant %}Afwijkende training bewerken{% else %}Training bewerken{% endif %}</h1>
+      <p class="subkop">{{ f.groep.naam }} · {{ h.datum | datum_kort }} {{ h.datum.year }}{% if f.starttijd %} · {{ f.starttijd }}{% endif %}</p>
+    </div>
+  </header>
+
+  {% if fout %}<p class="melding melding--fout" role="alert">{{ fout }}</p>{% endif %}
+  {% if f.nieuw %}
+    <p class="melding">Voor atleten die iets anders doen dan de groep. De velden staan al op de gewone training: pas alleen aan wat anders is. De rest van de groep volgt de gewone training.</p>
+  {% endif %}
+
+  <form method="post" class="blok trainingform">
+    {% for veld, titel, maximaal, waarde in f.velden %}
+      {% if veld == "onderwerp" %}
+        <label class="veld trainingform__onderwerp" for="veld-onderwerp"><span>{{ "Naam van de afwijkende training" if f.is_variant else "Onderwerp" }} <span class="zacht">(optioneel)</span></span>
+          <input type="text" id="veld-onderwerp" name="onderwerp" value="{{ waarde }}" maxlength="{{ maximaal }}"
+                 placeholder="{{ 'bijv. Revalidatie of Meerkamp' if f.is_variant else 'bijv. Starts en versnellingen' }}">
+        </label>
+        <div class="trainingform__delen">
+      {% elif veld == "notities" %}
+        </div>
+        <label class="veld trainingform__veld trainingform__veld--breed" for="veld-notities"><span>{{ titel }} <span class="zacht">(materiaal, aandachtspunten, …)</span></span>
+          <textarea id="veld-notities" name="notities" rows="4" maxlength="{{ maximaal }}">{{ waarde }}</textarea>
+        </label>
+      {% else %}
+        <label class="veld trainingform__veld" for="veld-{{ veld }}"><span>{{ titel }}</span>
+          <textarea id="veld-{{ veld }}" name="{{ veld }}" rows="7" maxlength="{{ maximaal }}">{{ waarde }}</textarea>
+        </label>
+      {% endif %}
+    {% endfor %}
+    <p class="zacht trainingform__hint">Opmaak mag: <code>**vet**</code>, <code>*schuin*</code>, een regel met <code>- </code> voor een lijstje, <code>1. </code> voor stappen en <code># </code> voor een kopje.</p>
+
+    {% if f.is_variant %}
+      <fieldset class="veld atleetkeuze">
+        <legend>Voor welke atleten? <span class="zacht">(minstens één)</span></legend>
+        {% if f.atleten %}
+          <div class="atleetkeuze__lijst">
+            {% for k in f.atleten %}
+              <label class="vinkje{{ ' atleetkeuze__elders' if k.elders }}">
+                <input type="checkbox" name="atleet" value="{{ k.atleet.master_id }}"{% if k.gekozen %} checked{% endif %}{% if k.elders %} disabled{% endif %}>
+                {{ k.atleet.naam }}{% if k.elders %} <span class="zacht">— al bij {{ k.elders }}</span>{% endif %}
+              </label>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="leeg">Er zitten nog geen atleten in deze groep.</p>
+        {% endif %}
+      </fieldset>
+    {% endif %}
+
+    <div class="opslaan opslaan--onder">
+      <a href="{{ url_for('training', training_id=h.id) }}">Annuleren</a>
+      <button class="knop knop--vol" type="submit">{{ "Toevoegen" if f.nieuw else "Opslaan" }}</button>
+    </div>
+  </form>
+
+  {% if f.variant %}
+    <form method="post" action="{{ url_for('variant_verwijderen', training_id=f.variant.id) }}" class="blok verwijderen"
+          onsubmit="return confirm('Deze afwijkende training verwijderen? De atleten volgen dan weer de gewone training.');">
+      <p class="zacht" style="margin: 0; font-size: var(--maat-s)">Niet meer nodig? Na verwijderen volgen deze atleten weer de gewone training.</p>
+      <button class="knop knop--gevaar" type="submit">Afwijkende training verwijderen</button>
+    </form>
+  {% endif %}
+
+  <footer class="vel__voet">Atleet Volg Systeem<br>{{ f.groep.naam }} · {{ h.datum | datum_lang }}</footer>
+</article>
+{% endblock %}

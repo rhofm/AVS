@@ -373,6 +373,60 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
         return render_template("training.html", tp=tp, melding=meldingen[0] if meldingen else None,
                                actief_menu="groepen")
 
+    # ---------------- training bewerken en afwijkende trainingen ----------------
+    def _bewerkpagina(f, fout: str | None = None, status: int = 200):
+        if f is None:
+            abort(404)
+        return render_template("training_bewerken.html", f=f, fout=fout, actief_menu="groepen"), status
+
+    def _naar_training(t, melding: str):
+        flash(melding)
+        hoofd_id = t.hoofdtraining_id or t.id
+        anker = f"#kop-variant-{t.id}" if t.hoofdtraining_id else ""
+        return redirect(url_for("training", training_id=hoofd_id) + anker)
+
+    @app.get("/training/<int:training_id>/bewerken")
+    def training_bewerken(training_id: int):
+        return _bewerkpagina(trainingsbeheer.bewerkformulier(db(), training_id))
+
+    @app.post("/training/<int:training_id>/bewerken")
+    def training_bewerken_opslaan(training_id: int):
+        if db().training(training_id) is None:
+            abort(404)
+        gekozen = request.form.getlist(trainingsbeheer.ATLEET_VELD)
+        try:
+            t = trainingsbeheer.training_bewerken(db(), training_id, request.form, gekozen)
+        except (OpslagFout, ValueError) as e:
+            return _bewerkpagina(trainingsbeheer.bewerkformulier(db(), training_id, formulier=request.form,
+                                                                 gekozen=gekozen), f"Niet opgeslagen: {e}", 400)
+        return _naar_training(t, "Afwijkende training opgeslagen." if t.is_afwijkend else "Training opgeslagen.")
+
+    @app.get("/training/<int:training_id>/variant/nieuw")
+    def variant_nieuw(training_id: int):
+        return _bewerkpagina(trainingsbeheer.variantformulier(db(), training_id))
+
+    @app.post("/training/<int:training_id>/variant/nieuw")
+    def variant_nieuw_opslaan(training_id: int):
+        if trainingsbeheer.variantformulier(db(), training_id) is None:
+            abort(404)
+        gekozen = request.form.getlist(trainingsbeheer.ATLEET_VELD)
+        try:
+            v = trainingsbeheer.variant_toevoegen(db(), training_id, request.form, gekozen)
+        except (OpslagFout, ValueError) as e:
+            return _bewerkpagina(trainingsbeheer.variantformulier(db(), training_id, formulier=request.form,
+                                                                  gekozen=gekozen), f"Niet opgeslagen: {e}", 400)
+        n = len(v.atleten)
+        return _naar_training(v, f"Afwijkende training toegevoegd voor {n} {'atleten' if n != 1 else 'atleet'}.")
+
+    @app.post("/training/<int:training_id>/verwijderen")
+    def variant_verwijderen(training_id: int):
+        try:
+            hoofd = trainingsbeheer.variant_verwijderen(db(), training_id)
+        except OpslagFout:
+            abort(404)
+        flash("Afwijkende training verwijderd; die atleten volgen weer de gewone training.")
+        return redirect(url_for("training", training_id=hoofd.id))
+
     def _invullen(training_id: int, fout: str | None = None, status: int = 200):
         f = trainingsbeheer.invulformulier(db(), training_id)
         if f is None:

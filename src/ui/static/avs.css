@@ -578,3 +578,21 @@ th[aria-sort="descending"] .sorteer__naam::after { content: " \2193"; opacity: 1
   .lijst li { grid-template-columns: 1fr; gap: .15rem; }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+/* ---------- training bewerken ---------- */
+.trainingform { gap: 1.1rem; }
+.trainingform__onderwerp { max-width: 36rem; }
+.trainingform__onderwerp input { font: inherit; font-size: var(--maat-m); color: var(--tekst); background: var(--papier);
+  border: 1px solid var(--rand); padding: .45rem .55rem; width: 100%; font-weight: 400; }
+.trainingform__delen { display: grid; gap: 1rem 1.25rem; grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr)); }
+.trainingform__veld textarea { width: 100%; font: inherit; font-size: var(--maat-s); line-height: 1.5; color: var(--tekst);
+  background: var(--papier); border: 1px solid var(--rand); padding: .5rem .6rem; resize: vertical; min-height: 7rem; font-weight: 400; }
+.trainingform__veld > span, .trainingform__onderwerp > span { font-weight: 700; }
+.trainingform__veld textarea:focus-visible, .trainingform__onderwerp input:focus-visible { outline: 2px solid var(--rood); outline-offset: 1px; }
+.trainingform__hint { margin: -.4rem 0 0; font-size: var(--maat-xs); }
+.trainingform__hint code { font-size: .95em; background: var(--roze-licht); padding: 0 .25rem; }
+.atleetkeuze legend { font-weight: 700; margin-bottom: .4rem; }
+.atleetkeuze__lijst { display: grid; gap: .35rem 1.25rem; grid-template-columns: repeat(auto-fill, minmax(min(100%, 15rem), 1fr)); }
+.atleetkeuze input[type="checkbox"] { width: 1.1rem; height: 1.1rem; accent-color: var(--rood); }
+.atleetkeuze__lijst .vinkje { font-weight: 400; }
+.atleetkeuze__elders { opacity: .6; }
