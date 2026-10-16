@@ -1,12 +1,13 @@
 """Initialiseert de versleutelde AVS-databases.
 
-De databases staan NIET in git (privacy). De gegevens zijn verdeeld over vier
+De databases staan NIET in git (privacy). De gegevens zijn verdeeld over vijf
 bestanden, elk met SQLCipher versleuteld met een eigen sleutel:
 
-    data/personen.db         persoonsgegevens, groepen, absentie, leerlijnen, ploegen
+    data/personen.db         persoonsgegevens, groepen, trainingen, leerlijnen, ploegen
     data/prestaties.db       onderdelen, wedstrijden, prestaties, PR's
     data/testen.db           testen en testresultaten
     data/trainingsschema.db  op welke dagen van de week een atleet traint
+    data/absentie.db         aanwezigheid per training (aanwezig/afgemeld/afwezig/blessure)
 
 Sleutels
 --------
@@ -18,9 +19,8 @@ Daaruit worden met HMAC-SHA256 afgeleid:
   * per database een eigen pseudoniem voor elke atleet.
 
 Een atleet krijgt in personen.db een willekeurige master_id (nieuw_master_id()).
-Alleen daar staat die id naast naam en geboortedatum. In prestaties.db,
-testen.db en trainingsschema.db staat in plaats daarvan
-pseudoniem(master_id, '<database>'). Die
+Alleen daar staat die id naast naam en geboortedatum. In de andere
+databases staat in plaats daarvan pseudoniem(master_id, '<database>'). Die
 pseudoniemen verschillen per database. Zonder de hoofdsleutel zijn de bestanden
 onleesbaar, en ook met één gelekte database-sleutel is een bestand niet aan een
 ander bestand of aan een persoon te koppelen.
@@ -32,7 +32,9 @@ Dit script:
   1. maakt de map data/ aan als die nog niet bestaat,
   2. maakt zo nodig de hoofdsleutel aan in de sleutelkluis,
   3. voert per database het basisschema uit op een lege database (versie 1),
-  4. voert daarna per database de migraties uit die nog niet zijn toegepast.
+  4. voert daarna per database de migraties uit die nog niet zijn toegepast,
+  5. verplaatst zo nodig de oude absentie uit personen.db naar absentie.db
+     (eenmalig, zie migrations/personen/002_absentie_naar_eigen_database.sql).
 
 Migraties staan in migrations/<database>/NNN_beschrijving.sql (bijv.
 migrations/testen/002_add_testlocatie.sql) en worden op nummer gesorteerd.
@@ -66,9 +68,9 @@ DB_DIR = Path(__file__).resolve().parent
 MIGRATIONS_DIR = DB_DIR / "migrations"
 _MIGRATIE_NAAM = re.compile(r"^(\d+)_.*\.sql$")
 
-DATABASES = ("personen", "prestaties", "testen", "trainingsschema")
+DATABASES = ("personen", "prestaties", "testen", "trainingsschema", "absentie")
 # Databases waarin een atleet als pseudoniem staat (personen.db gebruikt master_id).
-GEPSEUDONIMISEERD = ("prestaties", "testen", "trainingsschema")
+GEPSEUDONIMISEERD = ("prestaties", "testen", "trainingsschema", "absentie")
 
 KEYRING_DIENST = "AVS"
 KEYRING_NAAM = "hoofdsleutel"
@@ -141,7 +143,7 @@ def nieuw_master_id() -> str:
 
 
 def pseudoniem(master_id: str, database: str, hoofd: str | bytes | None = None) -> str:
-    """Het pseudoniem (atleet_ref) van een atleet in prestaties.db, testen.db of trainingsschema.db."""
+    """Het pseudoniem (atleet_ref) van een atleet in een van de databases uit GEPSEUDONIMISEERD."""
     if database not in GEPSEUDONIMISEERD:
         raise ValueError(f"Geen pseudoniemen in {database!r}; kies uit {GEPSEUDONIMISEERD}.")
     hoofd = _naar_bytes(hoofd) if hoofd is not None else hoofdsleutel()
@@ -170,7 +172,7 @@ def db_pad(database: str, map: Path | None = None) -> Path:
 def verbind(database: str, map: Path | None = None, hoofd: str | bytes | None = None) -> sqlcipher3.Connection:
     """Open een versleutelde database met foreign keys aan en rijen als dict-achtige objecten.
 
-    database: 'personen', 'prestaties', 'testen' of 'trainingsschema'.
+    database: een naam uit DATABASES, bijv. 'personen' of 'absentie'.
     hoofd:    alleen voor tests; normaal komt de sleutel uit de sleutelkluis.
     """
     pad = db_pad(database, map)
@@ -244,6 +246,36 @@ def _init_een(database: str, map: Path | None, hoofd: bytes) -> int:
     return versie
 
 
+def _verplaats_absentie(map: Path | None, hoofd: bytes) -> int:
+    """Eenmalig: oude absentie uit personen.db naar absentie.db. Geeft het aantal rijen.
+
+    Eerst alles in absentie.db zetten, pas daarna de oude tabel weggooien. Gaat
+    het tussendoor mis, dan staat alles nog in personen.db en gaat het de
+    volgende keer verder; rijen die al verplaatst waren worden overgeslagen.
+    """
+    with verbind("personen", map, hoofd) as personen:
+        bestaat = personen.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='absentie_te_verplaatsen'"
+        ).fetchone()
+        if not bestaat:
+            return 0
+        rijen = personen.execute(
+            "SELECT training_id, atleet_id, status, reden FROM absentie_te_verplaatsen"
+        ).fetchall()
+        with verbind("absentie", map, hoofd) as absentie:
+            with absentie:
+                absentie.executemany(
+                    """INSERT OR IGNORE INTO absentie (training_id, atleet_ref, status, reden)
+                       VALUES (?, ?, ?, ?)""",
+                    [(r["training_id"], pseudoniem(r["atleet_id"], "absentie", hoofd), r["status"], r["reden"])
+                     for r in rijen],
+                )
+        with personen:
+            personen.execute("DROP TABLE absentie_te_verplaatsen")
+    print(f"Absentie verplaatst naar absentie.db: {len(rijen)} rij(en)")
+    return len(rijen)
+
+
 def init_db(map: Path | None = None, hoofd: str | bytes | None = None) -> Path:
     """Maak de databases aan en/of breng ze naar de nieuwste versie. Geeft de map terug.
 
@@ -268,6 +300,7 @@ def init_db(map: Path | None = None, hoofd: str | bytes | None = None) -> Path:
     for database in DATABASES:
         versie = _init_een(database, map, hoofd)
         print(f"{database}.db up-to-date: versie {versie}")
+    _verplaats_absentie(map, hoofd)
     return map
 
 

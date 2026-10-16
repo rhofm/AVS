@@ -2,12 +2,12 @@
 
 De rest van de app praat alleen met `Opslag` en krijgt/geeft modellen uit
 models/. Buiten dit bestand is geen SQL nodig, en niemand buiten db/ hoeft te
-weten dat de gegevens over vier versleutelde bestanden verdeeld zijn.
+weten dat de gegevens over vijf versleutelde bestanden verdeeld zijn.
 
 Pseudoniemen
 ------------
-In prestaties.db, testen.db en trainingsschema.db staat een atleet als
-atleet_ref (een pseudoniem per database). Modellen gebruiken altijd de master_id. Opslag rekent:
+In alle databases behalve personen.db staat een atleet als atleet_ref (een
+pseudoniem per database). Modellen gebruiken altijd de master_id. Opslag rekent:
 
   * heen:  master_id -> atleet_ref met pseudoniem() uit init_db;
   * terug: atleet_ref -> master_id via een tabel die in het geheugen wordt
@@ -30,7 +30,7 @@ Regels
 ------
   * Alleen geparametriseerde queries (?), nooit strings in SQL plakken.
   * Elke schrijf-methode is één transactie.
-  * Verwijzingen tussen bestanden (bijv. ploeg -> wedstrijd) dwingt SQLite niet
+  * Verwijzingen tussen bestanden (bijv. ploeg -> wedstrijd, absentie -> training) dwingt SQLite niet
     af; die controleert deze module in Python.
 """
 
@@ -84,7 +84,7 @@ def _vraagtekens(n: int) -> str:
 
 
 class Opslag:
-    """Toegang tot de vier AVS-databases met modellen in en modellen uit."""
+    """Toegang tot de vijf AVS-databases met modellen in en modellen uit."""
 
     def __init__(self, map: Path | None = None, hoofd: str | bytes | None = None) -> None:
         self._map = Path(map) if map else None
@@ -94,11 +94,12 @@ class Opslag:
         self.prestaties_db = verbind("prestaties", self._map, self._hoofd)
         self.testen_db = verbind("testen", self._map, self._hoofd)
         self.trainingsschema_db = verbind("trainingsschema", self._map, self._hoofd)
+        self.absentie_db = verbind("absentie", self._map, self._hoofd)
         self._terug: dict[str, dict[str, str]] = {}
 
     # ---------- openen / sluiten ----------
     def sluit(self) -> None:
-        for conn in (self.personen, self.prestaties_db, self.testen_db, self.trainingsschema_db):
+        for conn in (self.personen, self.prestaties_db, self.testen_db, self.trainingsschema_db, self.absentie_db):
             conn.close()
 
     def __enter__(self) -> Opslag:
@@ -189,7 +190,7 @@ class Opslag:
         return [self._atleet(r) for r in self.personen.execute(sql, (patroon,))]
 
     def atleet_verwijderen(self, master_id: str) -> None:
-        """Verwijdert een atleet en AL zijn gegevens uit alle vier de databases.
+        """Verwijdert een atleet en AL zijn gegevens uit alle vijf de databases.
 
         Bedoeld voor een verzoek tot verwijdering (AVG). Wie alleen niet meer
         traint: zet `actief = False` en sla op.
@@ -197,6 +198,7 @@ class Opslag:
         ref_p = self._ref(master_id, "prestaties")
         ref_t = self._ref(master_id, "testen")
         ref_s = self._ref(master_id, "trainingsschema")
+        ref_a = self._ref(master_id, "absentie")
         with self.prestaties_db:
             self.prestaties_db.execute("DELETE FROM prestatie WHERE atleet_ref = ?", (ref_p,))
             self.prestaties_db.execute("DELETE FROM inschrijving WHERE atleet_ref = ?", (ref_p,))
@@ -204,7 +206,9 @@ class Opslag:
             self.testen_db.execute("DELETE FROM testresultaat WHERE atleet_ref = ?", (ref_t,))
         with self.trainingsschema_db:
             self.trainingsschema_db.execute("DELETE FROM trainingsschema WHERE atleet_ref = ?", (ref_s,))
-        with self.personen:  # groep_lid, absentie, voortgang, opstellingen gaan mee (CASCADE)
+        with self.absentie_db:
+            self.absentie_db.execute("DELETE FROM absentie WHERE atleet_ref = ?", (ref_a,))
+        with self.personen:  # groep_lid, voortgang, opstellingen gaan mee (CASCADE)
             self.personen.execute("DELETE FROM atleet WHERE master_id = ?", (master_id,))
         self._vergeet_pseudoniemen()
 
@@ -609,29 +613,67 @@ class Opslag:
                          r["periodeplan_id"], r["id"])
                 for r in self.personen.execute(sql, args)]
 
-    def absentie_opslaan(self, a: Absentie) -> None:
+    def training(self, training_id: int) -> Training | None:
+        r = self.personen.execute("SELECT * FROM training WHERE id = ?", (training_id,)).fetchone()
+        if r is None:
+            return None
+        return Training(r["groep_id"], _naar_datum(r["datum"]), r["onderwerp"], r["inhoud"],
+                        r["periodeplan_id"], r["id"])
+
+    def training_verwijderen(self, training_id: int) -> None:
+        """Verwijdert een training en de absentie die erbij hoort (die staat in een ander bestand)."""
+        with self.absentie_db:
+            self.absentie_db.execute("DELETE FROM absentie WHERE training_id = ?", (training_id,))
         with self.personen:
-            self.personen.execute(
-                """INSERT INTO absentie (training_id, atleet_id, status, reden) VALUES (?, ?, ?, ?)
-                   ON CONFLICT (training_id, atleet_id) DO UPDATE SET
+            self.personen.execute("DELETE FROM training WHERE id = ?", (training_id,))
+
+    # ============================================================
+    # Absentie (absentie.db), lang formaat: één rij per atleet per training
+    # ============================================================
+    def absentie_opslaan(self, a: Absentie) -> None:
+        """Status van één atleet op één training opslaan; een bestaande status wordt overschreven."""
+        self.absenties_opslaan([a])
+
+    def absenties_opslaan(self, absenties: Iterable[Absentie]) -> None:
+        """Meerdere statuses in één transactie, bijv. een hele absentielijst."""
+        absenties = list(absenties)
+        for tid in {a.training_id for a in absenties}:
+            if self.training(tid) is None:
+                raise OpslagFout(f"Training {tid} bestaat niet.")
+        for mid in {a.atleet_id for a in absenties}:
+            if self.atleet(mid) is None:
+                raise OpslagFout(f"Atleet {mid} bestaat niet.")
+        with self.absentie_db:
+            self.absentie_db.executemany(
+                """INSERT INTO absentie (training_id, atleet_ref, status, reden) VALUES (?, ?, ?, ?)
+                   ON CONFLICT (training_id, atleet_ref) DO UPDATE SET
                        status = excluded.status, reden = excluded.reden""",
-                (a.training_id, a.atleet_id, a.status, a.reden),
+                [(a.training_id, self._ref(a.atleet_id, "absentie"), a.status, a.reden) for a in absenties],
             )
 
     def absenties(self, training_id: int) -> list[Absentie]:
-        return [Absentie(r["training_id"], r["atleet_id"], r["status"], r["reden"])
-                for r in self.personen.execute("SELECT * FROM absentie WHERE training_id = ?", (training_id,))]
+        """Alle ingevulde statuses van één training (atleten die niet meer bestaan worden overgeslagen)."""
+        uit = []
+        for r in self.absentie_db.execute("SELECT * FROM absentie WHERE training_id = ?", (training_id,)):
+            master_id = self._master_id(r["atleet_ref"], "absentie")
+            if master_id is not None:
+                uit.append(Absentie(r["training_id"], master_id, r["status"], r["reden"]))
+        return uit
 
     def absenties_van_atleet(self, master_id: str, groep_id: int | None = None) -> list[Absentie]:
-        sql = """SELECT a.* FROM absentie a JOIN training t ON t.id = a.training_id
-                 WHERE a.atleet_id = ?"""
-        args: list = [master_id]
-        if groep_id is not None:
-            sql += " AND t.groep_id = ?"
-            args.append(groep_id)
-        sql += " ORDER BY t.datum"
-        return [Absentie(r["training_id"], r["atleet_id"], r["status"], r["reden"])
-                for r in self.personen.execute(sql, args)]
+        """Alle statuses van één atleet, oudste training eerst. Met groep_id alleen die groep."""
+        rijen = self.absentie_db.execute(
+            "SELECT * FROM absentie WHERE atleet_ref = ?", (self._ref(master_id, "absentie"),)
+        ).fetchall()
+        if not rijen:
+            return []
+        ids = sorted({r["training_id"] for r in rijen})
+        sql = f"SELECT id, datum, groep_id FROM training WHERE id IN ({_vraagtekens(len(ids))})"
+        trainingen = {t["id"]: t for t in self.personen.execute(sql, ids)}
+        uit = [r for r in rijen if r["training_id"] in trainingen
+               and (groep_id is None or trainingen[r["training_id"]]["groep_id"] == groep_id)]
+        uit.sort(key=lambda r: (trainingen[r["training_id"]]["datum"], r["training_id"]))
+        return [Absentie(r["training_id"], master_id, r["status"], r["reden"]) for r in uit]
 
     # ============================================================
     # Leerlijnen (personen.db)

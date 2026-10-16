@@ -14,7 +14,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from db.init_db import init_db, pseudoniem  # noqa: E402
+from db.init_db import DB_DIR, init_db, pseudoniem, verbind  # noqa: E402
 from db.queries import Opslag, OpslagFout  # noqa: E402
 from models import (  # noqa: E402
     PR, heeft_windmeting, Absentie, Atleet, Groep, Inschrijving, Leerlijn, LeerlijnStap, LeerlijnVoortgang,
@@ -320,6 +320,75 @@ def test_groepen_trainingen_absentie():
         assert db.periodeplannen(g.id)[0].aantal_weken == 9
 
 
+def test_absentie_eigen_database():
+    with opslag() as db:
+        anna, tim, _, _ = _basis(db)
+        g = db.groep_opslaan(Groep("Junioren C", leden=[anna.master_id, tim.master_id]))
+        tr1 = db.training_opslaan(Training(g.id, date(2026, 10, 13)))
+        tr2 = db.training_opslaan(Training(g.id, date(2026, 10, 15)))
+        db.absenties_opslaan([Absentie(tr1.id, anna.master_id, "aanwezig"),
+                              Absentie(tr1.id, tim.master_id, "blessure", "enkel")])
+        db.absentie_opslaan(Absentie(tr2.id, anna.master_id, "afgemeld"))
+
+        # Lang formaat in absentie.db, met een eigen pseudoniem en zonder master_id.
+        rijen = db.absentie_db.execute("SELECT training_id, atleet_ref, status FROM absentie").fetchall()
+        assert len(rijen) == 3
+        refs = {r["atleet_ref"] for r in rijen}
+        assert pseudoniem(anna.master_id, "absentie", TESTSLEUTEL) in refs
+        assert anna.master_id not in refs
+        assert refs.isdisjoint({pseudoniem(anna.master_id, d, TESTSLEUTEL)
+                                for d in ("prestaties", "testen", "trainingsschema")})
+        # personen.db heeft geen absentietabel meer.
+        assert db.personen.execute(
+            "SELECT count(*) FROM sqlite_master WHERE name LIKE 'absentie%'").fetchone()[0] == 0
+
+        assert {(a.atleet_id, a.status) for a in db.absenties(tr1.id)} == {
+            (anna.master_id, "aanwezig"), (tim.master_id, "blessure")}
+        assert [a.status for a in db.absenties_van_atleet(anna.master_id)] == ["aanwezig", "afgemeld"]  # op datum
+        andere = db.groep_opslaan(Groep("Andere groep"))
+        assert db.absenties_van_atleet(anna.master_id, groep_id=andere.id) == []
+
+        # Verwijzingen naar personen.db worden in Python gecontroleerd.
+        _verwacht(OpslagFout, lambda: db.absentie_opslaan(Absentie(999, anna.master_id, "aanwezig")))
+        _verwacht(OpslagFout, lambda: db.absentie_opslaan(Absentie(tr1.id, "0" * 32, "aanwezig")))
+        _verwacht(OpslagFout, lambda: db.absenties_opslaan([   # alles-of-niets
+            Absentie(tr2.id, tim.master_id, "afwezig"), Absentie(999, tim.master_id, "afwezig")]))
+        assert len(db.absenties(tr2.id)) == 1
+
+        # Training weg -> absentie in het andere bestand ook weg.
+        db.training_verwijderen(tr1.id)
+        assert db.training(tr1.id) is None
+        assert db.absentie_db.execute("SELECT count(*) FROM absentie WHERE training_id = ?",
+                                      (tr1.id,)).fetchone()[0] == 0
+
+
+def test_oude_absentie_wordt_verplaatst():
+    """Een personen.db van vóór absentie.db: de rijen verhuizen bij init_db, niets gaat verloren."""
+    with tempfile.TemporaryDirectory() as tmp:
+        map_ = Path(tmp)
+        mid = "ab" * 16
+        # Oude situatie nabootsen: alleen schema v1 van personen.db, met absentie erin.
+        with verbind("personen", map_, TESTSLEUTEL) as c:
+            c.executescript((DB_DIR / "schema_personen.sql").read_text(encoding="utf-8"))
+            c.execute("INSERT INTO atleet (master_id, voornaam, achternaam) VALUES (?, 'Anna', 'Voorbeeld')", (mid,))
+            c.execute("INSERT INTO groep (naam) VALUES ('C')")
+            c.execute("INSERT INTO training (groep_id, datum) VALUES (1, '2026-10-13')")
+            c.execute("INSERT INTO training (groep_id, datum) VALUES (1, '2026-10-15')")
+            c.execute("INSERT INTO absentie VALUES (1, ?, 'aanwezig', NULL)", (mid,))
+            c.execute("INSERT INTO absentie VALUES (2, ?, 'blessure', 'knie')", (mid,))
+            c.commit()
+        uitvoer = io.StringIO()
+        with contextlib.redirect_stdout(uitvoer):
+            init_db(map_, hoofd=TESTSLEUTEL)
+            init_db(map_, hoofd=TESTSLEUTEL)   # tweede keer: niets meer te doen
+        assert uitvoer.getvalue().count("Absentie verplaatst") == 1
+        with Opslag(map=map_, hoofd=TESTSLEUTEL) as db:
+            assert [(a.training_id, a.status, a.reden) for a in db.absenties_van_atleet(mid)] == [
+                (1, "aanwezig", None), (2, "blessure", "knie")]
+            assert db.personen.execute(
+                "SELECT count(*) FROM sqlite_master WHERE name LIKE 'absentie%'").fetchone()[0] == 0
+
+
 def test_leerlijnen():
     with opslag() as db:
         anna, _, _, _ = _basis(db)
@@ -342,6 +411,8 @@ def test_atleet_verwijderen_wist_alles():
         g = db.groep_opslaan(Groep("C", leden=[anna.master_id, tim.master_id]))
         db.trainingsschema_opslaan(Trainingsschema.met_dagen(anna.master_id, ["dinsdag"]))
         db.trainingsschema_opslaan(Trainingsschema.met_dagen(tim.master_id, ["dinsdag"]))
+        tr = db.training_opslaan(Training(g.id, date(2026, 10, 13)))
+        db.absenties_opslaan([Absentie(tr.id, anna.master_id, "blessure"), Absentie(tr.id, tim.master_id, "aanwezig")])
 
         db.atleet_verwijderen(anna.master_id)
         assert db.atleet(anna.master_id) is None
@@ -349,6 +420,7 @@ def test_atleet_verwijderen_wist_alles():
         assert db.testresultaten(anna.master_id) == []
         assert db.trainingsschema(anna.master_id).dagen == []
         assert db.atleten_op_dag("dinsdag") == [tim.master_id]
+        assert db.absentie_db.execute("SELECT count(*) FROM absentie").fetchone()[0] == 1   # alleen Tim
         assert db.groep(g.id).leden == [tim.master_id]
         assert len(db.prestaties(tim.master_id)) == 1  # Tim blijft
 

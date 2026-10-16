@@ -37,7 +37,7 @@ This project holds personal data about athletes, many of them minors.
   (`--herstelsleutel`). Do not write keys to files, config or test fixtures.
 - **Keep the split intact.** Names, birth dates, `master_id` and `atletieknu_id`
   live only in `personen.db`. Never copy them into `prestaties.db`,
-  `testen.db` or `trainingsschema.db`, and never store anything there that points back to a person
+  `testen.db`, `trainingsschema.db` or `absentie.db`, and never store anything there that points back to a person
   (e.g. a per-athlete atletiek.nu URL).
 - Test fixtures in `tests/fixtures/` must be **anonymised** (fake names, fake
   athlete IDs) before they are saved.
@@ -79,15 +79,16 @@ follow it when implementing.
 
 ### Three encrypted databases
 
-The data is split over four SQLCipher-encrypted files in `data/` (repo root
+The data is split over five SQLCipher-encrypted files in `data/` (repo root
 when run from source, next to the `.exe` when frozen):
 
 | File             | Contents | Athlete identified by |
 |------------------|----------|-----------------------|
-| `personen.db`    | `atleet` (personal details), groups, trainings, `absentie`, `periodeplan`, leerlijnen, `ploeg`, `ploeg_opstelling` | `master_id` |
+| `personen.db`    | `atleet` (personal details), groups, trainings, `periodeplan`, leerlijnen, `ploeg`, `ploeg_opstelling` | `master_id` |
 | `prestaties.db`  | `onderdeel`, `wedstrijd`, `prestatie`, `inschrijving`, `pr` view | `atleet_ref` (pseudonym) |
 | `testen.db`      | `test`, `testresultaat` | `atleet_ref` (pseudonym) |
 | `trainingsschema.db` | `trainingsschema`: one row per athlete, columns `maandag` … `zondag` (0/1) | `atleet_ref` (pseudonym) |
+| `absentie.db`    | `absentie`: long format, one row per athlete per training (`training_id`, `status`, `reden`) | `atleet_ref` (pseudonym) |
 
 None of the databases are in git. `src/db/init_db.py` creates them and brings
 them up to date:
@@ -110,13 +111,18 @@ python src/db/init_db.py --herstel <sleutel>  # restore the key (e.g. new comput
 - Every athlete gets a random `master_id` (32 hex chars) in `personen.db`.
   Create it with `nieuw_master_id()` — **never derive it** from name, birth date
   or a federation number.
-- In `prestaties.db`, `testen.db` and `trainingsschema.db` an athlete is
-  `atleet_ref = pseudoniem(master_id, "prestaties" | "testen" | "trainingsschema")`.
+- In every database except `personen.db` an athlete is
+  `atleet_ref = pseudoniem(master_id, "<database>")`.
   The pseudonyms differ per database, so the files cannot be joined without the master key.
   To combine data, look up the `master_id` in `personen.db` and compute the
   pseudonym in Python; there is no stored mapping table.
 - Cross-file references (`ploeg.wedstrijd_id`, `ploeg_opstelling.onderdeel_id`
-  → `prestaties.db`) are not enforced by SQLite; check them in Python.
+  → `prestaties.db`; `absentie.training_id` → `personen.db`) are not enforced
+  by SQLite; check them in Python. Deleting a training must go through
+  `Opslag.training_verwijderen()` so its absence rows go too.
+- Absence stores every status explicitly, `aanwezig` included: no row means
+  "not filled in yet". `blessure` is health data — keep `reden` short and
+  factual, never a diagnosis.
 
 ### Rules
 
