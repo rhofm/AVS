@@ -25,7 +25,7 @@ Dit staat in het [Structuur](docs/Structuur.md) bestand.
 ## Opmerkingen
 
 * Database management in SQL, verwerking in python
-* Databases zijn versleuteld (SQLCipher) en gesplitst in zeven bestanden: personen, prestaties, testen, trainingsschema, absentie, leerlijnen en leerdoelscores
+* Databases zijn versleuteld (SQLCipher) en gesplitst in acht bestanden: personen, prestaties, testen, trainingsschema, absentie, leerlijnen, leerdoelscores en notities
 * Alleen in de personen-database staan namen; in de andere twee staat een atleet onder een pseudoniem
 * **Bewaar de herstelsleutel!** (`python src/db/init_db.py --herstelsleutel`) Zonder die sleutel is alle data weg, bijv. na een nieuwe computer of herinstallatie van Windows
 * Makkelijke User Interface (moet zonder terminal kunnen worden gebruikt) (bouwen in C++? of iets met HTML?)

@@ -11,6 +11,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from models import (  # noqa: E402
+    Notitie,
     DAGEN, Trainingsschema,
     Absentie, Atleet, Groep, Leerlijn, LeerlijnStap, LeerlijnVoortgang,
     Onderdeel, Periodeplan, Prestatie, heeft_windmeting,
@@ -146,6 +147,20 @@ def test_trainingsschema():
     for fout in (lambda: Trainingsschema.met_dagen("a" * 32, ["maandg"]), lambda: s.traint_op("weekend")):
         try:
             fout()
+        except ValueError:
+            continue
+        raise AssertionError("ValueError verwacht")
+
+
+def test_notitie():
+    n = Notitie("a" * 32, date(2026, 10, 13), "  Eerste regel over de start.\nTweede regel.  ")
+    assert n.inhoud == "Eerste regel over de start.\nTweede regel."
+    assert n.samenvatting() == "Eerste regel over de start."
+    assert n.samenvatting(10) == "Eerste re…" and len(n.samenvatting(10)) <= 10
+    assert "Eerste" not in repr(n)                       # tekst niet in logs
+    for leeg in ("", "   ", None):
+        try:
+            Notitie("a" * 32, date(2026, 10, 13), leeg)
         except ValueError:
             continue
         raise AssertionError("ValueError verwacht")

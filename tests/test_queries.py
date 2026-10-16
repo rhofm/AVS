@@ -18,7 +18,7 @@ from db.init_db import DB_DIR, init_db, pseudoniem, verbind  # noqa: E402
 from db.queries import Opslag, OpslagFout  # noqa: E402
 from models import (  # noqa: E402
     PR, heeft_windmeting, Absentie, Atleet, Groep, Inschrijving, Leerlijn, LeerlijnStap, LeerlijnVoortgang,
-    Onderdeel, Periodeplan, Prestatie, Test, Testresultaat, Training, Trainingsschema, Wedstrijd,
+    Onderdeel, Periodeplan, Prestatie, Test, Testresultaat, Training, Trainingsschema, Wedstrijd, Notitie,
 )
 
 TESTSLEUTEL = "11" * 32
@@ -362,6 +362,40 @@ def test_absentie_eigen_database():
                                       (tr1.id,)).fetchone()[0] == 0
 
 
+def test_notities():
+    with opslag() as db:
+        anna, tim, _, _ = _basis(db)
+        lang = "Starthouding:\n" + "Te vroeg rechtop, armen te laag. " * 200   # lange tekst mag
+        n1 = db.notitie_opslaan(Notitie(anna.master_id, date(2026, 10, 13), lang))
+        n2 = db.notitie_opslaan(Notitie(anna.master_id, date(2026, 10, 15), "Sprong mooi af op de balk."))
+        n3 = db.notitie_opslaan(Notitie(tim.master_id, date(2026, 10, 13), "Klaagde over kuit, rustig aan gedaan."))
+        assert n1.id and n1.aangemaakt_op and n1.bijgewerkt_op is None
+
+        assert db.notitie(n1.id).inhoud == lang.strip()
+        assert [n.id for n in db.notities(anna.master_id)] == [n2.id, n1.id]                  # nieuwste eerst
+        assert {n.atleet_id for n in db.notities(van=date(2026, 10, 13), tot=date(2026, 10, 13))} == {
+            anna.master_id, tim.master_id}                                                     # alles van één dag
+        assert [n.id for n in db.notities(zoek="BALK")] == [n2.id]                             # hoofdletterongevoelig
+        assert db.notities(tim.master_id, zoek="balk") == []
+
+        # Aanpassen: zelfde id, bijgewerkt_op gezet.
+        n2.inhoud = "Sprong mooi af op de balk, wel te kort aanloop."
+        db.notitie_opslaan(n2)
+        terug = db.notitie(n2.id)
+        assert terug.inhoud.endswith("aanloop.") and terug.bijgewerkt_op is not None
+        assert len(db.notities(anna.master_id)) == 2
+
+        # Pseudoniem, geen master_id; tekst niet leesbaar in het bestand.
+        refs = {r[0] for r in db.notities_db.execute("SELECT atleet_ref FROM notitie")}
+        assert pseudoniem(anna.master_id, "notities", TESTSLEUTEL) in refs and anna.master_id not in refs
+        assert refs.isdisjoint({pseudoniem(anna.master_id, d, TESTSLEUTEL) for d in ("prestaties", "absentie")})
+
+        _verwacht(OpslagFout, lambda: db.notitie_opslaan(Notitie("0" * 32, date(2026, 10, 1), "x")))
+        _verwacht(OpslagFout, lambda: db.notitie_opslaan(Notitie(anna.master_id, date(2026, 10, 1), "x", id=999)))
+        db.notitie_verwijderen(n3.id)
+        assert db.notitie(n3.id) is None and db.notities(tim.master_id) == []
+
+
 def test_oude_absentie_wordt_verplaatst():
     """Een personen.db van vóór absentie.db: de rijen verhuizen bij init_db, niets gaat verloren."""
     with tempfile.TemporaryDirectory() as tmp:
@@ -413,6 +447,8 @@ def test_atleet_verwijderen_wist_alles():
         db.trainingsschema_opslaan(Trainingsschema.met_dagen(tim.master_id, ["dinsdag"]))
         tr = db.training_opslaan(Training(g.id, date(2026, 10, 13)))
         db.absenties_opslaan([Absentie(tr.id, anna.master_id, "blessure"), Absentie(tr.id, tim.master_id, "aanwezig")])
+        db.notitie_opslaan(Notitie(anna.master_id, date(2026, 10, 13), "Notitie over Anna"))
+        db.notitie_opslaan(Notitie(tim.master_id, date(2026, 10, 13), "Notitie over Tim"))
 
         db.atleet_verwijderen(anna.master_id)
         assert db.atleet(anna.master_id) is None
@@ -421,6 +457,8 @@ def test_atleet_verwijderen_wist_alles():
         assert db.trainingsschema(anna.master_id).dagen == []
         assert db.atleten_op_dag("dinsdag") == [tim.master_id]
         assert db.absentie_db.execute("SELECT count(*) FROM absentie").fetchone()[0] == 1   # alleen Tim
+        assert db.notities(anna.master_id) == []
+        assert [n.inhoud for n in db.notities()] == ["Notitie over Tim"]
         assert db.groep(g.id).leden == [tim.master_id]
         assert len(db.prestaties(tim.master_id)) == 1  # Tim blijft
 

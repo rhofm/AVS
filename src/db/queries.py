@@ -2,7 +2,7 @@
 
 De rest van de app praat alleen met `Opslag` en krijgt/geeft modellen uit
 models/. Buiten dit bestand is geen SQL nodig, en niemand buiten db/ hoeft te
-weten dat de gegevens over zeven versleutelde bestanden verdeeld zijn.
+weten dat de gegevens over acht versleutelde bestanden verdeeld zijn.
 
 Pseudoniemen
 ------------
@@ -53,6 +53,7 @@ from models import (
     Leerlijn,
     LeerlijnStap,
     LeerlijnVoortgang,
+    Notitie,
     Onderdeel,
     Periodeplan,
     Prestatie,
@@ -87,7 +88,7 @@ def _vraagtekens(n: int) -> str:
 
 
 class Opslag:
-    """Toegang tot de zeven AVS-databases met modellen in en modellen uit."""
+    """Toegang tot de acht AVS-databases met modellen in en modellen uit."""
 
     def __init__(self, map: Path | None = None, hoofd: str | bytes | None = None) -> None:
         self._map = Path(map) if map else None
@@ -100,12 +101,13 @@ class Opslag:
         self.absentie_db = verbind("absentie", self._map, self._hoofd)
         self.leerlijnen_db = verbind("leerlijnen", self._map, self._hoofd)
         self.leerdoelscores_db = verbind("leerdoelscores", self._map, self._hoofd)
+        self.notities_db = verbind("notities", self._map, self._hoofd)
         self._terug: dict[str, dict[str, str]] = {}
 
     # ---------- openen / sluiten ----------
     def sluit(self) -> None:
         for conn in (self.personen, self.prestaties_db, self.testen_db, self.trainingsschema_db, self.absentie_db,
-                     self.leerlijnen_db, self.leerdoelscores_db):
+                     self.leerlijnen_db, self.leerdoelscores_db, self.notities_db):
             conn.close()
 
     def __enter__(self) -> Opslag:
@@ -206,6 +208,7 @@ class Opslag:
         ref_s = self._ref(master_id, "trainingsschema")
         ref_a = self._ref(master_id, "absentie")
         ref_l = self._ref(master_id, "leerdoelscores")
+        ref_n = self._ref(master_id, "notities")
         with self.prestaties_db:
             self.prestaties_db.execute("DELETE FROM prestatie WHERE atleet_ref = ?", (ref_p,))
             self.prestaties_db.execute("DELETE FROM inschrijving WHERE atleet_ref = ?", (ref_p,))
@@ -217,6 +220,8 @@ class Opslag:
             self.absentie_db.execute("DELETE FROM absentie WHERE atleet_ref = ?", (ref_a,))
         with self.leerdoelscores_db:
             self.leerdoelscores_db.execute("DELETE FROM leerdoelscore WHERE atleet_ref = ?", (ref_l,))
+        with self.notities_db:
+            self.notities_db.execute("DELETE FROM notitie WHERE atleet_ref = ?", (ref_n,))
         with self.personen:  # groep_lid, voortgang, opstellingen gaan mee (CASCADE)
             self.personen.execute("DELETE FROM atleet WHERE master_id = ?", (master_id,))
         self._vergeet_pseudoniemen()
@@ -890,3 +895,75 @@ class Opslag:
         leerdoel_ids = list(leerdoel_ids)
         return {m: {lid: (laatste[m][lid].score if lid in laatste[m] else None) for lid in leerdoel_ids}
                 for m in master_ids}
+
+    # ============================================================
+    # Notities (notities.db): vrije tekst per atleet per datum
+    # ============================================================
+    @staticmethod
+    def _notitie(r, master_id: str) -> Notitie:
+        return Notitie(master_id, _naar_datum(r["datum"]), r["inhoud"], r["id"],
+                       r["aangemaakt_op"], r["bijgewerkt_op"])
+
+    def notitie_opslaan(self, n: Notitie) -> Notitie:
+        """Nieuwe notitie toevoegen, of een bestaande (met id) aanpassen."""
+        if self.atleet(n.atleet_id) is None:
+            raise OpslagFout(f"Atleet {n.atleet_id} bestaat niet.")
+        ref = self._ref(n.atleet_id, "notities")
+        with self.notities_db:
+            if n.id is None:
+                n.id = self.notities_db.execute(
+                    "INSERT INTO notitie (atleet_ref, datum, inhoud) VALUES (?, ?, ?)",
+                    (ref, _naar_tekst(n.datum), n.inhoud),
+                ).lastrowid
+            else:
+                cur = self.notities_db.execute(
+                    """UPDATE notitie SET atleet_ref = ?, datum = ?, inhoud = ?, bijgewerkt_op = datetime('now')
+                       WHERE id = ?""",
+                    (ref, _naar_tekst(n.datum), n.inhoud, n.id),
+                )
+                if cur.rowcount == 0:
+                    raise OpslagFout(f"Notitie {n.id} bestaat niet.")
+        r = self.notities_db.execute(
+            "SELECT aangemaakt_op, bijgewerkt_op FROM notitie WHERE id = ?", (n.id,)).fetchone()
+        n.aangemaakt_op, n.bijgewerkt_op = r["aangemaakt_op"], r["bijgewerkt_op"]
+        return n
+
+    def notitie(self, notitie_id: int) -> Notitie | None:
+        r = self.notities_db.execute("SELECT * FROM notitie WHERE id = ?", (notitie_id,)).fetchone()
+        if r is None:
+            return None
+        master_id = self._master_id(r["atleet_ref"], "notities")
+        return self._notitie(r, master_id) if master_id is not None else None
+
+    def notities(self, master_id: str | None = None, van: date | None = None, tot: date | None = None,
+                 zoek: str | None = None) -> list[Notitie]:
+        """Notities, nieuwste eerst.
+
+        master_id: alleen van deze atleet (anders van iedereen, bijv. alles van één training).
+        van / tot: datumbereik (beide inclusief).
+        zoek:      tekst die in de notitie voorkomt (hoofdletterongevoelig).
+        """
+        sql, args = "SELECT * FROM notitie WHERE 1 = 1", []
+        if master_id is not None:
+            sql += " AND atleet_ref = ?"
+            args.append(self._ref(master_id, "notities"))
+        if van:
+            sql += " AND datum >= ?"
+            args.append(_naar_tekst(van))
+        if tot:
+            sql += " AND datum <= ?"
+            args.append(_naar_tekst(tot))
+        if zoek and zoek.strip():
+            sql += " AND inhoud LIKE ?"
+            args.append(f"%{zoek.strip()}%")
+        sql += " ORDER BY datum DESC, id DESC"
+        uit = []
+        for r in self.notities_db.execute(sql, args):
+            mid = master_id or self._master_id(r["atleet_ref"], "notities")
+            if mid is not None:
+                uit.append(self._notitie(r, mid))
+        return uit
+
+    def notitie_verwijderen(self, notitie_id: int) -> None:
+        with self.notities_db:
+            self.notities_db.execute("DELETE FROM notitie WHERE id = ?", (notitie_id,))

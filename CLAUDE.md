@@ -37,8 +37,8 @@ This project holds personal data about athletes, many of them minors.
   (`--herstelsleutel`). Do not write keys to files, config or test fixtures.
 - **Keep the split intact.** Names, birth dates, `master_id` and `atletieknu_id`
   live only in `personen.db`. Never copy them into `prestaties.db`,
-  `testen.db`, `trainingsschema.db`, `absentie.db`, `leerlijnen.db` or
-  `leerdoelscores.db`, and never store anything there that points back to a person
+  `testen.db`, `trainingsschema.db`, `absentie.db`, `leerlijnen.db`,
+  `leerdoelscores.db` or `notities.db`, and never store anything there that points back to a person
   (e.g. a per-athlete atletiek.nu URL).
 - Test fixtures in `tests/fixtures/` must be **anonymised** (fake names, fake
   athlete IDs) before they are saved.
@@ -81,7 +81,7 @@ follow it when implementing.
 
 ### Encrypted databases
 
-The data is split over seven SQLCipher-encrypted files in `data/` (repo root
+The data is split over eight SQLCipher-encrypted files in `data/` (repo root
 when run from source, next to the `.exe` when frozen):
 
 | File             | Contents | Athlete identified by |
@@ -93,6 +93,7 @@ when run from source, next to the `.exe` when frozen):
 | `absentie.db`    | `absentie`: long format, one row per athlete per training (`training_id`, `status`, `reden`) | `atleet_ref` (pseudonym) |
 | `leerlijnen.db`  | Catalogue, no personal data: `leerlijn`, `leerdoel` (id `SPR-U10-01`, per category U10–U20), `categorie`, `scoreschaal` | — |
 | `leerdoelscores.db` | `leerdoelscore`: long format, one row per athlete per leerdoel per date (score 1–5), `laatste_leerdoelscore` view | `atleet_ref` (pseudonym) |
+| `notities.db`    | `notitie`: free-text notes, one row per note (`datum`, `inhoud`, `aangemaakt_op`, `bijgewerkt_op`) | `atleet_ref` (pseudonym) |
 
 None of the databases are in git. `src/db/init_db.py` creates them and brings
 them up to date:
@@ -129,6 +130,10 @@ python src/db/init_db.py --herstel <sleutel>  # restore the key (e.g. new comput
   leerdoel with `actief = 0` in a migration. The old `leerlijn`/`leerlijn_stap`/
   `atleet_leerlijn` tables in `personen.db` predate `leerlijnen.db` and are superseded
   by it (the old `Opslag.leerlijn*`/`voortgang*` methods still use them).
+- Notes (`notities.db`) are free text: the pseudonym protects the link to the
+  athlete, but not what is written in the text. Only the encryption protects
+  that. Keep notes factual, no diagnoses, and don't name other athletes.
+  `Notitie.inhoud` is hidden from `repr()`; never log note text.
 - Absence stores every status explicitly, `aanwezig` included: no row means
   "not filled in yet". `blessure` is health data — keep `reden` short and
   factual, never a diagnosis.
