@@ -1,0 +1,68 @@
+{#
+  Nieuwe atleet toevoegen.
+  Context:
+    f         – atleten.nieuw.NieuwFormulier
+    fouten    – {veld: melding}, leeg als er (nog) niets mis is
+    dubbelen  – optioneel lijst met bestaande atleten met dezelfde naam (vraag om bevestiging)
+  POST naar /atleten/nieuw. Bij dubbelen: opnieuw versturen met 'toch' = 1.
+#}
+{% extends "basis.html" %}
+{% block titel %}Nieuwe atleet{% endblock %}
+
+
+{% block inhoud %}
+<article class="vel">
+  <header class="blok">
+    <a class="terug" href="{{ url_for('atleten') }}">&larr; Atleten</a>
+    <h1 class="kop kop--pagina">Nieuwe atleet</h1>
+    <p class="subkop">Velden met * zijn verplicht. De rest kun je later aanvullen.</p>
+  </header>
+
+  {% if fouten.algemeen %}<p class="melding melding--fout" role="alert">Niet opgeslagen: {{ fouten.algemeen }}</p>
+  {% elif fouten %}<p class="melding melding--fout" role="alert">Nog niet opgeslagen: controleer de rood gemarkeerde velden.</p>{% endif %}
+
+  <form class="blok atleetform" method="post" action="{{ url_for('atleet_nieuw_opslaan') }}" novalidate>
+    {% if dubbelen %}
+      <div class="melding melding--let-op" role="alert">
+        <p><strong>Er bestaat al een atleet met deze naam:</strong></p>
+        <ul>
+          {% for a in dubbelen %}
+            <li><a href="{{ url_for('atleet', master_id=a.master_id) }}" target="_blank" rel="noopener">{{ a.naam }}</a>
+              <span class="zacht">{% if a.geboortedatum %}geboren {{ a.geboortedatum[:4] }}{% endif %}{% if not a.actief %} · niet actief{% endif %}</span></li>
+          {% endfor %}
+        </ul>
+        <label class="vinkje" for="veld-toch"><input type="checkbox" id="veld-toch" name="toch" value="1">
+          Het is een andere atleet: toch toevoegen</label>
+      </div>
+    {% endif %}
+
+    {% include "_atleet_velden.html" %}
+
+    <section class="blok" aria-labelledby="kop-dagen">
+      <h2 class="subkop" id="kop-dagen">Trainingsdagen</h2>
+      <fieldset class="dagkeuze">
+        <legend class="verborgen">Trainingsdagen</legend>
+        {% for d in f.dagen %}
+          <div class="dagkeuze__dag">
+            <input type="checkbox" id="dag-{{ d.dag }}" name="dag" value="{{ d.dag }}"{% if d.gekozen %} checked{% endif %}>
+            <label for="dag-{{ d.dag }}">
+              <span class="dagkeuze__kort">{{ d.kort }}</span>
+              <span class="dagkeuze__vink" aria-hidden="true"></span>
+              <span class="verborgen">{{ d.dag }}</span>
+            </label>
+          </div>
+        {% endfor %}
+      </fieldset>
+      {% if fouten.dag %}<span class="veld__fout">{{ fouten.dag }}</span>{% endif %}
+      <p class="zacht uitleg">Op deze dagen staat de atleet vooraf op &lsquo;aanwezig&rsquo; op de absentielijst.</p>
+    </section>
+
+    <div class="opslaan opslaan--onder">
+      <a class="knop" href="{{ url_for('atleten') }}">Annuleren</a>
+      <button class="knop knop--vol" type="submit">Atleet toevoegen</button>
+    </div>
+  </form>
+
+  <footer class="vel__voet">Atleet Volg Systeem</footer>
+</article>
+{% endblock %}

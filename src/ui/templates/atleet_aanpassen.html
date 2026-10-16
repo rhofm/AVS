@@ -1,0 +1,57 @@
+{#
+  Gegevens van een atleet aanpassen, of de atleet verwijderen.
+  Context:
+    a           – de atleet (models.Atleet), zoals hij nu is opgeslagen
+    f           – atleten.nieuw.NieuwFormulier, vooraf ingevuld (of zoals verstuurd na een fout)
+    actief      – stand van het vinkje 'actief'
+    fouten      – {veld: melding}
+    verwijder_fout – optioneel, melding bij het verwijderen
+  POST naar /atleet/<id>/aanpassen (opslaan) of /atleet/<id>/verwijderen (met 'bevestiging' = volledige naam).
+#}
+{% extends "basis.html" %}
+{% set basis = url_for('atleet', master_id=a.master_id) %}
+{% block titel %}Aanpassen {{ a.naam }}{% endblock %}
+
+{% block inhoud %}
+<article class="vel">
+  <header class="blok">
+    <a class="terug" href="{{ basis }}">&larr; {{ a.naam }}</a>
+    <h1 class="kop kop--pagina">Gegevens aanpassen</h1>
+    <p class="subkop">{{ a.naam }}{% if a.aangemaakt_op %} · in AVS sinds {{ a.aangemaakt_op | tekstdatum }}{% endif %}</p>
+  </header>
+
+  {% if fouten.algemeen %}<p class="melding melding--fout" role="alert">Niet opgeslagen: {{ fouten.algemeen }}</p>
+  {% elif fouten %}<p class="melding melding--fout" role="alert">Nog niet opgeslagen: controleer de rood gemarkeerde velden.</p>{% endif %}
+
+  <form class="blok atleetform" method="post" action="{{ basis }}/aanpassen" novalidate>
+    {% include "_atleet_velden.html" %}
+
+    <section class="blok" aria-labelledby="kop-status">
+      <h2 class="subkop" id="kop-status">Status</h2>
+      <label class="vinkje" for="veld-actief"><input type="checkbox" id="veld-actief" name="actief" value="1"{% if actief %} checked{% endif %}>
+        Actief: traint nu bij de club</label>
+      <p class="zacht uitleg">Stopt de atleet? Haal dan dit vinkje weg. Alle gegevens blijven bewaard en de atleet staat niet meer in de standaardlijsten.</p>
+      <p class="uitleg"><a href="{{ basis }}/trainingsschema">Trainingsdagen aanpassen &rarr;</a></p>
+    </section>
+
+    <div class="opslaan opslaan--onder">
+      <a class="knop" href="{{ basis }}">Annuleren</a>
+      <button class="knop knop--vol" type="submit">Opslaan</button>
+    </div>
+  </form>
+
+  <form class="blok verwijderen" method="post" action="{{ basis }}/verwijderen" id="verwijderen">
+    <h2 class="kop">Atleet verwijderen</h2>
+    <p class="uitleg">Dit wist {{ a.voornaam }} en <strong>alle</strong> gegevens uit AVS: prestaties, testen, aanwezigheid, leerdoelscores en notities.
+      Dit kan niet ongedaan worden gemaakt. Alleen doen bij een verzoek om gegevens te verwijderen; wie stopt, zet je op niet actief.</p>
+    {% if verwijder_fout %}<p class="melding melding--fout" role="alert">{{ verwijder_fout }}</p>{% endif %}
+    <div class="veld">
+      <label for="veld-bevestiging">Typ ter bevestiging de volledige naam: <strong>{{ a.naam }}</strong></label>
+      <input type="text" id="veld-bevestiging" name="bevestiging" autocomplete="off" required>
+    </div>
+    <div><button class="knop knop--gevaar" type="submit">Definitief verwijderen</button></div>
+  </form>
+
+  <footer class="vel__voet">Atleet Volg Systeem<br>{{ a.naam }}</footer>
+</article>
+{% endblock %}

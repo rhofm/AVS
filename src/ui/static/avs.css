@@ -178,6 +178,7 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--rood); outline-
 }
 .atleetkop__spec { margin: .35rem 0 0; font-size: var(--maat-l); font-variant-caps: small-caps; font-weight: 700; letter-spacing: .03em; }
 .atleetkop__feiten { margin: .6rem 0 0; display: flex; flex-wrap: wrap; gap: .25rem 1.25rem; font-size: var(--maat-s); color: var(--tekst-zacht); }
+.atleetkop__aanpassen { margin-top: .9rem; }
 .categorie {                   /* rood blokje zoals "2025" op de voorkant */
   background: var(--rood); color: var(--op-zalm);
   min-width: 4.5rem; padding: .9rem .9rem .6rem; text-align: center;
@@ -385,6 +386,7 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--rood); outline-
 }
 .zoekbalk input[type="search"]:focus-visible { outline: 2px solid var(--rood); outline-offset: 1px; }
 .vinkje { display: inline-flex; align-items: center; gap: .35rem; font-size: var(--maat-s); }
+.vinkje input { accent-color: var(--rood); }
 
 /* ---------- groep ---------- */
 .legenda { list-style: none; margin: .2rem 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: .25rem 1.25rem; font-size: var(--maat-s); color: var(--tekst-zacht); }
@@ -500,6 +502,28 @@ th[aria-sort="descending"] .sorteer__naam::after { content: " \2193"; opacity: 1
 .verwijderen { border-top: 1px solid var(--rand); padding-top: 1.25rem; justify-items: start; }
 .knop--gevaar { border-color: var(--afwezig); color: var(--afwezig); }
 .knop--gevaar:hover { background: var(--afwezig); color: var(--op-zalm); }
+
+/* ---------- nieuwe atleet ---------- */
+.atleetform { gap: 1.75rem; max-width: 56rem; }
+.velden { display: grid; gap: .9rem 1.25rem; grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr)); align-items: start; }
+.veld { display: grid; gap: .3rem; min-width: 0; font-size: var(--maat-s); border: 0; margin: 0; padding: 0; }
+.veld > label, .veld > legend { font-weight: 700; padding: 0; }
+.veld input[type="text"], .veld input[type="date"] {
+  font: inherit; font-size: var(--maat-m); color: var(--tekst); background: var(--papier);
+  border: 1px solid var(--rand); padding: .45rem .55rem; width: 100%; min-width: 0;
+}
+.veld input:focus-visible { outline: 2px solid var(--rood); outline-offset: 1px; }
+.veld__hint { font-size: var(--maat-xs); }
+.veld__fout { color: var(--rood); font-size: var(--maat-xs); font-weight: 700; }
+.veld--fout input[type="text"], .veld--fout input[type="date"] { border-color: var(--rood); box-shadow: inset 3px 0 0 var(--rood); }
+.keuzerij { display: flex; flex-wrap: wrap; gap: .4rem 1rem; }
+.keuzerij legend { width: 100%; margin-bottom: .2rem; }
+.keuzerij > label.vinkje { font-weight: 400; }
+.groepkeuze { display: flex; flex-wrap: wrap; gap: .5rem 1.25rem; }
+.groepkeuze .vinkje input, .keuzerij .vinkje input { accent-color: var(--rood); width: 1.05rem; height: 1.05rem; }
+.melding--let-op { border-left-color: var(--afgemeld); background: var(--afgemeld-vlak); display: grid; gap: .4rem; }
+.melding--let-op p, .melding--let-op ul { margin: 0; }
+.melding--let-op ul { padding-left: 1.2rem; }
 
 @media (max-width: 40rem) {
   .invultabel, .invultabel tbody, .invultabel tr, .invultabel th, .invultabel td { display: block; width: auto; }
