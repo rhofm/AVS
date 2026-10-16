@@ -25,7 +25,8 @@ from pathlib import Path
 if __package__ in (None, ""):          # los gestart: src/ op het pad zetten
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from flask import Flask, abort, flash, g, get_flashed_messages, redirect, render_template, request, url_for
+from flask import (Flask, Response, abort, flash, g, get_flashed_messages, redirect, render_template, request,
+                   url_for)
 
 from atleten import beheer, landingspagina
 from atleten import aanpassen as atleetbeheer
@@ -40,6 +41,7 @@ from groepen import landingspagina as groep_landingspagina
 from groepen import overzichten as groep_overzichten
 from groepen import trainingen as trainingsbeheer
 from leerlijnen import voortgang
+from ui import export as trainingsexport
 from ui.opmaak import registreer_filters
 from wedstrijden import kalender
 
@@ -372,6 +374,26 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
         meldingen = get_flashed_messages()
         return render_template("training.html", tp=tp, melding=meldingen[0] if meldingen else None,
                                actief_menu="groepen")
+
+    @app.get("/training/<int:training_id>/export.<soort>")
+    def training_export(training_id: int, soort: str):
+        """Training als .md of .pdf om te delen. Namen bij afwijkende trainingen alleen met ?namen=1."""
+        if soort not in ("md", "pdf"):
+            abort(404)
+        tp = trainingsbeheer.trainingpagina(db(), training_id)
+        if tp is None:
+            abort(404)
+        e = trainingsexport.trainingsexport(tp, namen=request.args.get("namen") == "1")
+        if soort == "md":
+            inhoud, mime = trainingsexport.naar_markdown(e).encode("utf-8"), "text/markdown; charset=utf-8"
+        else:
+            try:
+                inhoud, mime = trainingsexport.naar_pdf(e), "application/pdf"
+            except ImportError:
+                flash("PDF maken lukt niet: het pakket fpdf2 ontbreekt (pip install fpdf2). Markdown werkt wel.")
+                return redirect(url_for("training", training_id=tp.training.id))
+        return Response(inhoud, mimetype=mime, headers={
+            "Content-Disposition": f'attachment; filename="{e.bestandsnaam}.{soort}"'})
 
     # ---------------- training bewerken en afwijkende trainingen ----------------
     def _bewerkpagina(f, fout: str | None = None, status: int = 200):

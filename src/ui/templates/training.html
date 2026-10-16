@@ -77,6 +77,23 @@
     </section>
   {% endfor %}
 
+  <form class="exportbalk" method="get" action="{{ url_for('training_export', training_id=t.id, soort='pdf') }}">
+    <span class="exportbalk__titel">Delen <span class="zacht">— de training zonder aanwezigheid</span></span>
+    {% if tp.varianten %}
+      <label class="vinkje"><input type="checkbox" name="namen" value="1"> Namen bij afwijkende trainingen</label>
+    {% endif %}
+    <span class="knoppen">
+      <button class="knop" type="submit" formaction="{{ url_for('training_export', training_id=t.id, soort='md') }}">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M7 1h2v7.6l2.3-2.3 1.4 1.4L8 12.4 3.3 7.7l1.4-1.4L7 8.6zM2 13h12v2H2z"/></svg>
+        Markdown (.md)
+      </button>
+      <button class="knop" type="submit">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M7 1h2v7.6l2.3-2.3 1.4 1.4L8 12.4 3.3 7.7l1.4-1.4L7 8.6zM2 13h12v2H2z"/></svg>
+        PDF
+      </button>
+    </span>
+  </form>
+
   <section class="blok" aria-labelledby="kop-aw">
     <div class="blok__kop">
       <h2 class="kop" id="kop-aw">Aanwezigheid</h2>
