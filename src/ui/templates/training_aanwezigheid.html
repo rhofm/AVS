@@ -1,0 +1,92 @@
+{#
+  Aanwezigheid invullen voor één training.
+  Context:
+    f     – groepen.trainingen.Invulformulier
+    fout  – foutmelding (optioneel)
+    max_reden – maximale lengte van de reden
+  Wie volgens zijn trainingsschema die dag traint, staat al op 'aanwezig';
+  de trainer past alleen de uitzonderingen aan. Werkt zonder JavaScript; een
+  klein script toont het redenveld alleen als de status niet 'aanwezig' is.
+#}
+{% extends "basis.html" %}
+{% set t = f.training %}
+{% block titel %}Aanwezigheid {{ t.datum | datum_kort }}{% endblock %}
+
+{% block inhoud %}
+<article class="vel">
+  <header class="blok__kop">
+    <div>
+      <a class="terug" href="{{ url_for('training', training_id=t.id) }}">&larr; {{ t.onderwerp or "Training" }}</a>
+      <h1 class="kop kop--pagina">Aanwezigheid invullen</h1>
+      <p class="subkop">{{ f.groep.naam }} · {{ t.datum | datum_kort }} {{ t.datum.year }}</p>
+    </div>
+  </header>
+
+  {% if fout %}<p class="melding melding--fout" role="alert">{{ fout }}</p>{% endif %}
+  {% if not f.al_ingevuld %}
+    <p class="melding">Wie op deze dag volgens het trainingsschema traint, staat al op aanwezig. Pas alleen de uitzonderingen aan en sla op.</p>
+  {% endif %}
+
+  {% if f.regels %}
+    <form method="post" class="blok">
+      <div class="tabelvak">
+        <table class="tabel invultabel">
+          <thead><tr><th scope="col">Naam</th><th scope="col">Status</th><th scope="col">Reden <span class="zacht">(kort, geen diagnose)</span></th></tr></thead>
+          <tbody>
+            {% for r in f.regels %}
+              <tr>
+                <th scope="row">
+                  {{ r.atleet.naam }}
+                  <br><span class="matrix__sub">{{ r.categorie_code or "" }}
+                    {%- if not r.ingeroosterd %}{{ " · " if r.categorie_code }}niet ingeroosterd{% endif %}
+                    {%- if not r.lid %} · niet meer in de groep{% endif %}</span>
+                </th>
+                <td>
+                  <fieldset class="statuskiezer">
+                    <legend class="verborgen">Status {{ r.atleet.naam }}</legend>
+                    {% for s, tekst in f.statussen %}
+                      <input type="radio" id="st-{{ r.veld }}-{{ s }}" name="status-{{ r.veld }}" value="{{ s }}"{% if r.status == s %} checked{% endif %}>
+                      <label class="status-{{ s }}" for="st-{{ r.veld }}-{{ s }}">{{ tekst }}</label>
+                    {% endfor %}
+                    {% if not r.opgeslagen %}
+                      <input type="radio" id="st-{{ r.veld }}-leeg" name="status-{{ r.veld }}" value=""{% if not r.status %} checked{% endif %}>
+                      <label class="status-niet_ingevuld" for="st-{{ r.veld }}-leeg" title="Niets opslaan">–</label>
+                    {% endif %}
+                  </fieldset>
+                </td>
+                <td>
+                  <label class="verborgen" for="reden-{{ r.veld }}">Reden {{ r.atleet.naam }}</label>
+                  <input class="redenveld" type="text" id="reden-{{ r.veld }}" name="reden-{{ r.veld }}" value="{{ r.reden or '' }}" maxlength="{{ max_reden }}" placeholder="bijv. ziek, school">
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div class="opslaan opslaan--onder">
+        <a href="{{ url_for('training', training_id=t.id) }}">Annuleren</a>
+        <button class="knop knop--vol" type="submit">Opslaan</button>
+      </div>
+    </form>
+  {% else %}
+    <p class="leeg">Er zitten nog geen atleten in deze groep.</p>
+  {% endif %}
+
+  <footer class="vel__voet">Atleet Volg Systeem<br>{{ f.groep.naam }} · {{ t.datum | datum_lang }}</footer>
+</article>
+<script>
+  /* Reden alleen tonen bij afgemeld/afwezig/blessure; zonder script staat het veld er altijd. */
+  (function () {
+    document.querySelectorAll(".invultabel tbody tr").forEach(function (rij) {
+      var veld = rij.querySelector(".redenveld");
+      function bij() {
+        var k = rij.querySelector("input[type=radio]:checked");
+        var nodig = k && k.value && k.value !== "aanwezig";
+        veld.hidden = !nodig && !veld.value;
+      }
+      rij.querySelectorAll("input[type=radio]").forEach(function (r) { r.addEventListener("change", bij); });
+      bij();
+    });
+  })();
+</script>
+{% endblock %}

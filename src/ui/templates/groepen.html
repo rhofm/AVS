@@ -1,0 +1,42 @@
+{#
+  Overzicht van alle groepen.
+  Context:
+    groepen – lijst van (Groep, ['Di', 'Do']) uit groepen.landingspagina.overzicht()
+#}
+{% extends "basis.html" %}
+{% block titel %}Groepen{% endblock %}
+
+{% block inhoud %}
+<article class="vel">
+  <header class="blok__kop">
+    <div>
+      <h1 class="kop kop--pagina">Groepen</h1>
+      <p class="subkop">{{ groepen | length }} groep{{ "en" if groepen | length != 1 }}</p>
+    </div>
+  </header>
+
+  {% if groepen %}
+    <div class="tabelvak">
+      <table class="tabel">
+        <thead>
+          <tr><th scope="col">Groep</th><th scope="col">Seizoen</th><th scope="col" class="rechts">Atleten</th><th scope="col">Trainingsdagen</th></tr>
+        </thead>
+        <tbody>
+          {% for g, dagen in groepen %}
+            <tr>
+              <td><a href="{{ url_for('groep', groep_id=g.id) }}"><strong>{{ g.naam }}</strong></a></td>
+              <td>{{ g.seizoen or "–" }}</td>
+              <td class="rechts">{{ g.leden | length }}</td>
+              <td>{{ dagen | join(", ") or "–" }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <p class="leeg">Nog geen groepen. Maak ze aan met een CSV-bestand met atleten en groepen.</p>
+  {% endif %}
+
+  <footer class="vel__voet">Atleet Volg Systeem</footer>
+</article>
+{% endblock %}

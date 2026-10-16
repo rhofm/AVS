@@ -1,0 +1,72 @@
+{#
+  Tabel atleten x kolommen voor een groep: gebruikt voor de PR's en voor de testresultaten.
+  Context:
+    tabel      – groepen.overzichten.Tabel
+    titel      – 'PR's' of 'Testresultaten'
+    soort      – 'prs' of 'testen' (voor de link naar de andere pagina)
+    uitleg     – korte tekst onder de tabel
+    leeg       – tekst als er nog niets is
+  De rijen staan gesorteerd op categorie (U14M, U14V, U16M, ...). De beste waarde per kolom
+  binnen een categorie staat vet met een rode streep (bij minstens twee waarden).
+#}
+{% extends "basis.html" %}
+{% set groep = tabel.groep %}
+{% block titel %}{{ titel }} {{ groep.naam }}{% endblock %}
+
+{% block inhoud %}
+<article class="vel">
+  <header class="blok__kop">
+    <div>
+      <a class="terug" href="{{ url_for('groep', groep_id=groep.id) }}">&larr; {{ groep.naam }}</a>
+      <h1 class="kop kop--pagina">{{ titel }}</h1>
+      <p class="subkop">{{ tabel.rijen | length }} {{ "atleten" if tabel.rijen | length != 1 else "atleet" }} · {{ tabel.kolommen | length }} {{ "onderdelen" if soort == "prs" else "testen" }}</p>
+    </div>
+    {% if soort == "prs" %}
+      <a class="knop" href="{{ url_for('groep_testen', groep_id=groep.id) }}">Testresultaten &rarr;</a>
+    {% else %}
+      <a class="knop" href="{{ url_for('groep_prs', groep_id=groep.id) }}">PR's &rarr;</a>
+    {% endif %}
+  </header>
+
+  {% if tabel.kolommen and tabel.rijen %}
+    <div class="tabelvak">
+      <table class="tabel matrix">
+        <thead>
+          <tr>
+            <th scope="col">Naam</th>
+            <th scope="col">Cat.</th>
+            {% for k in tabel.kolommen %}
+              <th scope="col" class="rechts">{{ k.naam }}{% if k.sub %}<br><span class="matrix__sub">{{ k.sub }}</span>{% endif %}</th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in tabel.rijen %}
+            <tr>
+              <th scope="row"><a href="{{ url_for('atleet', master_id=r.atleet.master_id) }}">{{ r.atleet.naam }}</a></th>
+              <td class="nowrap">{{ r.categorie_code or "–" }}</td>
+              {% for c in r.cellen %}
+                {% if c %}
+                  <td class="rechts nowrap{{ ' beste' if c.beste }}"{% if c.datum %} title="Getest op {{ c.datum | datum_lang }}"{% endif %}>
+                    {{ c.tekst }}{% if c.beste %}<span class="verborgen"> (beste in {{ r.categorie_code }})</span>{% endif %}
+                    {% if c.datum %}<br><span class="matrix__sub">{{ c.datum | datum_lang }}</span>{% endif %}
+                  </td>
+                {% else %}
+                  <td class="rechts zacht">–</td>
+                {% endif %}
+              {% endfor %}
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <p class="zacht" style="font-size: var(--maat-xs); margin: 0">{{ uitleg }}</p>
+  {% elif not tabel.rijen %}
+    <p class="leeg">Nog geen atleten in deze groep.</p>
+  {% else %}
+    <p class="leeg">{{ leeg }}</p>
+  {% endif %}
+
+  <footer class="vel__voet">Atleet Volg Systeem<br>{{ titel }} {{ groep.naam }}</footer>
+</article>
+{% endblock %}

@@ -1,0 +1,244 @@
+{#
+  Landingspagina van één groep.
+  Context:
+    pagina  – groepen.landingspagina.GroepLandingspagina
+  Filters uit ui/opmaak.py (registreer_filters).
+  Kleuren in de atletenlijst: .dagcel--groep (traint met de groep, rood) en
+  .dagcel--elders (traint die dag ergens anders, blauw). De betekenis staat er
+  ook als tekst bij (title en verborgen tekst), dus niet alleen in de kleur.
+#}
+{% extends "basis.html" %}
+{% set groep = pagina.groep %}
+{% set basis = "/groep/" ~ groep.id %}
+{% block titel %}{{ groep.naam }}{% endblock %}
+
+{% block inhoud %}
+<article class="vel">
+
+  {# ---------------- Groep [naam] ---------------- #}
+  <header class="atleetkop">
+    <div>
+      <a class="terug" href="/groepen">&larr; Groepen</a>
+      <span class="label" style="display: block">Groep</span>
+      <h1 class="atleetkop__naam">{{ groep.naam }}</h1>
+      <p class="atleetkop__feiten">
+        {% if groep.seizoen %}<span>seizoen {{ groep.seizoen }}</span>{% endif %}
+        {% if pagina.categorieen %}<span>{{ pagina.categorieen | join(" · ") }}</span>{% endif %}
+        {% if pagina.trainingsdagen %}<span>{{ pagina.trainingsdagen | length }}× per week</span>{% endif %}
+        {% if pagina.periode %}<span>{{ pagina.periode.naam }} · week {{ pagina.periode_week }} van {{ pagina.periode.aantal_weken }}</span>{% endif %}
+      </p>
+    </div>
+    <div class="categorie" title="Aantal atleten in de groep">{{ pagina.leden | length }}<small>{{ "atleten" if pagina.leden | length != 1 else "atleet" }}</small></div>
+  </header>
+
+  {# ---------------- Trainingsdagen ---------------- #}
+  <section class="blok" aria-labelledby="kop-dagen">
+    <div class="blok__kop">
+      <div>
+        <h2 class="kop" id="kop-dagen">Trainingsdagen</h2>
+        <p class="subkop">
+          {%- if pagina.dagen_bron == "trainingen" %}Uit de trainingen van de groep
+          {%- elif pagina.dagen_bron == "schema" %}Afgeleid uit de trainingsschema's van de atleten (nog geen trainingen gepland)
+          {%- else %}Nog niet bekend{% endif %}</p>
+      </div>
+    </div>
+    <div class="tabelvak">
+      <table class="tabel schema">
+        <thead>
+          <tr>
+            {% for d in pagina.dagen %}
+              <th scope="col"{% if d.vandaag %} aria-current="date" title="Vandaag"{% endif %}>{{ d.kort }}</th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            {% for d in pagina.dagen %}
+              <td class="{{ '' if d.groep_traint else 'rust' }}">
+                {% if d.groep_traint %}<span class="vink" aria-label="training">&#9632;</span>
+                {% else %}<span class="geen" aria-label="geen training">–</span>{% endif %}
+              </td>
+            {% endfor %}
+          </tr>
+          <tr>
+            {% for d in pagina.dagen %}
+              <td class="{{ '' if d.groep_traint else 'rust' }}">
+                {% if d.groep_traint %}<span class="gekoppeld"><span>{{ d.aantal_atleten }} {{ "atleten" if d.aantal_atleten != 1 else "atleet" }}</span></span>{% endif %}
+              </td>
+            {% endfor %}
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  {# ---------------- Atleten ---------------- #}
+  <section class="blok" aria-labelledby="kop-atleten">
+    <div class="blok__kop">
+      <div>
+        <h2 class="kop" id="kop-atleten">Atleten</h2>
+        <ul class="legenda" aria-label="Legenda">
+          <li><span class="dagcel dagcel--groep" aria-hidden="true"></span>traint met de groep</li>
+          <li><span class="dagcel dagcel--elders" aria-hidden="true"></span>traint elders</li>
+        </ul>
+      </div>
+      <span class="knoppen">
+        <a class="knop knop--vol" href="{{ basis }}/prs">PR's &rarr;</a>
+        <a class="knop knop--vol" href="{{ basis }}/testen">Testresultaten &rarr;</a>
+      </span>
+    </div>
+    {% if pagina.leden %}
+      <div class="tabelvak">
+        <table class="tabel ledentabel">
+          <thead>
+            <tr>
+              <th scope="col">Naam</th>
+              <th scope="col">Cat.</th>
+              <th scope="col">Specialisatie</th>
+              {% for d in pagina.dagen %}
+                <th scope="col" class="midden{{ ' dag--groep' if d.groep_traint }}" title="{{ d.dag | capitalize }}{{ ' (groepstraining)' if d.groep_traint }}">{{ d.kort }}</th>
+              {% endfor %}
+            </tr>
+          </thead>
+          <tbody>
+            {% for l in pagina.leden %}
+              <tr{% if not l.atleet.actief %} class="geweest"{% endif %}>
+                <td><a href="{{ url_for('atleet', master_id=l.atleet.master_id) }}"><strong>{{ l.atleet.naam }}</strong></a>
+                  {%- if not l.atleet.actief %} <span class="kenmerk">niet actief</span>{% endif %}</td>
+                <td class="nowrap">{{ l.categorie_code or "–" }}</td>
+                <td>{{ l.atleet.specialisatie or "–" }}</td>
+                {% for d in l.dagen %}
+                  <td class="midden" title="{{ pagina.dagen[loop.index0].dag | capitalize }}: {{ d.uitleg }}">
+                    {% if d.soort %}<span class="dagcel dagcel--{{ d.soort }}" aria-hidden="true"></span><span class="verborgen">{{ d.uitleg }}</span>
+                    {% else %}<span class="geen" aria-hidden="true">·</span><span class="verborgen">traint niet</span>{% endif %}
+                  </td>
+                {% endfor %}
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="leeg">Nog geen atleten in deze groep.</p>
+    {% endif %}
+  </section>
+
+  {# ---------------- Komende wedstrijden | Komende trainingen ---------------- #}
+  <div class="raster">
+    <section class="blok" aria-labelledby="kop-wed">
+      <div class="blok__kop">
+        <h2 class="kop" id="kop-wed">Komende wedstrijden</h2>
+        <a class="knop" href="{{ basis }}/wedstrijden">Volledige planning &rarr;</a>
+      </div>
+      {% if pagina.wedstrijden %}
+        <div class="tabelvak">
+          <table class="tabel">
+            <thead><tr><th scope="col">Datum</th><th scope="col">Wedstrijd</th><th scope="col">Atleten</th></tr></thead>
+            <tbody>
+              {% for r in pagina.wedstrijden %}
+                <tr>
+                  <td class="nowrap"><strong>{{ r.wedstrijd.datum | datum_kort }}</strong><br><span class="zacht">{{ r.dagen_tot | over_dagen }}</span></td>
+                  <td>
+                    {% if r.wedstrijd.bron_url %}<a href="{{ r.wedstrijd.bron_url }}" target="_blank" rel="noopener">{{ r.wedstrijd.naam }}</a>{% else %}{{ r.wedstrijd.naam }}{% endif %}
+                    {% if r.wedstrijd.locatie %}<br><span class="zacht">{{ r.wedstrijd.locatie }}</span>{% endif %}
+                  </td>
+                  <td><strong>{{ r.deelnames | length }}</strong><br><span class="zacht">{{ r.deelnames | map(attribute="naam") | join(", ") }}</span></td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% if pagina.aantal_wedstrijden > pagina.wedstrijden | length %}
+          <a href="{{ basis }}/wedstrijden">Nog {{ pagina.aantal_wedstrijden - pagina.wedstrijden | length }} wedstrijd{{ "en" if pagina.aantal_wedstrijden - pagina.wedstrijden | length != 1 }}</a>
+        {% endif %}
+      {% else %}
+        <p class="leeg">Niemand uit de groep is ingeschreven voor een komende wedstrijd.</p>
+      {% endif %}
+    </section>
+
+    <section class="blok" aria-labelledby="kop-tr">
+      <div class="blok__kop">
+        <h2 class="kop" id="kop-tr">Komende trainingen</h2>
+        <a class="knop" href="{{ basis }}/trainingen">Alle trainingen &rarr;</a>
+      </div>
+      {% if pagina.trainingen %}
+        <div class="tabelvak">
+          <table class="tabel">
+            <thead><tr><th scope="col">Datum</th><th scope="col">Training</th><th scope="col" class="rechts">Verwacht</th><th scope="col">Aanwezigheid</th></tr></thead>
+            <tbody>
+              {% for k in pagina.trainingen %}
+                <tr>
+                  <td class="nowrap"><a href="{{ url_for('training', training_id=k.training.id) }}"><strong>{{ k.training.datum | datum_kort }}</strong></a><br><span class="zacht">{{ k.dagen_tot | over_dagen }}</span></td>
+                  <td><a href="{{ url_for('training', training_id=k.training.id) }}">{{ k.training.onderwerp or "Training" }}</a>{% if k.periode %}<br><span class="zacht">{{ k.periode }}</span>{% endif %}</td>
+                  <td class="rechts" title="Atleten die deze dag volgens hun trainingsschema trainen">{{ k.verwacht }}</td>
+                  <td><a class="knop" href="{{ url_for('training_aanwezigheid', training_id=k.training.id) }}">{{ "Aanpassen" if k.ingevuld else "Invullen" }}</a></td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <p class="leeg">Geen trainingen gepland in de komende weken.</p>
+      {% endif %}
+    </section>
+  </div>
+
+  {# ---------------- Leerdoelen | Aanwezigheid ---------------- #}
+  <div class="raster">
+    <section class="blok" aria-labelledby="kop-ll">
+      <div class="blok__kop">
+        <div>
+          <h2 class="kop" id="kop-ll">Leerdoelen</h2>
+          <p class="subkop">gemiddeld over de atleten</p>
+        </div>
+        <a class="knop" href="{{ basis }}/leerdoelen">Per atleet &rarr;</a>
+      </div>
+      {% if pagina.leerdoelen %}
+        {% for b in pagina.leerdoelen %}
+          <div class="voortgang">
+            <div class="blok__kop">
+              <span>{{ b.naam }}</span>
+              <span class="zacht getallen">gem. {{ b.gemiddelde_score | getal }} · {{ b.beoordeeld }}/{{ pagina.leden | length }} atl.</span>
+            </div>
+            <div class="voortgang__balk" role="img" aria-label="Gemiddeld {{ b.zelfstandig_pct | round | int }}% van de leerdoelen zelfstandig of beheerst"><span style="width: {{ b.zelfstandig_pct | round | int }}%"></span></div>
+          </div>
+        {% endfor %}
+        <p class="zacht" style="font-size: var(--maat-xs); margin: 0">Balk: gemiddeld aandeel leerdoelen van de eigen categorie op niveau &lsquo;zelfstandig&rsquo; of hoger. Gem.: gemiddelde laatste score (1–5). Alleen atleten die op die leerlijn beoordeeld zijn.</p>
+      {% else %}
+        <p class="leeg">Nog geen leerdoelen beoordeeld bij atleten uit deze groep.</p>
+      {% endif %}
+    </section>
+
+    <section class="blok" aria-labelledby="kop-aw">
+      <div class="blok__kop">
+        <div>
+          <h2 class="kop" id="kop-aw">Aanwezigheid</h2>
+          <p class="subkop">sinds {{ pagina.aanwezigheid_van | datum_lang }}</p>
+        </div>
+        <span class="knoppen" style="align-items: center">
+          {% if pagina.aanwezig_pct is not none %}<span class="telling__getal" style="font-size: var(--maat-xl)">{{ pagina.aanwezig_pct | round | int }}%</span>{% endif %}
+          <a class="knop" href="{{ basis }}/aanwezigheid">Per training &rarr;</a>
+        </span>
+      </div>
+      {% if pagina.aanwezigheid %}
+        <ul class="dagbalken">
+          {% for d in pagina.aanwezigheid %}
+            <li>
+              <span class="dagbalken__dag" title="{{ d.dag | capitalize }}">{{ d.kort }}</span>
+              <span class="voortgang__balk dagbalken__balk" role="img" aria-label="{{ d.dag | capitalize }}: {% if d.percentage is not none %}{{ d.percentage | round | int }}% aanwezig{% else %}nog niets ingevuld{% endif %}"><span style="width: {{ (d.percentage or 0) | round | int }}%"></span></span>
+              <span class="dagbalken__pct getallen">{% if d.percentage is not none %}{{ d.percentage | round | int }}%{% else %}–{% endif %}</span>
+              <span class="dagbalken__uitleg zacht">
+                {%- if d.gemiddeld_aanwezig is not none %}gem. {{ d.gemiddeld_aanwezig | getal }} aanwezig · {% endif -%}
+                {{ d.ingevulde_trainingen }}/{{ d.trainingen }} training{{ "en" if d.trainingen != 1 }} ingevuld</span>
+            </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p class="leeg">Nog geen trainingen in deze periode.</p>
+      {% endif %}
+    </section>
+  </div>
+
+  <footer class="vel__voet">Atleet Volg Systeem<br>{{ groep.naam }}</footer>
+</article>
+{% endblock %}

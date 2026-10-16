@@ -29,6 +29,7 @@
   --afgemeld-vlak: #fff3bf;  --afgemeld: #a87f00;
   --blessure-vlak: #ffe2c6;  --blessure-st: #e06500;
   --leeg-vlak: #efefef;      --leeg-st: #8a8a8a;
+  --elders: #2f6fa3;        /* groep: atleet traint die dag ergens anders */
 
   --font: "Century Gothic", "CenturyGothic", "URW Gothic L", "URW Gothic", "Questrial", "Avant Garde", Futura, sans-serif;
   --maat-xs: .75rem;
@@ -62,6 +63,7 @@
     --afgemeld-vlak: #3b3313;  --afgemeld: #e5b900;
     --blessure-vlak: #45290f;  --blessure-st: #ff9a3c;
     --leeg-vlak: #2c2c2c;      --leeg-st: #9a9a9a;
+    --elders: #7fb2e0;
     color-scheme: dark;
   }
 }
@@ -85,6 +87,7 @@
   --afgemeld-vlak: #3b3313;  --afgemeld: #e5b900;
   --blessure-vlak: #45290f;  --blessure-st: #ff9a3c;
   --leeg-vlak: #2c2c2c;    --leeg-st: #9a9a9a;
+  --elders: #7fb2e0;
   color-scheme: dark;
 }
 
@@ -383,7 +386,74 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--rood); outline-
 .zoekbalk input[type="search"]:focus-visible { outline: 2px solid var(--rood); outline-offset: 1px; }
 .vinkje { display: inline-flex; align-items: center; gap: .35rem; font-size: var(--maat-s); }
 
+/* ---------- groep ---------- */
+.legenda { list-style: none; margin: .2rem 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: .25rem 1.25rem; font-size: var(--maat-s); color: var(--tekst-zacht); }
+.legenda li { display: inline-flex; align-items: center; gap: .4rem; }
+.dagcel { display: inline-block; width: .85rem; height: .85rem; vertical-align: middle; }
+.dagcel--groep { background: var(--rood); }
+.dagcel--elders { background: var(--elders); }
+.ledentabel th.midden, .ledentabel td.midden { width: 2.4rem; padding-inline: .2rem; }
+.ledentabel thead th.dag--groep { background: var(--rood); }
+.ledentabel .geen { color: var(--tekst-zacht); }
+.dagbalken { list-style: none; margin: 0; padding: 0; display: grid; gap: .55rem; font-size: var(--maat-s); }
+.dagbalken li { display: grid; grid-template-columns: 2rem 1fr 3rem; grid-template-areas: "dag balk pct" ". uitleg uitleg"; align-items: center; gap: .15rem .6rem; }
+.dagbalken__dag { grid-area: dag; font-weight: 700; }
+.dagbalken__balk { grid-area: balk; }
+.dagbalken__balk span { background: var(--aanwezig); }
+.dagbalken__pct { grid-area: pct; text-align: right; font-weight: 700; }
+.dagbalken__uitleg { grid-area: uitleg; font-size: var(--maat-xs); }
+
+/* tabellen atleten x kolommen (PR's, testen, leerdoelen, register) */
+.matrix tbody th, .matrix tfoot th { background: var(--papier); color: var(--tekst); font-weight: 400; white-space: nowrap;
+  position: sticky; left: 0; z-index: 1; box-shadow: inset -1px 0 0 var(--rand); }
+.matrix tbody th a { font-weight: 700; }
+.matrix__sub { font-size: var(--maat-xs); font-weight: 400; color: var(--tekst-zacht); }
+.matrix thead .matrix__sub { color: inherit; opacity: .85; }
+.matrix td.beste { font-weight: 700; box-shadow: inset 0 -3px 0 var(--rood); }
+.matrix tfoot td, .matrix tfoot th { border: 2px solid var(--lijn); padding: .45rem .6rem; background: var(--roze-licht); font-weight: 700; vertical-align: top; }
+.leerdoelmatrix td { min-width: 7.5rem; }
+.minibalk { display: block; height: .35rem; margin: .2rem 0; background: var(--papier); }
+
+/* aanwezigheidsregister */
+.register { width: auto; }
+.register thead th { font-size: var(--maat-xs); line-height: 1.2; padding: .35rem .3rem; }
+.register thead th a { color: var(--op-zalm); text-decoration: none; }
+.register thead th a:hover { text-decoration: underline; }
+.register tbody th { background: var(--papier); color: var(--tekst); font-weight: 400; white-space: nowrap; position: sticky; left: 0; z-index: 1; }
+.register tbody th a { font-weight: 700; }
+.register td.midden { padding: .25rem; min-width: 2.2rem; }
+.register tbody tr td { background: var(--papier) !important; }
+.register tbody td[class*="status-"] { background: var(--st-vlak) !important; }
+.register tfoot td, .register tfoot th { padding: .35rem .3rem; font-size: var(--maat-s); border: 2px solid var(--lijn); background: var(--roze-licht); }
+.regcel { display: inline-grid; place-items: center; width: 1.4rem; height: 1.4rem; font-size: var(--maat-xs); font-weight: 700;
+  color: var(--st); border: 1.5px solid var(--st); background: var(--st-vlak); }
+.legenda .regcel { width: 1.2rem; height: 1.2rem; }
+
+/* één training */
+.inhoudtekst { white-space: pre-line; font-size: var(--maat-s); padding: .75rem 1rem; background: var(--roze-licht); border-left: 4px solid var(--zalm); }
+
+/* aanwezigheid invullen */
+.invultabel tbody th { font-weight: 700; background: var(--roze-licht) !important; color: var(--tekst); }
+.statuskiezer { border: 0; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px; }
+.statuskiezer input { position: absolute; opacity: 0; pointer-events: none; }
+.statuskiezer label {
+  cursor: pointer; padding: .3rem .6rem; font-size: var(--maat-s); line-height: 1.2;
+  border: 1px solid var(--st); background: var(--papier); color: var(--tekst);
+}
+.statuskiezer label:hover { background: var(--st-vlak); }
+.statuskiezer input:checked + label { background: var(--st); border-color: var(--st); color: #fff; font-weight: 700; }
+.statuskiezer input:focus-visible + label { outline: 2px solid var(--rood); outline-offset: 2px; }
+.redenveld { width: 100%; min-width: 9rem; font: inherit; font-size: var(--maat-s); padding: .3rem .45rem;
+  border: 1px solid var(--rand); background: var(--papier); color: var(--tekst); }
+.redenveld:focus-visible { outline: 2px solid var(--rood); outline-offset: 1px; }
+
 @media (max-width: 40rem) {
+  .invultabel, .invultabel tbody, .invultabel tr, .invultabel th, .invultabel td { display: block; width: auto; }
+  .invultabel thead { display: none; }
+  .invultabel tr { border-bottom: 2px solid var(--lijn); }
+  .invultabel tbody th { padding-bottom: .2rem; }
+  .invultabel td { border: 0; padding-top: .3rem; }
+  .invultabel td:last-child:has(.redenveld[hidden]) { display: none; }
   .kalender__training { margin-top: .35rem; }
   .leerdoeltabel, .leerdoeltabel tbody, .leerdoeltabel tr, .leerdoeltabel th, .leerdoeltabel td { display: block; width: auto !important; }
   .leerdoeltabel thead { display: none; }

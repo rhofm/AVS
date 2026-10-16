@@ -1,0 +1,60 @@
+{#
+  Alle trainingen van een groep.
+  Context:
+    lijst – groepen.trainingen.Trainingenlijst
+#}
+{% extends "basis.html" %}
+{% set groep = lijst.groep %}
+{% block titel %}Trainingen {{ groep.naam }}{% endblock %}
+
+{% macro tabel(regels) %}
+  <div class="tabelvak">
+    <table class="tabel">
+      <thead>
+        <tr><th scope="col">Datum</th><th scope="col">Training</th><th scope="col">Periode</th><th scope="col">Aanwezigheid</th><th scope="col"><span class="verborgen">Invullen</span></th></tr>
+      </thead>
+      <tbody>
+        {% for r in regels %}
+          {% set s = r.stand %}
+          <tr>
+            <td class="nowrap"><a href="{{ url_for('training', training_id=r.training.id) }}"><strong>{{ r.training.datum | datum_kort }}</strong></a><br>
+              <span class="zacht">{{ r.training.datum.year }}{% if not r.geweest %} · {{ r.dagen_tot | over_dagen }}{% endif %}</span></td>
+            <td><a href="{{ url_for('training', training_id=r.training.id) }}">{{ r.training.onderwerp or "Training" }}</a></td>
+            <td>{{ r.periode or "–" }}</td>
+            <td class="nowrap">
+              {% if s.ingevuld %}<strong>{{ s.aanwezig }}</strong> aanwezig<br><span class="zacht">{{ s.ingevuld }} ingevuld</span>
+              {% elif r.geweest or r.dagen_tot == 0 %}<span class="statuslabel status-niet_ingevuld"><span class="statuslabel__stip" aria-hidden="true"></span>Nog invullen</span>
+              {% else %}<span class="zacht">{{ s.verwacht }} verwacht</span>{% endif %}
+            </td>
+            <td class="rechts"><a class="knop" href="{{ url_for('training_aanwezigheid', training_id=r.training.id) }}">{{ "Aanpassen" if s.ingevuld else "Invullen" }}</a></td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endmacro %}
+
+{% block inhoud %}
+<article class="vel">
+  <header class="blok__kop">
+    <div>
+      <a class="terug" href="{{ url_for('groep', groep_id=groep.id) }}">&larr; {{ groep.naam }}</a>
+      <h1 class="kop kop--pagina">Trainingen</h1>
+      <p class="subkop">{{ lijst.komend | length }} komend · {{ lijst.geweest | length }} geweest{% if lijst.nog_invullen %} · {{ lijst.nog_invullen }} nog in te vullen{% endif %}</p>
+    </div>
+    <a class="knop" href="{{ url_for('groep_aanwezigheid', groep_id=groep.id) }}">Aanwezigheid &rarr;</a>
+  </header>
+
+  <section class="blok" aria-labelledby="kop-komend">
+    <h2 class="kop" id="kop-komend">Komend</h2>
+    {% if lijst.komend %}{{ tabel(lijst.komend) }}{% else %}<p class="leeg">Geen trainingen gepland.</p>{% endif %}
+  </section>
+
+  <section class="blok" aria-labelledby="kop-geweest">
+    <h2 class="kop" id="kop-geweest">Geweest</h2>
+    {% if lijst.geweest %}{{ tabel(lijst.geweest) }}{% else %}<p class="leeg">Nog geen trainingen geweest.</p>{% endif %}
+  </section>
+
+  <footer class="vel__voet">Atleet Volg Systeem<br>Trainingen {{ groep.naam }}</footer>
+</article>
+{% endblock %}

@@ -1,0 +1,107 @@
+{#
+  Aanwezigheidsregister van een groep: atleten x trainingen.
+  Context:
+    reg  – groepen.overzichten.Register
+  Kleuren per status zoals aanwezigheid.html; elke cel heeft ook een letter
+  (A aanwezig, M afgemeld, X afwezig, B blessure, ? niet ingevuld).
+#}
+{% extends "basis.html" %}
+{% set groep = reg.groep %}
+{% set teksten = {"aanwezig": "Aanwezig", "afgemeld": "Afgemeld", "afwezig": "Afwezig", "blessure": "Blessure", "niet_ingevuld": "Niet ingevuld"} %}
+{% set letters = {"aanwezig": "A", "afgemeld": "M", "afwezig": "X", "blessure": "B", "niet_ingevuld": "?"} %}
+{% block titel %}Aanwezigheid {{ groep.naam }}{% endblock %}
+
+{% block inhoud %}
+<article class="vel">
+  <header class="blok__kop">
+    <div>
+      <a class="terug" href="{{ url_for('groep', groep_id=groep.id) }}">&larr; {{ groep.naam }}</a>
+      <h1 class="kop kop--pagina">Aanwezigheid</h1>
+      <p class="subkop">{{ reg.van | datum_lang }} t/m {{ reg.tot | datum_lang }} · {{ reg.trainingen | length }} training{{ "en" if reg.trainingen | length != 1 }}</p>
+    </div>
+    <span class="knoppen" role="group" aria-label="Periode">
+      {% for w in [4, 12, 26] %}
+        <a class="knop{{ ' knop--vol' if w == reg.weken }}" href="?weken={{ w }}"{% if w == reg.weken %} aria-current="true"{% endif %}>{{ w }} weken</a>
+      {% endfor %}
+    </span>
+  </header>
+
+  {# ---------------- per trainingsdag ---------------- #}
+  <div class="telling">
+    <div class="telling__pct">
+      <span class="telling__getal">{% if reg.percentage is not none %}{{ reg.percentage | round | int }}%{% else %}–{% endif %}</span>
+      <span class="zacht">aanwezig op ingevulde trainingen</span>
+    </div>
+    {% if reg.per_dag %}
+      <ul class="dagbalken" style="flex: 1 1 18rem">
+        {% for d in reg.per_dag %}
+          <li>
+            <span class="dagbalken__dag" title="{{ d.dag | capitalize }}">{{ d.kort }}</span>
+            <span class="voortgang__balk dagbalken__balk" aria-hidden="true"><span style="width: {{ (d.percentage or 0) | round | int }}%"></span></span>
+            <span class="dagbalken__pct getallen">{% if d.percentage is not none %}{{ d.percentage | round | int }}%{% else %}–{% endif %}</span>
+            <span class="dagbalken__uitleg zacht">{% if d.gemiddeld_aanwezig is not none %}gem. {{ d.gemiddeld_aanwezig | getal }} aanwezig · {% endif %}{{ d.ingevulde_trainingen }}/{{ d.trainingen }} ingevuld</span>
+          </li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+  </div>
+
+  {# ---------------- register ---------------- #}
+  {% if reg.trainingen and reg.rijen %}
+    <section class="blok" aria-labelledby="kop-reg">
+      <div class="blok__kop">
+        <h2 class="kop" id="kop-reg">Per training</h2>
+        <ul class="legenda" aria-label="Legenda">
+          {% for s, t in teksten.items() %}
+            <li class="status-{{ s }}"><span class="regcel" aria-hidden="true">{{ letters[s] }}</span>{{ t }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+      <div class="tabelvak">
+        <table class="tabel register">
+          <thead>
+            <tr>
+              <th scope="col">Naam</th>
+              {% for t in reg.trainingen %}
+                <th scope="col" class="midden"><a href="{{ url_for('training', training_id=t.id) }}" title="{{ t.onderwerp or 'Training' }}">{{ t.datum | datum_kort | replace(' ', '<br>', 1) | safe }}</a></th>
+              {% endfor %}
+              <th scope="col" class="rechts">%</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in reg.rijen %}
+              <tr>
+                <th scope="row"><a href="{{ url_for('atleet_aanwezigheid', master_id=r.atleet.master_id) }}">{{ r.atleet.naam }}</a></th>
+                {% for c in r.cellen %}
+                  {% if c %}
+                    <td class="midden status-{{ c.status }}" title="{{ reg.trainingen[loop.index0].datum | datum_kort }}: {{ c.tekst }}"><span class="regcel">{{ c.letter }}</span></td>
+                  {% else %}
+                    <td class="midden"><span class="verborgen">niet ingeroosterd</span></td>
+                  {% endif %}
+                {% endfor %}
+                <td class="rechts nowrap"><strong>{% if r.percentage is not none %}{{ r.percentage | round | int }}%{% else %}–{% endif %}</strong></td>
+              </tr>
+            {% endfor %}
+          </tbody>
+          <tfoot>
+            <tr>
+              <th scope="row">Aanwezig</th>
+              {% for t in reg.trainingen %}
+                <td class="midden"><a href="{{ url_for('training_aanwezigheid', training_id=t.id) }}" title="Aanwezigheid invullen">{{ reg.aanwezig_op(loop.index0) }}</a></td>
+              {% endfor %}
+              <td></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+      <p class="zacht" style="font-size: var(--maat-xs); margin: 0">Klik op een datum voor de training, op het getal onderaan om de aanwezigheid in te vullen, of op een naam voor de aanwezigheid van die atleet. Lege cel: niet ingeroosterd volgens het trainingsschema.</p>
+    </section>
+  {% elif not reg.rijen %}
+    <p class="leeg">Nog geen atleten in deze groep.</p>
+  {% else %}
+    <p class="leeg">Geen trainingen in deze periode.</p>
+  {% endif %}
+
+  <footer class="vel__voet">Atleet Volg Systeem<br>Aanwezigheid {{ groep.naam }}</footer>
+</article>
+{% endblock %}

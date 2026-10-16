@@ -1,7 +1,7 @@
 {#
   Overzicht van alle atleten, met zoeken.
   Context:
-    rijen         – lijst van {atleet, categorie, groepen}
+    rijen         – lijst van {atleet, categorie, groepen (Groep-objecten)}
     zoek          – zoektekst
     ook_inactief  – ook niet-actieve atleten tonen
 #}
@@ -13,7 +13,7 @@
   <header class="blok__kop">
     <div>
       <h1 class="kop kop--pagina">Atleten</h1>
-      <p class="subkop">{{ rijen | length }} atleet{{ "en" if rijen | length != 1 }}{% if zoek %} met &lsquo;{{ zoek }}&rsquo;{% endif %}</p>
+      <p class="subkop">{{ rijen | length }} {{ "atleten" if rijen | length != 1 else "atleet" }}{% if zoek %} met &lsquo;{{ zoek }}&rsquo;{% endif %}</p>
     </div>
   </header>
 
@@ -37,7 +37,7 @@
                 {%- if not r.atleet.actief %} <span class="kenmerk">niet actief</span>{% endif %}</td>
               <td>{{ r.categorie or "–" }}</td>
               <td>{{ r.atleet.specialisatie or "–" }}</td>
-              <td>{{ r.groepen | join(", ") or "–" }}</td>
+              <td>{% for g in r.groepen %}<a href="{{ url_for('groep', groep_id=g.id) }}">{{ g.naam }}</a>{{ ", " if not loop.last }}{% else %}–{% endfor %}</td>
             </tr>
           {% endfor %}
         </tbody>

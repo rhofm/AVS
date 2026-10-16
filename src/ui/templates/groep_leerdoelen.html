@@ -1,0 +1,71 @@
+{#
+  Leerdoelen van een groep: per atleet per leerlijn de stand.
+  Context:
+    tabel – groepen.overzichten.LeerdoelenTabel
+  Per cel: aantal leerdoelen 'zelfstandig' of hoger van het totaal voor de eigen
+  categorie, een balkje, en de gemiddelde score. Leeg (–) = leerlijn niet in de
+  categorie van de atleet.
+#}
+{% extends "basis.html" %}
+{% set groep = tabel.groep %}
+{% block titel %}Leerdoelen {{ groep.naam }}{% endblock %}
+
+{% block inhoud %}
+<article class="vel">
+  <header class="blok__kop">
+    <div>
+      <a class="terug" href="{{ url_for('groep', groep_id=groep.id) }}">&larr; {{ groep.naam }}</a>
+      <h1 class="kop kop--pagina">Leerdoelen</h1>
+      <p class="subkop">Per atleet, met de leerdoelen van de eigen categorie</p>
+    </div>
+  </header>
+
+  {% if tabel.rijen and tabel.kolommen %}
+    <div class="tabelvak">
+      <table class="tabel matrix leerdoelmatrix">
+        <thead>
+          <tr>
+            <th scope="col">Naam</th>
+            <th scope="col">Cat.</th>
+            {% for k in tabel.kolommen %}<th scope="col">{{ k.naam }}</th>{% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in tabel.rijen %}
+            <tr>
+              <th scope="row"><a href="{{ url_for('atleet_leerdoelen', master_id=r.atleet.master_id) }}">{{ r.atleet.naam }}</a></th>
+              <td class="nowrap">{{ r.categorie_code or "–" }}</td>
+              {% for c in r.cellen %}
+                {% if c %}
+                  <td title="{{ c.zelfstandig }} van {{ c.aantal }} zelfstandig · {{ c.beoordeeld }} beoordeeld">
+                    <span class="getallen"><strong>{{ c.zelfstandig }}</strong>/{{ c.aantal }}</span>
+                    <span class="voortgang__balk minibalk" aria-hidden="true"><span style="width: {{ c.pct }}%"></span></span>
+                    <span class="matrix__sub">{% if c.gemiddelde is not none %}gem. {{ c.gemiddelde | getal }}{% else %}niet beoordeeld{% endif %}</span>
+                  </td>
+                {% else %}
+                  <td class="zacht">–</td>
+                {% endif %}
+              {% endfor %}
+            </tr>
+          {% endfor %}
+        </tbody>
+        <tfoot>
+          <tr>
+            <th scope="row" colspan="2">Gemiddeld</th>
+            {% for g in tabel.gemiddelden %}
+              <td>{% if g %}<strong>{{ g.zelfstandig_pct | round | int }}%</strong><br><span class="matrix__sub">gem. {{ g.gemiddelde_score | getal }} · {{ g.beoordeeld }} atl.</span>{% else %}<span class="zacht">–</span>{% endif %}</td>
+            {% endfor %}
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+    <p class="zacht" style="font-size: var(--maat-xs); margin: 0">Getal: leerdoelen op niveau &lsquo;zelfstandig&rsquo; of hoger van het aantal voor de categorie van de atleet. Gem.: gemiddelde laatste score (1–5). Klik op een naam om de leerdoelen van die atleet te bekijken of te scoren.</p>
+  {% elif not tabel.rijen %}
+    <p class="leeg">Nog geen atleten in deze groep.</p>
+  {% else %}
+    <p class="leeg">Geen leerdoelen voor de categorieën in deze groep.</p>
+  {% endif %}
+
+  <footer class="vel__voet">Atleet Volg Systeem<br>Leerdoelen {{ groep.naam }}</footer>
+</article>
+{% endblock %}

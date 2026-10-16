@@ -26,7 +26,7 @@
         {% if pagina.geslacht %}<span>{{ pagina.geslacht }}</span>{% endif %}
         {% if p.leeftijd is not none %}<span>{{ p.leeftijd }} jaar</span>{% endif %}
         {% if atleet.geboortejaar %}<span>geboren {{ atleet.geboortejaar }}</span>{% endif %}
-        {% if p.groepen %}<span>{{ p.groepen | map(attribute="naam") | join(", ") }}</span>{% endif %}
+        {% if p.groepen %}<span>{% for g in p.groepen %}<a href="/groep/{{ g.id }}">{{ g.naam }}</a>{{ ", " if not loop.last }}{% endfor %}</span>{% endif %}
         {% if not atleet.actief %}<span>niet actief</span>{% endif %}
       </p>
     </div>

@@ -31,6 +31,9 @@ from atleten import beheer, landingspagina
 from atleten.aanwezigheid import aanwezigheid
 from db.init_db import SleutelFout, init_db
 from db.queries import Opslag, OpslagFout
+from groepen import landingspagina as groep_landingspagina
+from groepen import overzichten as groep_overzichten
+from groepen import trainingen as trainingsbeheer
 from leerlijnen import voortgang
 from ui.opmaak import registreer_filters
 from wedstrijden import kalender
@@ -40,7 +43,6 @@ VOORKEUR_POORT = 5050
 
 #: Menu-items en losse links die nog geen eigen pagina hebben: (pad, titel).
 BINNENKORT = {
-    "groepen": "Groepen",
     "wedstrijden": "Wedstrijden",
     "ploegen": "Ploegen",
     "leerlijnen": "Leerlijnen",
@@ -114,7 +116,7 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
             rijen.append({
                 "atleet": a,
                 "categorie": landingspagina.categorie_code(landingspagina.leeftijdscategorie(a, vandaag), a.geslacht),
-                "groepen": [gr.naam for gr in db().groepen_van_atleet(a.master_id)],
+                "groepen": db().groepen_van_atleet(a.master_id),
             })
         return render_template("atleten.html", rijen=rijen, zoek=zoek, ook_inactief=ook_inactief,
                                actief_menu="atleten")
@@ -143,6 +145,100 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
             terug_url=url_for("atleet", master_id=master_id),
             weergave=request.args.get("weergave", "lijst"), actief_menu="atleten")
 
+    # ---------------- groepen ----------------
+    def haal_groep(groep_id: int):
+        gr = db().groep(groep_id)
+        if gr is None:
+            abort(404)
+        return gr
+
+    @app.get("/groepen")
+    def groepen():
+        return render_template("groepen.html", groepen=groep_landingspagina.overzicht(db()), actief_menu="groepen")
+
+    @app.get("/groep/<int:groep_id>")
+    def groep(groep_id: int):
+        pagina = groep_landingspagina.landingspagina(db(), groep_id)
+        if pagina is None:
+            abort(404)
+        return render_template("groep.html", pagina=pagina, actief_menu="groepen")
+
+    @app.get("/groep/<int:groep_id>/wedstrijden")
+    def groep_wedstrijden(groep_id: int):
+        gr = haal_groep(groep_id)
+        return render_template(
+            "wedstrijdplanning.html", planning=kalender.wedstrijdplanning(db(), gr.leden),
+            kop_naam=gr.naam, terug_url=url_for("groep", groep_id=groep_id),
+            weergave=request.args.get("weergave", "lijst"), actief_menu="groepen")
+
+    @app.get("/groep/<int:groep_id>/prs")
+    def groep_prs(groep_id: int):
+        return render_template(
+            "groep_tabel.html", tabel=groep_overzichten.prs(db(), haal_groep(groep_id)), titel="PR's", soort="prs",
+            uitleg="Vet met rode streep: beste PR binnen de eigen categorie (bijv. U16M alleen met U16M).",
+            leeg="Nog geen PR's. Importeer uitslagen of PR-lijsten van atletiek.nu of Seltec.", actief_menu="groepen")
+
+    @app.get("/groep/<int:groep_id>/testen")
+    def groep_testen(groep_id: int):
+        return render_template(
+            "groep_tabel.html", tabel=groep_overzichten.testresultaten(db(), haal_groep(groep_id)),
+            titel="Testresultaten", soort="testen",
+            uitleg="Het laatste resultaat per test, met de testdatum. Vet met rode streep: beste binnen de eigen categorie.",
+            leeg="Nog geen testresultaten.", actief_menu="groepen")
+
+    @app.get("/groep/<int:groep_id>/leerdoelen")
+    def groep_leerdoelen(groep_id: int):
+        return render_template("groep_leerdoelen.html", tabel=groep_overzichten.leerdoelen(db(), haal_groep(groep_id)),
+                               actief_menu="groepen")
+
+    @app.get("/groep/<int:groep_id>/aanwezigheid")
+    def groep_aanwezigheid(groep_id: int):
+        try:
+            weken = min(max(int(request.args.get("weken", 12)), 1), 104)
+        except ValueError:
+            weken = 12
+        return render_template("groep_aanwezigheid.html",
+                               reg=groep_overzichten.aanwezigheid(db(), haal_groep(groep_id), weken=weken),
+                               actief_menu="groepen")
+
+    @app.get("/groep/<int:groep_id>/trainingen")
+    def groep_trainingen(groep_id: int):
+        return render_template("groep_trainingen.html",
+                               lijst=trainingsbeheer.trainingenlijst(db(), haal_groep(groep_id)), actief_menu="groepen")
+
+    # ---------------- trainingen ----------------
+    @app.get("/training/<int:training_id>")
+    def training(training_id: int):
+        tp = trainingsbeheer.trainingpagina(db(), training_id)
+        if tp is None:
+            abort(404)
+        meldingen = get_flashed_messages()
+        return render_template("training.html", tp=tp, melding=meldingen[0] if meldingen else None,
+                               actief_menu="groepen")
+
+    def _invullen(training_id: int, fout: str | None = None, status: int = 200):
+        f = trainingsbeheer.invulformulier(db(), training_id)
+        if f is None:
+            abort(404)
+        return render_template("training_aanwezigheid.html", f=f, fout=fout, max_reden=trainingsbeheer.MAX_REDEN,
+                               actief_menu="groepen"), status
+
+    @app.get("/training/<int:training_id>/aanwezigheid")
+    def training_aanwezigheid(training_id: int):
+        return _invullen(training_id)
+
+    @app.post("/training/<int:training_id>/aanwezigheid")
+    def training_aanwezigheid_opslaan(training_id: int):
+        if db().training(training_id) is None:
+            abort(404)
+        try:
+            aantal = trainingsbeheer.aanwezigheid_opslaan(db(), training_id, request.form)
+        except (OpslagFout, ValueError) as e:
+            return _invullen(training_id, fout=f"Niet opgeslagen: {e}", status=400)
+        flash("Niets opgeslagen." if aantal == 0 else f"Aanwezigheid van {aantal} {'atleten' if aantal != 1 else 'atleet'} opgeslagen.")
+        return redirect(url_for("training", training_id=training_id))
+
+    # ---------------- leerdoelen van een atleet ----------------
     def _leerdoelen(master_id: str, *, modus: str, fout: str | None = None, status: int = 200):
         a = haal_atleet(master_id)
         categorie = landingspagina.leeftijdscategorie(a, date.today())
