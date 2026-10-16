@@ -32,6 +32,7 @@ from models import ABSENTIE_STATUSSEN, DAGEN, Atleet, Groep, Periodeplan, Traini
 from wedstrijden.kalender import PlanningRegel, wedstrijdplanning
 
 #: Waar de trainingsdagen vandaan komen.
+BRON_VAST = "vast"                    # ingesteld bij de groep (tabel groep_trainingsdag)
 BRON_TRAININGEN = "trainingen"
 BRON_SCHEMA = "schema"
 
@@ -51,6 +52,7 @@ class GroepDag:
     groep_traint: bool
     vandaag: bool = False
     aantal_atleten: int = 0           # leden die volgens hun schema die dag (met de groep) trainen
+    starttijd: str | None = None      # '18:30' bij vaste trainingsdagen met een begintijd
 
 
 @dataclass
@@ -188,12 +190,15 @@ def trainingsdagen(db: Opslag, groep: Groep, vandaag: date, *, weken_terug: int 
                    ) -> tuple[set[str], str | None]:
     """De weekdagen waarop de groep traint, en waar dat uit is afgeleid.
 
-    1. De weekdagen van de trainingen van de groep van `weken_terug` weken terug
+    0. De vaste trainingsdagen van de groep, als die zijn ingesteld.
+    1. Anders de weekdagen van de trainingen van de groep van `weken_terug` weken terug
        tot `weken_vooruit` weken vooruit.
     2. Geen trainingen: de dagen waarop minstens de helft van de leden traint
        volgens het trainingsschema.
-    Geeft (dagen, BRON_TRAININGEN | BRON_SCHEMA | None).
+    Geeft (dagen, BRON_VAST | BRON_TRAININGEN | BRON_SCHEMA | None).
     """
+    if groep.trainingsdagen:
+        return set(groep.trainingsdagen), BRON_VAST
     trainingen = db.trainingen(groep.id, van=vandaag - timedelta(weeks=weken_terug),
                                tot=vandaag + timedelta(weeks=weken_vooruit))
     if trainingen:
@@ -322,7 +327,8 @@ def landingspagina(db: Opslag, groep_id: int, *, peildatum: date | None = None,
     groepsdagen, bron = trainingsdagen(db, groep, vandaag, schemas=schemas)
 
     dagen = [GroepDag(d, DAG_KORT[d], d in groepsdagen, vandaag.weekday() == i,
-                      sum(1 for s in schemas.values() if s.traint_op(d)) if d in groepsdagen else 0)
+                      sum(1 for s in schemas.values() if s.traint_op(d)) if d in groepsdagen else 0,
+                      groep.trainingsdagen.get(d))
              for i, d in enumerate(DAGEN)]
     leden = _leden(db, groep, groepsdagen, schemas, vandaag)
 
@@ -347,10 +353,11 @@ def landingspagina(db: Opslag, groep_id: int, *, peildatum: date | None = None,
 
 
 def overzicht(db: Opslag, *, peildatum: date | None = None) -> list[tuple[Groep, list[str]]]:
-    """Alle groepen met hun trainingsdagen (korte namen), voor de pagina 'Groepen'."""
+    """Alle groepen met hun trainingsdagen ('Di 18:30', 'Do'), voor de pagina 'Groepen'."""
     vandaag = peildatum or date.today()
     uit = []
     for g in db.groepen():
         dagen, _ = trainingsdagen(db, g, vandaag)
-        uit.append((g, [DAG_KORT[d] for d in DAGEN if d in dagen]))
+        uit.append((g, [f"{DAG_KORT[d]} {g.trainingsdagen[d]}" if g.trainingsdagen.get(d) else DAG_KORT[d]
+                        for d in DAGEN if d in dagen]))
     return uit

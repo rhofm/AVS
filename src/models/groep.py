@@ -19,6 +19,9 @@ class Groep:
     seizoen: str | None = None                       # bijv. '2026-2027'
     leden: list[str] = field(default_factory=list)   # master_ids (tabel groep_lid)
     id: int | None = None
+    # Vaste trainingsdagen: {'dinsdag': '18:30', 'donderdag': None} (tabel groep_trainingsdag).
+    # Leeg = geen vaste dagen. Opslaan via Opslag.groep_trainingsdagen_opslaan().
+    trainingsdagen: dict[str, str | None] = field(default_factory=dict)
 
     def voeg_toe(self, master_id: str) -> None:
         if master_id not in self.leden:

@@ -2,7 +2,7 @@
   Landingspagina van één groep.
   Context:
     pagina  – groepen.landingspagina.GroepLandingspagina
-    melding – bevestiging na het wijzigen van de atleten (optioneel)
+    melding – bevestiging na het wijzigen van de groep (optioneel)
   Filters uit ui/opmaak.py (registreer_filters).
   Kleuren in de atletenlijst: .dagcel--groep (traint met de groep, rood) en
   .dagcel--elders (traint die dag ergens anders, blauw). De betekenis staat er
@@ -38,11 +38,13 @@
       <div>
         <h2 class="kop" id="kop-dagen">Trainingsdagen</h2>
         <p class="subkop">
-          {%- if pagina.dagen_bron == "trainingen" %}Uit de trainingen van de groep
+          {%- if pagina.dagen_bron == "vast" %}Vaste trainingsdagen van de groep
+          {%- elif pagina.dagen_bron == "trainingen" %}Uit de trainingen van de groep
           {%- elif pagina.dagen_bron == "schema" %}Afgeleid uit de trainingsschema's van de atleten (nog geen trainingen gepland)
           {%- else %}Nog niet bekend{% endif %}</p>
       </div>
     </div>
+    {% if melding %}<p class="melding" role="status">{{ melding }}</p>{% endif %}
     <div class="tabelvak">
       <table class="tabel schema">
         <thead>
@@ -56,7 +58,7 @@
           <tr>
             {% for d in pagina.dagen %}
               <td class="{{ '' if d.groep_traint else 'rust' }}">
-                {% if d.groep_traint %}<span class="vink" aria-label="training">&#9632;</span>
+                {% if d.groep_traint %}{% if d.starttijd %}<strong class="starttijd">{{ d.starttijd }}</strong>{% else %}<span class="vink" aria-label="training">&#9632;</span>{% endif %}
                 {% else %}<span class="geen" aria-label="geen training">–</span>{% endif %}
               </td>
             {% endfor %}
@@ -92,7 +94,6 @@
         <a class="knop knop--vol" href="{{ basis }}/testen">Testresultaten &rarr;</a>
       </span>
     </div>
-    {% if melding %}<p class="melding" role="status">{{ melding }}</p>{% endif %}
     {% if pagina.leden %}
       <div class="tabelvak">
         <table class="tabel ledentabel">

@@ -1,18 +1,23 @@
 {#
-  Atleten van een groep wijzigen: vinkjes aan = in de groep.
+  Atleten van een groep kiezen: vinkjes aan = in de groep. Twee standen:
+    * nieuwe groep (f.nieuw): naam en seizoen invullen en de atleten aanvinken;
+    * bestaande groep wijzigen: de vaste trainingsdagen met begintijden, de
+      huidige leden (vinkje uit = eruit) en alle andere actieve atleten (vinkje aan = erbij).
   Context:
     f    – groepen.groep.LedenFormulier
     fout – foutmelding (optioneel)
-  Bovenaan de huidige leden (vinkje uit = eruit), daaronder alle andere actieve
-  atleten (vinkje aan = erbij), met een zoekveld. Werkt zonder JavaScript; het
-  script filtert alleen op naam en telt mee.
+  In beide standen de vaste trainingsdagen met (optioneel) een begintijd
+  (velden dag-<dag> en tijd-<dag>, zie groepen.groep.lees_trainingsdagen).
+  Zoeken werkt op naam en categorie (bijv. 'U14'); 'Zichtbare aanvinken' vinkt
+  alle gevonden atleten in één keer aan. Werkt zonder JavaScript; het script
+  filtert alleen, vinkt aan en telt mee.
 #}
 {% extends "basis.html" %}
 {% set groep = f.groep %}
-{% block titel %}Atleten wijzigen {{ groep.naam }}{% endblock %}
+{% block titel %}{% if f.nieuw %}Nieuwe groep{% else %}Groep wijzigen {{ groep.naam }}{% endif %}{% endblock %}
 
 {% macro rij(k, aan) %}
-  <tr data-naam="{{ k.atleet.naam | lower }}">
+  <tr data-zoek="{{ k.atleet.naam | lower }} {{ (k.categorie_code or '') | lower }} {{ (k.atleet.specialisatie or '') | lower }}">
     <td class="midden"><input type="checkbox" class="lidvink" name="lid" value="{{ k.atleet.master_id }}" id="lid-{{ k.atleet.master_id }}"{% if aan %} checked{% endif %}></td>
     <th scope="row"><label for="lid-{{ k.atleet.master_id }}">{{ k.atleet.naam }}</label>
       {%- if not k.atleet.actief %} <span class="kenmerk">niet actief</span>{% endif %}</th>
@@ -22,46 +27,98 @@
   </tr>
 {% endmacro %}
 
-{% macro tabel(kandidaten, aan, id) %}
+{% macro tabel(kandidaten, id, aan=false) %}
   <div class="tabelvak">
     <table class="tabel ledenkeuze" id="{{ id }}">
-      <thead><tr><th scope="col" class="midden"><span class="verborgen">In de groep</span></th><th scope="col">Naam</th><th scope="col">Cat.</th><th scope="col">Specialisatie</th><th scope="col">Andere groepen</th></tr></thead>
-      <tbody>{% for k in kandidaten %}{{ rij(k, aan) }}{% endfor %}</tbody>
+      <thead><tr><th scope="col" class="midden"><span class="verborgen">In de groep</span></th><th scope="col">Naam</th><th scope="col">Cat.</th><th scope="col">Specialisatie</th><th scope="col">{{ "Groepen" if f.nieuw else "Andere groepen" }}</th></tr></thead>
+      <tbody>{% for k in kandidaten %}{{ rij(k, (k.atleet.master_id in f.gekozen) if f.vinkjes_uit_keuze else aan) }}{% endfor %}</tbody>
     </table>
   </div>
+{% endmacro %}
+
+{% macro dagkeuze() %}
+  <fieldset class="dagkeuze">
+    {% if f.nieuw %}
+      <legend><strong>Trainingsdagen</strong> <span class="zacht">— vink de dagen aan en vul eventueel de begintijd in</span></legend>
+    {% else %}
+      <legend><span class="verborgen">Trainingsdagen</span><span class="zacht">Vink de dagen aan en vul eventueel de begintijd in.</span></legend>
+    {% endif %}
+    <div class="dagkeuze__dagen">
+      {% for dag, kort, aan, tijd in f.dagen %}
+        <div class="dagkeuze__dag">
+          <input type="checkbox" id="dag-{{ dag }}" name="dag-{{ dag }}" value="1"{% if aan %} checked{% endif %}>
+          <label for="dag-{{ dag }}" title="{{ dag | capitalize }}">{{ kort }}</label>
+          <label class="verborgen" for="tijd-{{ dag }}">Begintijd {{ dag }}</label>
+          <input type="time" id="tijd-{{ dag }}" name="tijd-{{ dag }}" value="{{ tijd }}" step="300">
+        </div>
+      {% endfor %}
+    </div>
+    {% if f.afgeleide_dagen %}
+      <p class="zacht" style="font-size: var(--maat-xs); margin: 0">Nog geen vaste trainingsdagen ingesteld; de app gaat nu uit van {{ f.afgeleide_dagen }} (uit de trainingen of de trainingsschema's). Vink de dagen aan om ze vast te leggen.</p>
+    {% endif %}
+  </fieldset>
 {% endmacro %}
 
 {% block inhoud %}
 <article class="vel">
   <header class="blok__kop">
     <div>
-      <a class="terug" href="{{ url_for('groep', groep_id=groep.id) }}">&larr; {{ groep.naam }}</a>
-      <h1 class="kop kop--pagina">Atleten wijzigen</h1>
-      <p class="subkop">Vinkje aan = in de groep. Haal een vinkje weg om een atleet uit de groep te halen.</p>
+      {% if f.nieuw %}
+        <a class="terug" href="{{ url_for('groepen') }}">&larr; Groepen</a>
+        <h1 class="kop kop--pagina">Nieuwe groep</h1>
+        <p class="subkop">Geef de groep een naam en vink de atleten aan die erin komen.</p>
+      {% else %}
+        <a class="terug" href="{{ url_for('groep', groep_id=groep.id) }}">&larr; {{ groep.naam }}</a>
+        <h1 class="kop kop--pagina">Groep wijzigen</h1>
+        <p class="subkop">Pas de trainingsdagen aan, en de atleten: vinkje aan = in de groep, vinkje weg = eruit.</p>
+      {% endif %}
     </div>
   </header>
 
   {% if fout %}<p class="melding melding--fout" role="alert">{{ fout }}</p>{% endif %}
 
   <form method="post" class="blok" style="gap: 2rem">
-    <section class="blok" aria-labelledby="kop-nu">
-      <h2 class="kop" id="kop-nu">In de groep <span class="zacht getallen" id="teller">({{ f.leden | length }})</span></h2>
-      {% if f.leden %}{{ tabel(f.leden, true, "tabel-leden") }}{% else %}<p class="leeg">Nog geen atleten in deze groep. Vink hieronder atleten aan.</p>{% endif %}
-    </section>
+    {% if f.nieuw %}
+      <section class="blok groepvelden" aria-labelledby="kop-gegevens">
+        <h2 class="kop" id="kop-gegevens">Groep</h2>
+        <div class="velden">
+          <label class="veld veld--breed"><span>Naam <span class="zacht">(verplicht)</span></span>
+            <input type="text" name="naam" value="{{ groep.naam }}" required maxlength="80" placeholder="bijv. U16 sprint" autofocus>
+          </label>
+          <label class="veld"><span>Seizoen</span>
+            <input type="text" name="seizoen" value="{{ groep.seizoen or '' }}" maxlength="20" placeholder="bijv. 2026-2027">
+          </label>
+        </div>
+        {{ dagkeuze() }}
+      </section>
+    {% else %}
+      <section class="blok" aria-labelledby="kop-dagenkeuze">
+        <h2 class="kop" id="kop-dagenkeuze">Trainingsdagen</h2>
+        {{ dagkeuze() }}
+      </section>
+
+      <section class="blok" aria-labelledby="kop-nu">
+        <h2 class="kop" id="kop-nu">In de groep <span class="zacht getallen">({{ f.leden | length }})</span></h2>
+        {% if f.leden %}{{ tabel(f.leden, "tabel-leden", true) }}{% else %}<p class="leeg">Nog geen atleten in deze groep. Vink hieronder atleten aan.</p>{% endif %}
+      </section>
+    {% endif %}
 
     <section class="blok" aria-labelledby="kop-erbij">
       <div class="blok__kop">
-        <h2 class="kop" id="kop-erbij">Toevoegen</h2>
+        <h2 class="kop" id="kop-erbij">{{ "Atleten" if f.nieuw else "Toevoegen" }}</h2>
         {% if f.overigen %}
           <div class="zoekbalk">
-            <label class="verborgen" for="zoek-atleet">Zoek op naam</label>
-            <input type="search" id="zoek-atleet" placeholder="Zoek op naam" autocomplete="off">
+            <label class="verborgen" for="zoek-atleet">Zoek op naam of categorie</label>
+            <input type="search" id="zoek-atleet" placeholder="Zoek op naam of categorie (bijv. U14)" autocomplete="off">
+            <button type="button" class="knop" id="zichtbare-aan">Zichtbare aanvinken</button>
           </div>
         {% endif %}
       </div>
       {% if f.overigen %}
-        {{ tabel(f.overigen, false, "tabel-overigen") }}
-        <p class="leeg" id="niets-gevonden" hidden>Geen atleet gevonden met deze naam.</p>
+        {{ tabel(f.overigen, "tabel-overigen") }}
+        <p class="leeg" id="niets-gevonden" hidden>Geen atleet gevonden.</p>
+      {% elif f.nieuw %}
+        <p class="leeg">Nog geen actieve atleten. Voeg ze toe via Importeren of met een CSV-bestand; je kunt de groep ook leeg aanmaken.</p>
       {% else %}
         <p class="leeg">Alle actieve atleten zitten al in deze groep.</p>
       {% endif %}
@@ -69,39 +126,58 @@
 
     <div class="opslaan">
       <span class="zacht" id="samenvatting" aria-live="polite"></span>
-      <a href="{{ url_for('groep', groep_id=groep.id) }}">Annuleren</a>
-      <button class="knop knop--vol" type="submit">Opslaan</button>
+      <a href="{{ url_for('groepen') if f.nieuw else url_for('groep', groep_id=groep.id) }}">Annuleren</a>
+      <button class="knop knop--vol" type="submit">{{ "Groep aanmaken" if f.nieuw else "Opslaan" }}</button>
     </div>
   </form>
 
-  <footer class="vel__voet">Atleet Volg Systeem<br>{{ groep.naam }}</footer>
+  <footer class="vel__voet">Atleet Volg Systeem<br>{{ "Nieuwe groep" if f.nieuw else groep.naam }}</footer>
 </article>
 <script>
   (function () {
-    /* Zoeken in 'Toevoegen' (aangevinkte atleten blijven altijd zichtbaar). */
+    var nieuw = {{ "true" if f.nieuw else "false" }};
+    /* Zoeken in de lijst om te kiezen (aangevinkte atleten blijven altijd zichtbaar). */
     var zoek = document.getElementById("zoek-atleet");
     var rijen = document.querySelectorAll("#tabel-overigen tbody tr");
     var niets = document.getElementById("niets-gevonden");
-    if (zoek) zoek.addEventListener("input", function () {
+    function filter() {
       var q = zoek.value.trim().toLowerCase(), zichtbaar = 0;
       rijen.forEach(function (r) {
-        var toon = !q || r.dataset.naam.indexOf(q) !== -1 || r.querySelector("input").checked;
+        var toon = !q || r.dataset.zoek.indexOf(q) !== -1 || r.querySelector("input").checked;
         r.hidden = !toon; if (toon) zichtbaar++;
       });
       niets.hidden = zichtbaar > 0;
+    }
+    if (zoek) zoek.addEventListener("input", filter);
+    /* Alle zichtbare atleten in één keer aanvinken (bijv. na zoeken op 'U14'). */
+    var alle = document.getElementById("zichtbare-aan");
+    if (alle) alle.addEventListener("click", function () {
+      rijen.forEach(function (r) { if (!r.hidden) r.querySelector("input").checked = true; });
+      tel();
     });
-    /* Samenvatting van de wijzigingen naast 'Opslaan'. */
-    var uit = document.getElementById("samenvatting"), teller = document.getElementById("teller");
+    /* Trainingsdagen: een begintijd invullen vinkt de dag aan; uitvinken maakt de tijd leeg. */
+    document.querySelectorAll(".dagkeuze__dag").forEach(function (d) {
+      var vink = d.querySelector("input[type=checkbox]"), tijd = d.querySelector("input[type=time]");
+      tijd.addEventListener("input", function () { if (tijd.value) vink.checked = true; });
+      vink.addEventListener("change", function () { if (!vink.checked) tijd.value = ""; });
+    });
+    /* Samenvatting naast de knop. */
+    var uit = document.getElementById("samenvatting");
     function tel() {
-      var weg = document.querySelectorAll("#tabel-leden input:not(:checked)").length;
-      var erbij = document.querySelectorAll("#tabel-overigen input:checked").length;
       var totaal = document.querySelectorAll("input.lidvink:checked").length;
-      var delen = [];
-      if (erbij) delen.push(erbij + " erbij");
-      if (weg) delen.push(weg + " eruit");
-      uit.textContent = delen.length ? delen.join(", ") + " · straks " + totaal + (totaal === 1 ? " atleet" : " atleten") : "";
+      var woord = totaal === 1 ? " atleet" : " atleten";
+      if (nieuw) {
+        uit.textContent = totaal ? totaal + woord + " gekozen" : "nog geen atleten gekozen";
+      } else {
+        var weg = document.querySelectorAll("#tabel-leden input:not(:checked)").length;
+        var erbij = document.querySelectorAll("#tabel-overigen input:checked").length;
+        var delen = [];
+        if (erbij) delen.push(erbij + " erbij");
+        if (weg) delen.push(weg + " eruit");
+        uit.textContent = delen.length ? delen.join(", ") + " · straks " + totaal + woord : "";
+      }
       document.querySelectorAll("input.lidvink").forEach(function (v) {
-        v.closest("tr").classList.toggle("gewijzigd", v.checked !== v.defaultChecked);
+        v.closest("tr").classList.toggle("gewijzigd", nieuw ? v.checked : v.checked !== v.defaultChecked);
       });
     }
     document.querySelectorAll("input.lidvink").forEach(function (v) { v.addEventListener("change", tel); });

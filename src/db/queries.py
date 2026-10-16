@@ -593,7 +593,24 @@ class Opslag:
         leden = [x[0] for x in self.personen.execute(
             """SELECT gl.atleet_id FROM groep_lid gl JOIN atleet a ON a.master_id = gl.atleet_id
                WHERE gl.groep_id = ? ORDER BY a.achternaam, a.voornaam""", (r["id"],))]
-        return Groep(r["naam"], r["seizoen"], leden, r["id"])
+        tijden = {d: t for d, t in self.personen.execute(
+            "SELECT dag, starttijd FROM groep_trainingsdag WHERE groep_id = ?", (r["id"],))}
+        return Groep(r["naam"], r["seizoen"], leden, r["id"], {d: tijden[d] for d in DAGEN if d in tijden})
+
+    def groep_trainingsdagen_opslaan(self, groep_id: int, dagen: dict[str, str | None]) -> None:
+        """Vaste trainingsdagen van een groep opslaan; de bestaande worden precies `dagen`.
+
+        dagen: {'dinsdag': '18:30', 'donderdag': None}. Los van groep_opslaan(), zodat
+        het opslaan van alleen de leden (bijv. bij een CSV-import) de dagen niet wist.
+        """
+        onbekend = [d for d in dagen if d not in DAGEN]
+        if onbekend:
+            raise OpslagFout(f"Onbekende dag(en) {onbekend}; kies uit {DAGEN}.")
+        with self.personen:
+            self.personen.execute("DELETE FROM groep_trainingsdag WHERE groep_id = ?", (groep_id,))
+            self.personen.executemany(
+                "INSERT INTO groep_trainingsdag (groep_id, dag, starttijd) VALUES (?, ?, ?)",
+                [(groep_id, d, dagen[d]) for d in DAGEN if d in dagen])
 
     def groep(self, groep_id: int) -> Groep | None:
         r = self.personen.execute("SELECT * FROM groep WHERE id = ?", (groep_id,)).fetchone()

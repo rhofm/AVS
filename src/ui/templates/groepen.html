@@ -13,6 +13,7 @@
       <h1 class="kop kop--pagina">Groepen</h1>
       <p class="subkop">{{ groepen | length }} groep{{ "en" if groepen | length != 1 }}</p>
     </div>
+    <a class="knop knop--vol" href="{{ url_for('groep_nieuw') }}">+ Nieuwe groep</a>
   </header>
 
   {% if groepen %}
@@ -34,7 +35,7 @@
       </table>
     </div>
   {% else %}
-    <p class="leeg">Nog geen groepen. Maak ze aan met een CSV-bestand met atleten en groepen.</p>
+    <p class="leeg">Nog geen groepen. Maak er een met <a href="{{ url_for('groep_nieuw') }}">+ Nieuwe groep</a>.</p>
   {% endif %}
 
   <footer class="vel__voet">Atleet Volg Systeem</footer>
