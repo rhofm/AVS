@@ -402,7 +402,7 @@ def test_oude_absentie_wordt_verplaatst():
         map_ = Path(tmp)
         mid = "ab" * 16
         # Oude situatie nabootsen: alleen schema v1 van personen.db, met absentie erin.
-        with verbind("personen", map_, TESTSLEUTEL) as c:
+        with contextlib.closing(verbind("personen", map_, TESTSLEUTEL)) as c:
             c.executescript((DB_DIR / "schema_personen.sql").read_text(encoding="utf-8"))
             c.execute("INSERT INTO atleet (master_id, voornaam, achternaam) VALUES (?, 'Anna', 'Voorbeeld')", (mid,))
             c.execute("INSERT INTO groep (naam) VALUES ('C')")

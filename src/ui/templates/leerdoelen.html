@@ -1,0 +1,129 @@
+{#
+  Leerdoelen van één atleet: per leerlijn de doelen van zijn/haar categorie met de laatste score.
+  Context:
+    lp         – leerlijnen.voortgang.LeerdoelenPagina
+    basis_url  – '/atleet/<master_id>' (terug-link en formulier-actie)
+    modus      – 'bekijken' (standaard) of 'bewerken'
+    melding    – optioneel, bijv. '6 scores opgeslagen'
+    fout       – optioneel, foutmelding na opslaan
+  Bewerken: POST naar {{ basis_url }}/leerdoelen met 'datum' en per leerdoel
+  'score-<leerdoel_id>' = 1..5 → leerlijnen.voortgang.scores_opslaan().
+  Wisselen tussen bekijken/bewerken gaat zonder JavaScript.
+#}
+{% extends "basis.html" %}
+{% set bewerken_eerst = (modus | default('bekijken')) == 'bewerken' %}
+{% block titel %}Leerdoelen {{ lp.atleet.naam }}{% endblock %}
+
+{% macro blokjes(waarde) -%}
+  <span class="blokjes" aria-hidden="true">{% for i in range(1, 6) %}<span class="{{ 'aan' if waarde and i <= waarde }}"></span>{% endfor %}</span>
+{%- endmacro %}
+
+{% block inhoud %}
+<article class="vel">
+  <header class="blok__kop">
+    <div>
+      <a class="terug" href="{{ basis_url }}">&larr; {{ lp.atleet.naam }}</a>
+      <span class="label" style="display:block">Atleet</span>
+      <h1 class="atleetkop__naam">{{ lp.atleet.naam }}</h1>
+      <p class="subkop">
+        {% if lp.categorie %}Leerdoelen {{ lp.categorie }}{% if lp.doorlopend %}, met eerdere categorieën{% endif %}{% else %}Alle leerdoelen (leeftijd onbekend){% endif %}
+        · {{ lp.zelfstandig }} van {{ lp.aantal }} zelfstandig of beheerst
+      </p>
+    </div>
+    {% if lp.categorie %}<div class="categorie">{{ lp.categorie }}<small>leerlijn</small></div>{% endif %}
+  </header>
+
+  {% if melding %}<p class="melding" role="status">{{ melding }}</p>{% endif %}
+  {% if fout %}<p class="melding melding--fout" role="alert">{{ fout }}</p>{% endif %}
+
+  <div class="wissel modus">
+    <input class="wissel__radio" type="radio" name="modus" id="modus-bekijken" value="bekijken"{% if not bewerken_eerst %} checked{% endif %}>
+    <input class="wissel__radio" type="radio" name="modus" id="modus-bewerken" value="bewerken"{% if bewerken_eerst %} checked{% endif %}>
+    <div class="modus__balk">
+      <div class="wissel__knoppen" role="group" aria-label="Modus">
+        <label for="modus-bekijken">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 3C4 3 1.3 6 .5 8c.8 2 3.5 5 7.5 5s6.7-3 7.5-5C14.7 6 12 3 8 3zm0 8a3 3 0 1 1 0-6 3 3 0 0 1 0 6zm0-1.6a1.4 1.4 0 1 0 0-2.8 1.4 1.4 0 0 0 0 2.8z"/></svg>Bekijken</label>
+        <label for="modus-bewerken">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M11.7 1.3a1 1 0 0 1 1.4 0l1.6 1.6a1 1 0 0 1 0 1.4L5.4 13.6 1.5 14.5l.9-3.9z"/></svg>Bewerken</label>
+      </div>
+      {% if lp.categorie %}
+        <a class="terug" href="?{{ '' if lp.doorlopend else 'doorlopend=1' }}">
+          {{ "Alleen " ~ lp.categorie ~ " tonen" if lp.doorlopend else "Ook eerdere categorieën tonen" }}</a>
+      {% endif %}
+    </div>
+
+    <form class="modus__inhoud blok" method="post" action="{{ basis_url }}/leerdoelen{{ '?doorlopend=1' if lp.doorlopend }}">
+      {# schaal: wat 1-5 betekent #}
+      <ol class="schaal" aria-label="Scoreschaal">
+        {% for s, label in lp.scoreschaal.items() %}
+          <li>{{ blokjes(s) }}<span><strong>{{ s }}</strong> {{ label }}</span></li>
+        {% endfor %}
+      </ol>
+
+      <nav class="sprongen" aria-label="Naar leerlijn">
+        {% for b in lp.leerlijnen %}
+          <a href="#ll-{{ b.code }}">{{ b.naam }} <span class="zacht getallen">{{ b.zelfstandig }}/{{ b.aantal }}</span></a>
+        {% endfor %}
+      </nav>
+
+      <div class="opslaan alleen-bewerken">
+        <label for="score-datum">Datum van beoordeling</label>
+        <input type="date" id="score-datum" name="datum" value="{{ lp.vandaag.isoformat() }}" max="{{ lp.vandaag.isoformat() }}" required>
+        <span class="zacht">Alleen gewijzigde scores worden opgeslagen; eerdere scores blijven bewaard.</span>
+        <button class="knop knop--vol" type="submit">Opslaan</button>
+      </div>
+
+      {% for b in lp.leerlijnen %}
+        <section class="blok leerlijn" id="ll-{{ b.code }}" aria-labelledby="kop-{{ b.code }}">
+          <div class="blok__kop">
+            <h2 class="subkop leerlijn__naam" id="kop-{{ b.code }}">Leerlijn {{ b.naam | lower }}</h2>
+            <span class="zacht getallen" style="font-size: var(--maat-s)">
+              {{ b.zelfstandig }}/{{ b.aantal }} zelfstandig · {{ b.beoordeeld }} beoordeeld
+              {%- if b.gemiddelde %} · gem. {{ b.gemiddelde | getal }}{% endif %}</span>
+          </div>
+          <div class="tabelvak">
+            <table class="tabel leerdoeltabel">
+              <thead>
+                <tr><th scope="col">Vaardigheid</th><th scope="col" class="midden">Cat.</th><th scope="col">Score</th></tr>
+              </thead>
+              <tbody>
+                {% for r in b.regels %}
+                  {% set d = r.leerdoel %}
+                  <tr class="{{ '' if r.eigen_categorie else 'eerder' }}">
+                    <th scope="row">{{ d.omschrijving }}
+                      {%- if d.alleen_specialisten %} <span class="kenmerk kenmerk--licht">specialisten</span>{% endif %}</th>
+                    <td class="midden zacht">{{ d.categorie }}</td>
+                    <td class="scorecel">
+                      <span class="alleen-bekijken">
+                        {% if r.score %}
+                          {{ blokjes(r.waarde) }}
+                          <span class="scorecel__tekst">{{ lp.scoreschaal[r.waarde] }}<br><span class="zacht">{{ r.score.datum | datum_lang }}</span></span>
+                        {% else %}
+                          {{ blokjes(none) }}<span class="scorecel__tekst zacht">Nog niet beoordeeld</span>
+                        {% endif %}
+                      </span>
+                      <fieldset class="kiezer alleen-bewerken">
+                        <legend class="verborgen">Score voor: {{ d.omschrijving }}</legend>
+                        {% for s in range(1, 6) %}
+                          <input type="radio" id="s-{{ d.id }}-{{ s }}" name="score-{{ d.id }}" value="{{ s }}"{% if r.waarde == s %} checked{% endif %}>
+                          <label for="s-{{ d.id }}-{{ s }}" title="{{ lp.scoreschaal[s] }}">{{ s }}</label>
+                        {% endfor %}
+                      </fieldset>
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      {% endfor %}
+
+      <div class="opslaan opslaan--onder alleen-bewerken">
+        <button class="knop knop--vol" type="submit">Opslaan</button>
+      </div>
+    </form>
+  </div>
+
+  <footer class="vel__voet">Atleet Volg Systeem<br>Leerdoelen {{ lp.atleet.naam }}</footer>
+</article>
+{% endblock %}

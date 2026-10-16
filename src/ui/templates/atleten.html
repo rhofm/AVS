@@ -1,0 +1,54 @@
+{#
+  Overzicht van alle atleten, met zoeken.
+  Context:
+    rijen         – lijst van {atleet, categorie, groepen}
+    zoek          – zoektekst
+    ook_inactief  – ook niet-actieve atleten tonen
+#}
+{% extends "basis.html" %}
+{% block titel %}Atleten{% endblock %}
+
+{% block inhoud %}
+<article class="vel">
+  <header class="blok__kop">
+    <div>
+      <h1 class="kop kop--pagina">Atleten</h1>
+      <p class="subkop">{{ rijen | length }} atleet{{ "en" if rijen | length != 1 }}{% if zoek %} met &lsquo;{{ zoek }}&rsquo;{% endif %}</p>
+    </div>
+  </header>
+
+  <form class="zoekbalk" method="get" action="">
+    <label class="verborgen" for="zoek-q">Zoek op naam</label>
+    <input type="search" id="zoek-q" name="q" value="{{ zoek }}" placeholder="Zoek op naam" autofocus>
+    <label class="vinkje" for="zoek-alle"><input type="checkbox" id="zoek-alle" name="alle" value="1"{% if ook_inactief %} checked{% endif %}> Ook niet-actief</label>
+    <button class="knop knop--vol" type="submit">Zoeken</button>
+  </form>
+
+  {% if rijen %}
+    <div class="tabelvak">
+      <table class="tabel">
+        <thead>
+          <tr><th scope="col">Naam</th><th scope="col">Cat.</th><th scope="col">Specialisatie</th><th scope="col">Groepen</th></tr>
+        </thead>
+        <tbody>
+          {% for r in rijen %}
+            <tr{% if not r.atleet.actief %} class="geweest"{% endif %}>
+              <td><a href="{{ url_for('atleet', master_id=r.atleet.master_id) }}"><strong>{{ r.atleet.naam }}</strong></a>
+                {%- if not r.atleet.actief %} <span class="kenmerk">niet actief</span>{% endif %}</td>
+              <td>{{ r.categorie or "–" }}</td>
+              <td>{{ r.atleet.specialisatie or "–" }}</td>
+              <td>{{ r.groepen | join(", ") or "–" }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% elif zoek %}
+    <p class="leeg">Geen atleten gevonden met &lsquo;{{ zoek }}&rsquo;.</p>
+  {% else %}
+    <p class="leeg">Nog geen atleten. Voeg ze toe via Importeren (atletiek.nu) of met een CSV-bestand.</p>
+  {% endif %}
+
+  <footer class="vel__voet">Atleet Volg Systeem</footer>
+</article>
+{% endblock %}

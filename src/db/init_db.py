@@ -63,6 +63,7 @@ import hmac
 import re
 import secrets
 import sys
+from contextlib import closing
 from pathlib import Path
 
 import sqlcipher3
@@ -231,7 +232,9 @@ def _migraties(database: str) -> list[tuple[int, Path]]:
 
 
 def _init_een(database: str, map: Path | None, hoofd: bytes) -> int:
-    with verbind(database, map, hoofd) as conn:
+    # closing(): `with conn` alleen commit, maar sluit de verbinding niet. Op Windows
+    # blijft het bestand dan open (en vergrendeld) tot de garbage collector langskomt.
+    with closing(verbind(database, map, hoofd)) as conn, conn:
         versie = huidige_versie(conn)
 
         if versie == 0:
@@ -257,7 +260,7 @@ def _verplaats_absentie(map: Path | None, hoofd: bytes) -> int:
     het tussendoor mis, dan staat alles nog in personen.db en gaat het de
     volgende keer verder; rijen die al verplaatst waren worden overgeslagen.
     """
-    with verbind("personen", map, hoofd) as personen:
+    with closing(verbind("personen", map, hoofd)) as personen, personen:
         bestaat = personen.execute(
             "SELECT 1 FROM sqlite_master WHERE type='table' AND name='absentie_te_verplaatsen'"
         ).fetchone()
@@ -266,7 +269,7 @@ def _verplaats_absentie(map: Path | None, hoofd: bytes) -> int:
         rijen = personen.execute(
             "SELECT training_id, atleet_id, status, reden FROM absentie_te_verplaatsen"
         ).fetchall()
-        with verbind("absentie", map, hoofd) as absentie:
+        with closing(verbind("absentie", map, hoofd)) as absentie:
             with absentie:
                 absentie.executemany(
                     """INSERT OR IGNORE INTO absentie (training_id, atleet_ref, status, reden)

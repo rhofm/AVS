@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block titel %}AVS{% endblock %} · Atleet Volg Systeem</title>
+  <link rel="stylesheet" href="{{ static_pad | default('/static') }}/avs.css">
+</head>
+<body>
+  <header class="appbalk">
+    <div class="appbalk__binnen">
+      <a class="appbalk__naam" href="/">AVS <span>Atleet Volg Systeem</span></a>
+      <nav aria-label="Hoofdmenu">
+        {% set menu = [("atleten", "Atleten"), ("groepen", "Groepen"), ("wedstrijden", "Wedstrijden"),
+                       ("ploegen", "Ploegen"), ("leerlijnen", "Leerlijnen"), ("importeren", "Importeren")] %}
+        {% for sleutel, tekst in menu %}
+          <a href="/{{ sleutel }}"{% if actief_menu == sleutel %} aria-current="page"{% endif %}>{{ tekst }}</a>
+        {% endfor %}
+      </nav>
+    </div>
+  </header>
+  <main class="pagina">
+    {% block inhoud %}{% endblock %}
+  </main>
+</body>
+</html>

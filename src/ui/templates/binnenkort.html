@@ -1,0 +1,14 @@
+{# Pagina die nog gebouwd moet worden. Context: titel, terug_url, terug_naam (optioneel). #}
+{% extends "basis.html" %}
+{% block titel %}{{ titel }}{% endblock %}
+
+{% block inhoud %}
+<article class="vel">
+  <div class="blok">
+    <a class="terug" href="{{ terug_url }}">&larr; {{ terug_naam or "Atleten" }}</a>
+    <h1 class="kop kop--pagina">{{ titel }}</h1>
+    <p class="leeg">Deze pagina komt nog.</p>
+  </div>
+  <footer class="vel__voet">Atleet Volg Systeem</footer>
+</article>
+{% endblock %}

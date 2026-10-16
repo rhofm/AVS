@@ -1,0 +1,223 @@
+{#
+  Landingspagina van één atleet.
+  Context:
+    pagina  – atleten.landingspagina.AtleetLandingspagina
+    fases   – atleten.landingspagina.FASES
+  Filters uit ui/opmaak.py (registreer_filters).
+#}
+{% extends "basis.html" %}
+{% set atleet = pagina.atleet %}
+{% set p = pagina.profiel %}
+{% set basis = "/atleet/" ~ atleet.master_id %}
+{% block titel %}{{ atleet.naam }}{% endblock %}
+
+{% block inhoud %}
+<article class="vel">
+
+  {# ---------------- Atleet [naam] / [specialisatie] ---------------- #}
+  <header class="atleetkop">
+    <div>
+      <span class="label">Atleet</span>
+      <h1 class="atleetkop__naam">{{ atleet.naam }}</h1>
+      <p class="atleetkop__spec">
+        {% if atleet.specialisatie %}{{ atleet.specialisatie }}{% else %}<span class="zacht">Geen specialisatie</span>{% endif %}
+      </p>
+      <p class="atleetkop__feiten">
+        {% if pagina.geslacht %}<span>{{ pagina.geslacht }}</span>{% endif %}
+        {% if p.leeftijd is not none %}<span>{{ p.leeftijd }} jaar</span>{% endif %}
+        {% if atleet.geboortejaar %}<span>geboren {{ atleet.geboortejaar }}</span>{% endif %}
+        {% if p.groepen %}<span>{{ p.groepen | map(attribute="naam") | join(", ") }}</span>{% endif %}
+        {% if not atleet.actief %}<span>niet actief</span>{% endif %}
+      </p>
+    </div>
+    {% if pagina.categorie %}
+      <div class="categorie" title="Categorie dit jaar">{{ pagina.categorie_code }}{% if pagina.categorie_groep %}<small>{{ pagina.categorie_groep }}</small>{% endif %}</div>
+    {% endif %}
+  </header>
+
+  {% if pagina.fase %}
+    <ol class="fases" aria-label="Fase in de leerlijn">
+      {% for f in fases %}
+        <li{% if f == pagina.fase %} aria-current="step"{% endif %}>{{ f }}</li>
+      {% endfor %}
+    </ol>
+  {% endif %}
+
+  {# ---------------- Trainingsschema ---------------- #}
+  <section class="blok" aria-labelledby="kop-schema">
+    <div class="blok__kop">
+      <div>
+        <h2 class="kop" id="kop-schema">Trainingsschema</h2>
+        <p class="subkop">{{ pagina.trainingen_per_week }}× per week{% if pagina.schema | selectattr("gekoppeld") | list %} · met de groepstrainingen van deze week{% endif %}</p>
+      </div>
+      <span class="knoppen">
+        <a class="knop" href="{{ basis }}/aanwezigheid">Aanwezigheid{% if pagina.aanwezig_pct is not none %} · {{ pagina.aanwezig_pct | round | int }}%{% endif %} &rarr;</a>
+        <a class="knop" href="{{ basis }}/trainingsschema">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M11.7 1.3a1 1 0 0 1 1.4 0l1.6 1.6a1 1 0 0 1 0 1.4L5.4 13.6 1.5 14.5l.9-3.9z"/></svg>
+          Aanpassen
+        </a>
+      </span>
+    </div>
+    <div class="tabelvak">
+      <table class="tabel schema">
+        <thead>
+          <tr>
+            {% for d in pagina.schema %}
+              <th scope="col"{% if d.vandaag %} aria-current="date" title="Vandaag"{% endif %}>{{ d.kort }}</th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            {% for d in pagina.schema %}
+              <td class="{{ '' if d.traint else 'rust' }}">
+                {% if d.traint %}<span class="vink" aria-label="traint">&#9632;</span>
+                {% else %}<span class="geen" aria-label="traint niet">–</span>{% endif %}
+              </td>
+            {% endfor %}
+          </tr>
+          <tr>
+            {% for d in pagina.schema %}
+              <td class="{{ '' if d.traint or d.gekoppeld else 'rust' }}">
+                <span class="gekoppeld">
+                  {% for t in d.gekoppeld %}<span>{{ t }}</span>{% else %}<span class="geen">&nbsp;</span>{% endfor %}
+                </span>
+              </td>
+            {% endfor %}
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  {# ---------------- Opmerkingen [blessures] | Wedstrijden/doelen [planning] ---------------- #}
+  <div class="raster">
+    <section class="blok" aria-labelledby="kop-opm">
+      <div class="blok__kop">
+        <h2 class="kop" id="kop-opm">Opmerkingen</h2>
+        <a class="knop" href="{{ basis }}/notities/nieuw">+ Notitie</a>
+      </div>
+
+      {% if pagina.blessures %}
+        <h3 class="subkop">Blessures (afgelopen weken)</h3>
+        <ul class="lijst lijst--blessure">
+          {% for b in pagina.blessures %}
+            <li><time datetime="{{ b.datum }}">{{ b.datum | datum_kort }}</time><span>{{ b.reden or "blessure gemeld" }}</span></li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+
+      <h3 class="subkop">Notities</h3>
+      {% if pagina.notities %}
+        <ul class="lijst">
+          {% for n in pagina.notities %}
+            <li><time datetime="{{ n.datum }}">{{ n.datum | datum_kort }}</time><span>{{ n.samenvatting(120) }}</span></li>
+          {% endfor %}
+        </ul>
+        {% if pagina.aantal_notities > pagina.notities | length %}
+          <a href="{{ basis }}/notities">Alle {{ pagina.aantal_notities }} notities</a>
+        {% endif %}
+      {% else %}
+        <p class="leeg">Nog geen notities. Schrijf op wat je op training of wedstrijd opviel.</p>
+      {% endif %}
+    </section>
+
+    <section class="blok" aria-labelledby="kop-wed">
+      <div class="blok__kop">
+        <h2 class="kop" id="kop-wed">Wedstrijden &amp; doelen</h2>
+        <span class="knoppen">
+          <a class="knop" href="{{ basis }}/wedstrijden">Volledige planning &rarr;</a>
+          <a class="knop" href="{{ basis }}/inschrijven">+ Inschrijven</a>
+        </span>
+      </div>
+      <h3 class="subkop">Planning</h3>
+      {% if pagina.wedstrijden %}
+        <div class="tabelvak">
+          <table class="tabel">
+            <thead><tr><th scope="col">Datum</th><th scope="col">Wedstrijd</th><th scope="col">Onderdelen</th></tr></thead>
+            <tbody>
+              {% for w in pagina.wedstrijden %}
+                <tr>
+                  <td><strong>{{ w.wedstrijd.datum | datum_kort }}</strong><br><span class="zacht">{{ w.dagen_tot | over_dagen }}</span></td>
+                  <td>
+                    {% if w.wedstrijd.bron_url %}<a href="{{ w.wedstrijd.bron_url }}" target="_blank" rel="noopener">{{ w.wedstrijd.naam }}</a>{% else %}{{ w.wedstrijd.naam }}{% endif %}
+                    {% if w.wedstrijd.locatie %}<br><span class="zacht">{{ w.wedstrijd.locatie }}</span>{% endif %}
+                  </td>
+                  <td>{{ w.onderdelen | join(", ") if w.onderdelen else "volgt nog" }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <p class="leeg">Niet ingeschreven voor komende wedstrijden.</p>
+      {% endif %}
+      <h3 class="subkop">Doelen</h3>
+      {# Nog geen tabel voor doelen; zie de vraag in docs/Structuur.md ("Geplande/verwachte prestaties"). #}
+      <p class="leeg">Nog geen doelen vastgelegd.</p>
+    </section>
+  </div>
+
+  {# ---------------- PR's, testen, leerlijnen ---------------- #}
+  <div class="raster raster--drie">
+    <section class="blok" aria-labelledby="kop-pr">
+      <h2 class="kop" id="kop-pr">PR's</h2>
+      {% if pagina.prs %}
+        <div class="tabelvak">
+          <table class="tabel">
+            <thead><tr><th scope="col">Onderdeel</th><th scope="col" class="rechts">PR</th></tr></thead>
+            <tbody>
+              {% for r in pagina.prs %}
+                <tr><td>{{ r.onderdeel }}</td><td class="rechts"><strong>{{ r.waarde }}</strong></td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <p class="leeg">Nog geen prestaties. Importeer een uitslag of PR-lijst.</p>
+      {% endif %}
+    </section>
+
+    <section class="blok" aria-labelledby="kop-test">
+      <h2 class="kop" id="kop-test">Testen</h2>
+      {% if p.testen %}
+        <div class="tabelvak">
+          <table class="tabel">
+            <thead><tr><th scope="col">Test</th><th scope="col" class="rechts">Laatste</th></tr></thead>
+            <tbody>
+              {% for t in p.testen %}
+                <tr>
+                  <td>{{ t.test.naam }}<br><span class="zacht">{{ t.laatste.datum | datum_lang }}</span></td>
+                  <td class="rechts"><strong>{{ t.laatste.waarde | getal }}</strong> {{ t.test.eenheid }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <p class="leeg">Nog geen testresultaten.</p>
+      {% endif %}
+    </section>
+
+    <section class="blok" aria-labelledby="kop-ll">
+      <div class="blok__kop">
+        <h2 class="kop" id="kop-ll">Leerdoelen</h2>
+        <a class="knop" href="{{ basis }}/leerdoelen">Alle leerdoelen &rarr;</a>
+      </div>
+      {% if pagina.leerdoelen %}
+        {% for b in pagina.leerdoelen %}
+          <div class="voortgang">
+            <div class="blok__kop"><span>{{ b.naam }}</span><span class="zacht getallen">{{ b.zelfstandig }}/{{ b.aantal }}</span></div>
+            <div class="voortgang__balk" role="img" aria-label="{{ b.zelfstandig }} van {{ b.aantal }} leerdoelen zelfstandig of beheerst"><span style="width: {{ (100 * b.zelfstandig / b.aantal) | round | int if b.aantal else 0 }}%"></span></div>
+          </div>
+        {% endfor %}
+        <p class="zacht" style="font-size: var(--maat-xs); margin: 0">Aantal leerdoelen van {{ pagina.categorie }} op niveau &lsquo;zelfstandig&rsquo; of hoger.</p>
+      {% else %}
+        <p class="leeg">Nog geen leerdoelen beoordeeld.</p>
+      {% endif %}
+    </section>
+  </div>
+
+  <footer class="vel__voet">Atleet Volg Systeem<br>{{ atleet.naam }}</footer>
+</article>
+{% endblock %}

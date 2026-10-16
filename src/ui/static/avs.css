@@ -1,0 +1,401 @@
+/* =====================================================================
+   AVS – huisstijl
+   Afgeleid van "Leerlijn baanatletiek jeugd NA": Century Gothic, rood
+   accent, zalmkleurige tabelkoppen, roze rijen met witte lijnen,
+   kopjes in klein-kapitaal, rode subkopjes en een rode hoek als
+   paginamarkering. Alle kleuren zijn tokens; donker thema hieronder.
+   Layout: één kolom met een kopblok, het weekschema over de volle
+   breedte, daaronder blokken in een raster dat op smalle schermen stapelt.
+   ===================================================================== */
+
+:root {
+  --rood: #c00000;          /* kopjes, accent, hoek */
+  --rood-donker: #9e0000;
+  --zalm: #ff8080;          /* tabelkop / eerste kolom */
+  --roze: #ffbfbf;          /* tabelrij */
+  --roze-licht: #ffdfdf;    /* tabelrij (afwisselend), vlakken */
+  --lijn: #ffffff;          /* lijnen tussen tabelcellen */
+  --papier: #ffffff;
+  --achtergrond: #f4f4f2;   /* rond het "vel": neutraal gebroken wit */
+  --tekst: #171717;
+  --tekst-zacht: #5c5c5c;
+  --op-zalm: #ffffff;       /* tekst op zalm/rood */
+  --rand: #dedede;
+  --blessure: #8a1c1c;
+  --schaduw: 0 1px 2px rgb(0 0 0 / .05), 0 8px 24px rgb(0 0 0 / .05);
+  /* aanwezigheid: vlak (achtergrond) en sterk (stip, rand) */
+  --aanwezig-vlak: #dcf1de;  --aanwezig: #2e7d32;
+  --afwezig-vlak: #fbd9d7;   --afwezig: #c62828;
+  --afgemeld-vlak: #fff3bf;  --afgemeld: #a87f00;
+  --blessure-vlak: #ffe2c6;  --blessure-st: #e06500;
+  --leeg-vlak: #efefef;      --leeg-st: #8a8a8a;
+
+  --font: "Century Gothic", "CenturyGothic", "URW Gothic L", "URW Gothic", "Questrial", "Avant Garde", Futura, sans-serif;
+  --maat-xs: .75rem;
+  --maat-s: .875rem;
+  --maat-m: 1rem;
+  --maat-l: 1.25rem;
+  --maat-xl: 1.75rem;
+  --maat-xxl: 2.5rem;
+  --ruimte: 1rem;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --rood: #ff6b6b;
+    --rood-donker: #ff8a8a;
+    --zalm: #a8484c;
+    --roze: #34302f;
+    --roze-licht: #2c2a2a;
+    --lijn: #232323;
+    --papier: #232323;
+    --achtergrond: #1a1a1a;
+    --tekst: #ececec;
+    --tekst-zacht: #a8a8a8;
+    --op-zalm: #ffffff;
+    --rand: #3a3a3a;
+    --blessure: #ff9d9d;
+    --schaduw: 0 1px 2px rgb(0 0 0 / .4);
+    --aanwezig-vlak: #1f3823;  --aanwezig: #66bb6a;
+    --afwezig-vlak: #43201f;   --afwezig: #ef5350;
+    --afgemeld-vlak: #3b3313;  --afgemeld: #e5b900;
+    --blessure-vlak: #45290f;  --blessure-st: #ff9a3c;
+    --leeg-vlak: #2c2c2c;      --leeg-st: #9a9a9a;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --rood: #ff6b6b;
+  --rood-donker: #ff8a8a;
+  --zalm: #a8484c;
+  --roze: #34302f;
+  --roze-licht: #2c2a2a;
+  --lijn: #232323;
+  --papier: #232323;
+  --achtergrond: #1a1a1a;
+  --tekst: #ececec;
+  --tekst-zacht: #a8a8a8;
+  --op-zalm: #ffffff;
+  --rand: #3a3a3a;
+  --blessure: #ff9d9d;
+  --schaduw: 0 1px 2px rgb(0 0 0 / .4);
+  --aanwezig-vlak: #1f3823;  --aanwezig: #66bb6a;
+  --afwezig-vlak: #43201f;   --afwezig: #ef5350;
+  --afgemeld-vlak: #3b3313;  --afgemeld: #e5b900;
+  --blessure-vlak: #45290f;  --blessure-st: #ff9a3c;
+  --leeg-vlak: #2c2c2c;    --leeg-st: #9a9a9a;
+  color-scheme: dark;
+}
+
+/* ---------- basis ---------- */
+*, *::before, *::after { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: var(--font);
+  font-size: var(--maat-m);
+  line-height: 1.5;
+  color: var(--tekst);
+  background: var(--achtergrond);
+}
+a { color: var(--rood); text-underline-offset: .15em; }
+a:focus-visible, button:focus-visible { outline: 2px solid var(--rood); outline-offset: 2px; }
+.getallen, table { font-variant-numeric: tabular-nums; }
+
+/* ---------- appbalk ---------- */
+.appbalk {
+  background: var(--papier);
+  border-bottom: 3px solid var(--rood);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.appbalk__binnen {
+  max-width: 72rem; margin: 0 auto; padding-block: .6rem;
+  display: flex; flex-wrap: wrap; align-items: center; gap: .5rem 1.5rem;
+}
+.appbalk__naam { font-weight: 700; color: var(--rood); text-decoration: none; letter-spacing: .02em; }
+.appbalk__naam span { color: var(--tekst); font-weight: 400; }
+.appbalk nav { display: flex; flex-wrap: wrap; gap: .25rem 1rem; font-size: var(--maat-s); }
+.appbalk nav a { color: var(--tekst); text-decoration: none; padding-block: .2rem; border-bottom: 2px solid transparent; }
+.appbalk nav a:hover, .appbalk nav a[aria-current="page"] { border-bottom-color: var(--rood); }
+.appbalk__instellingen {
+  margin-left: auto; display: inline-flex; align-items: center; gap: .35rem;
+  font-size: var(--maat-s); color: var(--tekst); text-decoration: none;
+  padding: .3rem .6rem; border: 1px solid var(--rand);
+}
+.appbalk__instellingen svg { width: 1.05em; height: 1.05em; }
+.appbalk__instellingen:hover, .appbalk__instellingen[aria-current="page"] { border-color: var(--rood); color: var(--rood); }
+
+/* ---------- het "vel" ---------- */
+.pagina {
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 1.5rem 3rem;
+}
+.vel {
+  position: relative; overflow: hidden;
+  max-width: 72rem; margin: 0 auto;
+  background: var(--papier);
+  box-shadow: var(--schaduw);
+  padding: clamp(1.25rem, 3vw, 2.5rem);
+  padding-bottom: 4rem;
+  display: grid; gap: 2rem;
+}
+/* rode hoek rechtsonder, zoals de paginanummers in de leerlijn */
+.vel::after {
+  content: ""; position: absolute; right: 0; bottom: 0;
+  width: 4.5rem; height: 4.5rem;
+  background: linear-gradient(135deg, transparent 50%, var(--rood) 50%);
+}
+.vel__voet {
+  position: absolute; left: 0; right: 0; bottom: 1rem;
+  text-align: center; font-size: var(--maat-xs); color: var(--tekst-zacht); line-height: 1.3;
+}
+
+/* ---------- kopjes ---------- */
+.kop {                         /* "BEOOGDE LEERLIJN …" */
+  margin: 0; font-size: var(--maat-l); font-weight: 700;
+  font-variant-caps: small-caps; letter-spacing: .03em; text-wrap: balance;
+}
+.subkop {                      /* "Leerlijn sprint" */
+  margin: 0; font-size: var(--maat-m); font-weight: 400; color: var(--rood);
+}
+.label { font-size: var(--maat-xs); letter-spacing: .08em; text-transform: uppercase; color: var(--tekst-zacht); }
+.zacht { color: var(--tekst-zacht); }
+.blok { display: grid; gap: .6rem; align-content: start; min-width: 0; }
+.blok__kop { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+
+/* ---------- kopblok atleet ---------- */
+.atleetkop {
+  display: grid; grid-template-columns: 1fr auto; gap: 1rem 2rem; align-items: start;
+}
+.atleetkop__naam {
+  margin: .1rem 0 0; font-size: clamp(var(--maat-xl), 5vw, var(--maat-xxl));
+  line-height: 1.1; font-weight: 400; color: var(--rood); text-wrap: balance;
+}
+.atleetkop__spec { margin: .35rem 0 0; font-size: var(--maat-l); font-variant-caps: small-caps; font-weight: 700; letter-spacing: .03em; }
+.atleetkop__feiten { margin: .6rem 0 0; display: flex; flex-wrap: wrap; gap: .25rem 1.25rem; font-size: var(--maat-s); color: var(--tekst-zacht); }
+.categorie {                   /* rood blokje zoals "2025" op de voorkant */
+  background: var(--rood); color: var(--op-zalm);
+  min-width: 4.5rem; padding: .9rem .9rem .6rem; text-align: center;
+  font-weight: 700; font-size: var(--maat-xl); line-height: 1;
+}
+.categorie small { display: block; margin-top: .4rem; font-size: var(--maat-xs); font-weight: 400; letter-spacing: .05em; }
+
+/* fasepijlen: BMO → Wedstrijdgericht → Specialisatie */
+.fases { display: flex; flex-wrap: wrap; gap: .25rem; margin: 0; padding: 0; list-style: none; }
+.fases li {
+  position: relative; padding: .35rem 1.4rem .35rem 1rem; font-size: var(--maat-s);
+  background: var(--roze-licht); color: var(--tekst-zacht);
+  clip-path: polygon(0 0, calc(100% - .7rem) 0, 100% 50%, calc(100% - .7rem) 100%, 0 100%, .7rem 50%);
+}
+.fases li:first-child { clip-path: polygon(0 0, calc(100% - .7rem) 0, 100% 50%, calc(100% - .7rem) 100%, 0 100%); }
+.fases li[aria-current="step"] { background: var(--zalm); color: var(--op-zalm); font-weight: 700; }
+
+/* ---------- tabellen in leerlijn-stijl ---------- */
+.tabelvak { overflow-x: auto; min-width: 0; }
+.tabel {
+  width: 100%; border-collapse: collapse; font-size: var(--maat-s);
+}
+.tabel th, .tabel td { border: 2px solid var(--lijn); padding: .45rem .6rem; text-align: left; vertical-align: top; }
+.tabel thead th { background: var(--zalm); color: var(--op-zalm); font-weight: 700; }
+.tabel tbody tr:nth-child(odd) td { background: var(--roze); }
+.tabel tbody tr:nth-child(even) td { background: var(--roze-licht); }
+.tabel tbody th { background: var(--zalm); color: var(--op-zalm); font-weight: 700; }
+.tabel .rechts { text-align: right; }
+.tabel .midden { text-align: center; }
+
+/* weekschema */
+.schema th, .schema td { text-align: center; width: calc(100% / 7); }
+.schema thead th[aria-current="date"] { background: var(--rood); }
+.schema .vink { font-size: 1.1rem; line-height: 1; color: var(--tekst); }
+.schema .geen { color: var(--tekst-zacht); }
+.schema .gekoppeld { display: grid; gap: .2rem; font-size: var(--maat-xs); line-height: 1.3; color: var(--tekst); }
+.schema td.rust { background: var(--papier) !important; }
+
+/* ---------- raster met blokken ---------- */
+.raster { display: grid; gap: 2rem 2.5rem; grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr)); }
+.raster--drie { grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr)); }
+
+/* lijsten (notities, blessures) */
+.lijst { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.lijst li { background: var(--roze-licht); padding: .55rem .75rem; display: grid; grid-template-columns: 5.5rem 1fr; gap: .75rem; font-size: var(--maat-s); }
+.lijst li:nth-child(odd) { background: var(--roze); }
+.lijst time { font-weight: 700; white-space: nowrap; }
+.lijst--blessure li { background: var(--roze-licht); border-left: 4px solid var(--blessure); }
+.leeg { margin: 0; padding: .75rem; font-size: var(--maat-s); color: var(--tekst-zacht); border: 1px dashed var(--rand); }
+
+/* knoppen */
+.knop {
+  display: inline-flex; align-items: center; gap: .35rem;
+  font: inherit; font-size: var(--maat-s); text-decoration: none; cursor: pointer;
+  padding: .3rem .7rem; border: 1px solid var(--rood); color: var(--rood); background: transparent;
+}
+.knop:hover { background: var(--rood); color: var(--op-zalm); }
+.knop svg { width: 1em; height: 1em; }
+.knoppen { display: inline-flex; flex-wrap: wrap; gap: .5rem; }
+
+/* voortgang leerlijnen */
+.voortgang { display: grid; gap: .3rem; }
+.voortgang__balk { height: .6rem; background: var(--roze-licht); }
+.voortgang__balk span { display: block; height: 100%; background: var(--zalm); }
+
+/* ---------- wedstrijdplanning ---------- */
+.kop--pagina { font-size: var(--maat-xl); }
+.terug { font-size: var(--maat-s); text-decoration: none; }
+.terug:hover { text-decoration: underline; }
+.kenmerk { font-size: var(--maat-xs); padding: 0 .35rem; border: 1px solid var(--rand); color: var(--tekst-zacht); white-space: nowrap; }
+.nowrap { white-space: nowrap; }
+.tabel tr.geweest td { opacity: .65; }
+.deelnames { list-style: none; margin: 0; padding: 0; display: grid; gap: .15rem; }
+
+/* lijst/kalender-wissel zonder JavaScript */
+.wissel { display: grid; gap: 1.25rem; }
+.wissel__radio { position: absolute; opacity: 0; pointer-events: none; }
+.wissel__knoppen { display: inline-flex; justify-self: start; border: 1px solid var(--rood); }
+.wissel__knoppen label {
+  display: inline-flex; align-items: center; gap: .4rem; cursor: pointer;
+  padding: .35rem .9rem; font-size: var(--maat-s); color: var(--rood);
+}
+.wissel__knoppen label svg { width: 1em; height: 1em; }
+#weergave-lijst:checked ~ .wissel__knoppen label[for="weergave-lijst"],
+#weergave-kalender:checked ~ .wissel__knoppen label[for="weergave-kalender"] { background: var(--rood); color: var(--op-zalm); }
+#weergave-lijst:focus-visible ~ .wissel__knoppen label[for="weergave-lijst"],
+#weergave-kalender:focus-visible ~ .wissel__knoppen label[for="weergave-kalender"] { outline: 2px solid var(--rood); outline-offset: 2px; }
+#weergave-lijst:checked ~ .weergave--kalender,
+#weergave-kalender:checked ~ .weergave--lijst { display: none; }
+
+/* maandkalender */
+.weergave--kalender { gap: 2.25rem; }
+.maand { display: grid; gap: .6rem; }
+.maand__naam { font-size: var(--maat-l); }
+.kalender { width: 100%; min-width: 20rem; border-collapse: collapse; table-layout: fixed; font-size: var(--maat-s); }
+.kalender th { background: var(--zalm); color: var(--op-zalm); font-weight: 700; padding: .35rem; border: 2px solid var(--lijn); }
+.kalender td {
+  height: 4.75rem; vertical-align: top; padding: .3rem; border: 1px solid var(--rand);
+  background: var(--papier);
+}
+.kalender td.buiten { color: var(--tekst-zacht); opacity: .5; }
+.kalender td.heeft { background: var(--roze-licht); }
+.kalender td.vandaag { box-shadow: inset 0 0 0 2px var(--rood); }
+.kalender__dag { display: block; font-weight: 700; font-variant-numeric: tabular-nums; }
+.kalender td.vandaag .kalender__dag { color: var(--rood); }
+.kalender__wedstrijd {
+  display: flex; align-items: baseline; gap: .3rem; margin-top: .2rem;
+  font-size: var(--maat-xs); line-height: 1.25; color: var(--tekst); text-decoration: none;
+}
+.kalender__wedstrijd:hover .kalender__naam { text-decoration: underline; }
+.kalender__naam { overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.stip { flex: none; width: .55rem; height: .55rem; border-radius: 50%; background: var(--rood); }
+.kalender__wedstrijd.geweest .stip { background: var(--tekst-zacht); }
+.maand__lijst li.geweest { opacity: .65; }
+.maand__lijst li:target { outline: 2px solid var(--rood); }
+
+/* ---------- leerdoelen ---------- */
+.modus__balk { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .75rem 1.5rem; }
+#modus-bekijken:checked ~ .modus__balk label[for="modus-bekijken"],
+#modus-bewerken:checked ~ .modus__balk label[for="modus-bewerken"] { background: var(--rood); color: var(--op-zalm); }
+#modus-bekijken:focus-visible ~ .modus__balk label[for="modus-bekijken"],
+#modus-bewerken:focus-visible ~ .modus__balk label[for="modus-bewerken"] { outline: 2px solid var(--rood); outline-offset: 2px; }
+#modus-bekijken:checked ~ .modus__inhoud .alleen-bewerken,
+#modus-bewerken:checked ~ .modus__inhoud .alleen-bekijken { display: none; }
+.modus__inhoud { gap: 1.75rem; }
+
+.melding { margin: 0; padding: .6rem .9rem; font-size: var(--maat-s); background: var(--roze-licht); border-left: 4px solid var(--zalm); }
+.melding--fout { border-left-color: var(--rood); color: var(--rood); }
+.verborgen { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.kenmerk--licht { border-color: currentColor; color: inherit; opacity: .85; font-weight: 400; }
+
+/* score als vijf blokjes, zoals de ■ in de leerlijn */
+.blokjes { display: inline-flex; gap: 3px; flex: none; }
+.blokjes span { width: .8rem; height: .8rem; border: 1px solid var(--zalm); background: var(--papier); }
+.blokjes span.aan { background: var(--rood); border-color: var(--rood); }
+
+.schaal { list-style: none; margin: 0; padding: .75rem 1rem; display: flex; flex-wrap: wrap; gap: .5rem 1.5rem;
+  font-size: var(--maat-s); border: 1px solid var(--rand); }
+.schaal li { display: inline-flex; align-items: center; gap: .5rem; }
+.sprongen { display: flex; flex-wrap: wrap; gap: .4rem; font-size: var(--maat-s); }
+.sprongen a { text-decoration: none; color: var(--tekst); padding: .25rem .6rem; border: 1px solid var(--rand); }
+.sprongen a:hover { border-color: var(--rood); color: var(--rood); }
+
+.leerlijn { scroll-margin-top: 1rem; }
+.leerlijn__naam { font-size: var(--maat-l); }
+.leerdoeltabel tbody th { font-weight: 700; width: 60%; }
+.leerdoeltabel th:nth-child(2), .leerdoeltabel td:nth-child(2) { width: 4rem; }
+.leerdoeltabel tr.eerder th { background: var(--roze); color: var(--tekst); font-weight: 400; }
+.scorecel { min-width: 12rem; }
+.scorecel .alleen-bekijken { display: flex; align-items: flex-start; gap: .6rem; }
+.scorecel .blokjes { margin-top: .25rem; }
+.scorecel__tekst { font-size: var(--maat-s); line-height: 1.3; }
+
+/* 1-5 kiezen: vijf vierkantjes */
+.kiezer { border: 0; margin: 0; padding: 0; display: inline-flex; gap: 4px; }
+.kiezer input { position: absolute; opacity: 0; pointer-events: none; }
+.kiezer label {
+  width: 2rem; height: 2rem; display: grid; place-items: center; cursor: pointer;
+  border: 1px solid var(--zalm); background: var(--papier); font-weight: 700; font-size: var(--maat-s);
+  font-variant-numeric: tabular-nums;
+}
+.kiezer label:hover { border-color: var(--rood); }
+.kiezer input:checked + label { background: var(--rood); border-color: var(--rood); color: var(--op-zalm); }
+.kiezer input:focus-visible + label { outline: 2px solid var(--rood); outline-offset: 2px; }
+
+.opslaan {
+  display: flex; flex-wrap: wrap; align-items: center; gap: .5rem 1rem; font-size: var(--maat-s);
+  padding: .75rem 1rem; background: var(--papier); border: 1px solid var(--rand);
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 2;
+}
+.opslaan input[type="date"] { font: inherit; padding: .25rem .4rem; border: 1px solid var(--rand); background: var(--papier); color: var(--tekst); }
+.opslaan .knop--vol { margin-left: auto; }
+.opslaan--onder { position: static; justify-content: flex-end; border: 0; padding: 0; }
+.knop--vol { background: var(--rood); color: var(--op-zalm); }
+.knop--vol:hover { background: var(--rood-donker); border-color: var(--rood-donker); }
+
+/* ---------- aanwezigheid ---------- */
+.status-aanwezig      { --st-vlak: var(--aanwezig-vlak); --st: var(--aanwezig); }
+.status-afwezig       { --st-vlak: var(--afwezig-vlak);  --st: var(--afwezig); }
+.status-afgemeld      { --st-vlak: var(--afgemeld-vlak); --st: var(--afgemeld); }
+.status-blessure      { --st-vlak: var(--blessure-vlak); --st: var(--blessure-st); }
+.status-niet_ingevuld { --st-vlak: var(--leeg-vlak);     --st: var(--leeg-st); }
+
+.statuslabel { display: inline-flex; align-items: center; gap: .4rem; }
+.statuslabel__stip { flex: none; width: .65rem; height: .65rem; border-radius: 50%; background: var(--st); }
+.tabel tbody tr[class*="status-"] td { background: var(--st-vlak); }
+.statustabel tbody tr td:first-child { box-shadow: inset 4px 0 0 var(--st); }
+
+.telling { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem 2.5rem; padding: 1rem 1.25rem; border: 1px solid var(--rand); }
+.telling__pct { display: grid; gap: .1rem; }
+.telling__getal { font-size: var(--maat-xxl); line-height: 1; color: var(--rood); font-variant-numeric: tabular-nums; }
+.telling__lijst { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: .5rem; font-size: var(--maat-s); }
+.telling__lijst .statuslabel { padding: .3rem .7rem; background: var(--st-vlak); }
+.telling__lijst strong { font-variant-numeric: tabular-nums; }
+
+.kalender--status td[class*="status-"] { background: var(--st-vlak); box-shadow: inset 0 3px 0 var(--st); }
+.kalender--status td.vandaag { box-shadow: inset 0 0 0 2px var(--rood); }
+.kalender__training { display: flex; align-items: center; gap: .3rem; margin-top: .2rem; font-size: var(--maat-xs); line-height: 1.25; }
+
+/* ---------- atleten (zoeken) ---------- */
+.zoekbalk { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem 1rem; }
+.zoekbalk input[type="search"] {
+  flex: 1 1 16rem; min-width: 0; font: inherit; padding: .45rem .6rem;
+  border: 1px solid var(--rand); background: var(--papier); color: var(--tekst);
+}
+.zoekbalk input[type="search"]:focus-visible { outline: 2px solid var(--rood); outline-offset: 1px; }
+.vinkje { display: inline-flex; align-items: center; gap: .35rem; font-size: var(--maat-s); }
+
+@media (max-width: 40rem) {
+  .kalender__training { margin-top: .35rem; }
+  .leerdoeltabel, .leerdoeltabel tbody, .leerdoeltabel tr, .leerdoeltabel th, .leerdoeltabel td { display: block; width: auto !important; }
+  .leerdoeltabel thead { display: none; }
+  .leerdoeltabel tr { border-bottom: 2px solid var(--lijn); }
+  .leerdoeltabel td:nth-child(2) { display: none; }
+  .scorecel { min-width: 0; }
+  .kalender td { height: 3rem; }
+  .kalender__naam { display: none; }
+  .kalender__wedstrijd { margin-top: .35rem; }
+  .stip { width: .7rem; height: .7rem; }
+  .atleetkop { grid-template-columns: 1fr; }
+  .categorie { justify-self: start; order: -1; }
+  .lijst li { grid-template-columns: 1fr; gap: .15rem; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }

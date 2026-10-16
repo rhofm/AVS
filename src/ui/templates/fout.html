@@ -1,0 +1,14 @@
+{# Foutpagina (404, of databases die niet geopend konden worden). Context: titel, tekst. #}
+{% extends "basis.html" %}
+{% block titel %}{{ titel }}{% endblock %}
+
+{% block inhoud %}
+<article class="vel">
+  <div class="blok">
+    <h1 class="kop kop--pagina">{{ titel }}</h1>
+    <p class="melding melding--fout" style="white-space: pre-line">{{ tekst }}</p>
+    <a class="terug" href="/atleten">&larr; Naar atleten</a>
+  </div>
+  <footer class="vel__voet">Atleet Volg Systeem</footer>
+</article>
+{% endblock %}

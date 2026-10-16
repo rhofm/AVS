@@ -1,0 +1,129 @@
+{#
+  Aanwezigheid van één atleet, als lijst of als kalender.
+  Context:
+    aw         – atleten.aanwezigheid.Aanwezigheid
+    kop_naam   – naam van de atleet
+    terug_url  – link terug naar de landingspagina
+    weergave   – 'lijst' (standaard) of 'kalender'
+  Kleuren per status: .status-aanwezig (groen), -afwezig (rood), -afgemeld (geel),
+  -blessure (oranje), -niet_ingevuld (grijs). De status staat er altijd ook als tekst bij.
+#}
+{% extends "basis.html" %}
+{% set kalender_eerst = (weergave | default('lijst')) == 'kalender' %}
+{% set statussen = ["aanwezig", "afgemeld", "afwezig", "blessure", "niet_ingevuld"] %}
+{% set teksten = {"aanwezig": "Aanwezig", "afgemeld": "Afgemeld", "afwezig": "Afwezig", "blessure": "Blessure", "niet_ingevuld": "Niet ingevuld"} %}
+{% block titel %}Aanwezigheid {{ kop_naam }}{% endblock %}
+
+{% block inhoud %}
+<article class="vel">
+  <header class="blok__kop">
+    <div>
+      <a class="terug" href="{{ terug_url }}">&larr; {{ kop_naam }}</a>
+      <h1 class="kop kop--pagina">Aanwezigheid</h1>
+      <p class="subkop">{{ aw.van | datum_lang }} t/m {{ aw.tot | datum_lang }} · {{ aw.regels | length }} training{{ "en" if aw.regels | length != 1 }}</p>
+    </div>
+  </header>
+
+  {# ---------------- samenvatting ---------------- #}
+  <div class="telling">
+    <div class="telling__pct">
+      <span class="telling__getal">{% if aw.percentage is not none %}{{ aw.percentage | round | int }}%{% else %}–{% endif %}</span>
+      <span class="zacht">aanwezig van {{ aw.ingevuld }} ingevulde trainingen</span>
+    </div>
+    <ul class="telling__lijst">
+      {% for s in statussen %}
+        {% if s != "niet_ingevuld" or aw.telling[s] %}
+          <li class="statuslabel status-{{ s }}"><span class="statuslabel__stip" aria-hidden="true"></span>{{ teksten[s] }} <strong>{{ aw.telling[s] }}</strong></li>
+        {% endif %}
+      {% endfor %}
+    </ul>
+  </div>
+
+  <div class="wissel">
+    <input class="wissel__radio" type="radio" name="weergave" id="weergave-lijst" value="lijst"{% if not kalender_eerst %} checked{% endif %}>
+    <input class="wissel__radio" type="radio" name="weergave" id="weergave-kalender" value="kalender"{% if kalender_eerst %} checked{% endif %}>
+    <div class="wissel__knoppen" role="group" aria-label="Weergave">
+      <label for="weergave-lijst">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M1 3h2v2H1zm4 0h10v2H5zM1 7h2v2H1zm4 0h10v2H5zm-4 4h2v2H1zm4 0h10v2H5z"/></svg>Lijst</label>
+      <label for="weergave-kalender">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M4 0h2v2h4V0h2v2h3v14H1V2h3zM3 6v8h10V6zm1 1h2v2H4zm3 0h2v2H7zm3 0h2v2h-2zM4 10h2v2H4zm3 0h2v2H7z"/></svg>Kalender</label>
+    </div>
+
+    {# ---------------- Lijst ---------------- #}
+    <section class="weergave weergave--lijst blok" aria-label="Lijst">
+      {% if aw.regels %}
+        <div class="tabelvak">
+          <table class="tabel statustabel">
+            <thead>
+              <tr><th scope="col">Datum</th><th scope="col">Groep</th><th scope="col">Training</th><th scope="col">Status</th><th scope="col">Reden</th></tr>
+            </thead>
+            <tbody>
+              {% for r in aw.regels %}
+                <tr class="status-{{ r.status }}">
+                  <td class="nowrap"><strong>{{ r.training.datum | datum_kort }}</strong><br><span class="zacht">{{ r.training.datum.year }}</span></td>
+                  <td>{{ r.groep }}</td>
+                  <td>{{ r.training.onderwerp or "–" }}</td>
+                  <td class="nowrap"><span class="statuslabel"><span class="statuslabel__stip" aria-hidden="true"></span>{{ r.status_tekst }}</span></td>
+                  <td>{{ r.reden or "" }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <p class="leeg">Geen trainingen in deze periode.</p>
+      {% endif %}
+    </section>
+
+    {# ---------------- Kalender ---------------- #}
+    <section class="weergave weergave--kalender blok" aria-label="Kalender">
+      {% for m in aw.maanden %}
+        <div class="maand">
+          <div class="blok__kop">
+            <h2 class="subkop maand__naam">{{ m.naam }}</h2>
+            <span class="zacht getallen" style="font-size: var(--maat-s)">
+              {%- for s in statussen if m.telling[s] %}{{ m.telling[s] }} {{ teksten[s] | lower }}{{ " · " if not loop.last }}{% else %}geen trainingen{% endfor %}</span>
+          </div>
+          <div class="tabelvak">
+            <table class="kalender kalender--status">
+              <thead><tr>{% for d in ["Ma", "Di", "Wo", "Do", "Vr", "Za", "Zo"] %}<th scope="col">{{ d }}</th>{% endfor %}</tr></thead>
+              <tbody>
+                {# nieuwste week bovenaan, net als de maanden en de lijst #}
+                {% for week in m.weken | reverse %}
+                  <tr>
+                    {% for dag in week %}
+                      <td class="{{ 'buiten' if not dag.in_maand }}{{ ' vandaag' if dag.vandaag }}{{ ' status-' ~ dag.status if dag.status }}">
+                        <span class="kalender__dag">{{ dag.datum.day }}</span>
+                        {% for r in dag.regels %}
+                          <span class="kalender__training status-{{ r.status }}" title="{{ r.groep }}{{ ' – ' ~ r.training.onderwerp if r.training.onderwerp }}{{ ' – ' ~ r.reden if r.reden }}">
+                            <span class="statuslabel__stip" aria-hidden="true"></span><span class="kalender__naam">{{ r.status_tekst }}{% if dag.regels | length > 1 %} · {{ r.groep }}{% endif %}</span></span>
+                        {% endfor %}
+                      </td>
+                    {% endfor %}
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      {% endfor %}
+    </section>
+  </div>
+
+  <footer class="vel__voet">Atleet Volg Systeem<br>Aanwezigheid {{ kop_naam }}</footer>
+</article>
+<script>
+  /* Onthoud lijst/kalender per computer; zonder opslag werkt de pagina gewoon. */
+  (function () {
+    var sleutel = "avs-aanwezigheid-weergave";
+    try {
+      var keuze = localStorage.getItem(sleutel);
+      var el = keuze && document.getElementById("weergave-" + keuze);
+      if (el && !location.search.includes("weergave=")) el.checked = true;
+    } catch (e) {}
+    document.querySelectorAll(".wissel__radio").forEach(function (r) {
+      r.addEventListener("change", function () { try { localStorage.setItem(sleutel, r.value); } catch (e) {} });
+    });
+  })();
+</script>
+{% endblock %}
