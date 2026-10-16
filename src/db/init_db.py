@@ -1,11 +1,12 @@
 """Initialiseert de versleutelde AVS-databases.
 
-De databases staan NIET in git (privacy). De gegevens zijn verdeeld over drie
+De databases staan NIET in git (privacy). De gegevens zijn verdeeld over vier
 bestanden, elk met SQLCipher versleuteld met een eigen sleutel:
 
-    data/personen.db    persoonsgegevens, groepen, absentie, leerlijnen, ploegen
-    data/prestaties.db  onderdelen, wedstrijden, prestaties, PR's
-    data/testen.db      testen en testresultaten
+    data/personen.db         persoonsgegevens, groepen, absentie, leerlijnen, ploegen
+    data/prestaties.db       onderdelen, wedstrijden, prestaties, PR's
+    data/testen.db           testen en testresultaten
+    data/trainingsschema.db  op welke dagen van de week een atleet traint
 
 Sleutels
 --------
@@ -17,8 +18,9 @@ Daaruit worden met HMAC-SHA256 afgeleid:
   * per database een eigen pseudoniem voor elke atleet.
 
 Een atleet krijgt in personen.db een willekeurige master_id (nieuw_master_id()).
-Alleen daar staat die id naast naam en geboortedatum. In prestaties.db en
-testen.db staat in plaats daarvan pseudoniem(master_id, '<database>'). Die
+Alleen daar staat die id naast naam en geboortedatum. In prestaties.db,
+testen.db en trainingsschema.db staat in plaats daarvan
+pseudoniem(master_id, '<database>'). Die
 pseudoniemen verschillen per database. Zonder de hoofdsleutel zijn de bestanden
 onleesbaar, en ook met één gelekte database-sleutel is een bestand niet aan een
 ander bestand of aan een persoon te koppelen.
@@ -34,7 +36,9 @@ Dit script:
 
 Migraties staan in migrations/<database>/NNN_beschrijving.sql (bijv.
 migrations/testen/002_add_testlocatie.sql) en worden op nummer gesorteerd.
-Een bestaande database wordt nooit gewist.
+Een bestaande database wordt nooit gewist. Komt er een nieuwe database bij
+(zoals trainingsschema.db), dan maakt dit script hem bij de volgende start aan
+met de bestaande hoofdsleutel.
 
 Vereist: pip install sqlcipher3-wheels keyring
 
@@ -62,9 +66,9 @@ DB_DIR = Path(__file__).resolve().parent
 MIGRATIONS_DIR = DB_DIR / "migrations"
 _MIGRATIE_NAAM = re.compile(r"^(\d+)_.*\.sql$")
 
-DATABASES = ("personen", "prestaties", "testen")
+DATABASES = ("personen", "prestaties", "testen", "trainingsschema")
 # Databases waarin een atleet als pseudoniem staat (personen.db gebruikt master_id).
-GEPSEUDONIMISEERD = ("prestaties", "testen")
+GEPSEUDONIMISEERD = ("prestaties", "testen", "trainingsschema")
 
 KEYRING_DIENST = "AVS"
 KEYRING_NAAM = "hoofdsleutel"
@@ -137,7 +141,7 @@ def nieuw_master_id() -> str:
 
 
 def pseudoniem(master_id: str, database: str, hoofd: str | bytes | None = None) -> str:
-    """Het pseudoniem (atleet_ref) van een atleet in prestaties.db of testen.db."""
+    """Het pseudoniem (atleet_ref) van een atleet in prestaties.db, testen.db of trainingsschema.db."""
     if database not in GEPSEUDONIMISEERD:
         raise ValueError(f"Geen pseudoniemen in {database!r}; kies uit {GEPSEUDONIMISEERD}.")
     hoofd = _naar_bytes(hoofd) if hoofd is not None else hoofdsleutel()
@@ -166,7 +170,7 @@ def db_pad(database: str, map: Path | None = None) -> Path:
 def verbind(database: str, map: Path | None = None, hoofd: str | bytes | None = None) -> sqlcipher3.Connection:
     """Open een versleutelde database met foreign keys aan en rijen als dict-achtige objecten.
 
-    database: 'personen', 'prestaties' of 'testen'.
+    database: 'personen', 'prestaties', 'testen' of 'trainingsschema'.
     hoofd:    alleen voor tests; normaal komt de sleutel uit de sleutelkluis.
     """
     pad = db_pad(database, map)

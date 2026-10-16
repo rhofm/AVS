@@ -26,6 +26,7 @@ from .prestatie import (
     Wedstrijd,
     heeft_windmeting,
 )
+from .trainingsschema import DAGEN, Trainingsschema
 
 __all__ = [
     "Atleet", "Geslacht", "GESLACHTEN",
@@ -33,4 +34,5 @@ __all__ = [
     "Bron", "BRONNEN", "Eenheid", "EENHEDEN", "MAX_WIND", "heeft_windmeting",
     "Groep", "Training", "Absentie", "AbsentieStatus", "ABSENTIE_STATUSSEN", "Periodeplan",
     "Leerlijn", "LeerlijnStap", "LeerlijnVoortgang",
+    "Trainingsschema", "DAGEN",
 ]

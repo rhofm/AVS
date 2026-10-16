@@ -36,8 +36,8 @@ This project holds personal data about athletes, many of them minors.
   keyring; the recovery key is shown only on explicit request
   (`--herstelsleutel`). Do not write keys to files, config or test fixtures.
 - **Keep the split intact.** Names, birth dates, `master_id` and `atletieknu_id`
-  live only in `personen.db`. Never copy them into `prestaties.db` or
-  `testen.db`, and never store anything there that points back to a person
+  live only in `personen.db`. Never copy them into `prestaties.db`,
+  `testen.db` or `trainingsschema.db`, and never store anything there that points back to a person
   (e.g. a per-athlete atletiek.nu URL).
 - Test fixtures in `tests/fixtures/` must be **anonymised** (fake names, fake
   athlete IDs) before they are saved.
@@ -79,7 +79,7 @@ follow it when implementing.
 
 ### Three encrypted databases
 
-The data is split over three SQLCipher-encrypted files in `data/` (repo root
+The data is split over four SQLCipher-encrypted files in `data/` (repo root
 when run from source, next to the `.exe` when frozen):
 
 | File             | Contents | Athlete identified by |
@@ -87,6 +87,7 @@ when run from source, next to the `.exe` when frozen):
 | `personen.db`    | `atleet` (personal details), groups, trainings, `absentie`, `periodeplan`, leerlijnen, `ploeg`, `ploeg_opstelling` | `master_id` |
 | `prestaties.db`  | `onderdeel`, `wedstrijd`, `prestatie`, `inschrijving`, `pr` view | `atleet_ref` (pseudonym) |
 | `testen.db`      | `test`, `testresultaat` | `atleet_ref` (pseudonym) |
+| `trainingsschema.db` | `trainingsschema`: one row per athlete, columns `maandag` … `zondag` (0/1) | `atleet_ref` (pseudonym) |
 
 None of the databases are in git. `src/db/init_db.py` creates them and brings
 them up to date:
@@ -109,9 +110,9 @@ python src/db/init_db.py --herstel <sleutel>  # restore the key (e.g. new comput
 - Every athlete gets a random `master_id` (32 hex chars) in `personen.db`.
   Create it with `nieuw_master_id()` — **never derive it** from name, birth date
   or a federation number.
-- In `prestaties.db` and `testen.db` an athlete is
-  `atleet_ref = pseudoniem(master_id, "prestaties" | "testen")`. The two
-  pseudonyms differ, so the files cannot be joined without the master key.
+- In `prestaties.db`, `testen.db` and `trainingsschema.db` an athlete is
+  `atleet_ref = pseudoniem(master_id, "prestaties" | "testen" | "trainingsschema")`.
+  The pseudonyms differ per database, so the files cannot be joined without the master key.
   To combine data, look up the `master_id` in `personen.db` and compute the
   pseudonym in Python; there is no stored mapping table.
 - Cross-file references (`ploeg.wedstrijd_id`, `ploeg_opstelling.onderdeel_id`
@@ -180,4 +181,4 @@ feature/<naam>  →  dev  →  staging  →  main
 - Write tests for new logic (`tests/`); importers and team selection especially.
 - When a design decision is still open (UI framework, test runner, dependency
   management in `pyproject.toml`), propose an option and ask rather than
-  silently picking one.
+  silently picking one.

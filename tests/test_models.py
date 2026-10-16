@@ -11,6 +11,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from models import (  # noqa: E402
+    DAGEN, Trainingsschema,
     Absentie, Atleet, Groep, Leerlijn, LeerlijnStap, LeerlijnVoortgang,
     Onderdeel, Periodeplan, Prestatie, heeft_windmeting,
 )
@@ -133,6 +134,21 @@ def test_leerlijn():
     assert lijn.volgende_stap({11, 12, 13}) is None
     assert not LeerlijnVoortgang(NEP_ID, 11).behaald
     assert LeerlijnVoortgang(NEP_ID, 11, date(2026, 9, 1)).behaald
+
+
+def test_trainingsschema():
+    s = Trainingsschema.met_dagen("a" * 32, ["dinsdag", "donderdag"])
+    assert s.dagen == ["dinsdag", "donderdag"] and s.aantal_per_week == 2
+    assert s.traint_op("Dinsdag") and not s.traint_op("maandag")
+    assert s.traint_op(date(2026, 10, 20))          # een dinsdag
+    assert not s.traint_op(date(2026, 10, 19))      # een maandag
+    assert len(DAGEN) == 7 and DAGEN[0] == "maandag"
+    for fout in (lambda: Trainingsschema.met_dagen("a" * 32, ["maandg"]), lambda: s.traint_op("weekend")):
+        try:
+            fout()
+        except ValueError:
+            continue
+        raise AssertionError("ValueError verwacht")
 
 
 if __name__ == "__main__":

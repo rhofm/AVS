@@ -2,12 +2,12 @@
 
 De rest van de app praat alleen met `Opslag` en krijgt/geeft modellen uit
 models/. Buiten dit bestand is geen SQL nodig, en niemand buiten db/ hoeft te
-weten dat de gegevens over drie versleutelde bestanden verdeeld zijn.
+weten dat de gegevens over vier versleutelde bestanden verdeeld zijn.
 
 Pseudoniemen
 ------------
-In prestaties.db en testen.db staat een atleet als atleet_ref (een pseudoniem
-per database). Modellen gebruiken altijd de master_id. Opslag rekent:
+In prestaties.db, testen.db en trainingsschema.db staat een atleet als
+atleet_ref (een pseudoniem per database). Modellen gebruiken altijd de master_id. Opslag rekent:
 
   * heen:  master_id -> atleet_ref met pseudoniem() uit init_db;
   * terug: atleet_ref -> master_id via een tabel die in het geheugen wordt
@@ -41,6 +41,7 @@ from pathlib import Path
 from typing import Iterable
 
 from models import (
+    DAGEN,
     PR,
     Absentie,
     Atleet,
@@ -55,6 +56,7 @@ from models import (
     Test,
     Testresultaat,
     Training,
+    Trainingsschema,
     Wedstrijd,
 )
 
@@ -82,7 +84,7 @@ def _vraagtekens(n: int) -> str:
 
 
 class Opslag:
-    """Toegang tot de drie AVS-databases met modellen in en modellen uit."""
+    """Toegang tot de vier AVS-databases met modellen in en modellen uit."""
 
     def __init__(self, map: Path | None = None, hoofd: str | bytes | None = None) -> None:
         self._map = Path(map) if map else None
@@ -91,11 +93,12 @@ class Opslag:
         self.personen = verbind("personen", self._map, self._hoofd)
         self.prestaties_db = verbind("prestaties", self._map, self._hoofd)
         self.testen_db = verbind("testen", self._map, self._hoofd)
+        self.trainingsschema_db = verbind("trainingsschema", self._map, self._hoofd)
         self._terug: dict[str, dict[str, str]] = {}
 
     # ---------- openen / sluiten ----------
     def sluit(self) -> None:
-        for conn in (self.personen, self.prestaties_db, self.testen_db):
+        for conn in (self.personen, self.prestaties_db, self.testen_db, self.trainingsschema_db):
             conn.close()
 
     def __enter__(self) -> Opslag:
@@ -186,18 +189,21 @@ class Opslag:
         return [self._atleet(r) for r in self.personen.execute(sql, (patroon,))]
 
     def atleet_verwijderen(self, master_id: str) -> None:
-        """Verwijdert een atleet en AL zijn gegevens uit alle drie de databases.
+        """Verwijdert een atleet en AL zijn gegevens uit alle vier de databases.
 
         Bedoeld voor een verzoek tot verwijdering (AVG). Wie alleen niet meer
         traint: zet `actief = False` en sla op.
         """
         ref_p = self._ref(master_id, "prestaties")
         ref_t = self._ref(master_id, "testen")
+        ref_s = self._ref(master_id, "trainingsschema")
         with self.prestaties_db:
             self.prestaties_db.execute("DELETE FROM prestatie WHERE atleet_ref = ?", (ref_p,))
             self.prestaties_db.execute("DELETE FROM inschrijving WHERE atleet_ref = ?", (ref_p,))
         with self.testen_db:
             self.testen_db.execute("DELETE FROM testresultaat WHERE atleet_ref = ?", (ref_t,))
+        with self.trainingsschema_db:
+            self.trainingsschema_db.execute("DELETE FROM trainingsschema WHERE atleet_ref = ?", (ref_s,))
         with self.personen:  # groep_lid, absentie, voortgang, opstellingen gaan mee (CASCADE)
             self.personen.execute("DELETE FROM atleet WHERE master_id = ?", (master_id,))
         self._vergeet_pseudoniemen()
@@ -466,6 +472,51 @@ class Opslag:
         sql += " ORDER BY datum"
         return [Testresultaat(master_id, r["test_id"], _naar_datum(r["datum"]), r["waarde"], r["notities"], r["id"])
                 for r in self.testen_db.execute(sql, args)]
+
+    # ============================================================
+    # Trainingsschema (trainingsschema.db)
+    # ============================================================
+    def trainingsschema_opslaan(self, s: Trainingsschema) -> Trainingsschema:
+        """Trainingsdagen van een atleet opslaan; een bestaand schema wordt overschreven."""
+        if self.atleet(s.atleet_id) is None:
+            raise OpslagFout(f"Atleet {s.atleet_id} bestaat niet.")
+        dagen = [int(bool(getattr(s, d))) for d in DAGEN]
+        with self.trainingsschema_db:
+            self.trainingsschema_db.execute(
+                f"""INSERT INTO trainingsschema (atleet_ref, {", ".join(DAGEN)})
+                    VALUES (?, {_vraagtekens(len(DAGEN))})
+                    ON CONFLICT (atleet_ref) DO UPDATE SET
+                        {", ".join(f"{d} = excluded.{d}" for d in DAGEN)}""",  # DAGEN zijn vaste namen
+                (self._ref(s.atleet_id, "trainingsschema"), *dagen),
+            )
+        return s
+
+    def trainingsschema(self, master_id: str) -> Trainingsschema:
+        """Het schema van één atleet. Zonder opgeslagen schema: alle dagen False."""
+        r = self.trainingsschema_db.execute(
+            "SELECT * FROM trainingsschema WHERE atleet_ref = ?", (self._ref(master_id, "trainingsschema"),)
+        ).fetchone()
+        if r is None:
+            return Trainingsschema(master_id)
+        return Trainingsschema(master_id, **{d: bool(r[d]) for d in DAGEN})
+
+    def atleten_op_dag(self, dag: str, master_ids: Iterable[str] | None = None) -> list[str]:
+        """master_ids van de atleten die op `dag` ('dinsdag') trainen.
+
+        Met master_ids alleen binnen die atleten (bijv. de leden van een groep).
+        Atleten die niet (meer) in personen.db staan, worden overgeslagen.
+        """
+        dag = dag.lower()
+        if dag not in DAGEN:
+            raise OpslagFout(f"Onbekende dag {dag!r}; kies uit {DAGEN}.")
+        refs = self.trainingsschema_db.execute(
+            f"SELECT atleet_ref FROM trainingsschema WHERE {dag} = 1"  # dag is gecontroleerd tegen DAGEN
+        ).fetchall()
+        ids = [m for m in (self._master_id(r[0], "trainingsschema") for r in refs) if m is not None]
+        if master_ids is not None:
+            binnen = set(master_ids)
+            ids = [m for m in ids if m in binnen]
+        return ids
 
     # ============================================================
     # Groepen, periodeplannen, trainingen, absentie (personen.db)
