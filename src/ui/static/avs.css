@@ -404,23 +404,24 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--rood); outline-
 .veld input { font: inherit; font-weight: 400; padding: .45rem .6rem; border: 1px solid var(--rand); background: var(--papier); color: var(--tekst); }
 .veld input:focus-visible { outline: 2px solid var(--rood); outline-offset: 1px; }
 .veld .zacht { font-weight: 400; }
-.dagkeuze { border: 0; margin: .25rem 0 0; padding: 0; display: grid; gap: .5rem; }
-.dagkeuze legend { padding: 0; margin-bottom: .5rem; font-size: var(--maat-s); }
-.dagkeuze__dagen { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
-.dagkeuze__dag { display: grid; gap: 4px; }
-.dagkeuze__dag input[type="checkbox"] { position: absolute; opacity: 0; pointer-events: none; }
-.dagkeuze__dag label:not(.verborgen) {
+/* vaste trainingsdagen + begintijden van een groep (templates/_tijdkeuze.html); los van .dagkeuze hieronder */
+.tijdkeuze { border: 0; margin: .25rem 0 0; padding: 0; display: grid; gap: .5rem; }
+.tijdkeuze legend { padding: 0; margin-bottom: .5rem; font-size: var(--maat-s); }
+.tijdkeuze__dagen { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+.tijdkeuze__dag { display: grid; gap: 4px; }
+.tijdkeuze__dag input[type="checkbox"] { position: absolute; opacity: 0; pointer-events: none; }
+.tijdkeuze__dag label:not(.verborgen) {
   display: block; text-align: center; cursor: pointer; padding: .45rem 0; font-weight: 700; font-size: var(--maat-s);
   border: 1px solid var(--zalm); background: var(--papier); color: var(--tekst);
 }
-.dagkeuze__dag label:not(.verborgen):hover { border-color: var(--rood); }
-.dagkeuze__dag input[type="checkbox"]:checked + label { background: var(--rood); border-color: var(--rood); color: var(--op-zalm); }
-.dagkeuze__dag input[type="checkbox"]:focus-visible + label { outline: 2px solid var(--rood); outline-offset: 2px; }
-.dagkeuze__dag input[type="time"] { width: 100%; min-width: 0; font: inherit; font-size: var(--maat-s); padding: .3rem .2rem;
+.tijdkeuze__dag label:not(.verborgen):hover { border-color: var(--rood); }
+.tijdkeuze__dag input[type="checkbox"]:checked + label { background: var(--rood); border-color: var(--rood); color: var(--op-zalm); }
+.tijdkeuze__dag input[type="checkbox"]:focus-visible + label { outline: 2px solid var(--rood); outline-offset: 2px; }
+.tijdkeuze__dag input[type="time"] { width: 100%; min-width: 0; font: inherit; font-size: var(--maat-s); padding: .3rem .2rem;
   border: 1px solid var(--rand); background: var(--papier); color: var(--tekst); text-align: center; }
-.dagkeuze__dag input[type="checkbox"]:not(:checked) ~ input[type="time"] { opacity: .55; }
+.tijdkeuze__dag input[type="checkbox"]:not(:checked) ~ input[type="time"] { opacity: .55; }
 .schema .starttijd { font-variant-numeric: tabular-nums; }
-@media (max-width: 40rem) { .dagkeuze__dagen { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@media (max-width: 40rem) { .tijdkeuze__dagen { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 .ledenkeuze td.midden { width: 2.5rem; }
 .ledenkeuze input[type="checkbox"] { width: 1.15rem; height: 1.15rem; accent-color: var(--rood); cursor: pointer; }
 .ledenkeuze tbody th { font-weight: 700; color: var(--tekst); }

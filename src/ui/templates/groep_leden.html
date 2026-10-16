@@ -13,6 +13,7 @@
   filtert alleen, vinkt aan en telt mee.
 #}
 {% extends "basis.html" %}
+{% from "_tijdkeuze.html" import tijdkeuze %}
 {% set groep = f.groep %}
 {% block titel %}{% if f.nieuw %}Nieuwe groep{% else %}Groep wijzigen {{ groep.naam }}{% endif %}{% endblock %}
 
@@ -36,28 +37,6 @@
   </div>
 {% endmacro %}
 
-{% macro dagkeuze() %}
-  <fieldset class="dagkeuze">
-    {% if f.nieuw %}
-      <legend><strong>Trainingsdagen</strong> <span class="zacht">— vul per trainingsdag de begintijd in</span></legend>
-    {% else %}
-      <legend><span class="verborgen">Trainingsdagen</span><span class="zacht">Vul per trainingsdag de begintijd in.</span></legend>
-    {% endif %}
-    <div class="dagkeuze__dagen">
-      {% for dag, kort, aan, tijd in f.dagen %}
-        <div class="dagkeuze__dag">
-          <input type="checkbox" id="dag-{{ dag }}" name="dag-{{ dag }}" value="1"{% if aan %} checked{% endif %}>
-          <label for="dag-{{ dag }}" title="{{ dag | capitalize }}">{{ kort }}</label>
-          <label class="verborgen" for="tijd-{{ dag }}">Begintijd {{ dag }}</label>
-          <input type="time" id="tijd-{{ dag }}" name="tijd-{{ dag }}" value="{{ tijd }}" step="300">
-        </div>
-      {% endfor %}
-    </div>
-    {% if f.afgeleide_dagen %}
-      <p class="zacht" style="font-size: var(--maat-xs); margin: 0">Nog geen vaste trainingsdagen ingesteld; de app gaat nu uit van {{ f.afgeleide_dagen }} (uit de trainingen of de trainingsschema's). Vink de dagen aan om ze vast te leggen.</p>
-    {% endif %}
-  </fieldset>
-{% endmacro %}
 
 {% block inhoud %}
 <article class="vel">
@@ -89,12 +68,12 @@
             <input type="text" name="seizoen" value="{{ groep.seizoen or '' }}" maxlength="20" placeholder="bijv. 2026-2027">
           </label>
         </div>
-        {{ dagkeuze() }}
+        {{ tijdkeuze(f) }}
       </section>
     {% else %}
       <section class="blok" aria-labelledby="kop-dagenkeuze">
         <h2 class="kop" id="kop-dagenkeuze">Trainingsdagen</h2>
-        {{ dagkeuze() }}
+        {{ tijdkeuze(f) }}
       </section>
 
       <section class="blok" aria-labelledby="kop-nu">
@@ -156,7 +135,7 @@
       tel();
     });
     /* Trainingsdagen: een begintijd invullen vinkt de dag aan; uitvinken maakt de tijd leeg. */
-    document.querySelectorAll(".dagkeuze__dag").forEach(function (d) {
+    document.querySelectorAll(".tijdkeuze__dag").forEach(function (d) {
       var vink = d.querySelector("input[type=checkbox]"), tijd = d.querySelector("input[type=time]");
       tijd.addEventListener("input", function () { if (tijd.value) vink.checked = true; });
       vink.addEventListener("change", function () { if (!vink.checked) tijd.value = ""; });

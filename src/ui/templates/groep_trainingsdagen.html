@@ -1,0 +1,38 @@
+{#
+  Trainingsdagen en begintijden van een groep wijzigen.
+  Context:
+    f    – groepen.groep.LedenFormulier (alleen f.groep, f.dagen en f.afgeleide_dagen worden gebruikt)
+    fout – foutmelding (optioneel); dan staat er nog wat er was ingevuld
+  Opslaan: groepen.groep.trainingsdagen_opslaan(). Nieuwe dagen worden aangevuld in de
+  trainingsschema's van de leden; er gaat nooit een dag uit een schema.
+#}
+{% extends "basis.html" %}
+{% from "_tijdkeuze.html" import tijdkeuze, tijdkeuze_script %}
+{% set groep = f.groep %}
+{% block titel %}Trainingsdagen {{ groep.naam }}{% endblock %}
+
+{% block inhoud %}
+<article class="vel">
+  <header class="blok__kop">
+    <div>
+      <a class="terug" href="{{ url_for('groep', groep_id=groep.id) }}">&larr; {{ groep.naam }}</a>
+      <h1 class="kop kop--pagina">Trainingsdagen wijzigen</h1>
+      <p class="subkop">Kies de dagen waarop {{ groep.naam }} traint, met de begintijd.</p>
+    </div>
+  </header>
+
+  {% if fout %}<p class="melding melding--fout" role="alert">{{ fout }}</p>{% endif %}
+
+  <form method="post" class="blok" style="gap: 1.5rem">
+    {{ tijdkeuze(f) }}
+    <p class="zacht" style="font-size: var(--maat-s); margin: 0">Komt er een dag bij, dan wordt die ook aangevuld in het trainingsschema van de atleten in de groep. Een dag weghalen haalt niets uit hun schema: of iemand op een dag nog komt, pas je per atleet aan bij &lsquo;Trainingsschema&rsquo;.</p>
+    <div class="opslaan">
+      <a href="{{ url_for('groep', groep_id=groep.id) }}">Annuleren</a>
+      <button class="knop knop--vol" type="submit">Opslaan</button>
+    </div>
+  </form>
+
+  <footer class="vel__voet">Atleet Volg Systeem<br>{{ groep.naam }}</footer>
+</article>
+{{ tijdkeuze_script() }}
+{% endblock %}

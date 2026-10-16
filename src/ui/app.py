@@ -274,6 +274,32 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
         flash(w.tekst)
         return redirect(url_for("groep", groep_id=groep_id) + "#kop-dagen")
 
+    def _trainingsdagen(groep_id: int, fout: str | None = None, status: int = 200):
+        f = groepsbeheer.ledenformulier(
+            db(), groep_id,
+            trainingsdagen=groepsbeheer.lees_trainingsdagen(request.form, streng=False) if fout else None)
+        if f is None:
+            abort(404)
+        return render_template("groep_trainingsdagen.html", f=f, fout=fout, actief_menu="groepen"), status
+
+    @app.get("/groep/<int:groep_id>/trainingsdagen")
+    def groep_trainingsdagen(groep_id: int):
+        return _trainingsdagen(groep_id)
+
+    @app.post("/groep/<int:groep_id>/trainingsdagen")
+    def groep_trainingsdagen_opslaan(groep_id: int):
+        haal_groep(groep_id)
+        try:
+            w = groepsbeheer.trainingsdagen_opslaan(db(), groep_id, groepsbeheer.lees_trainingsdagen(request.form))
+        except (OpslagFout, ValueError) as e:
+            return _trainingsdagen(groep_id, fout=f"Niet opgeslagen: {e}", status=400)
+        tekst = w.tekst
+        if w.schema_aangevuld:
+            n = len(w.schema_aangevuld)
+            tekst += f" Trainingsschema aangevuld voor {n} {'atleten' if n != 1 else 'atleet'}."
+        flash(tekst)
+        return redirect(url_for("groep", groep_id=groep_id) + "#kop-dagen")
+
     @app.get("/groep/<int:groep_id>/wedstrijden")
     def groep_wedstrijden(groep_id: int):
         gr = haal_groep(groep_id)

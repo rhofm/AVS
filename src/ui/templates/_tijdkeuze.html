@@ -1,0 +1,42 @@
+{#
+  Keuze van de vaste trainingsdagen van een groep, met per dag een begintijd.
+  Gebruikt op 'Nieuwe groep', 'Groep wijzigen' en 'Trainingsdagen wijzigen'.
+  Parameter f: een groepen.groep.LedenFormulier (f.dagen, f.nieuw, f.afgeleide_dagen).
+  Velden: dag-<dag> (vinkje) en tijd-<dag> (begintijd), zie groepen.groep.lees_trainingsdagen.
+  Let op: eigen klassen (.tijdkeuze...), los van .dagkeuze op de pagina 'Trainingsschema'
+  van een atleet; die verbergt alle inputs in .dagkeuze__dag, ook tijdvelden.
+  Het script dat een dag aanvinkt bij het invullen van een tijd staat in tijdkeuze_script().
+#}
+{% macro tijdkeuze(f) %}
+  <fieldset class="tijdkeuze">
+    {% if f.nieuw %}
+      <legend><strong>Trainingsdagen</strong> <span class="zacht">— vul per trainingsdag de begintijd in</span></legend>
+    {% else %}
+      <legend><span class="verborgen">Trainingsdagen</span><span class="zacht">Vul per trainingsdag de begintijd in.</span></legend>
+    {% endif %}
+    <div class="tijdkeuze__dagen">
+      {% for dag, kort, aan, tijd in f.dagen %}
+        <div class="tijdkeuze__dag">
+          <input type="checkbox" id="dag-{{ dag }}" name="dag-{{ dag }}" value="1"{% if aan %} checked{% endif %}>
+          <label for="dag-{{ dag }}" title="{{ dag | capitalize }}">{{ kort }}</label>
+          <label class="verborgen" for="tijd-{{ dag }}">Begintijd {{ dag }}</label>
+          <input type="time" id="tijd-{{ dag }}" name="tijd-{{ dag }}" value="{{ tijd }}" step="300">
+        </div>
+      {% endfor %}
+    </div>
+    {% if f.afgeleide_dagen %}
+      <p class="zacht" style="font-size: var(--maat-xs); margin: 0">Nog geen vaste trainingsdagen ingesteld; de app gaat nu uit van {{ f.afgeleide_dagen }} (uit de trainingen of de trainingsschema's). Vul de begintijden in om ze vast te leggen.</p>
+    {% endif %}
+  </fieldset>
+{% endmacro %}
+
+{% macro tijdkeuze_script() %}
+<script>
+  /* Begintijd invullen vinkt de dag aan; uitvinken maakt de tijd leeg. */
+  document.querySelectorAll(".tijdkeuze__dag").forEach(function (d) {
+    var vink = d.querySelector("input[type=checkbox]"), tijd = d.querySelector("input[type=time]");
+    tijd.addEventListener("input", function () { if (tijd.value) vink.checked = true; });
+    vink.addEventListener("change", function () { if (!vink.checked) tijd.value = ""; });
+  });
+</script>
+{% endmacro %}

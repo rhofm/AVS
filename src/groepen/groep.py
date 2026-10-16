@@ -3,6 +3,9 @@
 Pagina's:
   * 'Nieuwe groep' (knop op de pagina Groepen): naam, seizoen en de atleten in
     één keer kiezen; `groep_aanmaken()` slaat op.
+  * 'Trainingsdagen wijzigen' (knop 'Wijzigen' bij de trainingsdagen op de
+    landingspagina van een groep): alleen de dagen en begintijden;
+    `trainingsdagen_opslaan()` slaat op.
   * 'Wijzigen' (knop bij de atletenlijst op de landingspagina van een groep):
     de trainingsdagen met begintijden en de leden. Het formulier stuurt de volledige nieuwe ledenlijst mee (één
     vinkje per atleet); `leden_opslaan()` slaat die op en meldt wie erbij kwam en
@@ -277,6 +280,18 @@ def leden_opslaan(db: Opslag, groep_id: int, gekozen: Iterable[str],
     sorteer = lambda a: (a.achternaam.lower(), a.voornaam.lower())   # noqa: E731
     return Wijziging(sorted(toegevoegd, key=sorteer), sorted(verwijderd, key=sorteer),
                      dagen if dagen_gewijzigd else None, sorted(aangevuld, key=sorteer))
+
+
+def trainingsdagen_opslaan(db: Opslag, groep_id: int, trainingsdagen: dict[str, str | None]) -> Wijziging:
+    """Alleen de trainingsdagen en -tijden van een groep wijzigen (pagina 'Trainingsdagen wijzigen').
+
+    Zelfde regels als leden_opslaan(): {} = geen vaste dagen meer; dagen die erbij
+    komen worden aangevuld in de trainingsschema's van de leden. De leden blijven gelijk.
+    """
+    groep = db.groep(groep_id)
+    if groep is None:
+        raise OpslagFout(f"Groep {groep_id} bestaat niet.")
+    return leden_opslaan(db, groep_id, groep.leden, trainingsdagen)
 
 
 # ============================================================
