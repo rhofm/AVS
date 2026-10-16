@@ -143,13 +143,13 @@ def test_privacy_alleen_pseudoniem_en_verwijderen():
         with Opslag(map=Path(tmp), hoofd=TESTSLEUTEL) as db:
             anna = db.atleet_opslaan(Atleet("Anna", "Aalbers"))
             db.leerdoelscore_opslaan(LeerdoelScore(anna.master_id, "SPR-U10-01", 4, date(2026, 9, 1)))
-        with verbind("leerdoelscores", Path(tmp), TESTSLEUTEL) as conn:
+        with contextlib.closing(verbind("leerdoelscores", Path(tmp), TESTSLEUTEL)) as conn:
             refs = [r[0] for r in conn.execute("SELECT atleet_ref FROM leerdoelscore")]
         assert refs == [pseudoniem(anna.master_id, "leerdoelscores", TESTSLEUTEL)]
         assert anna.master_id not in refs
         with Opslag(map=Path(tmp), hoofd=TESTSLEUTEL) as db:
             db.atleet_verwijderen(anna.master_id)
-        with verbind("leerdoelscores", Path(tmp), TESTSLEUTEL) as conn:
+        with contextlib.closing(verbind("leerdoelscores", Path(tmp), TESTSLEUTEL)) as conn:
             assert conn.execute("SELECT count(*) FROM leerdoelscore").fetchone()[0] == 0
 
 
