@@ -11,25 +11,90 @@ Pagina's:
 Opslaan bewaart elke gekozen status expliciet, ook 'aanwezig' (geen rij =
 'nog niet ingevuld'). 'blessure' is gezondheidsinformatie: de reden blijft kort
 en feitelijk, geen diagnose. Geen SQL: alles via `Opslag`.
+
+Trainingen automatisch aanmaken
+-------------------------------
+Heeft een groep vaste trainingsdagen (`Groep.trainingsdagen`), dan maakt
+`trainingen_aanvullen()` voor elke trainingsdag een training aan, van vandaag
+tot `WEKEN_VOORUIT` weken vooruit. Is de app een tijd niet geopend, dan worden
+gemiste trainingen tot `MAX_DAGEN_TERUG` dagen terug alsnog aangemaakt, maar
+nooit vóór de eerste training van de groep (een nieuwe groep begint vandaag).
+Er komt nooit een tweede training op dezelfde datum, en bestaande trainingen
+worden niet aangepast. `trainingen_opruimen()` haalt na het wijzigen van de
+dagen de toekomstige trainingen weg op dagen die niet meer gelden, maar alleen
+als ze nog leeg zijn (geen onderwerp, inhoud, periodeplan of aanwezigheid).
 """
 
 from __future__ import annotations
 
 from collections import Counter
 from dataclasses import dataclass
-from datetime import date
-from typing import Mapping
+from datetime import date, timedelta
+from typing import Iterable, Mapping
 
 from atleten.aanwezigheid import NIET_INGEVULD, STATUS_TEKST
 from atleten.landingspagina import categorie_code, leeftijdscategorie
 from db.queries import Opslag, OpslagFout
-from models import ABSENTIE_STATUSSEN, Absentie, Atleet, Groep, Periodeplan, Training
+from models import ABSENTIE_STATUSSEN, DAGEN, Absentie, Atleet, Groep, Periodeplan, Training
 
 from .absentie import absentielijst
 
 STATUS_VELD = "status-"
 REDEN_VELD = "reden-"
 MAX_REDEN = 80                        # kort en feitelijk
+WEKEN_VOORUIT = 4                     # zo ver vooruit worden trainingen automatisch aangemaakt
+MAX_DAGEN_TERUG = 14                  # gemiste trainingen tot zo ver terug alsnog aanmaken
+
+
+# ============================================================
+# Trainingen automatisch aanmaken voor de vaste trainingsdagen
+# ============================================================
+def trainingen_aanvullen(db: Opslag, groep: Groep, *, peildatum: date | None = None,
+                         weken_vooruit: int = WEKEN_VOORUIT) -> list[Training]:
+    """Maak de ontbrekende trainingen aan op de vaste trainingsdagen van de groep. Geeft de nieuwe.
+
+    Van vandaag tot `weken_vooruit` weken vooruit; heeft de groep al eerdere
+    trainingen, dan ook gemiste dagen tot MAX_DAGEN_TERUG terug (niet vóór de
+    eerste training). Zonder vaste dagen gebeurt er niets.
+    """
+    if groep.id is None or not groep.trainingsdagen:
+        return []
+    vandaag = peildatum or date.today()
+    bestaand = db.trainingen(groep.id)
+    datums = {t.datum for t in bestaand}
+    eerdere = [t.datum for t in bestaand if t.datum < vandaag]
+    begin = max(vandaag - timedelta(days=MAX_DAGEN_TERUG), min(eerdere)) if eerdere else vandaag
+    eind = vandaag + timedelta(weeks=weken_vooruit)
+    nieuw = []
+    dag = begin
+    while dag <= eind:
+        if DAGEN[dag.weekday()] in groep.trainingsdagen and dag not in datums:
+            nieuw.append(db.training_opslaan(Training(groep.id, dag)))
+        dag += timedelta(days=1)
+    return nieuw
+
+
+def trainingen_opruimen(db: Opslag, groep: Groep, *, peildatum: date | None = None) -> list[Training]:
+    """Na het wijzigen van de vaste dagen: lege toekomstige trainingen op dagen die niet meer gelden weghalen.
+
+    Alleen trainingen vanaf vandaag zonder onderwerp, inhoud, periodeplan of
+    ingevulde aanwezigheid; al het andere blijft staan. Zonder vaste dagen gebeurt er niets.
+    """
+    if groep.id is None or not groep.trainingsdagen:
+        return []
+    weg = [t for t in db.trainingen(groep.id, van=peildatum or date.today())
+           if DAGEN[t.datum.weekday()] not in groep.trainingsdagen
+           and not t.onderwerp and not t.inhoud and t.periodeplan_id is None and not db.absenties(t.id)]
+    for t in weg:
+        db.training_verwijderen(t.id)
+    return weg
+
+
+def alle_trainingen_aanvullen(db: Opslag, groepen: Iterable[Groep] | None = None, *,
+                              peildatum: date | None = None) -> int:
+    """trainingen_aanvullen() voor alle groepen (of de opgegeven). Geeft het aantal nieuwe trainingen."""
+    return sum(len(trainingen_aanvullen(db, g, peildatum=peildatum))
+               for g in (db.groepen() if groepen is None else groepen))
 
 
 # ============================================================

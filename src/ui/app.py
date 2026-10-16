@@ -97,6 +97,16 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
         if startfout and request.endpoint != "static":
             return render_template("fout.html", titel="AVS kan niet starten", tekst=startfout), 500
 
+    @app.before_request
+    def trainingen_klaarzetten():
+        """Eén keer per dag (bij de eerste pagina): trainingen aanmaken voor de vaste trainingsdagen
+        van alle groepen, tot een paar weken vooruit. Zie groepen.trainingen.trainingen_aanvullen()."""
+        if request.endpoint == "static" or app.config.get("AVS_AANGEVULD_OP") == date.today():
+            return None
+        trainingsbeheer.alle_trainingen_aanvullen(db())
+        app.config["AVS_AANGEVULD_OP"] = date.today()
+        return None
+
     def haal_atleet(master_id: str):
         a = db().atleet(master_id)
         if a is None:
@@ -271,8 +281,22 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
                                            groepsbeheer.lees_trainingsdagen(request.form))
         except (OpslagFout, ValueError) as e:
             return _leden(groep_id, fout=f"Niet opgeslagen: {e}", status=400, na_fout=True)
-        flash(w.tekst)
+        flash(w.tekst + _extra_melding(w))
         return redirect(url_for("groep", groep_id=groep_id) + "#kop-dagen")
+
+    def _extra_melding(w) -> str:
+        """Wat er na het wijzigen van een groep nog meer automatisch is gebeurd (schema's, trainingen)."""
+        tekst = ""
+        if w.schema_aangevuld:
+            n = len(w.schema_aangevuld)
+            tekst += f" Trainingsschema aangevuld voor {n} {'atleten' if n != 1 else 'atleet'}."
+        if w.trainingen_erbij:
+            n = w.trainingen_erbij
+            tekst += f" {n} {'trainingen' if n != 1 else 'training'} ingepland."
+        if w.trainingen_weg:
+            n = w.trainingen_weg
+            tekst += f" {n} lege {'trainingen' if n != 1 else 'training'} op vervallen dagen weggehaald."
+        return tekst
 
     def _trainingsdagen(groep_id: int, fout: str | None = None, status: int = 200):
         f = groepsbeheer.ledenformulier(
@@ -293,11 +317,7 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
             w = groepsbeheer.trainingsdagen_opslaan(db(), groep_id, groepsbeheer.lees_trainingsdagen(request.form))
         except (OpslagFout, ValueError) as e:
             return _trainingsdagen(groep_id, fout=f"Niet opgeslagen: {e}", status=400)
-        tekst = w.tekst
-        if w.schema_aangevuld:
-            n = len(w.schema_aangevuld)
-            tekst += f" Trainingsschema aangevuld voor {n} {'atleten' if n != 1 else 'atleet'}."
-        flash(tekst)
+        flash(w.tekst + _extra_melding(w))
         return redirect(url_for("groep", groep_id=groep_id) + "#kop-dagen")
 
     @app.get("/groep/<int:groep_id>/wedstrijden")

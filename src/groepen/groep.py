@@ -37,6 +37,7 @@ from db.queries import Opslag, OpslagFout
 from models import DAGEN, Atleet, Groep, Trainingsschema
 
 from .landingspagina import trainingsdagen as afgeleide_trainingsdagen
+from .trainingen import trainingen_aanvullen, trainingen_opruimen
 
 DAG_VELD = "dag-"                     # vinkje per weekdag: dag-dinsdag=1
 TIJD_VELD = "tijd-"                   # begintijd per weekdag: tijd-dinsdag=18:30
@@ -180,6 +181,7 @@ def groep_aanmaken(db: Opslag, naam: str, seizoen: str | None, gekozen: Iterable
         g.trainingsdagen = dagen
         for m in g.leden:
             schema_aanvullen(db, m, dagen)
+        trainingen_aanvullen(db, g)                  # trainingen voor de vaste dagen meteen klaarzetten
     return g
 
 
@@ -220,6 +222,8 @@ class Wijziging:
     verwijderd: list[Atleet]
     dagen: dict[str, str] | None = None                            # nieuwe trainingstijden; None = niet gewijzigd
     schema_aangevuld: list[Atleet] = field(default_factory=list)   # trainingsschema kreeg dagen van de groep erbij
+    trainingen_erbij: int = 0         # automatisch aangemaakte trainingen voor de (nieuwe) vaste dagen
+    trainingen_weg: int = 0           # lege toekomstige trainingen op dagen die niet meer gelden
 
     @property
     def leeg(self) -> bool:
@@ -265,8 +269,12 @@ def leden_opslaan(db: Opslag, groep_id: int, gekozen: Iterable[str],
         db.groep_opslaan(groep)
     oude_dagen = dict(groep.trainingsdagen)
     dagen_gewijzigd = dagen is not None and dagen != oude_dagen
+    erbij_tr = weg_tr = 0
     if dagen_gewijzigd:
         db.groep_trainingsdagen_opslaan(groep.id, dagen)
+        groep.trainingsdagen = dict(dagen)
+        weg_tr = len(trainingen_opruimen(db, groep))
+        erbij_tr = len(trainingen_aanvullen(db, groep))
     huidige_dagen = dagen if dagen_gewijzigd else oude_dagen
 
     # Trainingsschema aanvullen (nooit iets weghalen): nieuwe leden krijgen alle
@@ -279,7 +287,7 @@ def leden_opslaan(db: Opslag, groep_id: int, gekozen: Iterable[str],
 
     sorteer = lambda a: (a.achternaam.lower(), a.voornaam.lower())   # noqa: E731
     return Wijziging(sorted(toegevoegd, key=sorteer), sorted(verwijderd, key=sorteer),
-                     dagen if dagen_gewijzigd else None, sorted(aangevuld, key=sorteer))
+                     dagen if dagen_gewijzigd else None, sorted(aangevuld, key=sorteer), erbij_tr, weg_tr)
 
 
 def trainingsdagen_opslaan(db: Opslag, groep_id: int, trainingsdagen: dict[str, str | None]) -> Wijziging:
