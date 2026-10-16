@@ -83,6 +83,25 @@ def test_opruimen_na_wijzigen():
         assert over == {D(10, 15), D(10, 22), D(10, 29)} and verleden.id
 
 
+def test_opruimen_laat_ingevulde_onderdelen_en_varianten_staan():
+    """Een training met warming-up/kern/cooling-down/notities of een afwijkende variant is niet 'leeg'."""
+    with opslag() as (db, _):
+        a = beheer.nieuwe_atleet(db, "Anna", "Voorbeeld").master_id
+        g = _groep(db, {"dinsdag": "18:30", "donderdag": "19:00"}, [a])
+        trainingen.trainingen_aanvullen(db, g, peildatum=VANDAAG)
+        do = sorted((t for t in db.trainingen(g.id) if t.datum.weekday() == 3), key=lambda t: t.datum)
+        do[0].warming_up = "ABC-loopscholing"
+        db.training_opslaan(do[0])
+        do[1].notities = "Hal is bezet, buiten"
+        db.training_opslaan(do[1])
+        db.training_opslaan(Training(g.id, do[2].datum, "Alleen voor Anna", hoofdtraining_id=do[2].id, atleten=[a]))
+        g = db.groep(g.id)
+        g.trainingsdagen = {"dinsdag": "18:30"}
+        weg = trainingen.trainingen_opruimen(db, g, peildatum=VANDAAG)
+        assert [t.datum for t in weg] == [do[3].datum]                                   # alleen de lege
+        assert {t.datum for t in db.trainingen(g.id) if t.datum.weekday() == 3} == {t.datum for t in do[:3]}
+
+
 def test_via_groep_aanmaken_en_wijzigen():
     """Maken en wijzigen in groepen.groep zetten de trainingen meteen klaar (met de echte datum)."""
     with opslag() as (db, _):

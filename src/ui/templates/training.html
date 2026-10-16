@@ -32,9 +32,35 @@
   {% if melding %}<p class="melding" role="status">{{ melding }}</p>{% endif %}
 
   <section class="blok" aria-labelledby="kop-inhoud">
-    <h2 class="kop" id="kop-inhoud">Inhoud</h2>
-    {% if t.inhoud %}<div class="inhoudtekst">{{ t.inhoud }}</div>{% else %}<p class="leeg">Nog geen inhoud beschreven.</p>{% endif %}
+    <h2 class="kop" id="kop-inhoud">Training</h2>
+    {% if t.onderdelen %}
+      {% for titel, tekst in t.onderdelen %}
+        <h3 class="trainingsonderdeel__kop">{{ titel }}</h3>
+        <div class="inhoudtekst inhoudtekst--md">{{ tekst | markdown }}</div>
+      {% endfor %}
+    {% else %}
+      <p class="leeg">Nog geen warming-up, kern of cooling-down beschreven.</p>
+    {% endif %}
+    {% if t.notities %}
+      <h3 class="trainingsonderdeel__kop">Notities</h3>
+      <div class="inhoudtekst inhoudtekst--md">{{ t.notities | markdown }}</div>
+    {% endif %}
   </section>
+
+  {% for v, atleten in tp.varianten %}
+    <section class="blok" aria-labelledby="kop-variant-{{ v.id }}">
+      <h2 class="kop" id="kop-variant-{{ v.id }}">Afwijkende training{% if v.onderwerp %}: {{ v.onderwerp }}{% endif %}</h2>
+      <p class="subkop">Voor {% for a in atleten %}<a href="{{ url_for('atleet', master_id=a.master_id) }}">{{ a.naam }}</a>{{ ", " if not loop.last }}{% endfor %}</p>
+      {% for titel, tekst in v.onderdelen %}
+        <h3 class="trainingsonderdeel__kop">{{ titel }}</h3>
+        <div class="inhoudtekst inhoudtekst--md">{{ tekst | markdown }}</div>
+      {% endfor %}
+      {% if v.notities %}
+        <h3 class="trainingsonderdeel__kop">Notities</h3>
+        <div class="inhoudtekst inhoudtekst--md">{{ v.notities | markdown }}</div>
+      {% endif %}
+    </section>
+  {% endfor %}
 
   <section class="blok" aria-labelledby="kop-aw">
     <div class="blok__kop">

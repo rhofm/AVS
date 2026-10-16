@@ -86,7 +86,7 @@ when run from source, next to the `.exe` when frozen):
 
 | File             | Contents | Athlete identified by |
 |------------------|----------|-----------------------|
-| `personen.db`    | `atleet` (personal details), `groep` (id + name), `groep_trainingstijden` (one row per group: `groep_id` + `maandag` … `zondag`, start time 'HH:MM' or NULL = no training), `groep_lid` (long: one row per athlete per group; an athlete can be in several groups), trainings, `periodeplan`, leerlijnen, `ploeg`, `ploeg_opstelling` | `master_id` |
+| `personen.db`    | `atleet` (personal details), `groep` (id + name), `groep_trainingstijden` (one row per group: `groep_id` + `maandag` … `zondag`, start time 'HH:MM' or NULL = no training), `groep_lid` (long: one row per athlete per group; an athlete can be in several groups), `training` (`warming_up`, `kern_a`, `kern_b`, `cooling_down`, `notities`; `hoofdtraining_id` for a deviating variant), `training_atleet` (long: who follows a variant), `periodeplan`, leerlijnen, `ploeg`, `ploeg_opstelling` | `master_id` |
 | `prestaties.db`  | `onderdeel`, `wedstrijd`, `prestatie`, `inschrijving`, `pr` view | `atleet_ref` (pseudonym) |
 | `testen.db`      | `test`, `testresultaat` | `atleet_ref` (pseudonym) |
 | `trainingsschema.db` | `trainingsschema`: one row per athlete, columns `maandag` … `zondag` (0/1) | `atleet_ref` (pseudonym) |
@@ -143,6 +143,19 @@ python src/db/init_db.py --herstel <sleutel>  # restore the key (e.g. new comput
 - Every migration number must be unique per database. `init_db.py` refuses to
   start when two files share a number (this happened once after merging two
   branches that both added a `003`).
+- Training texts (`warming_up`, `kern_a`, `kern_b`, `cooling_down`,
+  `notities`) are multi-line and may contain a small markdown subset; render
+  them only with the `markdown` Jinja filter (`ui/markdown.py`), which escapes
+  all HTML first. Never mark training text `| safe`.
+- A deviating training is a `training` row with `hoofdtraining_id` = the normal
+  training of the group (same group and date) plus its athletes in
+  `training_atleet`. `Opslag.trainingen()` returns normal trainings only;
+  attendance always belongs to the normal training. Use
+  `Opslag.training_voor_atleet()` to find what one athlete does.
+- Trainings on a group's fixed training days are created automatically
+  (`groepen.trainingen.trainingen_aanvullen`, once a day and after changing
+  the days). Only empty future trainings (no texts, period plan, variants or
+  attendance) are ever removed automatically (`trainingen_opruimen`).
 - Absence stores every status explicitly, `aanwezig` included: no row means
   "not filled in yet". `blessure` is health data — keep `reden` short and
   factual, never a diagnosis.

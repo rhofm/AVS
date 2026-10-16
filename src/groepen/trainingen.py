@@ -3,7 +3,8 @@
 Pagina's:
   * alle trainingen van een groep (komend en geweest), met per training de stand
     van de aanwezigheid en een link om die in te vullen;
-  * één training: datum, onderwerp, inhoud, periodeplan en wie er was;
+  * één training: datum, onderwerp, warming-up, kern A, kern B, cooling-down,
+    notities, afwijkende trainingen voor enkele atleten, periodeplan en wie er was;
   * aanwezigheid invullen: één regel per atleet, vooraf ingevuld volgens
     `groepen.absentie.absentielijst()` (opgeslagen status gaat voor, anders
     'aanwezig' als de atleet die dag volgens zijn schema traint).
@@ -22,13 +23,14 @@ nooit vóór de eerste training van de groep (een nieuwe groep begint vandaag).
 Er komt nooit een tweede training op dezelfde datum, en bestaande trainingen
 worden niet aangepast. `trainingen_opruimen()` haalt na het wijzigen van de
 dagen de toekomstige trainingen weg op dagen die niet meer gelden, maar alleen
-als ze nog leeg zijn (geen onderwerp, inhoud, periodeplan of aanwezigheid).
+als ze nog leeg zijn (geen onderwerp, notities, onderdelen, periodeplan,
+afwijkende varianten of aanwezigheid).
 """
 
 from __future__ import annotations
 
 from collections import Counter
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, timedelta
 from typing import Iterable, Mapping
 
@@ -77,17 +79,23 @@ def trainingen_aanvullen(db: Opslag, groep: Groep, *, peildatum: date | None = N
 def trainingen_opruimen(db: Opslag, groep: Groep, *, peildatum: date | None = None) -> list[Training]:
     """Na het wijzigen van de vaste dagen: lege toekomstige trainingen op dagen die niet meer gelden weghalen.
 
-    Alleen trainingen vanaf vandaag zonder onderwerp, inhoud, periodeplan of
-    ingevulde aanwezigheid; al het andere blijft staan. Zonder vaste dagen gebeurt er niets.
+    Alleen trainingen vanaf vandaag waarin niets is ingevuld (zie _leeg); al het
+    andere blijft staan. Zonder vaste dagen gebeurt er niets.
     """
     if groep.id is None or not groep.trainingsdagen:
         return []
     weg = [t for t in db.trainingen(groep.id, van=peildatum or date.today())
-           if DAGEN[t.datum.weekday()] not in groep.trainingsdagen
-           and not t.onderwerp and not t.inhoud and t.periodeplan_id is None and not db.absenties(t.id)]
+           if DAGEN[t.datum.weekday()] not in groep.trainingsdagen and _leeg(db, t)]
     for t in weg:
         db.training_verwijderen(t.id)
     return weg
+
+
+def _leeg(db: Opslag, t: Training) -> bool:
+    """Niets ingevuld: geen onderwerp, notities of onderdelen (warming-up … cooling-down),
+    geen periodeplan, geen afwijkende varianten en geen aanwezigheid."""
+    return (not t.onderwerp and not t.notities and not t.onderdelen and t.periodeplan_id is None
+            and not db.varianten(t.id) and not db.absenties(t.id))
 
 
 def alle_trainingen_aanvullen(db: Opslag, groepen: Iterable[Groep] | None = None, *,
@@ -182,6 +190,7 @@ class TrainingPagina:
     stand: Stand
     vorige: Training | None
     volgende: Training | None
+    varianten: list[tuple[Training, list[Atleet]]] = field(default_factory=list)   # afwijkend: (training, atleten)
 
     @property
     def telling(self) -> dict[str, int]:
@@ -193,6 +202,8 @@ def trainingpagina(db: Opslag, training_id: int, *, peildatum: date | None = Non
     t = db.training(training_id)
     if t is None:
         return None
+    if t.is_afwijkend:                      # een variant toont de pagina van de gewone training
+        t = db.training(t.hoofdtraining_id)
     groep = db.groep(t.groep_id)
     vandaag = peildatum or date.today()
     opgeslagen = {a.atleet_id: a for a in db.absenties(t.id)}
@@ -208,8 +219,9 @@ def trainingpagina(db: Opslag, training_id: int, *, peildatum: date | None = Non
     alle = db.trainingen(groep.id)
     i = next(n for n, x in enumerate(alle) if x.id == t.id)
     periode = next((p for p in db.periodeplannen(groep.id) if p.id == t.periodeplan_id), None)
+    varianten = [(v, [a for a in (db.atleet(m) for m in v.atleten) if a is not None]) for v in db.varianten(t.id)]
     return TrainingPagina(t, groep, periode, (t.datum - vandaag).days, deelnemers, _stand(db, groep, t),
-                          alle[i - 1] if i > 0 else None, alle[i + 1] if i + 1 < len(alle) else None)
+                          alle[i - 1] if i > 0 else None, alle[i + 1] if i + 1 < len(alle) else None, varianten)
 
 
 # ============================================================

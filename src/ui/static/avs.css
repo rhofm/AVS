@@ -472,6 +472,13 @@ th[aria-sort="descending"] .sorteer__naam::after { content: " \2193"; opacity: 1
 
 /* één training */
 .inhoudtekst { white-space: pre-line; font-size: var(--maat-s); padding: .75rem 1rem; background: var(--roze-licht); border-left: 4px solid var(--zalm); }
+/* opgemaakte markdown: regelovergangen komen uit de HTML, niet uit pre-line */
+.inhoudtekst--md { white-space: normal; }
+.inhoudtekst--md > :first-child { margin-top: 0; }
+.inhoudtekst--md > :last-child { margin-bottom: 0; }
+.inhoudtekst--md ul, .inhoudtekst--md ol { padding-left: 1.25rem; margin: .25rem 0 .5rem; }
+.inhoudtekst--md h3, .inhoudtekst--md h4, .inhoudtekst--md h5 { font-size: var(--maat-s); margin: .5rem 0 .25rem; }
+.trainingsonderdeel__kop { font-size: var(--maat-s); margin: 1rem 0 .35rem; }
 
 /* aanwezigheid invullen */
 .invultabel tbody th { font-weight: 700; background: var(--roze-licht) !important; color: var(--tekst); }

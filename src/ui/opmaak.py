@@ -64,6 +64,8 @@ def tekstdatum(tekst: str | None) -> str:
 
 
 def registreer_filters(env) -> None:
+    from ui.markdown import naar_html              # trainingsteksten: {{ tekst | markdown }}
+    env.filters["markdown"] = naar_html
     env.filters["tekstdatum"] = tekstdatum
     env.filters["getal"] = getal
     env.filters["datum_kort"] = datum_kort
