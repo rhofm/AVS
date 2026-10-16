@@ -31,6 +31,7 @@ from atleten import beheer, landingspagina
 from atleten.aanwezigheid import aanwezigheid
 from db.init_db import SleutelFout, init_db
 from db.queries import Opslag, OpslagFout
+from groepen import groep as groepsbeheer
 from groepen import landingspagina as groep_landingspagina
 from groepen import overzichten as groep_overzichten
 from groepen import trainingen as trainingsbeheer
@@ -161,7 +162,29 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
         pagina = groep_landingspagina.landingspagina(db(), groep_id)
         if pagina is None:
             abort(404)
-        return render_template("groep.html", pagina=pagina, actief_menu="groepen")
+        meldingen = get_flashed_messages()
+        return render_template("groep.html", pagina=pagina, melding=meldingen[0] if meldingen else None,
+                               actief_menu="groepen")
+
+    def _leden(groep_id: int, fout: str | None = None, status: int = 200):
+        f = groepsbeheer.ledenformulier(db(), groep_id)
+        if f is None:
+            abort(404)
+        return render_template("groep_leden.html", f=f, fout=fout, actief_menu="groepen"), status
+
+    @app.get("/groep/<int:groep_id>/leden")
+    def groep_leden(groep_id: int):
+        return _leden(groep_id)
+
+    @app.post("/groep/<int:groep_id>/leden")
+    def groep_leden_opslaan(groep_id: int):
+        haal_groep(groep_id)
+        try:
+            w = groepsbeheer.leden_opslaan(db(), groep_id, request.form.getlist("lid"))
+        except (OpslagFout, ValueError) as e:
+            return _leden(groep_id, fout=f"Niet opgeslagen: {e}", status=400)
+        flash(w.tekst)
+        return redirect(url_for("groep", groep_id=groep_id) + "#kop-atleten")
 
     @app.get("/groep/<int:groep_id>/wedstrijden")
     def groep_wedstrijden(groep_id: int):

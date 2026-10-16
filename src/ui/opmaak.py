@@ -31,11 +31,15 @@ def datum_lang(d: date | None) -> str:
 
 
 def over_dagen(n: int) -> str:
-    """0 -> 'vandaag', 1 -> 'morgen', 9 -> 'over 9 dagen'."""
+    """0 -> 'vandaag', 1 -> 'morgen', 9 -> 'over 9 dagen'; -1 -> 'gisteren', -3 -> '3 dagen geleden'."""
     if n == 0:
         return "vandaag"
     if n == 1:
         return "morgen"
+    if n == -1:
+        return "gisteren"
+    if n < 0:
+        return f"{-n} dagen geleden" if n > -14 else f"{-n // 7} weken geleden"
     if n < 14:
         return f"over {n} dagen"
     return f"over {n // 7} weken"

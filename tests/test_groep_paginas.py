@@ -80,6 +80,9 @@ def test_leerdoelen():
         anna = rij["Anna"].cellen[i]
         assert (anna.zelfstandig, anna.beoordeeld, anna.gemiddelde) == (1, 2, 3.0)
         assert rij["Cas"].cellen[i].beoordeeld == 0 and rij["Cas"].cellen[i].gemiddelde is None
+        # Sorteerwaarde: % zelfstandig, dan gemiddelde; niet beoordeeld = None (altijd onderaan).
+        assert anna.sortering == anna.pct + 0.3 and rij["Cas"].cellen[i].sortering is None
+        assert rij["Bram"].cellen[i].sortering > anna.sortering                     # 1/n zelfstandig, gem. 5
         assert t.gemiddelden[i].beoordeeld == 2 and t.gemiddelden[i].gemiddelde_score == 4.0
         assert all(g is None for n, g in enumerate(t.gemiddelden) if n != i)
 
@@ -163,8 +166,14 @@ def test_routes():
             # Elke link op deze pagina werkt.
             for link in sorted(set(re.findall(r'href="(/(?:groep|atleet|training)/[^"]*)"', r.get_data(as_text=True)))):
                 assert c.get(link).status_code == 200, (pad, link)
+        ld_html = c.get(f"/groep/{gid}/leerdoelen").get_data(as_text=True)
+        assert "sorteerbaar" in ld_html and ld_html.count('class="sorteer"') >= 3 and 'data-eerst="af"' in ld_html
+        assert "/static/sorteer.js" in ld_html and c.get("/static/sorteer.js").status_code == 200
         prs_html = c.get(f"/groep/{gid}/prs").get_data(as_text=True)
-        assert "12,90" in prs_html and "<td class=\"nowrap\">U16M</td>" in prs_html and "matrix__groep" not in prs_html
+        assert "12,90" in prs_html and ">U16M</td>" in prs_html and "matrix__groep" not in prs_html
+        # Sorteerbaar: ruwe waarde per cel, en de sorteerrichting per kolom (100m: laag = beter).
+        assert 'data-sort="12.9"' in prs_html and 'data-sort="test bram"' in prs_html
+        assert prs_html.count('class="sorteer"') == 2 + 2 and 'data-eerst="op"' in prs_html
         assert "30m vliegend" in c.get(f"/groep/{gid}/testen").get_data(as_text=True)
         for pad in ("prs", "testen", "leerdoelen", "aanwezigheid", "trainingen"):
             assert c.get(f"/groep/9999/{pad}").status_code == 404

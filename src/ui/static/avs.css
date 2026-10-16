@@ -394,6 +394,16 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--rood); outline-
 .dagcel--elders { background: var(--elders); }
 .ledentabel th.midden, .ledentabel td.midden { width: 2.4rem; padding-inline: .2rem; }
 .ledentabel thead th.dag--groep { background: var(--rood); }
+.tabel tr.nog-invullen td:first-child { box-shadow: inset 4px 0 0 var(--st); }
+.tabel tr.nog-invullen .statuslabel { font-size: var(--maat-xs); margin-bottom: .3rem; }
+.ledenkeuze td.midden { width: 2.5rem; }
+.ledenkeuze input[type="checkbox"] { width: 1.15rem; height: 1.15rem; accent-color: var(--rood); cursor: pointer; }
+.ledenkeuze tbody th { font-weight: 700; color: var(--tekst); }
+.ledenkeuze tbody tr:nth-child(odd) th { background: var(--roze); }
+.ledenkeuze tbody tr:nth-child(even) th { background: var(--roze-licht); }
+.ledenkeuze tbody th label { cursor: pointer; }
+.ledenkeuze tr.gewijzigd td:first-child { box-shadow: inset 4px 0 0 var(--rood); }
+#tabel-leden tr.gewijzigd th, #tabel-leden tr.gewijzigd td:not(:first-child) { text-decoration: line-through; opacity: .7; }
 .ledentabel .geen { color: var(--tekst-zacht); }
 .dagbalken { list-style: none; margin: 0; padding: 0; display: grid; gap: .55rem; font-size: var(--maat-s); }
 .dagbalken li { display: grid; grid-template-columns: 2rem 1fr 3rem; grid-template-areas: "dag balk pct" ". uitleg uitleg"; align-items: center; gap: .15rem .6rem; }
@@ -409,6 +419,11 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--rood); outline-
 .matrix tbody th a { font-weight: 700; }
 .matrix__sub { font-size: var(--maat-xs); font-weight: 400; color: var(--tekst-zacht); }
 .matrix thead .matrix__sub { color: inherit; opacity: .85; }
+.sorteer { all: unset; cursor: pointer; display: inline-block; }
+.sorteer:focus-visible { outline: 2px solid var(--op-zalm); outline-offset: 2px; }
+.sorteer__naam::after { content: " \2195"; opacity: .45; font-size: .85em; }
+th[aria-sort="ascending"] .sorteer__naam::after { content: " \2191"; opacity: 1; }
+th[aria-sort="descending"] .sorteer__naam::after { content: " \2193"; opacity: 1; }
 .matrix td.beste { font-weight: 700; box-shadow: inset 0 -3px 0 var(--rood); }
 .matrix tfoot td, .matrix tfoot th { border: 2px solid var(--lijn); padding: .45rem .6rem; background: var(--roze-licht); font-weight: 700; vertical-align: top; }
 .leerdoelmatrix td { min-width: 7.5rem; }

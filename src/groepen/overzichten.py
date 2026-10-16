@@ -39,6 +39,18 @@ class Rij:
     def categorie_code(self) -> str | None:
         return categorie_code(self.categorie, self.atleet.geslacht)
 
+    @property
+    def naam_sortering(self) -> str:
+        """Sorteren op achternaam zonder tussenvoegsel, dan voornaam: 'boer eva'."""
+        return f"{self.atleet.achternaam} {self.atleet.voornaam}".lower()
+
+    @property
+    def categorie_sortering(self) -> int:
+        """Categorie jong naar oud, jongens voor meisjes; onbekend achteraan."""
+        if self.categorie not in CATEGORIE_VOLGORDE:
+            return 99
+        return CATEGORIE_VOLGORDE.index(self.categorie) * 3 + {"M": 0, "V": 1}.get(self.atleet.geslacht, 2)
+
 
 #: Volgorde van de leeftijdscategorieën, jong naar oud.
 CATEGORIE_VOLGORDE = ("U8", "U10", "U12", "U14", "U16", "U18", "U20", "Senior")
@@ -90,12 +102,14 @@ class Waarde:
     tekst: str                        # '12,93', '4,80 m'
     beste: bool = False               # beste van de groep in deze kolom
     datum: date | None = None         # bij testresultaten: wanneer getest
+    waarde: float | None = None       # ruwe waarde (seconden/meters/punten), om op te sorteren
 
 
 @dataclass
 class Kolom:
     naam: str
     sub: str | None = None            # categorie van het onderdeel / eenheid van de test
+    lager_is_beter: bool | None = None   # bepaalt de sorteerrichting: eerst klikken = beste bovenaan
 
 
 @dataclass
@@ -131,12 +145,13 @@ def prs(db: Opslag, groep: Groep, *, peildatum: date | None = None) -> Tabel:
     rijen = []
     for a, cat in atleten:
         p = per_atleet[a.master_id]
-        rijen.append(Rij(a, cat, [Waarde(toon_waarde(p[oid], onderdelen[oid].eenheid)) if oid in p else None
+        rijen.append(Rij(a, cat, [Waarde(toon_waarde(p[oid], onderdelen[oid].eenheid), waarde=p[oid]) if oid in p else None
                                   for oid in gebruikt]))
     rijen.sort(key=_volgorde)
     _markeer_beste(rijen, [[per_atleet[r.atleet.master_id].get(oid) for oid in gebruikt] for r in rijen],
                    [onderdelen[oid].lager_is_beter for oid in gebruikt])
-    return Tabel(groep, [Kolom(onderdelen[oid].naam, onderdelen[oid].categorie) for oid in gebruikt], rijen)
+    return Tabel(groep, [Kolom(onderdelen[oid].naam, onderdelen[oid].categorie, onderdelen[oid].lager_is_beter)
+                         for oid in gebruikt], rijen)
 
 
 # ============================================================
@@ -156,13 +171,15 @@ def testresultaten(db: Opslag, groep: Groep, *, peildatum: date | None = None) -
     rijen = []
     for a, cat in atleten:
         p = per_atleet[a.master_id]
-        rijen.append(Rij(a, cat, [None if tid not in p else Waarde(_getal(p[tid].waarde), datum=p[tid].datum)
+        rijen.append(Rij(a, cat, [None if tid not in p else Waarde(_getal(p[tid].waarde), datum=p[tid].datum,
+                                                                                 waarde=p[tid].waarde)
                                   for tid in gebruikt]))
     rijen.sort(key=_volgorde)
     _markeer_beste(rijen, [[per_atleet[r.atleet.master_id][tid].waarde if tid in per_atleet[r.atleet.master_id]
                             else None for tid in gebruikt] for r in rijen],
                    [testen[tid].lager_is_beter for tid in gebruikt])
-    return Tabel(groep, [Kolom(testen[tid].naam, testen[tid].eenheid) for tid in gebruikt], rijen)
+    return Tabel(groep, [Kolom(testen[tid].naam, testen[tid].eenheid, testen[tid].lager_is_beter)
+                         for tid in gebruikt], rijen)
 
 
 # ============================================================
@@ -178,6 +195,16 @@ class LeerlijnCel:
     @property
     def pct(self) -> int:
         return round(100 * self.zelfstandig / self.aantal) if self.aantal else 0
+
+    @property
+    def sortering(self) -> float | None:
+        """Om op te sorteren: eerst het aandeel 'zelfstandig', bij gelijke stand de gemiddelde score.
+
+        None (niet beoordeeld) komt bij sorteren altijd onderaan, ook onder een 0%.
+        """
+        if not self.beoordeeld or self.gemiddelde is None:
+            return None
+        return self.pct + self.gemiddelde / 10      # gemiddelde ≤ 5 -> ≤ 0,5: verandert de volgorde op % niet
 
 
 @dataclass

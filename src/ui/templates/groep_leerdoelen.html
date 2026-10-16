@@ -2,6 +2,8 @@
   Leerdoelen van een groep: per atleet per leerlijn de stand.
   Context:
     tabel – groepen.overzichten.LeerdoelenTabel
+  Sorteerbaar (static/sorteer.js): eerste klik op een leerlijn = beste bovenaan
+  (aandeel zelfstandig, dan gemiddelde score); niet beoordeeld en '–' blijven onderaan.
   Per cel: aantal leerdoelen 'zelfstandig' of hoger van het totaal voor de eigen
   categorie, een balkje, en de gemiddelde score. Leeg (–) = leerlijn niet in de
   categorie van de atleet.
@@ -22,22 +24,22 @@
 
   {% if tabel.rijen and tabel.kolommen %}
     <div class="tabelvak">
-      <table class="tabel matrix leerdoelmatrix">
+      <table class="tabel matrix leerdoelmatrix sorteerbaar">
         <thead>
           <tr>
-            <th scope="col">Naam</th>
-            <th scope="col">Cat.</th>
-            {% for k in tabel.kolommen %}<th scope="col">{{ k.naam }}</th>{% endfor %}
+            <th scope="col" data-soort="tekst" aria-sort="ascending"><button type="button" class="sorteer"><span class="sorteer__naam">Naam</span></button></th>
+            <th scope="col" data-soort="getal"><button type="button" class="sorteer"><span class="sorteer__naam">Cat.</span></button></th>
+            {% for k in tabel.kolommen %}<th scope="col" data-soort="getal" data-eerst="af"><button type="button" class="sorteer"><span class="sorteer__naam">{{ k.naam }}</span></button></th>{% endfor %}
           </tr>
         </thead>
         <tbody>
           {% for r in tabel.rijen %}
             <tr>
-              <th scope="row"><a href="{{ url_for('atleet_leerdoelen', master_id=r.atleet.master_id) }}">{{ r.atleet.naam }}</a></th>
-              <td class="nowrap">{{ r.categorie_code or "–" }}</td>
+              <th scope="row" data-sort="{{ r.naam_sortering }}"><a href="{{ url_for('atleet_leerdoelen', master_id=r.atleet.master_id) }}">{{ r.atleet.naam }}</a></th>
+              <td class="nowrap" data-sort="{{ r.categorie_sortering }}">{{ r.categorie_code or "–" }}</td>
               {% for c in r.cellen %}
                 {% if c %}
-                  <td title="{{ c.zelfstandig }} van {{ c.aantal }} zelfstandig · {{ c.beoordeeld }} beoordeeld">
+                  <td data-sort="{{ c.sortering if c.sortering is not none else '' }}" title="{{ c.zelfstandig }} van {{ c.aantal }} zelfstandig · {{ c.beoordeeld }} beoordeeld">
                     <span class="getallen"><strong>{{ c.zelfstandig }}</strong>/{{ c.aantal }}</span>
                     <span class="voortgang__balk minibalk" aria-hidden="true"><span style="width: {{ c.pct }}%"></span></span>
                     <span class="matrix__sub">{% if c.gemiddelde is not none %}gem. {{ c.gemiddelde | getal }}{% else %}niet beoordeeld{% endif %}</span>
@@ -59,7 +61,7 @@
         </tfoot>
       </table>
     </div>
-    <p class="zacht" style="font-size: var(--maat-xs); margin: 0">Getal: leerdoelen op niveau &lsquo;zelfstandig&rsquo; of hoger van het aantal voor de categorie van de atleet. Gem.: gemiddelde laatste score (1–5). Klik op een naam om de leerdoelen van die atleet te bekijken of te scoren.</p>
+    <p class="zacht" style="font-size: var(--maat-xs); margin: 0">Getal: leerdoelen op niveau &lsquo;zelfstandig&rsquo; of hoger van het aantal voor de categorie van de atleet. Gem.: gemiddelde laatste score (1–5). Klik op een kolomkop om te sorteren, of op een naam om de leerdoelen van die atleet te bekijken of te scoren.</p>
   {% elif not tabel.rijen %}
     <p class="leeg">Nog geen atleten in deze groep.</p>
   {% else %}
@@ -68,4 +70,5 @@
 
   <footer class="vel__voet">Atleet Volg Systeem<br>Leerdoelen {{ groep.naam }}</footer>
 </article>
+<script src="{{ static_pad | default('/static') }}/sorteer.js"></script>
 {% endblock %}

@@ -103,8 +103,11 @@ def test_landingspagina():
         assert [r.wedstrijd.naam for r in lp.wedstrijden] == ["Clubkampioenschappen"]
         assert [d.naam for d in lp.wedstrijden[0].deelnames] == ["Bram Test", "Anna Voorbeeld"]
 
-        assert [(k.training.onderwerp, k.dagen_tot, k.verwacht, k.periode) for k in lp.trainingen] == [
-            ("Startblok", 4, 3, "Algemene voorbereiding"), (None, 6, 3, None)]
+        # Eerst de training van afgelopen dinsdag (nog niets ingevuld), dan de komende.
+        # 'Horden'/'Starts' van vorige week vallen buiten de 7 dagen (en zijn ingevuld).
+        assert [(k.training.onderwerp, k.dagen_tot, k.verwacht, k.periode, k.geweest) for k in lp.trainingen] == [
+            ("Niet ingevuld", -3, 3, None, True),
+            ("Startblok", 4, 3, "Algemene voorbereiding", False), (None, 6, 3, None, False)]
 
         assert [(b.code, b.gemiddelde_score, b.beoordeeld) for b in lp.leerdoelen] == [("SPR", 4.0, 2)]
         aantal = len(ids["spr"])
@@ -117,6 +120,12 @@ def test_landingspagina():
         assert lp.aanwezig_pct == 60.0
 
         assert landingspagina.landingspagina(db, 9999) is None
+
+        # Zodra er aanwezigheid is opgeslagen, verdwijnt de training van vorige week uit de lijst.
+        dinsdag = lp.trainingen[0].training
+        db.absenties_opslaan([Absentie(dinsdag.id, ids["anna"], "aanwezig")])
+        lp = landingspagina.landingspagina(db, ids["groep"], peildatum=VANDAAG)
+        assert [k.training.onderwerp for k in lp.trainingen] == ["Startblok", None]
 
 
 def test_dagen_uit_schema_en_lege_groep():
@@ -156,6 +165,7 @@ def test_template():
         assert "U16V" in html and "Werpen" in html
         assert "Clubkampioenschappen" in html and "Zonder groep" not in html and "Vorige maand" not in html
         assert "Startblok" in html and "Algemene voorbereiding" in html
+        assert "3 dagen geleden" in html and "Nog invullen" in html and "1 van de afgelopen week nog in te vullen" in html
         assert "gem. 4 · 2/3 atl." in html
         assert "50%" in html and "67%" in html and "60%" in html
         assert f'href="/groep/{ids["groep"]}/prs"' in html and f'href="/groep/{ids["groep"]}/testen"' in html

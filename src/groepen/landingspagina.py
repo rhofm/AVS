@@ -95,6 +95,11 @@ class KomendeTraining:
     periode: str | None = None        # naam van het periodeplan
     ingevuld: int = 0                 # al opgeslagen statussen (aanwezigheid)
 
+    @property
+    def geweest(self) -> bool:
+        """Training van de afgelopen week waarvan de aanwezigheid nog niet is ingevuld."""
+        return self.dagen_tot < 0
+
 
 @dataclass
 class LeerlijnGemiddelde:
@@ -138,7 +143,7 @@ class GroepLandingspagina:
     leden: list[GroepLid]
     wedstrijden: list[PlanningRegel]  # komende wedstrijden met minstens één lid
     aantal_wedstrijden: int           # alle komende (de lijst kan ingekort zijn)
-    trainingen: list[KomendeTraining]
+    trainingen: list[KomendeTraining]   # eerst niet-ingevulde van de afgelopen week, dan de komende
     leerdoelen: list[LeerlijnGemiddelde]
     aanwezigheid: list[DagAanwezigheid]
     aanwezigheid_van: date
@@ -235,10 +240,16 @@ def _leden(db: Opslag, groep: Groep, groepsdagen: set[str], schemas: dict[str, T
 # Komend: wedstrijden en trainingen
 # ============================================================
 def _trainingen(db: Opslag, groep: Groep, schemas: dict[str, Trainingsschema], vandaag: date,
-                weken: int, aantal: int) -> list[KomendeTraining]:
+                weken: int, aantal: int, dagen_terug: int = 7) -> list[KomendeTraining]:
+    """De komende trainingen (max. `aantal`), met daarvoor de trainingen van de afgelopen
+    `dagen_terug` dagen waarvan de aanwezigheid nog helemaal niet is ingevuld."""
     plannen = {p.id: p.naam for p in db.periodeplannen(groep.id)}
+    open_trainingen = [t for t in db.trainingen(groep.id, van=vandaag - timedelta(days=dagen_terug),
+                                                tot=vandaag - timedelta(days=1))
+                       if not db.absenties(t.id)]
+    komend = db.trainingen(groep.id, van=vandaag, tot=vandaag + timedelta(weeks=weken))[:aantal]
     uit = []
-    for t in db.trainingen(groep.id, van=vandaag, tot=vandaag + timedelta(weeks=weken))[:aantal]:
+    for t in open_trainingen + komend:
         verwacht = sum(1 for s in schemas.values() if s.traint_op(t.datum))
         uit.append(KomendeTraining(t, (t.datum - vandaag).days, verwacht, plannen.get(t.periodeplan_id),
                                    len(db.absenties(t.id))))

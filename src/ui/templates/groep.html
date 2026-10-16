@@ -2,6 +2,7 @@
   Landingspagina van één groep.
   Context:
     pagina  – groepen.landingspagina.GroepLandingspagina
+    melding – bevestiging na het wijzigen van de atleten (optioneel)
   Filters uit ui/opmaak.py (registreer_filters).
   Kleuren in de atletenlijst: .dagcel--groep (traint met de groep, rood) en
   .dagcel--elders (traint die dag ergens anders, blauw). De betekenis staat er
@@ -83,10 +84,15 @@
         </ul>
       </div>
       <span class="knoppen">
+        <a class="knop" href="{{ basis }}/leden">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M11.7 1.3a1 1 0 0 1 1.4 0l1.6 1.6a1 1 0 0 1 0 1.4L5.4 13.6 1.5 14.5l.9-3.9z"/></svg>
+          Wijzigen
+        </a>
         <a class="knop knop--vol" href="{{ basis }}/prs">PR's &rarr;</a>
         <a class="knop knop--vol" href="{{ basis }}/testen">Testresultaten &rarr;</a>
       </span>
     </div>
+    {% if melding %}<p class="melding" role="status">{{ melding }}</p>{% endif %}
     {% if pagina.leden %}
       <div class="tabelvak">
         <table class="tabel ledentabel">
@@ -119,7 +125,7 @@
         </table>
       </div>
     {% else %}
-      <p class="leeg">Nog geen atleten in deze groep.</p>
+      <p class="leeg">Nog geen atleten in deze groep. Voeg ze toe met <a href="{{ basis }}/leden">Wijzigen</a>.</p>
     {% endif %}
   </section>
 
@@ -158,7 +164,11 @@
 
     <section class="blok" aria-labelledby="kop-tr">
       <div class="blok__kop">
-        <h2 class="kop" id="kop-tr">Komende trainingen</h2>
+        <div>
+          <h2 class="kop" id="kop-tr">Trainingen</h2>
+          {% set open_tr = pagina.trainingen | selectattr("geweest") | list %}
+          {% if open_tr %}<p class="subkop">{{ open_tr | length }} van de afgelopen week nog in te vullen</p>{% endif %}
+        </div>
         <a class="knop" href="{{ basis }}/trainingen">Alle trainingen &rarr;</a>
       </div>
       {% if pagina.trainingen %}
@@ -167,18 +177,21 @@
             <thead><tr><th scope="col">Datum</th><th scope="col">Training</th><th scope="col" class="rechts">Verwacht</th><th scope="col">Aanwezigheid</th></tr></thead>
             <tbody>
               {% for k in pagina.trainingen %}
-                <tr>
+                <tr{% if k.geweest %} class="status-niet_ingevuld nog-invullen"{% endif %}>
                   <td class="nowrap"><a href="{{ url_for('training', training_id=k.training.id) }}"><strong>{{ k.training.datum | datum_kort }}</strong></a><br><span class="zacht">{{ k.dagen_tot | over_dagen }}</span></td>
                   <td><a href="{{ url_for('training', training_id=k.training.id) }}">{{ k.training.onderwerp or "Training" }}</a>{% if k.periode %}<br><span class="zacht">{{ k.periode }}</span>{% endif %}</td>
                   <td class="rechts" title="Atleten die deze dag volgens hun trainingsschema trainen">{{ k.verwacht }}</td>
-                  <td><a class="knop" href="{{ url_for('training_aanwezigheid', training_id=k.training.id) }}">{{ "Aanpassen" if k.ingevuld else "Invullen" }}</a></td>
+                  <td>
+                    {% if k.geweest %}<span class="statuslabel nowrap"><span class="statuslabel__stip" aria-hidden="true"></span>Nog invullen</span><br>{% endif %}
+                    <a class="knop{{ ' knop--vol' if k.geweest }}" href="{{ url_for('training_aanwezigheid', training_id=k.training.id) }}">{{ "Aanpassen" if k.ingevuld else "Invullen" }}</a>
+                  </td>
                 </tr>
               {% endfor %}
             </tbody>
           </table>
         </div>
       {% else %}
-        <p class="leeg">Geen trainingen gepland in de komende weken.</p>
+        <p class="leeg">Geen trainingen gepland in de komende weken, en de afgelopen week is helemaal ingevuld.</p>
       {% endif %}
     </section>
   </div>
