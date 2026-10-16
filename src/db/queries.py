@@ -642,43 +642,95 @@ class Opslag:
                 for r in self.personen.execute(
                     "SELECT * FROM periodeplan WHERE groep_id = ? ORDER BY startdatum", (groep_id,))]
 
+    _TRAINING_VELDEN = ("groep_id", "periodeplan_id", "datum", "onderwerp", "warming_up", "kern_a",
+                        "kern_b", "cooling_down", "notities", "hoofdtraining_id")   # vaste kolomnamen
+
+    def _training(self, r) -> Training:
+        atleten = [x[0] for x in self.personen.execute(
+            """SELECT ta.atleet_id FROM training_atleet ta JOIN atleet a ON a.master_id = ta.atleet_id
+               WHERE ta.training_id = ? ORDER BY a.achternaam, a.voornaam""", (r["id"],))]
+        return Training(r["groep_id"], _naar_datum(r["datum"]), r["onderwerp"], r["notities"],
+                        r["periodeplan_id"], r["id"], r["warming_up"], r["kern_a"], r["kern_b"],
+                        r["cooling_down"], r["hoofdtraining_id"], atleten)
+
     def training_opslaan(self, t: Training) -> Training:
-        waarden = (t.groep_id, t.periodeplan_id, _naar_tekst(t.datum), t.onderwerp, t.inhoud)
+        """Training toevoegen of bijwerken (met id).
+
+        Gewone training: geen `atleten`. Afwijkende training: hoofdtraining_id =
+        een gewone training; groep en datum worden daarvan overgenomen, en
+        `atleten` (minstens één, allemaal lid van de groep) volgen deze variant.
+        Een atleet kan per training maar in één variant zitten.
+        """
+        if t.hoofdtraining_id is None:
+            if t.atleten:
+                raise OpslagFout("Alleen een afwijkende training (met hoofdtraining) heeft eigen atleten.")
+        else:
+            hoofd = self.training(t.hoofdtraining_id)
+            if hoofd is None or hoofd.is_afwijkend:
+                raise OpslagFout(f"Training {t.hoofdtraining_id} is geen gewone training van een groep.")
+            if t.id is not None and t.id == hoofd.id:
+                raise OpslagFout("Een training kan geen variant van zichzelf zijn.")
+            t.groep_id, t.datum = hoofd.groep_id, hoofd.datum
+            t.atleten = list(dict.fromkeys(t.atleten))
+            if not t.atleten:
+                raise OpslagFout("Kies minstens één atleet voor de afwijkende training.")
+            groep = self.groep(t.groep_id)
+            buiten = [m for m in t.atleten if groep is None or m not in groep.leden]
+            if buiten:
+                raise OpslagFout("Een afwijkende training is alleen voor atleten uit de groep.")
+            al_elders = {m for v in self.varianten(hoofd.id) if v.id != t.id for m in v.atleten}
+            if al_elders & set(t.atleten):
+                raise OpslagFout("Een atleet staat al bij een andere afwijkende training op deze dag.")
+
+        waarden = tuple(_naar_tekst(t.datum) if v == "datum" else getattr(t, v) for v in self._TRAINING_VELDEN)
         with self.personen:
             if t.id is None:
                 t.id = self.personen.execute(
-                    "INSERT INTO training (groep_id, periodeplan_id, datum, onderwerp, inhoud) VALUES (?, ?, ?, ?, ?)",
-                    waarden,
+                    f"INSERT INTO training ({', '.join(self._TRAINING_VELDEN)}) "
+                    f"VALUES ({_vraagtekens(len(self._TRAINING_VELDEN))})", waarden,
                 ).lastrowid
             else:
                 self.personen.execute(
-                    "UPDATE training SET groep_id = ?, periodeplan_id = ?, datum = ?, onderwerp = ?, inhoud = ? WHERE id = ?",
+                    f"UPDATE training SET {', '.join(f'{v} = ?' for v in self._TRAINING_VELDEN)} WHERE id = ?",
                     (*waarden, t.id),
                 )
+            self.personen.execute("DELETE FROM training_atleet WHERE training_id = ?", (t.id,))
+            self.personen.executemany("INSERT INTO training_atleet (training_id, atleet_id) VALUES (?, ?)",
+                                      [(t.id, m) for m in t.atleten])
         return t
 
     def trainingen(self, groep_id: int, van: date | None = None, tot: date | None = None) -> list[Training]:
-        sql, args = "SELECT * FROM training WHERE groep_id = ?", [groep_id]
+        """De gewone trainingen van een groep (zonder afwijkende varianten), oudste eerst."""
+        sql, args = "SELECT * FROM training WHERE groep_id = ? AND hoofdtraining_id IS NULL", [groep_id]
         if van:
             sql += " AND datum >= ?"
             args.append(_naar_tekst(van))
         if tot:
             sql += " AND datum <= ?"
             args.append(_naar_tekst(tot))
-        sql += " ORDER BY datum"
-        return [Training(r["groep_id"], _naar_datum(r["datum"]), r["onderwerp"], r["inhoud"],
-                         r["periodeplan_id"], r["id"])
-                for r in self.personen.execute(sql, args)]
+        sql += " ORDER BY datum, id"
+        return [self._training(r) for r in self.personen.execute(sql, args).fetchall()]
 
     def training(self, training_id: int) -> Training | None:
         r = self.personen.execute("SELECT * FROM training WHERE id = ?", (training_id,)).fetchone()
-        if r is None:
+        return self._training(r) if r else None
+
+    def varianten(self, training_id: int) -> list[Training]:
+        """De afwijkende trainingen bij een gewone training."""
+        return [self._training(r) for r in self.personen.execute(
+            "SELECT * FROM training WHERE hoofdtraining_id = ? ORDER BY id", (training_id,)).fetchall()]
+
+    def training_voor_atleet(self, training_id: int, master_id: str) -> Training | None:
+        """Wat deze atleet op deze training doet: zijn afwijkende training, anders de gewone."""
+        t = self.training(training_id)
+        if t is None:
             return None
-        return Training(r["groep_id"], _naar_datum(r["datum"]), r["onderwerp"], r["inhoud"],
-                        r["periodeplan_id"], r["id"])
+        hoofd_id = t.hoofdtraining_id or t.id
+        return next((v for v in self.varianten(hoofd_id) if master_id in v.atleten), self.training(hoofd_id))
 
     def training_verwijderen(self, training_id: int) -> None:
-        """Verwijdert een training en de absentie die erbij hoort (die staat in een ander bestand)."""
+        """Verwijdert een training, zijn afwijkende varianten (CASCADE) en de absentie
+        die erbij hoort (die staat in een ander bestand)."""
         with self.absentie_db:
             self.absentie_db.execute("DELETE FROM absentie WHERE training_id = ?", (training_id,))
         with self.personen:
@@ -695,8 +747,11 @@ class Opslag:
         """Meerdere statuses in één transactie, bijv. een hele absentielijst."""
         absenties = list(absenties)
         for tid in {a.training_id for a in absenties}:
-            if self.training(tid) is None:
+            t = self.training(tid)
+            if t is None:
                 raise OpslagFout(f"Training {tid} bestaat niet.")
+            if t.is_afwijkend:
+                raise OpslagFout("Aanwezigheid hoort bij de gewone training, niet bij een afwijkende variant.")
         for mid in {a.atleet_id for a in absenties}:
             if self.atleet(mid) is None:
                 raise OpslagFout(f"Atleet {mid} bestaat niet.")

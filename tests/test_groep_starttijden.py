@@ -140,7 +140,7 @@ def test_bestaande_groepen_krijgen_kolommen():
         with contextlib.redirect_stdout(io.StringIO()):
             init_db(Path(tmp), hoofd=TESTSLEUTEL)
         with verbind("personen", Path(tmp), TESTSLEUTEL) as c:
-            assert huidige_versie(c) == 3
+            assert huidige_versie(c) == 5        # 003 starttijden, 005 trainingen
         with Opslag(map=Path(tmp), hoofd=TESTSLEUTEL) as db:
             oud = db.groepen()[0]
             assert (oud.naam, oud.starttijden) == ("Oude groep", {})

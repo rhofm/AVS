@@ -66,7 +66,9 @@ AVS/
 │   │   └── migrations/
 │   │       ├── personen/
 │   │       │   ├── 002_absentie_naar_eigen_database.sql  ✅ moves absence out of personen.db (init_db copies the rows)
-│   │       │   └── 003_groep_starttijden.sql             ✅ start time per weekday on groep (maandag … zondag, 'HH:MM' or empty)
+│   │       │   ├── 003_groep_starttijden.sql             ✅ start time per weekday on groep (maandag … zondag, 'HH:MM' or empty)
+│   │       │   └── 005_training_onderdelen.sql           ✅ training: warming-up, kern A/B, cooling-down, notities; deviating
+│   │       │                                                variants (hoofdtraining_id + training_atleet). 005, not 004: see the file
 │   │       └── prestaties/
 │   │           └── 002_pr_alleen_windlegaal.sql       ✅ PR view: windmeting per event (sprint/hurdles ≤200 m,
 │   │                                                     long/triple jump), max +2.0, indoor always counts
@@ -74,7 +76,7 @@ AVS/
 │   ├── models/                   ✅ dataclasses, no SQL
 │   │   ├── atleet.py             Atleet (names hidden from repr)
 │   │   ├── prestatie.py          Onderdeel, Wedstrijd, Prestatie, Inschrijving, PR, Test, Testresultaat
-│   │   ├── groep.py              Groep (with starttijden per weekday), Training, Absentie, Periodeplan
+│   │   ├── groep.py              Groep (with starttijden per weekday), Training (parts + variants), Absentie, Periodeplan
 │   │   ├── leerlijn.py           Leerlijn, LeerlijnStap, LeerlijnVoortgang
 │   │   ├── leerdoel.py           Leerdoel, LeerdoelScore, CATEGORIEEN
 │   │   ├── notitie.py            Notitie (text hidden from repr)
@@ -114,6 +116,7 @@ AVS/
 │   │
 │   └── ui/                       📝 local web UI (Flask or FastAPI, not yet chosen)
 │       ├── app.py
+│       ├── markdown.py           ✅ safe markdown subset for training texts (Jinja filter `markdown`)
 │       ├── templates/
 │       └── static/
 │
@@ -124,6 +127,7 @@ AVS/
     ├── test_absentie.py          ✅ 3 tests
     ├── test_wedstrijden.py       ✅ 5 tests
     ├── test_groep_starttijden.py ✅ 6 tests
+    ├── test_trainingen_inhoud.py ✅ 5 tests (training parts, variants, markdown, old `inhoud` → `notities`)
     ├── test_leerdoelen.py        ✅ 10 tests
     ├── test_importers.py         📝 on this branch
     ├── test_opstelling.py        📝
@@ -138,7 +142,7 @@ The data is split over eight encrypted files (SQLCipher). Only `personen.db` con
 
 | File | Contents | Athlete identified by |
 |------|----------|-----------------------|
-| `personen.db` | athletes, groups (with a start time per weekday) and group members (`groep_lid`, one row per athlete per group), trainings, period plans, leerlijnen, ploegen | `master_id` |
+| `personen.db` | athletes, groups (with a start time per weekday) and group members (`groep_lid`, one row per athlete per group), trainings (warming-up, kern A, kern B, cooling-down, notities; deviating variants for some athletes in `training_atleet`), period plans, leerlijnen, ploegen | `master_id` |
 | `prestaties.db` | onderdelen, wedstrijden (planned and past), prestaties, inschrijvingen (who goes to which meet, per event), `pr` view | pseudonym |
 | `testen.db` | tests and test results | pseudonym |
 | `trainingsschema.db` | per athlete, one column per weekday (`maandag` … `zondag`, 0/1): on which days they train | pseudonym |
@@ -153,7 +157,7 @@ python src/db/init_db.py --herstelsleutel     # show the recovery key (keep it s
 python src/db/init_db.py --herstel <sleutel>  # restore the key on a new computer
 ```
 
-Schema versions: `personen` 3 · `prestaties` 2 · `testen` 1 · `trainingsschema` 1 · `absentie` 1 · `leerlijnen` 1 · `leerdoelscores` 1 · `notities` 1.
+Schema versions: `personen` 5 · `prestaties` 2 · `testen` 1 · `trainingsschema` 1 · `absentie` 1 · `leerlijnen` 1 · `leerdoelscores` 1 · `notities` 1.
 
 Absence used to live in `personen.db`. Because `blessure` is health data, it moved to its own pseudonymised file. On an existing installation `init_db.py` moves the old rows automatically, once (`personen` migration 002).
 

@@ -97,14 +97,55 @@ class Periodeplan:
         return (self.einddatum - self.startdatum).days // 7 + 1
 
 
+#: De onderdelen van een training, in volgorde: (veldnaam, titel in de app).
+TRAININGSONDERDELEN: tuple[tuple[str, str], ...] = (
+    ("warming_up", "Warming-up"),
+    ("kern_a", "Kern A"),
+    ("kern_b", "Kern B"),
+    ("cooling_down", "Cooling-down"),
+)
+
+
 @dataclass(slots=True)
 class Training:
+    """Eén training van een groep (tabel training in personen.db, migratie 005).
+
+    De tekstvelden zijn meerregelig en mogen markdown bevatten (**vet**, *schuin*,
+    '- ' lijstjes, '# ' kopjes). Leeg/None = niet ingevuld.
+
+    Afwijkende training: hoofdtraining_id wijst naar de gewone training van de
+    groep (zelfde groep en datum) en `atleten` zegt wie deze variant volgt. De
+    gewone training heeft geen `atleten`: die geldt voor de rest van de groep.
+    """
     groep_id: int
     datum: date
     onderwerp: str | None = None
-    inhoud: str | None = None
+    notities: str | None = None
     periodeplan_id: int | None = None
     id: int | None = None
+    warming_up: str | None = None
+    kern_a: str | None = None
+    kern_b: str | None = None
+    cooling_down: str | None = None
+    hoofdtraining_id: int | None = None
+    atleten: list[str] = field(default_factory=list)   # master_ids; alleen bij een afwijkende training
+
+    def __post_init__(self) -> None:
+        # Lege tekst ('' of alleen spaties) opslaan als None; regeleinden gelijk trekken.
+        for veld in ("onderwerp", "notities", *(v for v, _ in TRAININGSONDERDELEN)):
+            tekst = getattr(self, veld)
+            if tekst is not None:
+                tekst = str(tekst).replace("\r\n", "\n").strip()
+                setattr(self, veld, tekst or None)
+
+    @property
+    def is_afwijkend(self) -> bool:
+        return self.hoofdtraining_id is not None
+
+    @property
+    def onderdelen(self) -> list[tuple[str, str]]:
+        """Ingevulde onderdelen als (titel, tekst), in volgorde warming-up -> cooling-down."""
+        return [(titel, getattr(self, veld)) for veld, titel in TRAININGSONDERDELEN if getattr(self, veld)]
 
 
 @dataclass(slots=True)

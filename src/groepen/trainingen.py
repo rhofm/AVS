@@ -3,7 +3,8 @@
 Pagina's:
   * alle trainingen van een groep (komend en geweest), met per training de stand
     van de aanwezigheid en een link om die in te vullen;
-  * één training: datum, onderwerp, inhoud, periodeplan en wie er was;
+  * één training: datum, onderwerp, warming-up, kern A, kern B, cooling-down,
+    notities, afwijkende trainingen voor enkele atleten, periodeplan en wie er was;
   * aanwezigheid invullen: één regel per atleet, vooraf ingevuld volgens
     `groepen.absentie.absentielijst()` (opgeslagen status gaat voor, anders
     'aanwezig' als de atleet die dag volgens zijn schema traint).
@@ -16,7 +17,7 @@ en feitelijk, geen diagnose. Geen SQL: alles via `Opslag`.
 from __future__ import annotations
 
 from collections import Counter
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date
 from typing import Mapping
 
@@ -117,6 +118,7 @@ class TrainingPagina:
     stand: Stand
     vorige: Training | None
     volgende: Training | None
+    varianten: list[tuple[Training, list[Atleet]]] = field(default_factory=list)   # afwijkend: (training, atleten)
 
     @property
     def telling(self) -> dict[str, int]:
@@ -128,6 +130,8 @@ def trainingpagina(db: Opslag, training_id: int, *, peildatum: date | None = Non
     t = db.training(training_id)
     if t is None:
         return None
+    if t.is_afwijkend:                      # een variant toont de pagina van de gewone training
+        t = db.training(t.hoofdtraining_id)
     groep = db.groep(t.groep_id)
     vandaag = peildatum or date.today()
     opgeslagen = {a.atleet_id: a for a in db.absenties(t.id)}
@@ -143,8 +147,9 @@ def trainingpagina(db: Opslag, training_id: int, *, peildatum: date | None = Non
     alle = db.trainingen(groep.id)
     i = next(n for n, x in enumerate(alle) if x.id == t.id)
     periode = next((p for p in db.periodeplannen(groep.id) if p.id == t.periodeplan_id), None)
+    varianten = [(v, [a for a in (db.atleet(m) for m in v.atleten) if a is not None]) for v in db.varianten(t.id)]
     return TrainingPagina(t, groep, periode, (t.datum - vandaag).days, deelnemers, _stand(db, groep, t),
-                          alle[i - 1] if i > 0 else None, alle[i + 1] if i + 1 < len(alle) else None)
+                          alle[i - 1] if i > 0 else None, alle[i + 1] if i + 1 < len(alle) else None, varianten)
 
 
 # ============================================================
