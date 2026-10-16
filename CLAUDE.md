@@ -64,6 +64,7 @@ This project holds personal data about athletes, many of them minors.
 | `importers/`  | Import results from links: atletiek.nu PRs, atletiek.nu competitions, Seltec competitions |
 | `ploeg/`      | Team selection: `vergelijk` (compare athletes), `regels` (rules), `opstelling` (lineup), `strategieen/` (selection "mentalities") |
 | `groepen/`    | Groups, `absentie`, `periodeplan` |
+| `wedstrijden/` | `planning`: upcoming meets, who goes, which events (uses `wedstrijd` + `inschrijving` in `prestaties.db`) |
 | `atleten/`, `leerlijnen/` | Feature logic for athletes and learning pathways |
 | `ui/`         | Web UI |
 
@@ -159,6 +160,10 @@ python src/db/init_db.py --herstel <sleutel>  # restore the key (e.g. new comput
   matching; do not store raw scraped pages.
 - Imports must be idempotent: re-importing the same link must not create
   duplicates (rely on the UNIQUE constraints and `wedstrijd.bron_url`).
+- A planned meet and its results are the **same** `wedstrijd` row. Always pass
+  meet links through `wedstrijden.planning.normaliseer_link()` before saving,
+  so an atletiek.nu `/main/`, `/inschrijvingen/` or `/uitslagen/` link all
+  find the meet that was planned earlier.
 - Tests run against saved, anonymised pages in `tests/fixtures/` — not against
   the live sites.
 

@@ -78,6 +78,11 @@ AVS/
 │   │   ├── testen.py             test results, progress over time
 │   │   └── profiel.py            full athlete profile from personen, prestaties and testen
 │   │
+│   ├── wedstrijden/              ✅ planned meets
+│   │   └── planning.py           plan a meet (date, name, location, link), register/deregister athletes
+│   │                             per event, upcoming meets with participants; links normalised so the
+│   │                             later results import finds the same meet
+│   │
 │   ├── importers/                📝 on this branch (see feature/importers)
 │   │   ├── base.py               common interface: can_handle(url), parse(url)
 │   │   ├── detect.py             picks the right importer automatically
@@ -108,6 +113,7 @@ AVS/
     ├── test_queries.py           ✅ 17 tests (real encrypted databases in a temp folder)
     ├── test_atleten.py           ✅ 7 tests
     ├── test_absentie.py          ✅ 3 tests
+    ├── test_wedstrijden.py       ✅ 5 tests
     ├── test_importers.py         📝 on this branch
     ├── test_opstelling.py        📝
     └── fixtures/                 saved, anonymised atletiek.nu/Seltec pages
@@ -122,7 +128,7 @@ The data is split over five encrypted files (SQLCipher). Only `personen.db` cont
 | File | Contents | Athlete identified by |
 |------|----------|-----------------------|
 | `personen.db` | athletes, groups, trainings, period plans, leerlijnen, ploegen | `master_id` |
-| `prestaties.db` | onderdelen, wedstrijden, prestaties, inschrijvingen, `pr` view | pseudonym |
+| `prestaties.db` | onderdelen, wedstrijden (planned and past), prestaties, inschrijvingen (who goes to which meet, per event), `pr` view | pseudonym |
 | `testen.db` | tests and test results | pseudonym |
 | `trainingsschema.db` | per athlete, one column per weekday (`maandag` … `zondag`, 0/1): on which days they train | pseudonym |
 | `absentie.db` | attendance in long format: one row per athlete per training, status `aanwezig` / `afgemeld` / `afwezig` / `blessure` | pseudonym |
@@ -152,7 +158,7 @@ A competition marked `indoor` passes that on to all its performances.
 ## How the layers fit together
 
 ```
-ui/  ──►  atleten/ · ploeg/ · groepen/ · leerlijnen/ · importers/
+ui/  ──►  atleten/ · wedstrijden/ · ploeg/ · groepen/ · leerlijnen/ · importers/
                               │
                               ▼
                      db/queries.py  (Opslag)  ──►  personen.db · prestaties.db · testen.db · trainingsschema.db · absentie.db
@@ -170,7 +176,7 @@ ui/  ──►  atleten/ · ploeg/ · groepen/ · leerlijnen/ · importers/
 ## Open items
 
 - [ ] Mark existing indoor competitions as `indoor` (existing ones all default to outdoor).
-- [ ] Importers: fill `bron_naam` / `bron_atletieknu_id` / `bron_geboortejaar` / `bron_club`, set `Wedstrijd.indoor`, and use `atleten/koppelen.py`.
+- [ ] Importers: fill `bron_naam` / `bron_atletieknu_id` / `bron_geboortejaar` / `bron_club`, set `Wedstrijd.indoor`, and use `atleten/koppelen.py`. Save meets with `wedstrijden.planning.normaliseer_link()` so results land on the planned meet.
 - [ ] Merge `feature/importers` and `feature/atleten` into `dev`.
 - [ ] `pyproject.toml`: replace the placeholder text with a real config (dependencies: `sqlcipher3-wheels`, `keyring`, …).
 - [ ] `src/db/schema.sql`: remove it; it has been replaced by the five `schema_*.sql` files.
