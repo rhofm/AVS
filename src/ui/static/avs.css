@@ -261,6 +261,36 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--rood); outline-
 .afgelopen__vink:checked ~ .afgelopen__inhoud { display: grid; }
 .afgelopen__vink:focus-visible { outline: 2px solid var(--rood); outline-offset: 2px; }
 
+/* wedstrijdpagina: tijdschema, onderdelen zonder atleten achter een vinkje (zonder JavaScript) */
+.wedstrijdlink { margin: .35rem 0 0; font-size: var(--maat-s); }
+.importbalk { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
+.importbalk input[type="url"] { font: inherit; font-size: var(--maat-s); padding: .3rem .5rem; min-width: min(22rem, 100%);
+  border: 1px solid var(--rand); background: var(--papier); color: var(--tekst); }
+.tijdschema { display: flex; flex-wrap: wrap; align-items: center; gap: .9rem .4rem; }
+.tijdschema > :not(.tijdschema__vink, .tijdschema__label) { flex-basis: 100%; }
+.tijdschema__vink, .kandidaten__vink { width: 1.1rem; height: 1.1rem; margin: 0; accent-color: var(--rood); cursor: pointer; }
+.tijdschema__vink:focus-visible, .kandidaten__vink:focus-visible { outline: 2px solid var(--rood); outline-offset: 2px; }
+.tijdschema__label, .kandidaten__label { cursor: pointer; }
+.tijdschema__dag { display: grid; gap: .5rem; }
+.tijdschema__vink:not(:checked) ~ .tijdschema__dag tr.zonder-atleten,
+.tijdschema__vink:not(:checked) ~ .tijdschema__dag--leeg { display: none; }
+.tijdschema__vink:checked ~ .tijdschema__leeg { display: none; }
+.programmatabel tr.zonder-atleten td { color: var(--tekst-zacht); }
+.programmatabel td:last-child { width: 1%; }
+.knop--klein { padding: .1rem .5rem; font-size: var(--maat-xs); }
+.botsingen ul { margin: .35rem 0 0; padding-left: 1.2rem; }
+.onderdeellijst { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: .3rem; }
+.onderdeellijst form { display: inline-flex; align-items: center; gap: .3rem; padding: .05rem .1rem .05rem .45rem;
+  background: var(--papier); border: 1px solid var(--rand); }
+.kruisje { font: inherit; line-height: 1; padding: .05rem .35rem; border: 0; background: none; color: var(--tekst-zacht); cursor: pointer; }
+.kruisje:hover, .kruisje:focus-visible { color: var(--op-zalm); background: var(--rood); }
+.meer-onderdelen summary { cursor: pointer; font-size: var(--maat-s); color: var(--rood); margin-bottom: .5rem; }
+.kandidaten { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem .4rem; }
+.kandidaten > :not(.kandidaten__vink, .kandidaten__label) { flex-basis: 100%; }
+.kandidaten tr.andere-categorie { display: none; }
+.kandidaten__vink:checked ~ .kandidaten__tabel tr.andere-categorie:not([hidden]) { display: table-row; }
+.kandidaten__vink:checked ~ .kandidaten__leeg { display: none; }
+
 /* lijst/kalender-wissel zonder JavaScript */
 .wissel { display: grid; gap: 1.25rem; }
 .wissel__radio { position: absolute; opacity: 0; pointer-events: none; }

@@ -11,8 +11,9 @@
 {% block titel %}Wedstrijden{% endblock %}
 
 {% macro wedstrijdnaam(w) -%}
-  {% if w.bron_url %}<a href="{{ w.bron_url }}" target="_blank" rel="noopener">{{ w.naam }}</a>{% else %}{{ w.naam }}{% endif %}
+  <a href="{{ url_for('wedstrijd', wedstrijd_id=w.id) }}"><strong>{{ w.naam }}</strong></a>
   {%- if w.indoor %} <span class="kenmerk">indoor</span>{% endif %}
+  {%- if w.bron_url %} <a class="zacht" href="{{ w.bron_url }}" target="_blank" rel="noopener" title="Wedstrijdpagina">&#8599;<span class="verborgen"> Wedstrijdpagina</span></a>{% endif %}
 {%- endmacro %}
 
 {% macro deelnemers(n) -%}

@@ -1,0 +1,190 @@
+{#
+  Eén wedstrijd: gegevens, tijdschema met onze atleten, deelnemers en botsingen.
+  Context:
+    d       – wedstrijden.detail.WedstrijdDetail
+    alle    – True als ?alle=1: ook onderdelen zonder atleten meteen tonen
+    melding – bevestiging na inschrijven, afmelden of importeren (optioneel)
+    fout    – foutmelding (optioneel)
+  Onderdelen zonder atleten van ons zijn verborgen tot 'Toon alle onderdelen' is
+  aangevinkt. Dat werkt zonder JavaScript (CSS :checked); een klein script
+  onthoudt alleen de laatste keuze.
+#}
+{% extends "basis.html" %}
+{% set w = d.wedstrijd %}
+{% block titel %}{{ w.naam }}{% endblock %}
+
+{% macro atleetlink(a) -%}
+  <a href="{{ url_for('atleet', master_id=a.master_id) }}">{{ a.naam }}</a>
+{%- endmacro %}
+
+{% block inhoud %}
+<article class="vel">
+  <header class="blok__kop">
+    <div>
+      <a class="terug" href="{{ url_for('wedstrijden') }}">&larr; Wedstrijden</a>
+      <h1 class="kop kop--pagina">{{ w.naam }}{% if w.indoor %} <span class="kenmerk">indoor</span>{% endif %}</h1>
+      <p class="subkop">{{ w.datum | datum_kort }} {{ w.datum.year }}
+        {%- if w.locatie %} · {{ w.locatie }}{% endif %}
+        · <span class="zacht">{{ "geweest" if d.geweest else d.dagen_tot | over_dagen }}</span></p>
+      {% if w.bron_url %}<p class="zacht wedstrijdlink"><a href="{{ w.bron_url }}" target="_blank" rel="noopener">Wedstrijdpagina &#8599;</a></p>{% endif %}
+    </div>
+    <a class="knop knop--vol" href="{{ url_for('wedstrijd_inschrijven', wedstrijd_id=w.id) }}">+ Atleten inschrijven</a>
+  </header>
+
+  {% if melding %}<p class="melding" role="status">{{ melding }}</p>{% endif %}
+  {% if fout %}<p class="melding melding--fout" role="alert">{{ fout }}</p>{% endif %}
+
+  {% if d.botsingen %}
+    <section class="melding melding--fout botsingen" aria-labelledby="kop-botsingen">
+      <strong id="kop-botsingen">Let op: {{ d.botsingen | length }} botsing{{ "en" if d.botsingen | length != 1 }} in het tijdschema</strong>
+      <ul>{% for b in d.botsingen %}<li>{{ b.tekst }}</li>{% endfor %}</ul>
+    </section>
+  {% endif %}
+
+  {# ---------------- Tijdschema ---------------- #}
+  <section class="blok" aria-labelledby="kop-tijdschema">
+    <div class="blok__kop">
+      <h2 class="kop" id="kop-tijdschema">Tijdschema
+        {%- if d.heeft_tijdschema %} <span class="zacht getallen">({{ d.aantal_met_atleten }} van {{ d.aantal_regels }} met onze atleten)</span>{% endif %}</h2>
+      <form method="post" action="{{ url_for('wedstrijd_tijdschema', wedstrijd_id=w.id) }}" class="importbalk">
+        {% if not w.bron_url %}
+          <label class="verborgen" for="tijdschema-link">Link naar de wedstrijd op atletiek.nu of Seltec</label>
+          <input type="url" id="tijdschema-link" name="link" required placeholder="Link naar atletiek.nu of Seltec">
+        {% endif %}
+        <button class="knop" type="submit">{{ "Tijdschema opnieuw importeren" if d.heeft_tijdschema else "Tijdschema importeren" }}</button>
+      </form>
+    </div>
+
+    {% if d.heeft_tijdschema %}
+      <div class="tijdschema">
+        <input class="tijdschema__vink" type="checkbox" id="toon-alle" name="alle" value="1"{% if alle %} checked{% endif %}>
+        <label class="vinkje tijdschema__label" for="toon-alle">Toon alle onderdelen
+          <span class="zacht">({{ d.aantal_zonder_atleten }} zonder atleten)</span></label>
+
+        {% if not d.aantal_met_atleten %}
+          <p class="leeg tijdschema__leeg">Nog geen van onze atleten staat in het tijdschema.
+            <a href="{{ url_for('wedstrijd_inschrijven', wedstrijd_id=w.id) }}">Schrijf atleten in</a> of vink &lsquo;Toon alle onderdelen&rsquo; aan.</p>
+        {% endif %}
+
+        {% for dag in d.dagen %}
+          <div class="tijdschema__dag{{ ' tijdschema__dag--leeg' if not dag.met_atleten }}">
+            {% if d.meerdaags %}<h3 class="subkop">{{ dag.datum | datum_kort }} {{ dag.datum.year }}</h3>{% endif %}
+            <div class="tabelvak">
+              <table class="tabel programmatabel">
+                <thead>
+                  <tr>
+                    <th scope="col">Tijd</th>
+                    <th scope="col">Onderdeel</th>
+                    <th scope="col">Categorie</th>
+                    <th scope="col">Atleten</th>
+                    <th scope="col"><span class="verborgen">Inschrijven</span></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for r in dag.rijen %}
+                    <tr id="regel-{{ r.regel.id }}" class="{{ 'met-atleten' if r.heeft_atleten else 'zonder-atleten' }}">
+                      <td class="nowrap getallen"><strong>{{ r.tijd }}</strong></td>
+                      <td>{{ r.onderdeel }}
+                        {%- if r.details %} <span class="zacht">· {{ r.details }}</span>{% endif %}
+                        {%- if r.regel.onderdeel_id is none %} <span class="kenmerk" title="Dit onderdeel staat niet in de onderdelenlijst; inschrijvingen worden niet gekoppeld">niet gekoppeld</span>{% endif %}
+                        {%- if r.regel.opmerking %}<br><span class="zacht">{{ r.regel.opmerking }}</span>{% endif %}</td>
+                      <td>{{ r.regel.categorie or "Alle" }}</td>
+                      <td>
+                        {% if r.heeft_atleten %}
+                          <ul class="deelnames">
+                            {% for a in r.atleten %}<li>{{ atleetlink(a) }}</li>{% endfor %}
+                            {% for a in r.misschien %}<li>{{ atleetlink(a) }} <span class="kenmerk" title="De categorie is niet zeker te koppelen; controleer zelf">?</span></li>{% endfor %}
+                          </ul>
+                        {% else %}<span class="zacht">–</span>{% endif %}
+                      </td>
+                      <td class="rechts">
+                        {% if r.regel.onderdeel_id is not none %}
+                          <a class="knop knop--klein" href="{{ url_for('wedstrijd_inschrijven', wedstrijd_id=w.id, regel=r.regel.id) }}"
+                             title="Atleten inschrijven voor {{ r.regel.omschrijving }}">+<span class="verborgen"> Atleten voor {{ r.regel.omschrijving }}</span></a>
+                        {% endif %}
+                      </td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="leeg">Nog geen tijdschema.
+        {%- if w.bron_url %} Importeer het met de knop hierboven van de wedstrijdpagina.{% else %} Plak de link van de wedstrijd op atletiek.nu of Seltec hierboven en importeer het.{% endif %}</p>
+    {% endif %}
+  </section>
+
+  {# ---------------- Deelnemers ---------------- #}
+  <section class="blok" aria-labelledby="kop-deelnemers">
+    <h2 class="kop" id="kop-deelnemers">Deelnemers <span class="zacht getallen">({{ d.deelnemers | length }})</span></h2>
+    {% if d.deelnemers %}
+      <div class="tabelvak">
+        <table class="tabel" id="tabel-deelnemers">
+          <thead>
+            <tr>
+              <th scope="col">Naam</th>
+              <th scope="col">Cat.</th>
+              <th scope="col">Onderdelen</th>
+              <th scope="col"><span class="verborgen">Afmelden</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for p in d.deelnemers %}
+              <tr>
+                <th scope="row">{{ atleetlink(p.atleet) }}</th>
+                <td class="nowrap">{{ p.categorie or "–" }}</td>
+                <td>
+                  {% if p.volgt_nog %}
+                    <span class="zacht">onderdelen volgen nog</span>
+                  {% else %}
+                    <ul class="onderdeellijst">
+                      {% for o in p.onderdelen %}
+                        <li>
+                          <form method="post" action="{{ url_for('wedstrijd_afmelden', wedstrijd_id=w.id) }}">
+                            <input type="hidden" name="atleet" value="{{ p.atleet.master_id }}">
+                            <input type="hidden" name="onderdeel" value="{{ o.id }}">
+                            {{ o.naam }}{% if d.heeft_tijdschema and o.naam in p.niet_in_tijdschema %} <span class="kenmerk" title="Geen regel in het tijdschema voor dit onderdeel en deze categorie">niet in tijdschema</span>{% endif %}
+                            <button type="submit" class="kruisje" title="{{ p.atleet.naam }} afmelden voor {{ o.naam }}"
+                                    aria-label="{{ p.atleet.naam }} afmelden voor {{ o.naam }}">&times;</button>
+                          </form>
+                        </li>
+                      {% endfor %}
+                    </ul>
+                  {% endif %}
+                </td>
+                <td class="rechts">
+                  <form method="post" action="{{ url_for('wedstrijd_afmelden', wedstrijd_id=w.id) }}">
+                    <input type="hidden" name="atleet" value="{{ p.atleet.master_id }}">
+                    <button type="submit" class="knop knop--klein knop--gevaar">Afmelden</button>
+                  </form>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="leeg">Nog niemand ingeschreven. <a href="{{ url_for('wedstrijd_inschrijven', wedstrijd_id=w.id) }}">+ Atleten inschrijven</a></p>
+    {% endif %}
+  </section>
+
+  <footer class="vel__voet">Atleet Volg Systeem<br>{{ w.naam }}</footer>
+</article>
+<script>
+  /* Onthoud 'Toon alle onderdelen' per computer; zonder opslag werkt de pagina gewoon. */
+  (function () {
+    var sleutel = "avs-tijdschema-alle";
+    var vink = document.getElementById("toon-alle");
+    if (!vink) return;
+    try {
+      if (!location.search.includes("alle=") && localStorage.getItem(sleutel) === "1") vink.checked = true;
+    } catch (e) {}
+    vink.addEventListener("change", function () {
+      try { localStorage.setItem(sleutel, vink.checked ? "1" : "0"); } catch (e) {}
+    });
+  })();
+</script>
+{% endblock %}

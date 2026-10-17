@@ -68,7 +68,9 @@
 * Persoonlijk schema per atleet (uit inschrijvingen + categorie op de wedstrijddag), per regel wie van ons meedoet, en controle op botsingen of te weinig pauze tussen onderdelen
 * Tijdschema importeren van atletiek.nu: datum, tijd, categorie, groep (A/B → 1/2), onderdeel, opmerking ('2 series', 'hoog 1') en duur als de site die geeft. Opnieuw importeren vervangt het oude tijdschema
 * Tijdschema importeren van Seltec: datum (per dag), tijd, onderdeel, ronde, categorieën en opmerking ('6 series, 43 atleten'); geen duur. Seltec-codes worden vertaald (U16M = meisjes U16 → U16-V, U18M = mannen U18 → U18-M). Een regel voor meer categorieën blijft één regel
-* Nog te doen: scherm om het tijdschema te bekijken/in te voeren en de import te starten
+* Wedstrijdpagina (/wedstrijd/<id>, klik op een wedstrijd in het overzicht): tijdschema per dag met tijd, onderdeel, categorie en onze atleten; onderdelen zonder atleten verborgen onder het vinkje 'Toon alle onderdelen'; botsingen; deelnemerslijst met afmelden (per onderdeel of helemaal); knop om het tijdschema te importeren
+* Atleten inschrijven (/wedstrijd/<id>/inschrijven): onderdelen en atleten aanvinken; vanuit een regel van het tijdschema ('+') staat het onderdeel al aan en staan atleten uit andere categorieën achter een vinkje
+* Nog te doen: tijdschema met de hand invoeren of een regel aanpassen
 
 
 

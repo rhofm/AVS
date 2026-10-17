@@ -46,7 +46,8 @@ from leerlijnen import voortgang
 from ui import export as trainingsexport
 from ui import startpagina
 from ui.opmaak import registreer_filters
-from wedstrijden import kalender
+from wedstrijden import detail as wedstrijddetail
+from wedstrijden import kalender, tijdschema_import
 from wedstrijden.overzicht import wedstrijdenoverzicht
 
 HOST = "127.0.0.1"
@@ -361,6 +362,80 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
         # Het formulier voor een nieuwe wedstrijd komt later.
         return render_template("binnenkort.html", titel="Nieuwe wedstrijd", terug_url=url_for("wedstrijden"),
                                terug_naam="Wedstrijden", actief_menu="wedstrijden")
+
+    def _wedstrijdpagina(wedstrijd_id: int, fout: str | None = None, status: int = 200):
+        d = wedstrijddetail.wedstrijd_detail(db(), wedstrijd_id)
+        if d is None:
+            abort(404)
+        meldingen = get_flashed_messages()
+        return render_template("wedstrijd.html", d=d, alle=request.args.get("alle") == "1",
+                               melding=meldingen[0] if meldingen else None, fout=fout,
+                               actief_menu="wedstrijden"), status
+
+    @app.get("/wedstrijd/<int:wedstrijd_id>")
+    def wedstrijd(wedstrijd_id: int):
+        return _wedstrijdpagina(wedstrijd_id)
+
+    @app.post("/wedstrijd/<int:wedstrijd_id>/tijdschema")
+    def wedstrijd_tijdschema(wedstrijd_id: int):
+        """Tijdschema ophalen van atletiek.nu of Seltec (de link van de wedstrijd, of een opgegeven link)."""
+        if db().wedstrijd(wedstrijd_id) is None:
+            abort(404)
+        link = request.form.get("link", "").strip() or None
+        try:
+            verslag = tijdschema_import.tijdschema_importeren(db(), wedstrijd_id, link)
+        except OpslagFout as e:
+            return _wedstrijdpagina(wedstrijd_id, fout=f"Tijdschema niet geïmporteerd: {e}", status=400)
+        except OSError:
+            return _wedstrijdpagina(wedstrijd_id, status=502, fout="Tijdschema niet geïmporteerd: de website is "
+                                    "niet bereikbaar. Controleer de internetverbinding en probeer het opnieuw.")
+        flash(verslag.tekst)
+        return redirect(url_for("wedstrijd", wedstrijd_id=wedstrijd_id) + "#kop-tijdschema")
+
+    def _inschrijfpagina(wedstrijd_id: int, regel_id: int | None, fout: str | None = None, status: int = 200,
+                         onderdelen=(), gekozen=()):
+        f = wedstrijddetail.inschrijfformulier(db(), wedstrijd_id, regel_id, onderdelen=onderdelen, gekozen=gekozen)
+        if f is None:
+            abort(404)
+        return render_template("wedstrijd_inschrijven.html", f=f, fout=fout, actief_menu="wedstrijden"), status
+
+    def _regel_id(waarde: str | None) -> int | None:
+        return int(waarde) if waarde and waarde.isdigit() else None
+
+    @app.get("/wedstrijd/<int:wedstrijd_id>/inschrijven")
+    def wedstrijd_inschrijven(wedstrijd_id: int):
+        return _inschrijfpagina(wedstrijd_id, _regel_id(request.args.get("regel")))
+
+    @app.post("/wedstrijd/<int:wedstrijd_id>/inschrijven")
+    def wedstrijd_inschrijven_opslaan(wedstrijd_id: int):
+        regel_id = _regel_id(request.form.get("regel"))
+        atleten, onderdelen = request.form.getlist("atleet"), request.form.getlist("onderdeel")
+        try:
+            aantal = wedstrijddetail.inschrijven_uit_formulier(db(), wedstrijd_id, atleten, onderdelen)
+        except OpslagFout as e:
+            if db().wedstrijd(wedstrijd_id) is None:
+                abort(404)
+            return _inschrijfpagina(wedstrijd_id, regel_id, fout=str(e), status=400,
+                                    onderdelen=[int(o) for o in onderdelen if o.isdigit()],
+                                    gekozen=[m for m in atleten if db().atleet(m)])
+        namen = [o.naam for o in db().onderdelen() if str(o.id) in onderdelen]
+        wat = f"voor {', '.join(namen)}" if namen else "(onderdelen volgen nog)"
+        flash(f"{aantal} {'atleet' if aantal == 1 else 'atleten'} ingeschreven {wat}.")
+        anker = f"#regel-{regel_id}" if regel_id else "#kop-deelnemers"
+        return redirect(url_for("wedstrijd", wedstrijd_id=wedstrijd_id) + anker)
+
+    @app.post("/wedstrijd/<int:wedstrijd_id>/afmelden")
+    def wedstrijd_afmelden(wedstrijd_id: int):
+        onderdeel = request.form.get("onderdeel", "")
+        try:
+            tekst = wedstrijddetail.afmelden(db(), wedstrijd_id, request.form.get("atleet", ""),
+                                             int(onderdeel) if onderdeel.isdigit() else None)
+        except OpslagFout as e:
+            if db().wedstrijd(wedstrijd_id) is None:
+                abort(404)
+            return _wedstrijdpagina(wedstrijd_id, fout=str(e), status=400)
+        flash(tekst)
+        return redirect(url_for("wedstrijd", wedstrijd_id=wedstrijd_id) + "#kop-deelnemers")
 
     @app.get("/groep/<int:groep_id>/wedstrijden")
     def groep_wedstrijden(groep_id: int):
