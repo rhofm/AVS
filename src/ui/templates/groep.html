@@ -28,6 +28,10 @@
         {% if pagina.trainingsdagen %}<span>{{ pagina.trainingsdagen | length }}× per week</span>{% endif %}
         {% if pagina.periode %}<span>{{ pagina.periode.naam }} · week {{ pagina.periode_week }} van {{ pagina.periode.aantal_weken }}</span>{% endif %}
       </p>
+      <a class="knop atleetkop__aanpassen" href="{{ basis }}/gegevens">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M11.7 1.3a1 1 0 0 1 1.4 0l1.6 1.6a1 1 0 0 1 0 1.4L5.4 13.6 1.5 14.5l.9-3.9z"/></svg>
+        Naam en seizoen wijzigen
+      </a>
     </div>
     <div class="categorie" title="Aantal atleten in de groep">{{ pagina.leden | length }}<small>{{ "atleten" if pagina.leden | length != 1 else "atleet" }}</small></div>
   </header>

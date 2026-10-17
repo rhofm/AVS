@@ -78,6 +78,7 @@ class LedenFormulier:
 
 
 MAX_NAAM = 80
+MAX_SEIZOEN = 20
 
 
 def huidig_seizoen(peildatum: date) -> str:
@@ -204,12 +205,12 @@ def dagen_tekst(dagen: dict[str, str | None]) -> str:
     return ", ".join(f"{DAG_KORT[d]} {t}" if t else DAG_KORT[d] for d, t in dagen.items())
 
 
-def groep_aanmaken(db: Opslag, naam: str, seizoen: str | None, gekozen: Iterable[str],
-                   trainingsdagen: dict[str, str | None] | None = None,
-                   extra_tijden: dict[str, list[str]] | None = None) -> Groep:
-    """Maak een nieuwe groep met deze atleten en vaste trainingsdagen ({'dinsdag': '18:30'}).
+def _controleer_gegevens(db: Opslag, naam: str | None, seizoen: str | None,
+                         groep_id: int | None = None) -> tuple[str, str | None]:
+    """Naam en seizoen opgeschoond en gecontroleerd: (naam, seizoen of None).
 
-    Fout bij lege naam of als de naam in dat seizoen al bestaat; dan wordt niets opgeslagen.
+    Fout bij een lege of te lange naam, een te lang seizoen, of als er in dat seizoen
+    al een (andere) groep met die naam is. groep_id: de groep die gewijzigd wordt.
     """
     naam = " ".join((naam or "").split())
     seizoen = " ".join((seizoen or "").split()) or None
@@ -217,8 +218,49 @@ def groep_aanmaken(db: Opslag, naam: str, seizoen: str | None, gekozen: Iterable
         raise OpslagFout("Geef de groep een naam.")
     if len(naam) > MAX_NAAM:
         raise OpslagFout(f"De naam is te lang (maximaal {MAX_NAAM} tekens).")
-    if any(g.naam.lower() == naam.lower() and g.seizoen == seizoen for g in db.groepen()):
+    if seizoen and len(seizoen) > MAX_SEIZOEN:
+        raise OpslagFout(f"Het seizoen is te lang (maximaal {MAX_SEIZOEN} tekens), bijv. 2026-2027.")
+    if any(g.id != groep_id and g.naam.lower() == naam.lower() and g.seizoen == seizoen for g in db.groepen()):
         raise OpslagFout(f"Er is al een groep '{naam}'" + (f" in seizoen {seizoen}." if seizoen else "."))
+    return naam, seizoen
+
+
+def seizoenkeuzes(db: Opslag, peildatum: date | None = None) -> list[str]:
+    """Voorstellen voor het seizoenveld: vorig, huidig en volgend seizoen plus de seizoenen
+    die al bij groepen staan; nieuwste eerst."""
+    vandaag = peildatum or date.today()
+    begin = int(huidig_seizoen(vandaag)[:4])
+    voorstel = {f"{j}-{j + 1}" for j in (begin - 1, begin, begin + 1)}
+    voorstel |= {g.seizoen for g in db.groepen() if g.seizoen}
+    return sorted(voorstel, reverse=True)
+
+
+def gegevens_opslaan(db: Opslag, groep_id: int, naam: str | None, seizoen: str | None) -> tuple[Groep, list[str]]:
+    """Naam en seizoen van een bestaande groep wijzigen. Leden, trainingsdagen en
+    trainingen blijven zoals ze zijn. Geeft (groep, wat er veranderde in woorden)."""
+    g = db.groep(groep_id)
+    if g is None:
+        raise OpslagFout(f"Groep {groep_id} bestaat niet.")
+    naam, seizoen = _controleer_gegevens(db, naam, seizoen, groep_id)
+    veranderd = []
+    if naam != g.naam:
+        veranderd.append(f"naam '{naam}'")
+    if seizoen != g.seizoen:
+        veranderd.append(f"seizoen {seizoen}" if seizoen else "geen seizoen")
+    if veranderd:
+        g.naam, g.seizoen = naam, seizoen
+        db.groep_opslaan(g)                         # leden blijven gelijk (g.leden komt uit de database)
+    return g, veranderd
+
+
+def groep_aanmaken(db: Opslag, naam: str, seizoen: str | None, gekozen: Iterable[str],
+                   trainingsdagen: dict[str, str | None] | None = None,
+                   extra_tijden: dict[str, list[str]] | None = None) -> Groep:
+    """Maak een nieuwe groep met deze atleten en vaste trainingsdagen ({'dinsdag': '18:30'}).
+
+    Fout bij lege naam of als de naam in dat seizoen al bestaat; dan wordt niets opgeslagen.
+    """
+    naam, seizoen = _controleer_gegevens(db, naam, seizoen)
     atleten = _atleten_uit_keuze(db, gekozen)
     dagen = _controleer_dagen(trainingsdagen or {})
     g = db.groep_opslaan(Groep(naam, seizoen, list(atleten)))

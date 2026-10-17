@@ -264,6 +264,28 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
         return render_template("groep.html", pagina=pagina, melding=meldingen[0] if meldingen else None,
                                actief_menu="groepen")
 
+    def _gegevens(groep_id: int, fout: str | None = None, status: int = 200):
+        gr = haal_groep(groep_id)
+        waarden = ({"naam": request.form.get("naam", ""), "seizoen": request.form.get("seizoen", "")} if fout
+                   else {"naam": gr.naam, "seizoen": gr.seizoen or ""})
+        return render_template("groep_gegevens.html", groep=gr, waarden=waarden, fout=fout,
+                               seizoenen=groepsbeheer.seizoenkeuzes(db()), actief_menu="groepen"), status
+
+    @app.get("/groep/<int:groep_id>/gegevens")
+    def groep_gegevens(groep_id: int):
+        return _gegevens(groep_id)
+
+    @app.post("/groep/<int:groep_id>/gegevens")
+    def groep_gegevens_opslaan(groep_id: int):
+        haal_groep(groep_id)
+        try:
+            g, veranderd = groepsbeheer.gegevens_opslaan(db(), groep_id, request.form.get("naam"),
+                                                         request.form.get("seizoen"))
+        except OpslagFout as e:
+            return _gegevens(groep_id, fout=f"Niet opgeslagen: {e}", status=400)
+        flash("Gewijzigd: " + " en ".join(veranderd) + "." if veranderd else "Niets gewijzigd.")
+        return redirect(url_for("groep", groep_id=g.id))
+
     def _leden(groep_id: int, fout: str | None = None, status: int = 200, na_fout: bool = False):
         f = groepsbeheer.ledenformulier(
             db(), groep_id,
