@@ -38,6 +38,7 @@ from atleten.aanwezigheid import aanwezigheid
 from db.init_db import SleutelFout, init_db
 from db.queries import Opslag, OpslagFout
 from groepen import groep as groepsbeheer
+from groepen.groepenoverzicht import GEEN_SEIZOEN, groepenoverzicht
 from groepen import landingspagina as groep_landingspagina
 from groepen import overzichten as groep_overzichten
 from groepen import trainingen as trainingsbeheer
@@ -228,7 +229,9 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
 
     @app.get("/groepen")
     def groepen():
-        return render_template("groepen.html", groepen=groep_landingspagina.overzicht(db()), actief_menu="groepen")
+        o = groepenoverzicht(db(), zoek=request.args.get("q", ""), seizoen=request.args.get("seizoen", ""),
+                             dag=request.args.get("dag", ""))
+        return render_template("groepen.html", o=o, geen_seizoen=GEEN_SEIZOEN, actief_menu="groepen")
 
     @app.get("/groepen/nieuw")
     def groep_nieuw():

@@ -174,7 +174,8 @@ def test_template():
         html = render("groep.html", pagina=landingspagina.landingspagina(db, leeg.id, peildatum=VANDAAG))
         assert "Nog geen atleten" in html and "Nog niet bekend" in html
 
-        html = render("groepen.html", groepen=landingspagina.overzicht(db, peildatum=VANDAAG))
+        from groepen.groepenoverzicht import GEEN_SEIZOEN, groepenoverzicht
+        html = render("groepen.html", o=groepenoverzicht(db, peildatum=VANDAAG), geen_seizoen=GEEN_SEIZOEN)
         assert "U16 sprint" in html and "Di, Do" in html and "Werpgroep" in html
 
 

@@ -1,7 +1,12 @@
 {#
-  Overzicht van alle groepen.
+  Overzicht van alle groepen: zoeken, filteren en sorteren.
   Context:
-    groepen – lijst van (Groep, ['Di', 'Do']) uit groepen.landingspagina.overzicht()
+    o            – groepen.groepenoverzicht.Groepenoverzicht
+    geen_seizoen – waarde van de keuze 'Zonder seizoen'
+  Zoeken (q) doorzoekt naam, seizoen, trainingsdagen en aantal atleten; daarnaast
+  filters op seizoen en trainingsdag (dag). De server filtert bij versturen;
+  static/filter.js filtert al tijdens het typen. Sorteren door op een kolomkop
+  te klikken (static/sorteer.js).
 #}
 {% extends "basis.html" %}
 {% block titel %}Groepen{% endblock %}
@@ -11,33 +16,67 @@
   <header class="blok__kop">
     <div>
       <h1 class="kop kop--pagina">Groepen</h1>
-      <p class="subkop">{{ groepen | length }} groep{{ "en" if groepen | length != 1 }}</p>
+      <p class="subkop"><span data-filter-teller="groep groepen">{{ o.rijen | length }} {{ "groepen" if o.rijen | length != 1 else "groep" }}</span>
+        {%- if o.gefilterd %} van {{ o.totaal }}{% endif %}</p>
     </div>
     <a class="knop knop--vol" href="{{ url_for('groep_nieuw') }}">+ Nieuwe groep</a>
   </header>
 
-  {% if groepen %}
+  {% if o.totaal %}
+    <form class="zoekbalk zoekbalk--filters" method="get" action="{{ url_for('groepen') }}" data-filter="tabel-groepen" role="search">
+      <div class="zoekbalk__veld zoekbalk__veld--breed">
+        <label for="zoek-q">Zoeken</label>
+        <input type="search" id="zoek-q" name="q" value="{{ o.zoek }}" autocomplete="off"
+               placeholder="Naam, seizoen, trainingsdag of aantal atleten" data-filter-zoek>
+      </div>
+      <div class="zoekbalk__veld">
+        <label for="zoek-seizoen">Seizoen</label>
+        <select id="zoek-seizoen" name="seizoen" data-filter-veld="seizoen">
+          <option value="">Alle</option>
+          {% for s in o.seizoenen %}<option value="{{ s }}"{% if s == o.seizoen %} selected{% endif %}>{{ s }}</option>{% endfor %}
+          {% if o.zonder_seizoen %}<option value="{{ geen_seizoen }}"{% if o.seizoen == geen_seizoen %} selected{% endif %}>Zonder seizoen</option>{% endif %}
+        </select>
+      </div>
+      <div class="zoekbalk__veld">
+        <label for="zoek-dag">Trainingsdag</label>
+        <select id="zoek-dag" name="dag" data-filter-lijst="dagen">
+          <option value="">Alle</option>
+          {% for d, titel in o.dagkeuzes %}<option value="{{ d }}"{% if d == o.dag %} selected{% endif %}>{{ titel }}</option>{% endfor %}
+        </select>
+      </div>
+      <button class="knop knop--vol" type="submit">Zoeken</button>
+      {% if o.gefilterd %}<a class="terug" href="{{ url_for('groepen') }}">Wissen</a>{% endif %}
+    </form>
+
     <div class="tabelvak">
-      <table class="tabel">
+      <table class="tabel sorteerbaar" id="tabel-groepen">
         <thead>
-          <tr><th scope="col">Groep</th><th scope="col">Seizoen</th><th scope="col" class="rechts">Atleten</th><th scope="col">Trainingsdagen</th></tr>
+          <tr>
+            <th scope="col" data-soort="tekst" aria-sort="ascending"><button type="button" class="sorteer"><span class="sorteer__naam">Groep</span></button></th>
+            <th scope="col" data-soort="tekst" data-eerst="af"><button type="button" class="sorteer"><span class="sorteer__naam">Seizoen</span></button></th>
+            <th scope="col" class="rechts" data-soort="getal" data-eerst="af"><button type="button" class="sorteer"><span class="sorteer__naam">Atleten</span></button></th>
+            <th scope="col" data-soort="tekst"><button type="button" class="sorteer"><span class="sorteer__naam">Trainingsdagen</span></button></th>
+          </tr>
         </thead>
         <tbody>
-          {% for g, dagen in groepen %}
-            <tr>
-              <td><a href="{{ url_for('groep', groep_id=g.id) }}"><strong>{{ g.naam }}</strong></a></td>
-              <td>{{ g.seizoen or "–" }}</td>
-              <td class="rechts">{{ g.leden | length }}</td>
-              <td>{{ dagen | join(", ") or "–" }}</td>
+          {% for r in o.rijen %}
+            <tr data-zoek="{{ r.zoektekst }}" data-seizoen="{{ r.groep.seizoen or geen_seizoen }}" data-dagen="{{ r.dagen | join(' ') }}">
+              <td data-sort="{{ r.sort_naam }}"><a href="{{ url_for('groep', groep_id=r.groep.id) }}"><strong>{{ r.groep.naam }}</strong></a></td>
+              <td data-sort="{{ r.sort_seizoen }}">{{ r.groep.seizoen or "–" }}</td>
+              <td class="rechts getallen" data-sort="{{ r.aantal }}">{{ r.aantal }}</td>
+              <td data-sort="{{ r.sort_dagen }}">{{ r.labels | join(", ") or "–" }}</td>
             </tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
+    <p class="leeg" data-filter-leeg{% if o.rijen %} hidden{% endif %}>Geen groepen gevonden. Probeer een ander woord of zet een filter op &lsquo;Alle&rsquo;.</p>
   {% else %}
     <p class="leeg">Nog geen groepen. Maak er een met <a href="{{ url_for('groep_nieuw') }}">+ Nieuwe groep</a>.</p>
   {% endif %}
 
   <footer class="vel__voet">Atleet Volg Systeem</footer>
 </article>
+<script src="{{ static_pad | default('/static') }}/sorteer.js"></script>
+<script src="{{ static_pad | default('/static') }}/filter.js"></script>
 {% endblock %}

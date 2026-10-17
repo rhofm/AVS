@@ -350,14 +350,3 @@ def landingspagina(db: Opslag, groep_id: int, *, peildatum: date | None = None,
         periode=periode,
         vandaag=vandaag,
     )
-
-
-def overzicht(db: Opslag, *, peildatum: date | None = None) -> list[tuple[Groep, list[str]]]:
-    """Alle groepen met hun trainingsdagen ('Di 18:30', 'Do'), voor de pagina 'Groepen'."""
-    vandaag = peildatum or date.today()
-    uit = []
-    for g in db.groepen():
-        dagen, _ = trainingsdagen(db, g, vandaag)
-        uit.append((g, [f"{DAG_KORT[d]} {' & '.join(g.tijden(d))}" if g.tijden(d) else DAG_KORT[d]
-                        for d in DAGEN if d in dagen]))
-    return uit

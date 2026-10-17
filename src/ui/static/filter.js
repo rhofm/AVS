@@ -3,7 +3,8 @@
      <input data-filter-zoek>                      vrij zoeken: elk woord moet voorkomen in data-zoek van de rij
      <select data-filter-veld="categorie">         rij moet data-categorie="<waarde>" hebben (leeg = alles)
      <select data-filter-lijst="groepen">          data-groepen van de rij is een lijst met spaties: " 3 7 "
-   en optioneel <span data-filter-teller> voor "n atleten".
+   en optioneel <span data-filter-teller> voor "n atleten", of <span data-filter-teller="groep groepen">
+   voor andere woorden (enkelvoud en meervoud).
    De server filtert dezelfde velden bij het versturen, dus zonder JavaScript werkt alles ook. */
 (function () {
   function plat(t) {
@@ -18,6 +19,7 @@
     var lijsten = form.querySelectorAll("[data-filter-lijst]");
     var teller = document.querySelector("[data-filter-teller]");
     var leeg = document.querySelector("[data-filter-leeg]");
+    var telwoorden = ((teller && teller.dataset.filterTeller) || "atleet atleten").split(" ");
 
     function toepassen() {
       var woorden = plat(zoek ? zoek.value : "").split(" ").filter(Boolean);
@@ -31,7 +33,7 @@
         r.hidden = !ok;
         if (ok) zichtbaar++;
       });
-      if (teller) teller.textContent = zichtbaar + (zichtbaar === 1 ? " atleet" : " atleten");
+      if (teller) teller.textContent = zichtbaar + " " + (zichtbaar === 1 ? telwoorden[0] : telwoorden[1]);
       if (leeg) leeg.hidden = zichtbaar !== 0;
     }
     if (zoek) zoek.addEventListener("input", toepassen);

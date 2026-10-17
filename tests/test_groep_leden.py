@@ -15,6 +15,7 @@ from test_groep_landingspagina import TESTSLEUTEL, VANDAAG, opslag, voorbeeldgro
 from atleten import beheer  # noqa: E402
 from db.queries import OpslagFout  # noqa: E402
 from groepen import groep as groepsbeheer  # noqa: E402
+from groepen.groepenoverzicht import groepenoverzicht  # noqa: E402
 
 
 def test_formulier():
@@ -140,8 +141,8 @@ def test_groep_met_trainingsdagen():
         assert [(d.kort, d.starttijd) for d in lp.trainingsdagen] == [("Di", "09:15"), ("Do", "19:00"), ("Za", "09:00")]
         anna = lp.leden[0]                       # Anna traint di, do, za: alle drie met de groep
         assert [d.soort for d in anna.dagen] == [None, "groep", None, "groep", None, "groep", None]
-        assert dict((gr.naam, dagen) for gr, dagen in landingspagina.overzicht(db, peildatum=VANDAAG))["Avondgroep"] \
-            == ["Di 09:15", "Do 19:00", "Za 09:00"]
+        rijen = groepenoverzicht(db, peildatum=VANDAAG).rijen
+        assert {r.groep.naam: r.labels for r in rijen}["Avondgroep"] == ["Di 09:15", "Do 19:00", "Za 09:00"]
 
         # Ongeldige dagen/tijden: niets aangemaakt.
         aantal = len(db.groepen())
