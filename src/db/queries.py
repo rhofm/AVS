@@ -217,6 +217,7 @@ class Opslag:
             self.testen_db.execute("DELETE FROM testresultaat WHERE atleet_ref = ?", (ref_t,))
         with self.trainingsschema_db:
             self.trainingsschema_db.execute("DELETE FROM trainingsschema WHERE atleet_ref = ?", (ref_s,))
+            self.trainingsschema_db.execute("DELETE FROM trainingskeuze WHERE atleet_ref = ?", (ref_s,))
         with self.absentie_db:
             self.absentie_db.execute("DELETE FROM absentie WHERE atleet_ref = ?", (ref_a,))
         with self.leerdoelscores_db:
@@ -552,7 +553,51 @@ class Opslag:
         ).fetchone()
         if r is None:
             return Trainingsschema(master_id)
-        return Trainingsschema(master_id, **{d: bool(r[d]) for d in DAGEN})
+        return Trainingsschema(master_id, **{d: bool(r[d]) for d in DAGEN}, keuze=self.trainingskeuze(master_id))
+
+    def trainingskeuze(self, master_id: str) -> dict[str, set[tuple[int, str]]]:
+        """Gekozen trainingen per weekdag: {'zaterdag': {(groep_id, '10:30')}}.
+
+        Een dag die er niet in staat: geen keuze gemaakt = alle trainingen van de
+        groepen van de atleet op die dag. Keuzes voor een groep waar de atleet niet
+        (meer) in zit, of een tijd die de groep niet meer heeft, tellen niet mee.
+        """
+        rijen = self.trainingsschema_db.execute(
+            "SELECT dag, groep_id, starttijd FROM trainingskeuze WHERE atleet_ref = ?",
+            (self._ref(master_id, "trainingsschema"),)).fetchall()
+        if not rijen:
+            return {}
+        # Alleen keuzes die nog kloppen: de atleet zit in de groep en de groep traint dan
+        # (nog) op die tijd. Blijft er voor een dag niets over, dan geldt weer 'alles'.
+        groepen = {g.id: g for g in self.groepen_van_atleet(master_id)}
+        uit: dict[str, set[tuple[int, str]]] = {}
+        for r in rijen:
+            g = groepen.get(r["groep_id"])
+            if g is not None and r["starttijd"] in g.tijden(r["dag"]):
+                uit.setdefault(r["dag"], set()).add((r["groep_id"], r["starttijd"]))
+        return uit
+
+    def trainingskeuze_opslaan(self, master_id: str, keuze: dict[str, Iterable[tuple[int, str]]]) -> None:
+        """Vervang alle keuzes van de atleet. Een dag zonder (of met lege) keuze = alle trainingen."""
+        if self.atleet(master_id) is None:
+            raise OpslagFout(f"Atleet {master_id} bestaat niet.")
+        ref = self._ref(master_id, "trainingsschema")
+        rijen = []
+        for d, paren in keuze.items():
+            if d not in DAGEN:
+                raise OpslagFout(f"Onbekende dag {d!r}; kies uit {DAGEN}.")
+            for groep_id, tijd in paren:
+                try:
+                    tijd = normaliseer_tijd(tijd)
+                except ValueError as e:
+                    raise OpslagFout(str(e)) from None
+                if tijd is None:
+                    raise OpslagFout("Een gekozen training heeft een begintijd nodig.")
+                rijen.append((ref, d, int(groep_id), tijd))
+        with self.trainingsschema_db:
+            self.trainingsschema_db.execute("DELETE FROM trainingskeuze WHERE atleet_ref = ?", (ref,))
+            self.trainingsschema_db.executemany(
+                "INSERT OR IGNORE INTO trainingskeuze (atleet_ref, dag, groep_id, starttijd) VALUES (?, ?, ?, ?)", rijen)
 
     def atleten_op_dag(self, dag: str, master_ids: Iterable[str] | None = None) -> list[str]:
         """master_ids van de atleten die op `dag` ('dinsdag') trainen.
@@ -600,7 +645,12 @@ class Opslag:
                WHERE gl.groep_id = ? ORDER BY a.achternaam, a.voornaam""", (r["id"],))]
         t = self.personen.execute("SELECT * FROM groep_trainingstijden WHERE groep_id = ?", (r["id"],)).fetchone()
         tijden = {d: t[d] for d in DAGEN if t[d]} if t else {}
-        return Groep(r["naam"], r["seizoen"], leden, r["id"], trainingsdagen=tijden)
+        extra: dict[str, list[str]] = {}
+        for x in self.personen.execute(
+                "SELECT dag, starttijd FROM groep_extra_trainingstijd WHERE groep_id = ? ORDER BY starttijd", (r["id"],)):
+            if x["dag"] in tijden and x["starttijd"] != tijden[x["dag"]]:
+                extra.setdefault(x["dag"], []).append(x["starttijd"])
+        return Groep(r["naam"], r["seizoen"], leden, r["id"], trainingsdagen=tijden, extra_tijden=extra)
 
     def groep_trainingsdagen_opslaan(self, groep_id: int, dagen: dict[str, str]) -> None:
         """Trainingstijden van een groep opslaan (tabel groep_trainingstijden: één rij per groep).
@@ -622,6 +672,12 @@ class Opslag:
         if self.groep(groep_id) is None:
             raise OpslagFout(f"Groep {groep_id} bestaat niet.")
         with self.personen:
+            # Extra tijden horen bij een dag met een vaste tijd: vervalt de dag, dan vervallen ze ook.
+            vervallen = [d for d in DAGEN if d not in tijden]
+            if vervallen:
+                self.personen.execute(
+                    f"DELETE FROM groep_extra_trainingstijd WHERE groep_id = ? AND dag IN ({_vraagtekens(len(vervallen))})",
+                    (groep_id, *vervallen))
             if not tijden:
                 self.personen.execute("DELETE FROM groep_trainingstijden WHERE groep_id = ?", (groep_id,))
                 return
@@ -632,6 +688,33 @@ class Opslag:
                     ON CONFLICT (groep_id) DO UPDATE SET {", ".join(f"{d} = excluded.{d}" for d in DAGEN)}""",
                 (groep_id, *[tijden.get(d) for d in DAGEN]),
             )
+
+    def groep_extra_tijden_opslaan(self, groep_id: int, extra: dict[str, list[str]]) -> None:
+        """Extra begintijden per dag opslaan (tabel groep_extra_trainingstijd); vervangt alle extra tijden.
+
+        extra: {'zaterdag': ['10:30']}. Alleen op dagen met een vaste begintijd
+        (groep_trainingsdagen_opslaan eerst); een tijd gelijk aan de vaste tijd telt niet.
+        """
+        groep = self.groep(groep_id)
+        if groep is None:
+            raise OpslagFout(f"Groep {groep_id} bestaat niet.")
+        rijen = set()
+        for d, lijst in extra.items():
+            if d not in DAGEN:
+                raise OpslagFout(f"Onbekende dag {d!r}; kies uit {DAGEN}.")
+            if lijst and d not in groep.trainingsdagen:
+                raise OpslagFout(f"Een extra tijd op {d} kan alleen als {d} een vaste trainingsdag is.")
+            for t in lijst:
+                try:
+                    tijd = normaliseer_tijd(t)
+                except ValueError as e:
+                    raise OpslagFout(str(e)) from None
+                if tijd is not None and tijd != groep.trainingsdagen[d]:
+                    rijen.add((groep_id, d, tijd))
+        with self.personen:
+            self.personen.execute("DELETE FROM groep_extra_trainingstijd WHERE groep_id = ?", (groep_id,))
+            self.personen.executemany(
+                "INSERT INTO groep_extra_trainingstijd (groep_id, dag, starttijd) VALUES (?, ?, ?)", sorted(rijen))
 
     def groep(self, groep_id: int) -> Groep | None:
         r = self.personen.execute("SELECT * FROM groep WHERE id = ?", (groep_id,)).fetchone()
@@ -673,7 +756,7 @@ class Opslag:
                     "SELECT * FROM periodeplan WHERE groep_id = ? ORDER BY startdatum", (groep_id,))]
 
     _TRAINING_VELDEN = ("groep_id", "periodeplan_id", "datum", "onderwerp", "warming_up", "kern_a",
-                        "kern_b", "cooling_down", "notities", "hoofdtraining_id")   # vaste kolomnamen
+                        "kern_b", "cooling_down", "notities", "hoofdtraining_id", "starttijd")   # vaste kolomnamen
 
     def _training(self, r) -> Training:
         atleten = [x[0] for x in self.personen.execute(
@@ -681,7 +764,7 @@ class Opslag:
                WHERE ta.training_id = ? ORDER BY a.achternaam, a.voornaam""", (r["id"],))]
         return Training(r["groep_id"], _naar_datum(r["datum"]), r["onderwerp"], r["notities"],
                         r["periodeplan_id"], r["id"], r["warming_up"], r["kern_a"], r["kern_b"],
-                        r["cooling_down"], r["hoofdtraining_id"], atleten)
+                        r["cooling_down"], r["hoofdtraining_id"], atleten, r["starttijd"])
 
     def training_opslaan(self, t: Training) -> Training:
         """Training toevoegen of bijwerken (met id).
@@ -700,7 +783,7 @@ class Opslag:
                 raise OpslagFout(f"Training {t.hoofdtraining_id} is geen gewone training van een groep.")
             if t.id is not None and t.id == hoofd.id:
                 raise OpslagFout("Een training kan geen variant van zichzelf zijn.")
-            t.groep_id, t.datum = hoofd.groep_id, hoofd.datum
+            t.groep_id, t.datum, t.starttijd = hoofd.groep_id, hoofd.datum, hoofd.starttijd
             t.atleten = list(dict.fromkeys(t.atleten))
             if not t.atleten:
                 raise OpslagFout("Kies minstens één atleet voor de afwijkende training.")
@@ -738,7 +821,7 @@ class Opslag:
         if tot:
             sql += " AND datum <= ?"
             args.append(_naar_tekst(tot))
-        sql += " ORDER BY datum, id"
+        sql += " ORDER BY datum, starttijd, id"      # zonder eigen tijd (= vaste tijd) eerst
         return [self._training(r) for r in self.personen.execute(sql, args).fetchall()]
 
     def training(self, training_id: int) -> Training | None:

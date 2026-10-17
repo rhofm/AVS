@@ -6,7 +6,7 @@ Hoort bij trainingsschema.db. In de database staat de atleet als pseudoniem
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date
 
 # Volgorde van date.weekday(): maandag = 0, zondag = 6.
@@ -23,6 +23,10 @@ class Trainingsschema:
     vrijdag: bool = False
     zaterdag: bool = False
     zondag: bool = False
+    # Gekozen trainingen per weekdag als er meer zijn (trainingsschema.db: trainingskeuze,
+    # migratie 002): {'zaterdag': {(groep_id, '10:30')}}. Een dag zonder keuze = alle
+    # trainingen van de groepen van de atleet. Opslaan via Opslag.trainingskeuze_opslaan().
+    keuze: dict[str, set[tuple[int, str]]] = field(default_factory=dict)
 
     @classmethod
     def met_dagen(cls, atleet_id: str, dagen: list[str] | tuple[str, ...]) -> Trainingsschema:
@@ -40,6 +44,26 @@ class Trainingsschema:
     @property
     def aantal_per_week(self) -> int:
         return len(self.dagen)
+
+    def traint_mee(self, training, groep=None) -> bool:
+        """Doet de atleet mee aan deze training (models.Training) van deze groep (models.Groep)?
+
+        Alleen als hij die weekdag traint. Heeft hij voor die dag een keuze gemaakt,
+        dan alleen bij een gekozen training. Trainingen die niet te kiezen zijn (de
+        groep heeft op die tijd geen vaste training, bijv. een losse extra training)
+        tellen gewoon mee.
+        """
+        if not self.traint_op(training.datum):
+            return False
+        dag = DAGEN[training.datum.weekday()]
+        gekozen = self.keuze.get(dag)
+        if not gekozen:
+            return True
+        tijd = training.effectieve_starttijd(groep)
+        if (training.groep_id, tijd) in gekozen:
+            return True
+        kiesbaar = groep is not None and tijd in groep.tijden(dag)
+        return not kiesbaar
 
     def traint_op(self, dag_of_datum: str | date) -> bool:
         """Traint de atleet op deze dag ('dinsdag') of datum (date(2026, 10, 20))?"""

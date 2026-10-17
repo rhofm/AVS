@@ -32,6 +32,7 @@ from atleten import beheer, landingspagina
 from atleten import aanpassen as atleetbeheer
 from atleten import nieuw as nieuwe_atleten
 from atleten import notities as notitiebeheer
+from atleten.overzicht import atletenoverzicht
 from atleten import trainingsschema as schemabeheer
 from atleten.aanwezigheid import aanwezigheid
 from db.init_db import SleutelFout, init_db
@@ -124,19 +125,13 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
 
     @app.get("/atleten")
     def atleten():
-        zoek = request.args.get("q", "").strip()
-        ook_inactief = request.args.get("alle") == "1"
-        vandaag = date.today()
-        rijen = []
-        for a in beheer.zoeken(db(), zoek, alleen_actief=not ook_inactief):
-            rijen.append({
-                "atleet": a,
-                "categorie": landingspagina.categorie_code(landingspagina.leeftijdscategorie(a, vandaag), a.geslacht),
-                "groepen": db().groepen_van_atleet(a.master_id),
-            })
+        groep = request.args.get("groep", "")
+        o = atletenoverzicht(db(), zoek=request.args.get("q", ""), categorie=request.args.get("cat", ""),
+                             groep_id=int(groep) if groep.isdigit() else None,
+                             ook_inactief=request.args.get("alle") == "1")
         meldingen = get_flashed_messages()
-        return render_template("atleten.html", rijen=rijen, zoek=zoek, ook_inactief=ook_inactief,
-                               melding=meldingen[0] if meldingen else None, actief_menu="atleten")
+        return render_template("atleten.html", o=o, melding=meldingen[0] if meldingen else None,
+                               actief_menu="atleten")
 
     # ---------------- nieuwe atleet ----------------
     def _nieuw(ingevuld=None, *, fouten: dict | None = None, dubbelen=None, status: int = 200):
@@ -245,11 +240,13 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
         naam, seizoen, gekozen = request.form.get("naam", ""), request.form.get("seizoen", ""), request.form.getlist("lid")
         try:
             dagen = groepsbeheer.lees_trainingsdagen(request.form)
-            g = groepsbeheer.groep_aanmaken(db(), naam, seizoen, gekozen, dagen)
+            g = groepsbeheer.groep_aanmaken(db(), naam, seizoen, gekozen, dagen,
+                                            groepsbeheer.lees_extra_tijden(request.form))
         except (OpslagFout, ValueError) as e:
             f = groepsbeheer.nieuw_formulier(db(), naam=naam, seizoen=seizoen,
                                              gekozen=[m for m in gekozen if len(m) == 32 and db().atleet(m)],
-                                             trainingsdagen=groepsbeheer.lees_trainingsdagen(request.form, streng=False))
+                                             trainingsdagen=groepsbeheer.lees_trainingsdagen(request.form, streng=False),
+                                             extra_tijden=groepsbeheer.lees_extra_tijden(request.form, streng=False))
             return render_template("groep_leden.html", f=f, fout=str(e), actief_menu="groepen"), 400
         aantal = len(g.leden)
         flash(f"Groep {g.naam} aangemaakt met {aantal} {'atleten' if aantal != 1 else 'atleet'}.")
@@ -268,7 +265,8 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
         f = groepsbeheer.ledenformulier(
             db(), groep_id,
             gekozen=request.form.getlist("lid") if na_fout else None,
-            trainingsdagen=groepsbeheer.lees_trainingsdagen(request.form, streng=False) if na_fout else None)
+            trainingsdagen=groepsbeheer.lees_trainingsdagen(request.form, streng=False) if na_fout else None,
+            extra_tijden=groepsbeheer.lees_extra_tijden(request.form, streng=False) if na_fout else None)
         if f is None:
             abort(404)
         return render_template("groep_leden.html", f=f, fout=fout, actief_menu="groepen"), status
@@ -282,7 +280,8 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
         haal_groep(groep_id)
         try:
             w = groepsbeheer.leden_opslaan(db(), groep_id, request.form.getlist("lid"),
-                                           groepsbeheer.lees_trainingsdagen(request.form))
+                                           groepsbeheer.lees_trainingsdagen(request.form),
+                                           groepsbeheer.lees_extra_tijden(request.form))
         except (OpslagFout, ValueError) as e:
             return _leden(groep_id, fout=f"Niet opgeslagen: {e}", status=400, na_fout=True)
         flash(w.tekst + _extra_melding(w))
@@ -299,13 +298,14 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
             tekst += f" {n} {'trainingen' if n != 1 else 'training'} ingepland."
         if w.trainingen_weg:
             n = w.trainingen_weg
-            tekst += f" {n} lege {'trainingen' if n != 1 else 'training'} op vervallen dagen weggehaald."
+            tekst += f" {n} lege {'trainingen' if n != 1 else 'training'} op vervallen dagen of tijden weggehaald."
         return tekst
 
     def _trainingsdagen(groep_id: int, fout: str | None = None, status: int = 200):
         f = groepsbeheer.ledenformulier(
             db(), groep_id,
-            trainingsdagen=groepsbeheer.lees_trainingsdagen(request.form, streng=False) if fout else None)
+            trainingsdagen=groepsbeheer.lees_trainingsdagen(request.form, streng=False) if fout else None,
+            extra_tijden=groepsbeheer.lees_extra_tijden(request.form, streng=False) if fout else None)
         if f is None:
             abort(404)
         return render_template("groep_trainingsdagen.html", f=f, fout=fout, actief_menu="groepen"), status
@@ -318,7 +318,8 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
     def groep_trainingsdagen_opslaan(groep_id: int):
         haal_groep(groep_id)
         try:
-            w = groepsbeheer.trainingsdagen_opslaan(db(), groep_id, groepsbeheer.lees_trainingsdagen(request.form))
+            w = groepsbeheer.trainingsdagen_opslaan(db(), groep_id, groepsbeheer.lees_trainingsdagen(request.form),
+                                                    groepsbeheer.lees_extra_tijden(request.form))
         except (OpslagFout, ValueError) as e:
             return _trainingsdagen(groep_id, fout=f"Niet opgeslagen: {e}", status=400)
         flash(w.tekst + _extra_melding(w))
@@ -489,7 +490,8 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
     def atleet_trainingsschema_opslaan(master_id: str):
         haal_atleet(master_id)
         try:
-            w = schemabeheer.schema_opslaan(db(), master_id, request.form.getlist("dag"))
+            w = schemabeheer.schema_opslaan(db(), master_id, request.form.getlist("dag"),
+                                            schemabeheer.lees_trainingen(request.form))
         except (OpslagFout, ValueError) as e:
             return _schema(master_id, fout=f"Niet opgeslagen: {e}", status=400)
         flash(w.tekst)

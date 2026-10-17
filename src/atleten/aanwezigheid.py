@@ -107,7 +107,7 @@ def _regels(db: Opslag, master_id: str, van: date, tot: date) -> list[Aanwezighe
     schema = db.trainingsschema(master_id)
     for g in db.groepen_van_atleet(master_id):
         for t in db.trainingen(g.id, van=van, tot=tot):
-            if t.id not in uit and schema.traint_op(t.datum):
+            if t.id not in uit and schema.traint_mee(t, g):
                 uit[t.id] = AanwezigheidRegel(t, g.naam, NIET_INGEVULD)
     return sorted(uit.values(), key=lambda r: (r.training.datum, r.groep), reverse=True)
 

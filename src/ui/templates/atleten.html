@@ -1,10 +1,12 @@
 {#
-  Overzicht van alle atleten, met zoeken.
+  Overzicht van alle atleten: zoeken, filteren en sorteren.
   Context:
-    rijen         – lijst van {atleet, categorie, groepen (Groep-objecten)}
-    zoek          – zoektekst
-    ook_inactief  – ook niet-actieve atleten tonen
-    melding       – optioneel, bijv. na het verwijderen van een atleet
+    o        – atleten.overzicht.Overzicht
+    melding  – optioneel, bijv. na het verwijderen van een atleet
+  Zoeken (q) doorzoekt naam, categorie, groep en specialisatie; daarnaast filters
+  op categorie (cat) en groep (groep), en 'alle' = ook niet-actieve atleten.
+  De server filtert bij versturen; static/filter.js filtert al tijdens het typen.
+  Sorteren door op een kolomkop te klikken (static/sorteer.js).
 #}
 {% extends "basis.html" %}
 {% block titel %}Atleten{% endblock %}
@@ -14,45 +16,72 @@
   <header class="blok__kop">
     <div>
       <h1 class="kop kop--pagina">Atleten</h1>
-      <p class="subkop">{{ rijen | length }} {{ "atleten" if rijen | length != 1 else "atleet" }}{% if zoek %} met &lsquo;{{ zoek }}&rsquo;{% endif %}</p>
+      <p class="subkop"><span data-filter-teller>{{ o.rijen | length }} {{ "atleten" if o.rijen | length != 1 else "atleet" }}</span>
+        {%- if o.gefilterd %} van {{ o.totaal }}{% endif %}{% if o.ook_inactief %} · ook niet-actief{% endif %}</p>
     </div>
     <a class="knop knop--vol" href="{{ url_for('atleet_nieuw') }}">+ Nieuwe atleet</a>
   </header>
 
   {% if melding %}<p class="melding" role="status">{{ melding }}</p>{% endif %}
 
-  <form class="zoekbalk" method="get" action="">
-    <label class="verborgen" for="zoek-q">Zoek op naam</label>
-    <input type="search" id="zoek-q" name="q" value="{{ zoek }}" placeholder="Zoek op naam" autofocus>
-    <label class="vinkje" for="zoek-alle"><input type="checkbox" id="zoek-alle" name="alle" value="1"{% if ook_inactief %} checked{% endif %}> Ook niet-actief</label>
+  <form class="zoekbalk zoekbalk--filters" method="get" action="{{ url_for('atleten') }}" data-filter="tabel-atleten" role="search">
+    <div class="zoekbalk__veld zoekbalk__veld--breed">
+      <label for="zoek-q">Zoeken</label>
+      <input type="search" id="zoek-q" name="q" value="{{ o.zoek }}" autocomplete="off" autofocus
+             placeholder="Naam, categorie, groep of specialisatie" data-filter-zoek>
+    </div>
+    <div class="zoekbalk__veld">
+      <label for="zoek-cat">Categorie</label>
+      <select id="zoek-cat" name="cat" data-filter-veld="categorie">
+        <option value="">Alle</option>
+        {% for c in o.categorieen %}<option value="{{ c }}"{% if c == o.categorie %} selected{% endif %}>{{ c }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="zoekbalk__veld">
+      <label for="zoek-groep">Groep</label>
+      <select id="zoek-groep" name="groep" data-filter-lijst="groepen">
+        <option value="">Alle</option>
+        {% for g in o.groepen %}<option value="{{ g.id }}"{% if g.id == o.groep_id %} selected{% endif %}>{{ g.naam }}</option>{% endfor %}
+      </select>
+    </div>
+    <label class="vinkje" for="zoek-alle"><input type="checkbox" id="zoek-alle" name="alle" value="1"{% if o.ook_inactief %} checked{% endif %}
+      onchange="this.form.submit()"> Ook niet-actief</label>
     <button class="knop knop--vol" type="submit">Zoeken</button>
+    {% if o.gefilterd %}<a class="terug" href="{{ url_for('atleten', alle='1') if o.ook_inactief else url_for('atleten') }}">Wissen</a>{% endif %}
   </form>
 
-  {% if rijen %}
+  {% if o.totaal %}
     <div class="tabelvak">
-      <table class="tabel">
+      <table class="tabel sorteerbaar atletentabel" id="tabel-atleten">
         <thead>
-          <tr><th scope="col">Naam</th><th scope="col">Cat.</th><th scope="col">Specialisatie</th><th scope="col">Groepen</th></tr>
+          <tr>
+            <th scope="col" data-soort="tekst" aria-sort="ascending"><button type="button" class="sorteer"><span class="sorteer__naam">Naam</span></button></th>
+            <th scope="col" data-soort="getal"><button type="button" class="sorteer"><span class="sorteer__naam">Cat.</span></button></th>
+            <th scope="col" data-soort="tekst"><button type="button" class="sorteer"><span class="sorteer__naam">Specialisatie</span></button></th>
+            <th scope="col" data-soort="tekst"><button type="button" class="sorteer"><span class="sorteer__naam">Groepen</span></button></th>
+          </tr>
         </thead>
         <tbody>
-          {% for r in rijen %}
-            <tr{% if not r.atleet.actief %} class="geweest"{% endif %}>
-              <td><a href="{{ url_for('atleet', master_id=r.atleet.master_id) }}"><strong>{{ r.atleet.naam }}</strong></a>
+          {% for r in o.rijen %}
+            <tr{% if not r.atleet.actief %} class="geweest"{% endif %} data-zoek="{{ r.zoektekst }}"
+                data-categorie="{{ r.categorie or '' }}" data-groepen="{{ r.groepen | map(attribute='id') | join(' ') }}">
+              <td data-sort="{{ r.sort_naam }}"><a href="{{ url_for('atleet', master_id=r.atleet.master_id) }}"><strong>{{ r.atleet.naam }}</strong></a>
                 {%- if not r.atleet.actief %} <span class="kenmerk">niet actief</span>{% endif %}</td>
-              <td>{{ r.categorie or "–" }}</td>
-              <td>{{ r.atleet.specialisatie or "–" }}</td>
-              <td>{% for g in r.groepen %}<a href="{{ url_for('groep', groep_id=g.id) }}">{{ g.naam }}</a>{{ ", " if not loop.last }}{% else %}–{% endfor %}</td>
+              <td data-sort="{{ r.sort_categorie }}">{{ r.code or "–" }}</td>
+              <td data-sort="{{ r.sort_specialisatie }}">{{ r.atleet.specialisatie or "–" }}</td>
+              <td data-sort="{{ r.sort_groepen }}">{% for g in r.groepen %}<a href="{{ url_for('groep', groep_id=g.id) }}">{{ g.naam }}</a>{{ ", " if not loop.last }}{% else %}–{% endfor %}</td>
             </tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
-  {% elif zoek %}
-    <p class="leeg">Geen atleten gevonden met &lsquo;{{ zoek }}&rsquo;.</p>
+    <p class="leeg" data-filter-leeg{% if o.rijen %} hidden{% endif %}>Geen atleten gevonden. Probeer een ander woord of zet een filter op &lsquo;Alle&rsquo;.</p>
   {% else %}
     <p class="leeg">Nog geen atleten. Voeg ze toe met &lsquo;+ Nieuwe atleet&rsquo;, via Importeren (atletiek.nu) of met een CSV-bestand.</p>
   {% endif %}
 
   <footer class="vel__voet">Atleet Volg Systeem</footer>
 </article>
+<script src="{{ static_pad | default('/static') }}/sorteer.js"></script>
+<script src="{{ static_pad | default('/static') }}/filter.js"></script>
 {% endblock %}

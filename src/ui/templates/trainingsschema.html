@@ -4,7 +4,9 @@
     f         – atleten.trainingsschema.SchemaFormulier
     basis_url – '/atleet/<master_id>'
     fout      – optioneel, foutmelding na opslaan
-  POST naar {{ basis_url }}/trainingsschema met één veld 'dag' per aangevinkte dag.
+  POST naar {{ basis_url }}/trainingsschema met één veld 'dag' per aangevinkte dag zonder vaste
+  groepstraining, en per dag met vaste groepstrainingen een veld 'training-<dag>' = '<groep_id>|<tijd>'
+  per gekozen training.
 #}
 {% extends "basis.html" %}
 {% block titel %}Trainingsschema {{ f.atleet.naam }}{% endblock %}
@@ -24,12 +26,23 @@
       <legend class="verborgen">Trainingsdagen</legend>
       {% for d in f.dagen %}
         <div class="dagkeuze__dag">
-          <input type="checkbox" id="dag-{{ d.dag }}" name="dag" value="{{ d.dag }}"{% if d.traint %} checked{% endif %}>
-          <label for="dag-{{ d.dag }}">
+          {% if d.opties %}
             <span class="dagkeuze__kort">{{ d.kort }}</span>
-            <span class="dagkeuze__vink" aria-hidden="true"></span>
-            <span class="verborgen">{{ d.dag }}</span>
-          </label>
+            <span class="verborgen">{{ d.dag }}: kies de training(en)</span>
+            {% for o in d.opties %}
+              <span class="dagkeuze__optie">
+                <input type="checkbox" id="tr-{{ d.dag }}-{{ loop.index }}" name="{{ d.veld }}" value="{{ o.waarde }}"{% if o.gekozen %} checked{% endif %}>
+                <label for="tr-{{ d.dag }}-{{ loop.index }}"><strong>{{ o.tijd }}</strong><span>{{ o.groep }}</span></label>
+              </span>
+            {% endfor %}
+          {% else %}
+            <input type="checkbox" id="dag-{{ d.dag }}" name="dag" value="{{ d.dag }}"{% if d.traint %} checked{% endif %}>
+            <label for="dag-{{ d.dag }}">
+              <span class="dagkeuze__kort">{{ d.kort }}</span>
+              <span class="dagkeuze__vink" aria-hidden="true"></span>
+              <span class="verborgen">{{ d.dag }}</span>
+            </label>
+          {% endif %}
           <span class="dagkeuze__groepen">
             {% for g in d.groepen %}<span>{{ g }}</span>{% endfor %}
           </span>
@@ -37,10 +50,13 @@
       {% endfor %}
     </fieldset>
 
-    {% if f.heeft_groepsdagen %}
-      <p class="zacht uitleg">Onder elke dag staan de groepen van {{ f.atleet.voornaam }} die dan trainen (uit de geplande trainingen rond vandaag).</p>
+    {% if f.heeft_opties %}
+      <p class="zacht uitleg">Op dagen met groepstrainingen kies je de training(en) waar {{ f.atleet.voornaam }} heen gaat. Meer trainingen op één dag mag. Niets aangevinkt = {{ f.atleet.voornaam }} traint die dag niet.</p>
     {% endif %}
-    <p class="zacht uitleg">Op de absentielijst van een training staat {{ f.atleet.voornaam }} alleen vooraf op &lsquo;aanwezig&rsquo; als die dag hier is aangevinkt.</p>
+    {% if f.heeft_groepsdagen %}
+      <p class="zacht uitleg">Onder een dag staan groepen zonder vaste begintijd die die dag een training hebben.</p>
+    {% endif %}
+    <p class="zacht uitleg">Op de absentielijst staat {{ f.atleet.voornaam }} vooraf op &lsquo;aanwezig&rsquo; bij de gekozen trainingen. Bij de andere trainingen van die dag staat {{ f.atleet.voornaam }} er ook op, maar nog niet ingevuld.</p>
 
     <div class="opslaan opslaan--onder">
       <a class="knop" href="{{ basis_url }}">Annuleren</a>

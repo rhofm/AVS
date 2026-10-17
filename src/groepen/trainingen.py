@@ -20,9 +20,12 @@ Heeft een groep vaste trainingsdagen (`Groep.trainingsdagen`), dan maakt
 tot `WEKEN_VOORUIT` weken vooruit. Is de app een tijd niet geopend, dan worden
 gemiste trainingen tot `MAX_DAGEN_TERUG` dagen terug alsnog aangemaakt, maar
 nooit vóór de eerste training van de groep (een nieuwe groep begint vandaag).
-Er komt nooit een tweede training op dezelfde datum, en bestaande trainingen
-worden niet aangepast. `trainingen_opruimen()` haalt na het wijzigen van de
-dagen de toekomstige trainingen weg op dagen die niet meer gelden, maar alleen
+Heeft een dag meerdere begintijden (`Groep.tijden(dag)`, bijv. 09:00 en 10:30),
+dan komt er per tijd een training. Er komt nooit een tweede training op dezelfde
+datum en tijd, en bestaande trainingen worden niet aangepast (een training
+zonder eigen begintijd telt als de vaste tijd van die dag).
+`trainingen_opruimen()` haalt na het wijzigen van de dagen of tijden de
+toekomstige trainingen weg op dagen en tijden die niet meer gelden, maar alleen
 als ze nog leeg zijn (geen onderwerp, notities, onderdelen, periodeplan,
 afwijkende varianten of aanwezigheid).
 """
@@ -63,15 +66,16 @@ def trainingen_aanvullen(db: Opslag, groep: Groep, *, peildatum: date | None = N
         return []
     vandaag = peildatum or date.today()
     bestaand = db.trainingen(groep.id)
-    datums = {t.datum for t in bestaand}
+    momenten = {(t.datum, t.effectieve_starttijd(groep)) for t in bestaand}
     eerdere = [t.datum for t in bestaand if t.datum < vandaag]
     begin = max(vandaag - timedelta(days=MAX_DAGEN_TERUG), min(eerdere)) if eerdere else vandaag
     eind = vandaag + timedelta(weeks=weken_vooruit)
     nieuw = []
     dag = begin
     while dag <= eind:
-        if DAGEN[dag.weekday()] in groep.trainingsdagen and dag not in datums:
-            nieuw.append(db.training_opslaan(Training(groep.id, dag)))
+        for tijd in groep.tijden(DAGEN[dag.weekday()]):
+            if (dag, tijd) not in momenten:
+                nieuw.append(db.training_opslaan(Training(groep.id, dag, starttijd=tijd)))
         dag += timedelta(days=1)
     return nieuw
 
@@ -85,7 +89,7 @@ def trainingen_opruimen(db: Opslag, groep: Groep, *, peildatum: date | None = No
     if groep.id is None or not groep.trainingsdagen:
         return []
     weg = [t for t in db.trainingen(groep.id, van=peildatum or date.today())
-           if DAGEN[t.datum.weekday()] not in groep.trainingsdagen and _leeg(db, t)]
+           if t.effectieve_starttijd(groep) not in groep.tijden(DAGEN[t.datum.weekday()]) and _leeg(db, t)]
     for t in weg:
         db.training_verwijderen(t.id)
     return weg
@@ -124,7 +128,7 @@ class Stand:
 
 def _stand(db: Opslag, groep: Groep, t: Training) -> Stand:
     c = Counter(a.status for a in db.absenties(t.id))
-    verwacht = sum(1 for m in groep.leden if db.trainingsschema(m).traint_op(t.datum))
+    verwacht = sum(1 for m in groep.leden if db.trainingsschema(m).traint_mee(t, groep))
     return Stand({s: c.get(s, 0) for s in ABSENTIE_STATUSSEN}, verwacht)
 
 
@@ -194,8 +198,8 @@ class TrainingPagina:
 
     @property
     def starttijd(self) -> str | None:
-        """Begintijd uit de vaste trainingsdagen van de groep ('18:30'), als die er is."""
-        return self.groep.trainingsdagen.get(DAGEN[self.training.datum.weekday()])
+        """Begintijd van deze training ('18:30'): de eigen tijd, anders de vaste tijd van de groep."""
+        return self.training.effectieve_starttijd(self.groep)
 
     @property
     def telling(self) -> dict[str, int]:
@@ -219,7 +223,7 @@ def trainingpagina(db: Opslag, training_id: int, *, peildatum: date | None = Non
             continue
         if mid in opgeslagen:
             deelnemers.append(Deelnemer(a, opgeslagen[mid].status, opgeslagen[mid].reden))
-        elif db.trainingsschema(mid).traint_op(t.datum):
+        elif db.trainingsschema(mid).traint_mee(t, groep):
             deelnemers.append(Deelnemer(a, NIET_INGEVULD, verwacht=t.datum > vandaag))
     alle = db.trainingen(groep.id)
     i = next(n for n, x in enumerate(alle) if x.id == t.id)
@@ -264,7 +268,7 @@ class Bewerkformulier:
 
     @property
     def starttijd(self) -> str | None:
-        return self.groep.trainingsdagen.get(DAGEN[self.hoofd.datum.weekday()])
+        return self.hoofd.effectieve_starttijd(self.groep)
 
     @property
     def velden(self) -> list[tuple[str, str, int, str]]:
@@ -371,7 +375,7 @@ class InvulRegel:
     categorie: str | None
     status: str | None                # voorgestelde of opgeslagen status; None = niets kiezen
     reden: str | None
-    ingeroosterd: bool                # traint die weekdag volgens zijn schema
+    ingeroosterd: bool                # doet deze training volgens zijn schema (gekozen training op die dag)
     opgeslagen: bool                  # er staat al een status in de database
     lid: bool = True                  # False = niet (meer) in de groep, wel een opgeslagen status
 
@@ -412,7 +416,7 @@ def invulformulier(db: Opslag, training_id: int, *, peildatum: date | None = Non
             continue
         v = voorstel.get(mid)
         regels.append(InvulRegel(a, leeftijdscategorie(a, vandaag), v.status if v else None, v.reden if v else None,
-                                 db.trainingsschema(mid).traint_op(t.datum), mid in opgeslagen, mid in groep.leden))
+                                 db.trainingsschema(mid).traint_mee(t, groep), mid in opgeslagen, mid in groep.leden))
     return Invulformulier(t, groep, regels, bool(opgeslagen))
 
 

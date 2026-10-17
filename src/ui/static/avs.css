@@ -420,6 +420,12 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--rood); outline-
 .tijdkeuze__dag input[type="time"] { width: 100%; min-width: 0; font: inherit; font-size: var(--maat-s); padding: .3rem .2rem;
   border: 1px solid var(--rand); background: var(--papier); color: var(--tekst); text-align: center; }
 .tijdkeuze__dag input[type="checkbox"]:not(:checked) ~ input[type="time"] { opacity: .55; }
+.tijdkeuze__erbij {
+  font: inherit; font-size: var(--maat-xs); cursor: pointer; padding: .15rem .2rem;
+  color: var(--rood); background: transparent; border: 1px dashed var(--rand);
+}
+.tijdkeuze__erbij:hover { border-color: var(--rood); }
+.tijdkeuze__extra { border-style: dashed !important; }
 .schema .starttijd { font-variant-numeric: tabular-nums; }
 @media (max-width: 40rem) { .tijdkeuze__dagen { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 .ledenkeuze td.midden { width: 2.5rem; }
@@ -512,6 +518,20 @@ th[aria-sort="descending"] .sorteer__naam::after { content: " \2193"; opacity: 1
 .dagkeuze__dag input:focus-visible + label { outline: 2px solid var(--rood); outline-offset: 2px; }
 .dagkeuze__groepen { display: grid; gap: .15rem; font-size: var(--maat-xs); line-height: 1.25; text-align: center; color: var(--tekst-zacht); hyphens: auto; overflow-wrap: anywhere; }
 .uitleg { margin: 0; font-size: var(--maat-s); max-width: 65ch; }
+/* trainingsschema: per dag de vaste groepstrainingen om uit te kiezen */
+.dagkeuze__dag > .dagkeuze__kort { display: block; text-align: center; }
+.dagkeuze__optie { display: block; }
+.dagkeuze__optie input { position: absolute; opacity: 0; pointer-events: none; }
+.dagkeuze__optie label {
+  display: grid; gap: .1rem; text-align: center; cursor: pointer; padding: .4rem .2rem;
+  min-height: 3.5rem; align-content: center; font-size: var(--maat-xs); line-height: 1.25;
+  background: var(--papier); border: 1px solid var(--rand); color: var(--tekst-zacht); overflow-wrap: anywhere;
+}
+.dagkeuze__optie label strong { font-size: var(--maat-s); }
+.dagkeuze__optie label:hover { border-color: var(--rood); }
+.dagkeuze__optie input:checked + label { background: var(--roze); border-color: var(--roze); color: var(--tekst); }
+.dagkeuze__optie input:checked + label strong::before { content: "\25A0  "; }
+.dagkeuze__optie input:focus-visible + label { outline: 2px solid var(--rood); outline-offset: 2px; }
 
 /* ---------- notities ---------- */
 .notitieform { display: grid; gap: .6rem; max-width: 48rem; }
@@ -530,6 +550,19 @@ th[aria-sort="descending"] .sorteer__naam::after { content: " \2193"; opacity: 1
 .notitielijst__tekst { margin: 0; white-space: pre-line; overflow-wrap: anywhere; }
 .notitielijst__meta { font-size: var(--maat-xs); }
 .zoekbalk--smal { max-width: 48rem; }
+.zoekbalk--filters { align-items: flex-end; }
+.zoekbalk__veld { display: grid; gap: .25rem; font-size: var(--maat-s); min-width: 0; }
+.zoekbalk__veld label { font-weight: 700; }
+.zoekbalk__veld--breed { flex: 1 1 18rem; }
+.zoekbalk__veld--breed input[type="search"] { width: 100%; }
+.zoekbalk select {
+  font: inherit; color: var(--tekst); background: var(--papier); border: 1px solid var(--rand);
+  padding: .45rem .5rem; min-width: 7rem;
+}
+.zoekbalk select:focus-visible { outline: 2px solid var(--rood); outline-offset: 1px; }
+.zoekbalk--filters .vinkje, .zoekbalk--filters .knop, .zoekbalk--filters .terug { margin-bottom: .45rem; }
+.atletentabel thead th { white-space: nowrap; }
+.zoekbalk--filters input[type="search"], .zoekbalk--filters select { height: 2.5rem; box-sizing: border-box; padding-block: 0; }
 .verwijderen { border-top: 1px solid var(--rand); padding-top: 1.25rem; justify-items: start; }
 .knop--gevaar { border-color: var(--afwezig); color: var(--afwezig); }
 .knop--gevaar:hover { background: var(--afwezig); color: var(--op-zalm); }

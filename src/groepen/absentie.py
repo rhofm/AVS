@@ -5,8 +5,10 @@ Werkwijze voor de trainer:
     2. de trainer past alleen de uitzonderingen aan (afgemeld, afwezig, blessure)
     3. opslaan(db, lijst)                       # elke status wordt expliciet bewaard
 
-Vooraf invullen: leden van de groep die volgens hun trainingsschema op die
-weekdag trainen, staan op 'aanwezig'. Al opgeslagen statuses gaan altijd voor.
+Vooraf invullen: leden van de groep die volgens hun trainingsschema deze
+training doen, staan op 'aanwezig'. Op een dag met meer trainingen telt de
+gekozen training (`Trainingsschema.traint_mee`); wie die dag een andere
+training koos, staat er wel op (zie het invulformulier) maar niet vooraf ingevuld. Al opgeslagen statuses gaan altijd voor.
 Leden die die dag niet ingeroosterd staan, komen alleen op de lijst als
 alle_leden=True (bijv. voor een extra training).
 """
@@ -37,7 +39,7 @@ def absentielijst(db: Opslag, training_id: int, alle_leden: bool = False) -> lis
     if alle_leden:
         ingeroosterd = set(leden)
     else:
-        ingeroosterd = {m for m in leden if db.trainingsschema(m).traint_op(training.datum)}
+        ingeroosterd = {m for m in leden if db.trainingsschema(m).traint_mee(training, groep)}
 
     lijst = []
     for m in leden:

@@ -52,7 +52,7 @@ class GroepDag:
     groep_traint: bool
     vandaag: bool = False
     aantal_atleten: int = 0           # leden die volgens hun schema die dag (met de groep) trainen
-    starttijd: str | None = None      # '18:30' bij vaste trainingsdagen met een begintijd
+    starttijd: str | None = None      # '18:30' bij vaste trainingsdagen; '09:00 · 10:30' bij meer trainingen
 
 
 @dataclass
@@ -255,7 +255,7 @@ def _trainingen(db: Opslag, groep: Groep, schemas: dict[str, Trainingsschema], v
     komend = db.trainingen(groep.id, van=vandaag, tot=vandaag + timedelta(weeks=weken))[:aantal]
     uit = []
     for t in open_trainingen + komend:
-        verwacht = sum(1 for s in schemas.values() if s.traint_op(t.datum))
+        verwacht = sum(1 for s in schemas.values() if s.traint_mee(t, groep))
         uit.append(KomendeTraining(t, (t.datum - vandaag).days, verwacht, plannen.get(t.periodeplan_id),
                                    len(db.absenties(t.id))))
     return uit
@@ -328,7 +328,7 @@ def landingspagina(db: Opslag, groep_id: int, *, peildatum: date | None = None,
 
     dagen = [GroepDag(d, DAG_KORT[d], d in groepsdagen, vandaag.weekday() == i,
                       sum(1 for s in schemas.values() if s.traint_op(d)) if d in groepsdagen else 0,
-                      groep.trainingsdagen.get(d))
+                      " · ".join(groep.tijden(d)) or None)          # '09:00 · 10:30' bij meer trainingen
              for i, d in enumerate(DAGEN)]
     leden = _leden(db, groep, groepsdagen, schemas, vandaag)
 
@@ -358,6 +358,6 @@ def overzicht(db: Opslag, *, peildatum: date | None = None) -> list[tuple[Groep,
     uit = []
     for g in db.groepen():
         dagen, _ = trainingsdagen(db, g, vandaag)
-        uit.append((g, [f"{DAG_KORT[d]} {g.trainingsdagen[d]}" if g.trainingsdagen.get(d) else DAG_KORT[d]
+        uit.append((g, [f"{DAG_KORT[d]} {' & '.join(g.tijden(d))}" if g.tijden(d) else DAG_KORT[d]
                         for d in DAGEN if d in dagen]))
     return uit

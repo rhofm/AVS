@@ -40,9 +40,26 @@ class Groep:
     # De tijden horen bij de groep, niet bij de atleet. Opslaan via
     # Opslag.groep_trainingsdagen_opslaan() (los van groep_opslaan()).
     trainingsdagen: dict[str, str] = field(default_factory=dict)
+    # Extra begintijden op dezelfde dag (tabel groep_extra_trainingstijd, migratie 006):
+    # {'zaterdag': ['10:30']}. Alleen op dagen die ook in trainingsdagen staan.
+    # Opslaan via Opslag.groep_extra_tijden_opslaan().
+    extra_tijden: dict[str, list[str]] = field(default_factory=dict)
 
     def starttijd(self, dag: str) -> str | None:
+        """De vaste (eerste) begintijd op deze dag, of None."""
         return self.trainingsdagen.get(dag.lower())
+
+    def tijden(self, dag: str) -> list[str]:
+        """Alle begintijden op deze dag, vroegste eerst: ['09:00', '10:30']. [] = geen training."""
+        dag = dag.lower()
+        if dag not in self.trainingsdagen:
+            return []
+        return sorted({self.trainingsdagen[dag], *self.extra_tijden.get(dag, [])})
+
+    @property
+    def momenten(self) -> list[tuple[str, str]]:
+        """Alle vaste trainingen in een week als (dag, tijd), van maandag t/m zondag."""
+        return [(d, t) for d in DAGEN for t in self.tijden(d)]
 
     def voeg_toe(self, master_id: str) -> None:
         if master_id not in self.leden:
@@ -106,6 +123,9 @@ class Training:
     cooling_down: str | None = None
     hoofdtraining_id: int | None = None
     atleten: list[str] = field(default_factory=list)   # master_ids; alleen bij een afwijkende training
+    # Begintijd van deze training ('HH:MM', migratie 006). None = de vaste begintijd van die dag;
+    # nodig als een groep meerdere trainingen op één dag heeft. Zie effectieve_starttijd().
+    starttijd: str | None = None
 
     def __post_init__(self) -> None:
         # Lege tekst ('' of alleen spaties) opslaan als None; regeleinden gelijk trekken.
@@ -114,6 +134,12 @@ class Training:
             if tekst is not None:
                 tekst = str(tekst).replace("\r\n", "\n").strip()
                 setattr(self, veld, tekst or None)
+
+    def effectieve_starttijd(self, groep: "Groep | None") -> str | None:
+        """De begintijd: die van de training zelf, anders de vaste begintijd van de groep op die dag."""
+        if self.starttijd:
+            return self.starttijd
+        return groep.starttijd(DAGEN[self.datum.weekday()]) if groep is not None else None
 
     @property
     def is_afwijkend(self) -> bool:

@@ -86,10 +86,10 @@ when run from source, next to the `.exe` when frozen):
 
 | File             | Contents | Athlete identified by |
 |------------------|----------|-----------------------|
-| `personen.db`    | `atleet` (personal details), `groep` (id + name), `groep_trainingstijden` (one row per group: `groep_id` + `maandag` … `zondag`, start time 'HH:MM' or NULL = no training), `groep_lid` (long: one row per athlete per group; an athlete can be in several groups), `training` (`warming_up`, `kern_a`, `kern_b`, `cooling_down`, `notities`; `hoofdtraining_id` for a deviating variant), `training_atleet` (long: who follows a variant), `periodeplan`, leerlijnen, `ploeg`, `ploeg_opstelling` | `master_id` |
+| `personen.db`    | `atleet` (personal details), `groep` (id + name), `groep_trainingstijden` (one row per group: `groep_id` + `maandag` … `zondag`, start time 'HH:MM' or NULL = no training), `groep_extra_trainingstijd` (extra start times on a fixed day: `groep_id`, `dag`, `starttijd`), `groep_lid` (long: one row per athlete per group; an athlete can be in several groups), `training` (`warming_up`, `kern_a`, `kern_b`, `cooling_down`, `notities`; `hoofdtraining_id` for a deviating variant), `training_atleet` (long: who follows a variant), `periodeplan`, leerlijnen, `ploeg`, `ploeg_opstelling` | `master_id` |
 | `prestaties.db`  | `onderdeel`, `wedstrijd`, `prestatie`, `inschrijving`, `pr` view | `atleet_ref` (pseudonym) |
 | `testen.db`      | `test`, `testresultaat` | `atleet_ref` (pseudonym) |
-| `trainingsschema.db` | `trainingsschema`: one row per athlete, columns `maandag` … `zondag` (0/1) | `atleet_ref` (pseudonym) |
+| `trainingsschema.db` | `trainingsschema`: one row per athlete, columns `maandag` … `zondag` (0/1); `trainingskeuze`: which (`groep_id`, `starttijd`) the athlete picks on a day with several trainings | `atleet_ref` (pseudonym) |
 | `absentie.db`    | `absentie`: long format, one row per athlete per training (`training_id`, `status`, `reden`) | `atleet_ref` (pseudonym) |
 | `leerlijnen.db`  | Catalogue, no personal data: `leerlijn`, `leerdoel` (id `SPR-U10-01`, per category U10–U20), `categorie`, `scoreschaal` | — |
 | `leerdoelscores.db` | `leerdoelscore`: long format, one row per athlete per leerdoel per date (score 1–5), `laatste_leerdoelscore` view | `atleet_ref` (pseudonym) |
@@ -140,6 +140,17 @@ python src/db/init_db.py --herstel <sleutel>  # restore the key (e.g. new comput
   `groep_trainingsdagen_opslaan()`. Joining a group or adding a day only ADDS
   days to the members' `trainingsschema` (`groepen.groep.schema_aanvullen`);
   nothing removes days automatically, since that can differ per athlete.
+- A group can train more than once on a day: the main time stays in
+  `groep_trainingstijden`, extra times go in `groep_extra_trainingstijd` (only
+  on days with a main time; `Groep.tijden(dag)` gives all). Each time is its own
+  `training` row; `training.starttijd` NULL = the day's main time, so always
+  read it with `Training.effectieve_starttijd(groep)`.
+- `trainingskeuze` stores a strict subset only: no rows for a day = all
+  trainings of the athlete's groups that day. Keuzes for a group the athlete
+  left or a time the group dropped are ignored on reading. Use
+  `Trainingsschema.traint_mee(training, groep)` (not `traint_op`) wherever
+  "is this athlete expected at this training" matters: pre-filling attendance,
+  expected counts, 'niet ingevuld'. The attendance form still lists all members.
 - Every migration number must be unique per database. `init_db.py` refuses to
   start when two files share a number (this happened once after merging two
   branches that both added a `003`).

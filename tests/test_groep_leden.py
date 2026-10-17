@@ -170,7 +170,7 @@ def test_trainingsdagen_wijzigen():
         leden = db.groep(gid).leden
         # Zonder vaste dagen: het formulier geeft als hint wat de app nu afleidt.
         f = groepsbeheer.ledenformulier(db, gid, peildatum=VANDAAG)
-        assert f.afgeleide_dagen == "Di, Do" and not any(aan for _, _, aan, _ in f.dagen)
+        assert f.afgeleide_dagen == "Di, Do" and not any(aan for _, _, aan, _, _ in f.dagen)
         # Alleen leden opslaan (trainingsdagen leeg gelaten) legt geen dagen vast.
         w = groepsbeheer.leden_opslaan(db, gid, leden, {})
         assert w.leeg and w.tekst == "Niets gewijzigd." and db.groep(gid).trainingsdagen == {}
@@ -180,7 +180,7 @@ def test_trainingsdagen_wijzigen():
         assert w.tekst == "Trainingsdagen nu: Di 18:30, Do 19:00."
         assert db.groep(gid).trainingsdagen == {"dinsdag": "18:30", "donderdag": "19:00"}
         f = groepsbeheer.ledenformulier(db, gid, peildatum=VANDAAG)
-        assert f.afgeleide_dagen == "" and [(d, t) for d, _, aan, t in f.dagen if aan] == [
+        assert f.afgeleide_dagen == "" and [(d, t) for d, _, aan, t, _ in f.dagen if aan] == [
             ("dinsdag", "18:30"), ("donderdag", "19:00")]
         assert landingspagina.landingspagina(db, gid, peildatum=VANDAAG).dagen_bron == landingspagina.BRON_VAST
 

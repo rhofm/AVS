@@ -119,9 +119,12 @@ def test_rooster_en_schemapagina():
             ("donderdag", "19:30", "Junioren C"),
             ("zaterdag", "09:00", "Junioren C"),
         ]
+        # Groepen met een vaste tijd zijn op de schemapagina een keuze (op tijd), geen losse tekst meer.
+        opties = schema_pagina.opties(db, anna.master_id)
+        assert opties["donderdag"] == [(sprint.id, "Sprintgroep", "18:30"), (junioren.id, "Junioren C", "19:30")]
+        assert opties["maandag"] == []
         per_dag = schema_pagina.groepsdagen(db, anna.master_id, date(2026, 10, 16))
-        assert per_dag["donderdag"] == ["Junioren C 19:30", "Sprintgroep 18:30"]   # groepen op naam
-        assert per_dag["maandag"] == []
+        assert per_dag["donderdag"] == [] and per_dag["maandag"] == []
 
 
 def _oude_personen_db(map_: Path, extra_sql: str) -> None:
@@ -148,7 +151,7 @@ def test_oude_variant_kolommen_op_groep():
             init_db(map_, hoofd=TESTSLEUTEL)                     # tweede keer: niets meer te doen
         assert uit.getvalue().count("overgezet") == 1
         with Opslag(map=map_, hoofd=TESTSLEUTEL) as db:
-            assert huidige_versie(db.personen) == 5      # 004 tijden, 005 trainingsonderdelen
+            assert huidige_versie(db.personen) == 6      # 004 tijden, 005 trainingsonderdelen, 006 meerdere per dag
             assert db.groep(1).trainingsdagen == {"dinsdag": "18:30", "donderdag": "18:30"}
             assert db.groep(2).trainingsdagen == {}
             kolommen = {r[1] for r in db.personen.execute("PRAGMA table_info(groep)")}

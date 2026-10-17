@@ -17,7 +17,9 @@ leerdoelscores blijven bij de atleet bewaard. Geen SQL: alles via `Opslag`.
 Trainingstijden en trainingsschema
 ---------------------------------
 Een groep heeft per weekdag een begintijd of niets (`Groep.trainingsdagen`,
-tabel groep_trainingstijden). Een
+tabel groep_trainingstijden), en eventueel extra begintijden op die dag
+(`Groep.extra_tijden`, tabel groep_extra_trainingstijd), bijv. zaterdag 09:00 en
+10:30. Elke tijd wordt een eigen training. Een
 atleet kan in meerdere groepen zitten. Komt een atleet in een groep, of krijgt
 een groep een extra trainingsdag, dan worden die dagen AANGEVULD in het
 trainingsschema van de atleet (dat bepaalt de absentielijst). Er wordt nooit
@@ -69,10 +71,10 @@ class LedenFormulier:
         return self.groep.id is None
 
     @property
-    def dagen(self) -> list[tuple[str, str, bool, str]]:
-        """Voor de dagkeuze: (dag, kort, aangevinkt, begintijd) van maandag t/m zondag."""
-        td = self.groep.trainingsdagen
-        return [(d, DAG_KORT[d], d in td, td.get(d) or "") for d in DAGEN]
+    def dagen(self) -> list[tuple[str, str, bool, str, list[str]]]:
+        """Voor de dagkeuze: (dag, kort, aangevinkt, begintijd, extra tijden) van maandag t/m zondag."""
+        td, ex = self.groep.trainingsdagen, self.groep.extra_tijden
+        return [(d, DAG_KORT[d], d in td, td.get(d) or "", list(ex.get(d, []))) for d in DAGEN]
 
 
 MAX_NAAM = 80
@@ -113,15 +115,58 @@ def lees_trainingsdagen(formulier: Mapping[str, str], *, streng: bool = True) ->
     return uit
 
 
+def lees_extra_tijden(formulier: Mapping[str, str], *, streng: bool = True) -> dict[str, list[str]]:
+    """Extra begintijden per dag uit het formulier: {'zaterdag': ['10:30']}.
+
+    Het formulier kan per dag meerdere velden 'tijd-<dag>' hebben; het eerste is de
+    vaste begintijd (lees_trainingsdagen), de rest zijn extra tijden. Lege velden
+    tellen niet. Een ongeldige tijd geeft een fout (met streng=False: overgeslagen).
+    """
+    if not hasattr(formulier, "getlist"):
+        return {}
+    uit: dict[str, list[str]] = {}
+    for d in DAGEN:
+        tijden = []
+        for tijd in formulier.getlist(TIJD_VELD + d)[1:]:
+            tijd = str(tijd or "").strip()
+            if not tijd:
+                continue
+            m = _TIJD.match(tijd.replace(".", ":"))
+            if m is None:
+                if streng:
+                    raise OpslagFout(f"Ongeldige extra begintijd {tijd!r} op {d}; gebruik bijv. 10:30.")
+                continue
+            tijden.append(f"{int(m.group(1)):02d}:{m.group(2)}")
+        if tijden:
+            uit[d] = sorted(set(tijden))
+    return uit
+
+
+def _controleer_extra(dagen: dict[str, str], extra: dict[str, list[str]] | None) -> dict[str, list[str]]:
+    """Alleen extra tijden op dagen met een vaste tijd, zonder de vaste tijd zelf, gesorteerd."""
+    uit = {}
+    for d in DAGEN:
+        tijden = sorted({t for t in (extra or {}).get(d, []) if t and t != dagen.get(d)})
+        if tijden and d in dagen:
+            uit[d] = tijden
+    return uit
+
+
+def _alle_tijden(dagen: dict[str, str], extra: dict[str, list[str]]) -> dict[str, str]:
+    """Voor meldingen: {'zaterdag': '09:00 en 10:30'}."""
+    return {d: " en ".join(sorted({t, *extra.get(d, [])})) for d, t in dagen.items()}
+
+
 def nieuw_formulier(db: Opslag, *, naam: str = "", seizoen: str | None = None, gekozen: Iterable[str] = (),
                     trainingsdagen: dict[str, str | None] | None = None,
-                    peildatum: date | None = None) -> LedenFormulier:
+                    peildatum: date | None = None,
+                    extra_tijden: dict[str, list[str]] | None = None) -> LedenFormulier:
     """Formulier voor een nieuwe groep: alle actieve atleten om uit te kiezen."""
     vandaag = peildatum or date.today()
     overigen = [Kandidaat(a, leeftijdscategorie(a, vandaag), [g.naam for g in db.groepen_van_atleet(a.master_id)])
                 for a in db.atleten(alleen_actief=True)]
     groep = Groep(naam, huidig_seizoen(vandaag) if seizoen is None else seizoen,
-                  trainingsdagen=dict(trainingsdagen or {}))
+                  trainingsdagen=dict(trainingsdagen or {}), extra_tijden=dict(extra_tijden or {}))
     return LedenFormulier(groep, [], overigen, set(gekozen), vinkjes_uit_keuze=True)
 
 
@@ -160,7 +205,8 @@ def dagen_tekst(dagen: dict[str, str | None]) -> str:
 
 
 def groep_aanmaken(db: Opslag, naam: str, seizoen: str | None, gekozen: Iterable[str],
-                   trainingsdagen: dict[str, str | None] | None = None) -> Groep:
+                   trainingsdagen: dict[str, str | None] | None = None,
+                   extra_tijden: dict[str, list[str]] | None = None) -> Groep:
     """Maak een nieuwe groep met deze atleten en vaste trainingsdagen ({'dinsdag': '18:30'}).
 
     Fout bij lege naam of als de naam in dat seizoen al bestaat; dan wordt niets opgeslagen.
@@ -179,6 +225,10 @@ def groep_aanmaken(db: Opslag, naam: str, seizoen: str | None, gekozen: Iterable
     if dagen:
         db.groep_trainingsdagen_opslaan(g.id, dagen)
         g.trainingsdagen = dagen
+        extra = _controleer_extra(dagen, extra_tijden)
+        if extra:
+            db.groep_extra_tijden_opslaan(g.id, extra)
+            g.extra_tijden = extra
         for m in g.leden:
             schema_aanvullen(db, m, dagen)
         trainingen_aanvullen(db, g)                  # trainingen voor de vaste dagen meteen klaarzetten
@@ -187,7 +237,8 @@ def groep_aanmaken(db: Opslag, naam: str, seizoen: str | None, gekozen: Iterable
 
 def ledenformulier(db: Opslag, groep_id: int, *, peildatum: date | None = None,
                    gekozen: Iterable[str] | None = None,
-                   trainingsdagen: dict[str, str | None] | None = None) -> LedenFormulier | None:
+                   trainingsdagen: dict[str, str | None] | None = None,
+                   extra_tijden: dict[str, list[str]] | None = None) -> LedenFormulier | None:
     """Formulier 'Wijzigen' van een bestaande groep: leden, andere atleten en de trainingsdagen.
 
     gekozen / trainingsdagen: wat er net was ingevuld (na een fout), in plaats van wat er is opgeslagen.
@@ -202,6 +253,7 @@ def ledenformulier(db: Opslag, groep_id: int, *, peildatum: date | None = None,
         hint = dagen_tekst({d: None for d in DAGEN if d in dagen})
     if trainingsdagen is not None:
         groep.trainingsdagen = dict(trainingsdagen)
+        groep.extra_tijden = dict(extra_tijden or {})
 
     def kandidaat(a: Atleet) -> Kandidaat:
         anderen = [g.naam for g in db.groepen_van_atleet(a.master_id) if g.id != groep.id]
@@ -221,6 +273,7 @@ class Wijziging:
     toegevoegd: list[Atleet]
     verwijderd: list[Atleet]
     dagen: dict[str, str] | None = None                            # nieuwe trainingstijden; None = niet gewijzigd
+    extra: dict[str, list[str]] = field(default_factory=dict)      # nieuwe extra tijden (bij gewijzigde dagen)
     schema_aangevuld: list[Atleet] = field(default_factory=list)   # trainingsschema kreeg dagen van de groep erbij
     trainingen_erbij: int = 0         # automatisch aangemaakte trainingen voor de (nieuwe) vaste dagen
     trainingen_weg: int = 0           # lege toekomstige trainingen op dagen die niet meer gelden
@@ -243,13 +296,14 @@ class Wijziging:
                 delen.append(f"{len(self.verwijderd)} verwijderd ({', '.join(a.naam for a in self.verwijderd)})")
             zinnen.append("Atleten gewijzigd: " + "; ".join(delen) + ".")
         if self.dagen is not None:
-            zinnen.append(f"Trainingsdagen nu: {dagen_tekst(self.dagen)}." if self.dagen
+            zinnen.append(f"Trainingsdagen nu: {dagen_tekst(_alle_tijden(self.dagen, self.extra))}." if self.dagen
                           else "Geen vaste trainingsdagen meer.")
         return " ".join(zinnen)
 
 
 def leden_opslaan(db: Opslag, groep_id: int, gekozen: Iterable[str],
-                  trainingsdagen: dict[str, str | None] | None = None) -> Wijziging:
+                  trainingsdagen: dict[str, str | None] | None = None,
+                  extra_tijden: dict[str, list[str]] | None = None) -> Wijziging:
     """Maak de leden van de groep precies `gekozen` (master_ids) en, als meegegeven, de
     trainingsdagen precies `trainingsdagen` ({} = geen vaste dagen; None = niet aanpassen).
 
@@ -268,11 +322,14 @@ def leden_opslaan(db: Opslag, groep_id: int, gekozen: Iterable[str],
         groep.leden = nieuw
         db.groep_opslaan(groep)
     oude_dagen = dict(groep.trainingsdagen)
-    dagen_gewijzigd = dagen is not None and dagen != oude_dagen
+    oude_extra = {d: list(t) for d, t in groep.extra_tijden.items()}
+    extra = oude_extra if dagen is None else _controleer_extra(dagen, extra_tijden)
+    dagen_gewijzigd = dagen is not None and (dagen != oude_dagen or extra != oude_extra)
     erbij_tr = weg_tr = 0
     if dagen_gewijzigd:
         db.groep_trainingsdagen_opslaan(groep.id, dagen)
-        groep.trainingsdagen = dict(dagen)
+        db.groep_extra_tijden_opslaan(groep.id, extra)
+        groep.trainingsdagen, groep.extra_tijden = dict(dagen), extra
         weg_tr = len(trainingen_opruimen(db, groep))
         erbij_tr = len(trainingen_aanvullen(db, groep))
     huidige_dagen = dagen if dagen_gewijzigd else oude_dagen
@@ -287,10 +344,12 @@ def leden_opslaan(db: Opslag, groep_id: int, gekozen: Iterable[str],
 
     sorteer = lambda a: (a.achternaam.lower(), a.voornaam.lower())   # noqa: E731
     return Wijziging(sorted(toegevoegd, key=sorteer), sorted(verwijderd, key=sorteer),
-                     dagen if dagen_gewijzigd else None, sorted(aangevuld, key=sorteer), erbij_tr, weg_tr)
+                     dagen if dagen_gewijzigd else None, extra if dagen_gewijzigd else {},
+                     sorted(aangevuld, key=sorteer), erbij_tr, weg_tr)
 
 
-def trainingsdagen_opslaan(db: Opslag, groep_id: int, trainingsdagen: dict[str, str | None]) -> Wijziging:
+def trainingsdagen_opslaan(db: Opslag, groep_id: int, trainingsdagen: dict[str, str | None],
+                           extra_tijden: dict[str, list[str]] | None = None) -> Wijziging:
     """Alleen de trainingsdagen en -tijden van een groep wijzigen (pagina 'Trainingsdagen wijzigen').
 
     Zelfde regels als leden_opslaan(): {} = geen vaste dagen meer; dagen die erbij
@@ -299,7 +358,7 @@ def trainingsdagen_opslaan(db: Opslag, groep_id: int, trainingsdagen: dict[str, 
     groep = db.groep(groep_id)
     if groep is None:
         raise OpslagFout(f"Groep {groep_id} bestaat niet.")
-    return leden_opslaan(db, groep_id, groep.leden, trainingsdagen)
+    return leden_opslaan(db, groep_id, groep.leden, trainingsdagen, extra_tijden)
 
 
 # ============================================================
@@ -328,5 +387,5 @@ class RoosterRegel:
 def rooster(db: Opslag, master_id: str) -> list[RoosterRegel]:
     """Alle groepstrainingen van de atleet in een week, op dag en tijd gesorteerd."""
     regels = [RoosterRegel(d, t, g.id, g.naam)
-              for g in db.groepen_van_atleet(master_id) for d, t in g.trainingsdagen.items()]
+              for g in db.groepen_van_atleet(master_id) for d, t in g.momenten]
     return sorted(regels, key=lambda r: (DAGEN.index(r.dag), r.tijd, r.groep.lower()))

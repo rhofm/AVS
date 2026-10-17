@@ -46,7 +46,7 @@ def test_paginas():
         assert c.get("/").status_code == 200                           # startpagina (zie test_startpagina.py)
         r = c.get("/atleten")
         assert r.status_code == 200 and "Anna Voorbeeld" in tekst(r) and "U16 sprint" in tekst(r)
-        assert "<td>U16V</td>" in tekst(r)
+        assert ">U16V</td>" in tekst(r)
         assert "Anna" not in tekst(c.get("/atleten?q=zzz"))
         assert c.get("/static/avs.css").status_code == 200
 

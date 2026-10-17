@@ -304,7 +304,7 @@ def aanwezigheid(db: Opslag, groep: Groep, *, peildatum: date | None = None, wek
             s = statussen[t.id].get(a.master_id)
             if s is not None:
                 cellen.append(RegisterCel(s.status, s.reden))
-            elif schema.traint_op(t.datum):
+            elif schema.traint_mee(t, groep):
                 cellen.append(RegisterCel(NIET_INGEVULD))
             else:
                 cellen.append(None)
