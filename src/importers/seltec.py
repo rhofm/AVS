@@ -112,8 +112,10 @@ def wedstrijd_id_uit_url(url: str) -> str:
     """
     '/Competitions/Resultoverview/19133'      -> '19133'
     '/Competitions/CurrentList/982650/19133'  -> '19133'  (laatste getal = wedstrijd)
+    '/Competitions/Details/19133/2'           -> '19133'  (tijdschema van dag 2)
     """
-    m = re.search(r"/Competitions/[A-Za-z]+/(?:\d+/)?(\d+)", url or "")
+    m = (re.search(r"/Competitions/Details/(\d+)", url or "")
+         or re.search(r"/Competitions/[A-Za-z]+/(?:\d+/)?(\d+)", url or ""))
     return m.group(1) if m else ""
 
 

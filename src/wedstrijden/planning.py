@@ -54,7 +54,7 @@ def bron_uit_link(link: str | None) -> str:
     tekst = (link or "").lower()
     if "atletiek.nu" in tekst:
         return "atletieknu"
-    if "seltec" in tekst:
+    if "seltec" in tekst or "uitslagen.atletiek.nl" in tekst:
         return "seltec"
     return "handmatig"
 

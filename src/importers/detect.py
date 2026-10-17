@@ -4,7 +4,7 @@ from __future__ import annotations
 
 # Importeren registreert de importers bij Importer (via __init_subclass__).
 # Een nieuwe importer: maak een subklasse van Importer en importeer de module hier.
-from . import atletieknu_prs, atletieknu_wedstrijd, seltec  # noqa: F401
+from . import atletieknu_prs, atletieknu_tijdschema, atletieknu_wedstrijd, seltec, seltec_tijdschema  # noqa: F401
 from .base import Importer, ImportFout
 
 
@@ -14,7 +14,7 @@ def kies_importer(url: str, log=None) -> Importer:
         if klasse.can_handle(url):
             return klasse(log=log)
     raise ImportFout(f"Deze link wordt (nog) niet herkend: {url}\n"
-                     "Ondersteund: atletiek.nu-profielen en -wedstrijden, en Seltec-wedstrijden.")
+                     "Ondersteund: atletiek.nu-profielen, -wedstrijden en -tijdschema's, en Seltec-wedstrijden en -tijdschema's.")
 
 
 def importeer(url: str, log=None):

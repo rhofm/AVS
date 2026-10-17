@@ -89,10 +89,12 @@ class ProgrammaOnderdeel:
 # ============================================================
 # Categorie uit de tekst van een tijdschema
 # ============================================================
-_LEEFTIJD = re.compile(r"\b(?:[MJ]?U)\s?(\d{1,2})\b", re.I)          # 'U16', 'U 16', 'MU16', 'JU14'
-_SENIOR = re.compile(r"\b(senioren|seniors?|mannen|vrouwen|heren|dames|[MV]sen)\b", re.I)
-_VROUW = re.compile(r"\b(meisjes|meiden|vrouwen|dames|MU\d{1,2}|Vsen)\b", re.I)
-_MAN = re.compile(r"\b(jongens|mannen|heren|JU\d{1,2}|Msen)\b", re.I)
+_LEEFTIJD = re.compile(r"\b(?:[MJVW]?U)\s?(\d{1,2})\b", re.I)        # 'U16', 'U 16', 'MU16', 'JU14', 'VU20'
+_MASTERS = re.compile(r"\bmasters?\b", re.I)
+_SENIOR = re.compile(r"\b(senioren|seniors?|sen|mannen|vrouwen|heren|dames|[MV]sen)\b", re.I)
+_VROUW = re.compile(r"\b(meisjes|meiden|vrouwen|dames|Vsen|VU\d{1,2})\b|-V\b|\bSEN-V\b", re.I)
+_MAN = re.compile(r"\b(jongens|mannen|heren|JU\d{1,2}|Msen)\b|-M\b|\bSEN-M\b", re.I)
+_MU = re.compile(r"\bMU\s?(\d{1,2})\b", re.I)                              # MU16 = meisjes, MU20 = mannen
 
 
 def lees_categorie(tekst: str | None) -> tuple[str | None, str | None]:
@@ -100,14 +102,28 @@ def lees_categorie(tekst: str | None) -> tuple[str | None, str | None]:
 
     'Meisjes U16' / 'MU16' -> ('U16', 'V'); 'Jongens U14' / 'JU14' -> ('U14', 'M');
     'Vrouwen' / 'VSen' -> ('Senior', 'V'); 'U12' -> ('U12', None). Wat niet te lezen is: None.
+    Ook de notatie van atletiek.nu: 'U16-V' -> ('U16', 'V'), 'SEN-M' -> ('Senior', 'M'),
+    'VU20+V Masters' -> ('U20', 'V'), 'MU20 + M Masters' -> ('U20', 'M') (MU20 = mannen U20).
+    En wat de Seltec-importer maakt: 'U16-V', 'SEN-M', 'Masters-V' -> ('Masters', 'V').
+    Eén categorie per keer; een lijst ('U18-M, U16-V') splitst wedstrijden/chronoloog.past_bij.
     """
     if not tekst or not tekst.strip():
         return None, None
     if m := _LEEFTIJD.search(tekst):
         leeftijd = f"U{int(m.group(1))}"
+    elif _MASTERS.search(tekst):
+        leeftijd = "Masters"            # 35+; geen eigen categorie bij de atleten
     elif _SENIOR.search(tekst):
         leeftijd = "Senior"
     else:
         leeftijd = None
-    geslacht = "V" if _VROUW.search(tekst) else "M" if _MAN.search(tekst) else None
+    if _VROUW.search(tekst):
+        geslacht = "V"
+    elif _MAN.search(tekst):
+        geslacht = "M"
+    elif m := _MU.search(tekst):
+        # Atletiekunie: MU8 t/m MU18 = meisjes, maar MU20 = mannen U20 (naast VU20 = vrouwen).
+        geslacht = "M" if int(m.group(1)) >= 20 else "V"
+    else:
+        geslacht = None
     return leeftijd, geslacht

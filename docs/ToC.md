@@ -99,6 +99,7 @@ AVS/
 │   │                             later results import finds the same meet
 │   │   ├── kalender.py           ✅ planning of one athlete or a group as list and month calendar
 │   │   ├── chronoloog.py         ✅ timetable: personal schedule per athlete, participants per item, clashes / too little rest
+│   │   ├── tijdschema_import.py  ✅ atletiek.nu or Seltec timetable → wedstrijd_programma (replaces it; events matched by name/code)
 │   │   └── overzicht.py          ✅ page 'Wedstrijden': upcoming meets, past meets behind a checkbox (counts only, no names)
 │   │
 │   ├── importers/                📝 on this branch (see feature/importers)
@@ -106,7 +107,11 @@ AVS/
 │   │   ├── detect.py             picks the right importer automatically
 │   │   ├── atletieknu_prs.py
 │   │   ├── atletieknu_wedstrijd.py
-│   │   └── seltec.py
+│   │   ├── atletieknu_tijdschema.py ✅ timetable from /wedstrijd/chronoloog/<id>/: time, category, groep A/B → 1/2,
+│   │   │                            event, '2 series' / 'hoog 1' as remark, duration from the timeline tab
+│   │   ├── seltec.py
+│   │   └── seltec_tijdschema.py  ✅ timetable from /Competitions/Details/<id> (all days): time, event, round,
+│   │                                categories (U16M → U16-V, U18M → U18-M), '6 series, 43 atleten' as remark
 │   │
 │   ├── ploeg/                    📝 team selection
 │   │   ├── vergelijk.py          compare PRs/performances across a group
@@ -135,6 +140,8 @@ AVS/
     ├── test_absentie.py          ✅ 3 tests
     ├── test_wedstrijden.py       ✅ 5 tests
     ├── test_chronoloog.py        ✅ 5 tests (timetable storage, groups/duration, category matching, clashes, migration)
+    ├── test_tijdschema_import.py ✅ 6 tests (parse two meets, links/detection, import into the database)
+    ├── test_seltec_tijdschema.py ✅ 6 tests (category codes, multi-category matching, 3-day NK, club meet, links, import)
     ├── test_wedstrijdenoverzicht.py ✅ 5 tests (upcoming/past, counts, checkbox, '+ Nieuwe wedstrijd')
     ├── test_groep_starttijden.py ✅ 7 tests (training times, moving old data, duplicate migration numbers)
     ├── test_startpagina.py       ✅ 3 tests (tiles, counts, top bar with only Importeren + Instellingen)
@@ -142,7 +149,7 @@ AVS/
     ├── test_leerdoelen.py        ✅ 10 tests
     ├── test_importers.py         📝 on this branch
     ├── test_opstelling.py        📝
-    └── fixtures/                 saved, anonymised atletiek.nu/Seltec pages
+    └── fixtures/                 saved, anonymised atletiek.nu/Seltec pages (incl. atletieknu_tijdschema/, seltec_tijdschema/)
 ```
 
 ---

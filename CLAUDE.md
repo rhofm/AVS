@@ -200,6 +200,22 @@ python src/db/init_db.py --herstel <sleutel>  # restore the key (e.g. new comput
   `can_handle(url)` and `parse(url)`.
 - `importers/detect.py` picks the importer automatically by trying each
   `can_handle(url)` until one matches. Register new importers there.
+- The atletiek.nu timetable importer (`importers/atletieknu_tijdschema.py`)
+  reads `/wedstrijd/chronoloog/<id>/`; any meet link or id works. Duration only
+  exists when the page has the timeline tab ('visueel'); otherwise it stays
+  empty. `wedstrijden/tijdschema_import.py` writes it to `wedstrijd_programma`
+  (replacing the old version) and never creates events itself: unmatched
+  events are stored as text and listed in the report.
+- The Seltec timetable importer (`importers/seltec_tijdschema.py`) reads
+  `/Competitions/Details/<id>` plus one page per day (`/Details/<id>/<dag>`);
+  the date is the first day from the header + (day − 1). Seltec gives no end
+  times, so duration stays empty. A row can be for several categories
+  ('U18M, U16J'); it stays one row and `chronoloog.past_bij` matches if any
+  of them fits. Seltec's `M` is ambiguous: men from U18 up, girls up to U16
+  (`U16J` = boys). Codes are stored as `U18-M`, `U16-V`, `SEN-V`, `Masters-M`.
+  `tijdschema_import.site_van` picks atletiek.nu or Seltec from the link, the
+  saved file, or (for a bare id) the meet's own link. `detect.kies_importer`
+  still sends Seltec `Details` links to the results importer.
 - Match each imported athlete to a `master_id` in `personen.db` (via
   `atleet.atletieknu_id` where available), then store results in
   `prestaties.db` under the pseudonym. Drop names and per-athlete URLs after

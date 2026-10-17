@@ -36,10 +36,23 @@ def past_bij(regel: ProgrammaOnderdeel, categorie: str | None, geslacht: str | N
     """True = past, False = past niet, None = niet te zeggen (categorie onleesbaar of atleet onbekend).
 
     categorie/geslacht van de atleet: bijv. 'U16' en 'V' (geslacht 'M', 'V' of 'X').
+    Een regel voor meer categorieën ('U18-M, U16-M, U16-V', zoals bij Seltec) past als één
+    ervan past; past er geen, dan False; anders None.
     """
     if not regel.categorie:
         return True                                   # voor iedereen
-    leeftijd, regel_geslacht = lees_categorie(regel.categorie)
+    delen = [d.strip() for d in regel.categorie.split(",") if d.strip()]
+    if len(delen) > 1:
+        uitkomsten = [_past_bij_categorie(d, categorie, geslacht) for d in delen]
+        if True in uitkomsten:
+            return True
+        return None if None in uitkomsten else False
+    return _past_bij_categorie(regel.categorie, categorie, geslacht)
+
+
+def _past_bij_categorie(tekst: str, categorie: str | None, geslacht: str | None) -> bool | None:
+    """past_bij voor één categorie-tekst."""
+    leeftijd, regel_geslacht = lees_categorie(tekst)
     if leeftijd is None and regel_geslacht is None:
         return None                                   # onleesbaar
     if leeftijd is not None:
