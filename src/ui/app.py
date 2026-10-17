@@ -47,13 +47,13 @@ from ui import export as trainingsexport
 from ui import startpagina
 from ui.opmaak import registreer_filters
 from wedstrijden import kalender
+from wedstrijden.overzicht import wedstrijdenoverzicht
 
 HOST = "127.0.0.1"
 VOORKEUR_POORT = 5050
 
 #: Menu-items en losse links die nog geen eigen pagina hebben: (pad, titel).
 BINNENKORT = {
-    "wedstrijden": "Wedstrijden",
     "ploegen": "Ploegen",
     "leerlijnen": "Leerlijnen",
     "importeren": "Importeren",
@@ -349,6 +349,18 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
             return _trainingsdagen(groep_id, fout=f"Niet opgeslagen: {e}", status=400)
         flash(w.tekst + _extra_melding(w))
         return redirect(url_for("groep", groep_id=groep_id) + "#kop-dagen")
+
+    # ---------------- wedstrijden ----------------
+    @app.get("/wedstrijden")
+    def wedstrijden():
+        return render_template("wedstrijden.html", o=wedstrijdenoverzicht(db()),
+                               toon_afgelopen=request.args.get("afgelopen") == "1", actief_menu="wedstrijden")
+
+    @app.get("/wedstrijden/nieuw")
+    def wedstrijd_nieuw():
+        # Het formulier voor een nieuwe wedstrijd komt later.
+        return render_template("binnenkort.html", titel="Nieuwe wedstrijd", terug_url=url_for("wedstrijden"),
+                               terug_naam="Wedstrijden", actief_menu="wedstrijden")
 
     @app.get("/groep/<int:groep_id>/wedstrijden")
     def groep_wedstrijden(groep_id: int):

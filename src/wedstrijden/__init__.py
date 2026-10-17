@@ -1,12 +1,12 @@
 """Wedstrijden: plannen van komende wedstrijden en wie er met welke onderdelen meedoet,
-en de planning als lijst of kalender tonen.
+de planning als lijst of kalender tonen, en het overzicht van alle wedstrijden.
 
 Alle functies krijgen een open `Opslag` (db/queries.py) mee als eerste argument
 en werken met modellen uit models/. Ze bevatten geen SQL.
 
-    from wedstrijden import planning, kalender
+    from wedstrijden import planning, kalender, overzicht
 """
 
-from . import kalender, planning
+from . import kalender, overzicht, planning
 
-__all__ = ["kalender", "planning"]
+__all__ = ["kalender", "overzicht", "planning"]

@@ -253,6 +253,14 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--rood); outline-
 .tabel tr.geweest td { opacity: .65; }
 .deelnames { list-style: none; margin: 0; padding: 0; display: grid; gap: .15rem; }
 
+/* wedstrijdenoverzicht: afgelopen wedstrijden achter een vinkje, zonder JavaScript */
+.afgelopen { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem .4rem; margin-top: 1.75rem; }
+.afgelopen__vink { width: 1.1rem; height: 1.1rem; margin: 0; accent-color: var(--rood); cursor: pointer; }
+.afgelopen__label { font-size: var(--maat-m); cursor: pointer; }
+.afgelopen__inhoud { display: none; flex-basis: 100%; }
+.afgelopen__vink:checked ~ .afgelopen__inhoud { display: grid; }
+.afgelopen__vink:focus-visible { outline: 2px solid var(--rood); outline-offset: 2px; }
+
 /* lijst/kalender-wissel zonder JavaScript */
 .wissel { display: grid; gap: 1.25rem; }
 .wissel__radio { position: absolute; opacity: 0; pointer-events: none; }

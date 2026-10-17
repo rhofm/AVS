@@ -91,9 +91,11 @@ AVS/
 │   │   └── profiel.py            full athlete profile from personen, prestaties and testen
 │   │
 │   ├── wedstrijden/              ✅ planned meets
-│   │   └── planning.py           plan a meet (date, name, location, link), register/deregister athletes
+│   │   ├── planning.py           plan a meet (date, name, location, link), register/deregister athletes
 │   │                             per event, upcoming meets with participants; links normalised so the
 │   │                             later results import finds the same meet
+│   │   ├── kalender.py           ✅ planning of one athlete or a group as list and month calendar
+│   │   └── overzicht.py          ✅ page 'Wedstrijden': upcoming meets, past meets behind a checkbox (counts only, no names)
 │   │
 │   ├── importers/                📝 on this branch (see feature/importers)
 │   │   ├── base.py               common interface: can_handle(url), parse(url)
@@ -128,6 +130,7 @@ AVS/
     ├── test_atleten.py           ✅ 7 tests
     ├── test_absentie.py          ✅ 3 tests
     ├── test_wedstrijden.py       ✅ 5 tests
+    ├── test_wedstrijdenoverzicht.py ✅ 5 tests (upcoming/past, counts, checkbox, '+ Nieuwe wedstrijd')
     ├── test_groep_starttijden.py ✅ 7 tests (training times, moving old data, duplicate migration numbers)
     ├── test_startpagina.py       ✅ 3 tests (tiles, counts, top bar with only Importeren + Instellingen)
     ├── test_trainingen_inhoud.py ✅ 5 tests (training parts, variants, markdown, old `inhoud` → `notities`)

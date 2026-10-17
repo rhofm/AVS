@@ -1,0 +1,115 @@
+{#
+  Overzicht van alle wedstrijden (menu 'Wedstrijden').
+  Context:
+    o              – wedstrijden.overzicht.Wedstrijdenoverzicht
+    toon_afgelopen – True als ?afgelopen=1: het vinkje staat dan meteen aan
+  De afgelopen wedstrijden zijn verborgen tot het vinkje 'Afgelopen wedstrijden'
+  aan staat. Dat werkt zonder JavaScript (CSS :checked); een klein script
+  onthoudt alleen de laatste keuze.
+#}
+{% extends "basis.html" %}
+{% block titel %}Wedstrijden{% endblock %}
+
+{% macro wedstrijdnaam(w) -%}
+  {% if w.bron_url %}<a href="{{ w.bron_url }}" target="_blank" rel="noopener">{{ w.naam }}</a>{% else %}{{ w.naam }}{% endif %}
+  {%- if w.indoor %} <span class="kenmerk">indoor</span>{% endif %}
+{%- endmacro %}
+
+{% macro deelnemers(n) -%}
+  {{ n if n else "–" }}
+{%- endmacro %}
+
+{% block inhoud %}
+<article class="vel">
+  <header class="blok__kop">
+    <div>
+      <h1 class="kop kop--pagina">Wedstrijden</h1>
+      <p class="subkop">{{ o.komend | length }} komende wedstrijd{{ "en" if o.komend | length != 1 }}</p>
+    </div>
+    <a class="knop knop--vol" href="{{ url_for('wedstrijd_nieuw') }}">+ Nieuwe wedstrijd</a>
+  </header>
+
+  <section class="blok" aria-labelledby="kop-komend">
+    <h2 class="subkop" id="kop-komend">Komend</h2>
+    {% if o.komend %}
+      <div class="tabelvak">
+        <table class="tabel" id="tabel-komend">
+          <thead>
+            <tr>
+              <th scope="col">Datum</th>
+              <th scope="col">Wedstrijd</th>
+              <th scope="col">Locatie</th>
+              <th scope="col" class="rechts">Atleten</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in o.komend %}
+              <tr id="w-{{ r.wedstrijd.id }}">
+                <td class="nowrap"><strong>{{ r.wedstrijd.datum | datum_kort }}</strong><br>
+                  <span class="zacht">{{ r.wedstrijd.datum.year }} · {{ r.dagen_tot | over_dagen }}</span></td>
+                <td>{{ wedstrijdnaam(r.wedstrijd) }}</td>
+                <td>{{ r.wedstrijd.locatie or "–" }}</td>
+                <td class="rechts getallen">{{ deelnemers(r.deelnemers) }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="leeg">Geen komende wedstrijden gepland. Plan er een met <a href="{{ url_for('wedstrijd_nieuw') }}">+ Nieuwe wedstrijd</a>.</p>
+    {% endif %}
+  </section>
+
+  <div class="afgelopen">
+    <input class="afgelopen__vink" type="checkbox" id="toon-afgelopen" name="afgelopen" value="1"{% if toon_afgelopen %} checked{% endif %}>
+    <label class="vinkje afgelopen__label" for="toon-afgelopen">Afgelopen wedstrijden <span class="zacht">({{ o.afgelopen | length }})</span></label>
+
+    <section class="blok afgelopen__inhoud" aria-label="Afgelopen wedstrijden">
+      {% if o.afgelopen %}
+        <div class="tabelvak">
+          <table class="tabel" id="tabel-afgelopen">
+            <thead>
+              <tr>
+                <th scope="col">Datum</th>
+                <th scope="col">Wedstrijd</th>
+                <th scope="col">Locatie</th>
+                <th scope="col" class="rechts">Atleten</th>
+                <th scope="col">Uitslag</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for r in o.afgelopen %}
+                <tr id="w-{{ r.wedstrijd.id }}">
+                  <td class="nowrap"><strong>{{ r.wedstrijd.datum | datum_kort }}</strong><br>
+                    <span class="zacht">{{ r.wedstrijd.datum.year }}</span></td>
+                  <td>{{ wedstrijdnaam(r.wedstrijd) }}</td>
+                  <td>{{ r.wedstrijd.locatie or "–" }}</td>
+                  <td class="rechts getallen">{{ deelnemers(r.deelnemers) }}</td>
+                  <td>{% if r.prestaties %}{{ r.prestaties }} prestatie{{ "s" if r.prestaties != 1 }}{% else %}<span class="zacht">nog niet geïmporteerd</span>{% endif %}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <p class="leeg">Nog geen afgelopen wedstrijden.</p>
+      {% endif %}
+    </section>
+  </div>
+
+  <footer class="vel__voet">Atleet Volg Systeem<br>Wedstrijden</footer>
+</article>
+<script>
+  /* Onthoud het vinkje 'Afgelopen wedstrijden' per computer; zonder opslag werkt de pagina gewoon. */
+  (function () {
+    var sleutel = "avs-wedstrijden-afgelopen";
+    var vink = document.getElementById("toon-afgelopen");
+    try {
+      if (!location.search.includes("afgelopen=") && localStorage.getItem(sleutel) === "1") vink.checked = true;
+    } catch (e) {}
+    vink.addEventListener("change", function () {
+      try { localStorage.setItem(sleutel, vink.checked ? "1" : "0"); } catch (e) {}
+    });
+  })();
+</script>
+{% endblock %}

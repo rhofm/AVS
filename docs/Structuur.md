@@ -58,6 +58,8 @@
 * Komende wedstrijden plannen: datum, naam, locatie, link naar de wedstrijdpagina
 * Per atleet inschrijven voor één of meer onderdelen (of 'gaat mee, onderdelen volgen later'), en afmelden
 * Overzicht van komende wedstrijden met deelnemers, ook per onderdeel (handig voor ploegen)
+* Pagina 'Wedstrijden': komende wedstrijden (datum, naam, locatie, aantal atleten); afgelopen wedstrijden verborgen onder het vinkje 'Afgelopen wedstrijden', met of de uitslag al is geïmporteerd
+* Nog te doen: formulier achter de knop '+ Nieuwe wedstrijd' (/wedstrijden/nieuw)
 * Geplande wedstrijd en uitslag zijn dezelfde wedstrijd: importeer je later de uitslag via dezelfde link, dan komen de prestaties erbij
 * Staat in prestaties.db (tabellen wedstrijd en inschrijving), geen aparte database
 
