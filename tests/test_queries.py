@@ -216,7 +216,7 @@ def test_migratie_op_bestaande_database():
         with contextlib.redirect_stdout(io.StringIO()):
             init_db(Path(tmp), hoofd=TESTSLEUTEL)
         with Opslag(map=Path(tmp), hoofd=TESTSLEUTEL) as db:
-            assert db.prestaties_db.execute("SELECT MAX(versie) FROM schema_version").fetchone()[0] == 2
+            assert db.prestaties_db.execute("SELECT MAX(versie) FROM schema_version").fetchone()[0] == 3   # 002 + 003 (tijdschema)
             assert db.prs(anna.master_id) == []                  # te veel wind / geen meting
             assert len(db.prestaties(anna.master_id)) == 2       # de prestaties zelf zijn er nog
             sql = {o.naam: o.windmeting for o in db.onderdelen()}

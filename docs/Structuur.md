@@ -46,7 +46,7 @@
 ## Ploeg
 
 * Functie voor vergelijken prs/prestaties van groep atleten
-* Testfunctie voor chronoloog
+* Testfunctie voor chronoloog: gedaan als botsingencontrole (wedstrijden/chronoloog.py)
 * Makkelijk aan te passen
 * Verschillende 'mentaliteiten' van ploegenopstelling
 * Opstellingsregels makkelijk aan te passen voor de ploegleider
@@ -62,6 +62,9 @@
 * Nog te doen: formulier achter de knop '+ Nieuwe wedstrijd' (/wedstrijden/nieuw)
 * Geplande wedstrijd en uitslag zijn dezelfde wedstrijd: importeer je later de uitslag via dezelfde link, dan komen de prestaties erbij
 * Staat in prestaties.db (tabellen wedstrijd en inschrijving), geen aparte database
+* Tijdschema (chronoloog) per wedstrijd: per regel dag, starttijd, duur (minuten), onderdeel, categorie (zoals in het tijdschema), ronde, groep (1e, 2e, ...) en opmerking. Tabel wedstrijd_programma in prestaties.db (geen persoonsgegevens)
+* Persoonlijk schema per atleet (uit inschrijvingen + categorie op de wedstrijddag), per regel wie van ons meedoet, en controle op botsingen of te weinig pauze tussen onderdelen
+* Nog te doen: scherm om het tijdschema in te voeren, en importeren van het tijdschema van atletiek.nu / Seltec
 
 
 

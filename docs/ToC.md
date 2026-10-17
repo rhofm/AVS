@@ -71,8 +71,10 @@ AVS/
 │   │       │   └── 005_training_onderdelen.sql           ✅ training: warming-up, kern A/B, cooling-down, notities; deviating
 │   │       │                                                variants (hoofdtraining_id + training_atleet)
 │   │       └── prestaties/
-│   │           └── 002_pr_alleen_windlegaal.sql       ✅ PR view: windmeting per event (sprint/hurdles ≤200 m,
-│   │                                                     long/triple jump), max +2.0, indoor always counts
+│   │           ├── 002_pr_alleen_windlegaal.sql       ✅ PR view: windmeting per event (sprint/hurdles ≤200 m,
+│   │           │                                         long/triple jump), max +2.0, indoor always counts
+│   │           └── 003_wedstrijd_programma.sql        ✅ timetable (chronoloog) per meet: date, time, duur, event,
+│   │                                                     category, ronde, groep, remark
 │   │
 │   ├── models/                   ✅ dataclasses, no SQL
 │   │   ├── atleet.py             Atleet (names hidden from repr)
@@ -81,6 +83,7 @@ AVS/
 │   │   ├── leerlijn.py           Leerlijn, LeerlijnStap, LeerlijnVoortgang
 │   │   ├── leerdoel.py           Leerdoel, LeerdoelScore, CATEGORIEEN
 │   │   ├── notitie.py            Notitie (text hidden from repr)
+│   │   ├── programma.py          ProgrammaOnderdeel (one timetable item: begin/end, overlap), lees_categorie
 │   │   └── trainingsschema.py    Trainingsschema (training days), DAGEN
 │   │
 │   ├── atleten/                  ✅ everything around one athlete
@@ -95,6 +98,7 @@ AVS/
 │   │                             per event, upcoming meets with participants; links normalised so the
 │   │                             later results import finds the same meet
 │   │   ├── kalender.py           ✅ planning of one athlete or a group as list and month calendar
+│   │   ├── chronoloog.py         ✅ timetable: personal schedule per athlete, participants per item, clashes / too little rest
 │   │   └── overzicht.py          ✅ page 'Wedstrijden': upcoming meets, past meets behind a checkbox (counts only, no names)
 │   │
 │   ├── importers/                📝 on this branch (see feature/importers)
@@ -130,6 +134,7 @@ AVS/
     ├── test_atleten.py           ✅ 7 tests
     ├── test_absentie.py          ✅ 3 tests
     ├── test_wedstrijden.py       ✅ 5 tests
+    ├── test_chronoloog.py        ✅ 5 tests (timetable storage, groups/duration, category matching, clashes, migration)
     ├── test_wedstrijdenoverzicht.py ✅ 5 tests (upcoming/past, counts, checkbox, '+ Nieuwe wedstrijd')
     ├── test_groep_starttijden.py ✅ 7 tests (training times, moving old data, duplicate migration numbers)
     ├── test_startpagina.py       ✅ 3 tests (tiles, counts, top bar with only Importeren + Instellingen)
@@ -149,7 +154,7 @@ The data is split over eight encrypted files (SQLCipher). Only `personen.db` con
 | File | Contents | Athlete identified by |
 |------|----------|-----------------------|
 | `personen.db` | athletes, groups, training times per group (`groep_trainingstijden`: one row per group, a start time per weekday or empty), group members (`groep_lid`, one row per athlete per group), trainings (warming-up, kern A, kern B, cooling-down, notities; deviating variants for some athletes in `training_atleet`), period plans, leerlijnen, ploegen | `master_id` |
-| `prestaties.db` | onderdelen, wedstrijden (planned and past), prestaties, inschrijvingen (who goes to which meet, per event), `pr` view | pseudonym |
+| `prestaties.db` | onderdelen, wedstrijden (planned and past), prestaties, inschrijvingen (who goes to which meet, per event), timetables (`wedstrijd_programma`, no personal data), `pr` view | pseudonym |
 | `testen.db` | tests and test results | pseudonym |
 | `trainingsschema.db` | per athlete, one column per weekday (`maandag` … `zondag`, 0/1): on which days they train | pseudonym |
 | `absentie.db` | attendance in long format: one row per athlete per training, status `aanwezig` / `afgemeld` / `afwezig` / `blessure` | pseudonym |
@@ -163,7 +168,7 @@ python src/db/init_db.py --herstelsleutel     # show the recovery key (keep it s
 python src/db/init_db.py --herstel <sleutel>  # restore the key on a new computer
 ```
 
-Schema versions: `personen` 5 · `prestaties` 2 · `testen` 1 · `trainingsschema` 1 · `absentie` 1 · `leerlijnen` 1 · `leerdoelscores` 1 · `notities` 1.
+Schema versions: `personen` 5 · `prestaties` 3 · `testen` 1 · `trainingsschema` 1 · `absentie` 1 · `leerlijnen` 1 · `leerdoelscores` 1 · `notities` 1.
 
 Absence used to live in `personen.db`. Because `blessure` is health data, it moved to its own pseudonymised file. On an existing installation `init_db.py` moves the old rows automatically, once (`personen` migration 002).
 

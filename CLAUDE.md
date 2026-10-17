@@ -87,7 +87,7 @@ when run from source, next to the `.exe` when frozen):
 | File             | Contents | Athlete identified by |
 |------------------|----------|-----------------------|
 | `personen.db`    | `atleet` (personal details), `groep` (id + name), `groep_trainingstijden` (one row per group: `groep_id` + `maandag` … `zondag`, start time 'HH:MM' or NULL = no training), `groep_extra_trainingstijd` (extra start times on a fixed day: `groep_id`, `dag`, `starttijd`), `groep_lid` (long: one row per athlete per group; an athlete can be in several groups), `training` (`warming_up`, `kern_a`, `kern_b`, `cooling_down`, `notities`; `hoofdtraining_id` for a deviating variant), `training_atleet` (long: who follows a variant), `periodeplan`, leerlijnen, `ploeg`, `ploeg_opstelling` | `master_id` |
-| `prestaties.db`  | `onderdeel`, `wedstrijd`, `prestatie`, `inschrijving`, `pr` view | `atleet_ref` (pseudonym) |
+| `prestaties.db`  | `onderdeel`, `wedstrijd`, `prestatie`, `inschrijving`, `wedstrijd_programma` (meet timetable / chronoloog: one row per item, no personal data), `pr` view | `atleet_ref` (pseudonym) |
 | `testen.db`      | `test`, `testresultaat` | `atleet_ref` (pseudonym) |
 | `trainingsschema.db` | `trainingsschema`: one row per athlete, columns `maandag` … `zondag` (0/1); `trainingskeuze`: which (`groep_id`, `starttijd`) the athlete picks on a day with several trainings | `atleet_ref` (pseudonym) |
 | `absentie.db`    | `absentie`: long format, one row per athlete per training (`training_id`, `status`, `reden`) | `atleet_ref` (pseudonym) |
@@ -206,6 +206,12 @@ python src/db/init_db.py --herstel <sleutel>  # restore the key (e.g. new comput
   matching; do not store raw scraped pages.
 - Imports must be idempotent: re-importing the same link must not create
   duplicates (rely on the UNIQUE constraints and `wedstrijd.bron_url`).
+- A meet's timetable (`wedstrijd_programma`) belongs to the meet, not to a
+  person: date, start time, `duur` (minutes), event (`onderdeel_id` and/or
+  `onderdeel_tekst`), `categorie` as written in the timetable, `ronde`, `groep`
+  (1st, 2nd, ...), `opmerking`. Who has to be where is computed by
+  `wedstrijden/chronoloog.py` from the registrations and the athlete's
+  category on the day of the meet; never store per-athlete times.
 - A planned meet and its results are the **same** `wedstrijd` row. Always pass
   meet links through `wedstrijden.planning.normaliseer_link()` before saving,
   so an atletiek.nu `/main/`, `/inschrijvingen/` or `/uitslagen/` link all

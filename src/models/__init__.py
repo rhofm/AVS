@@ -13,6 +13,7 @@ from .groep import ABSENTIE_STATUSSEN, Absentie, AbsentieStatus, Groep, Periodep
 from .leerdoel import CATEGORIEEN, LEERDOEL_BRONNEN, Categorie, Leerdoel, LeerdoelScore
 from .leerlijn import Leerlijn, LeerlijnStap, LeerlijnVoortgang
 from .notitie import Notitie
+from .programma import ProgrammaOnderdeel, lees_categorie
 from .prestatie import (
     BRONNEN,
     EENHEDEN,
@@ -39,4 +40,5 @@ __all__ = [
     "Leerdoel", "LeerdoelScore", "Categorie", "CATEGORIEEN", "LEERDOEL_BRONNEN",
     "Trainingsschema", "DAGEN",
     "Notitie",
+    "ProgrammaOnderdeel", "lees_categorie",
 ]

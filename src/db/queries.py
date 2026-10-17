@@ -57,6 +57,7 @@ from models import (
     Onderdeel,
     Periodeplan,
     Prestatie,
+    ProgrammaOnderdeel,
     Test,
     Testresultaat,
     Training,
@@ -470,8 +471,92 @@ class Opslag:
             "SELECT 1 FROM prestatie WHERE wedstrijd_id = ? LIMIT 1", (wedstrijd_id,)
         ).fetchone():
             raise OpslagFout(f"Wedstrijd {wedstrijd_id} heeft al prestaties en wordt niet verwijderd.")
-        with self.prestaties_db:   # inschrijvingen gaan mee (ON DELETE CASCADE)
+        with self.prestaties_db:   # inschrijvingen en tijdschema gaan mee (ON DELETE CASCADE)
             self.prestaties_db.execute("DELETE FROM wedstrijd WHERE id = ?", (wedstrijd_id,))
+
+    # ============================================================
+    # Tijdschema / chronoloog (prestaties.db: wedstrijd_programma)
+    # ============================================================
+    _PROGRAMMA_VELDEN = ("wedstrijd_id", "datum", "starttijd", "duur", "onderdeel_id", "onderdeel_tekst",
+                         "categorie", "ronde", "groep", "opmerking")             # vaste kolomnamen
+
+    @staticmethod
+    def _programma(r) -> ProgrammaOnderdeel:
+        return ProgrammaOnderdeel(r["wedstrijd_id"], _naar_datum(r["datum"]), r["starttijd"], r["onderdeel_id"],
+                                  r["onderdeel_tekst"], r["categorie"], r["ronde"], r["groep"], r["duur"],
+                                  r["opmerking"], r["id"])
+
+    def programma_opslaan(self, p: ProgrammaOnderdeel) -> ProgrammaOnderdeel:
+        """Eén regel van het tijdschema toevoegen of bijwerken (met id).
+
+        Met onderdeel_id wordt de naam van dat onderdeel als onderdeel_tekst bewaard
+        als er nog geen tekst is, zodat de regel leesbaar blijft als het onderdeel
+        later uit de lijst verdwijnt.
+        """
+        if self.wedstrijd(p.wedstrijd_id) is None:
+            raise OpslagFout(f"Wedstrijd {p.wedstrijd_id} bestaat niet.")
+        if p.onderdeel_id is not None:
+            o = self.onderdeel(p.onderdeel_id)
+            if o is None:
+                raise OpslagFout(f"Onderdeel {p.onderdeel_id} bestaat niet.")
+            p.onderdeel_tekst = p.onderdeel_tekst or o.naam
+        waarden = tuple(_naar_tekst(p.datum) if v == "datum" else getattr(p, v) for v in self._PROGRAMMA_VELDEN)
+        with self.prestaties_db:
+            if p.id is None:
+                p.id = self.prestaties_db.execute(
+                    f"INSERT INTO wedstrijd_programma ({', '.join(self._PROGRAMMA_VELDEN)}) "
+                    f"VALUES ({_vraagtekens(len(self._PROGRAMMA_VELDEN))})", waarden,
+                ).lastrowid
+            else:
+                cur = self.prestaties_db.execute(
+                    f"UPDATE wedstrijd_programma SET {', '.join(f'{v} = ?' for v in self._PROGRAMMA_VELDEN)} "
+                    "WHERE id = ?", (*waarden, p.id),
+                )
+                if cur.rowcount == 0:
+                    raise OpslagFout(f"Regel {p.id} van het tijdschema bestaat niet.")
+        return p
+
+    def programma(self, wedstrijd_id: int) -> list[ProgrammaOnderdeel]:
+        """Het tijdschema van een wedstrijd, op dag, tijd, onderdeel en groep."""
+        return [self._programma(r) for r in self.prestaties_db.execute(
+            """SELECT * FROM wedstrijd_programma WHERE wedstrijd_id = ?
+               ORDER BY datum, starttijd, onderdeel_tekst, categorie, groep, id""", (wedstrijd_id,))]
+
+    def programma_regel(self, regel_id: int) -> ProgrammaOnderdeel | None:
+        r = self.prestaties_db.execute("SELECT * FROM wedstrijd_programma WHERE id = ?", (regel_id,)).fetchone()
+        return self._programma(r) if r else None
+
+    def programma_verwijderen(self, regel_id: int) -> None:
+        with self.prestaties_db:
+            self.prestaties_db.execute("DELETE FROM wedstrijd_programma WHERE id = ?", (regel_id,))
+
+    def programma_vervangen(self, wedstrijd_id: int, regels: Iterable[ProgrammaOnderdeel]) -> int:
+        """Het hele tijdschema in één keer vervangen (bijv. na een nieuwe versie of een import).
+
+        Alles of niets: bij een fout blijft het oude tijdschema staan. Geeft het aantal regels.
+        """
+        regels = list(regels)
+        if self.wedstrijd(wedstrijd_id) is None:
+            raise OpslagFout(f"Wedstrijd {wedstrijd_id} bestaat niet.")
+        namen = {}
+        for p in regels:
+            if p.wedstrijd_id != wedstrijd_id:
+                raise OpslagFout("Alle regels moeten bij dezelfde wedstrijd horen.")
+            if p.onderdeel_id is not None:
+                o = self.onderdeel(p.onderdeel_id)
+                if o is None:
+                    raise OpslagFout(f"Onderdeel {p.onderdeel_id} bestaat niet.")
+                namen[p.onderdeel_id] = o.naam
+        with self.prestaties_db:
+            self.prestaties_db.execute("DELETE FROM wedstrijd_programma WHERE wedstrijd_id = ?", (wedstrijd_id,))
+            for p in regels:
+                p.onderdeel_tekst = p.onderdeel_tekst or namen.get(p.onderdeel_id)
+                p.id = self.prestaties_db.execute(
+                    f"INSERT INTO wedstrijd_programma ({', '.join(self._PROGRAMMA_VELDEN)}) "
+                    f"VALUES ({_vraagtekens(len(self._PROGRAMMA_VELDEN))})",
+                    tuple(_naar_tekst(p.datum) if v == "datum" else getattr(p, v) for v in self._PROGRAMMA_VELDEN),
+                ).lastrowid
+        return len(regels)
 
     def inschrijvingen(self, master_id: str) -> list[Inschrijving]:
         rijen = self.prestaties_db.execute(
