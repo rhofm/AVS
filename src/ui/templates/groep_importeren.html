@@ -1,0 +1,257 @@
+{#
+  Groep importeren: een tabel met atleten invullen (of uit Excel plakken), kiezen in welke groep
+  ze komen (bestaande of nieuwe), en importeren. De server maakt van de tabel de CSV voor
+  groepen/atleten_uit_csv.py (alleen in het geheugen) en zet de gelukte atleten in de groep.
+  Zie groepen/groep_importeren.py.
+  Context:
+    rijen          – lijst van {veld: waarde} (ingevulde regels eerst, dan lege)
+    kolommen       – groep_importeren.KOLOMMEN: (veld, kop, verplicht)
+    fouten         – {rij-index: melding}: rode melding onder die regel
+    fout           – algemene foutmelding (optioneel)
+    resultaat      – groep_importeren.Resultaat na een import (optioneel)
+    keuze          – groep_importeren.Groepkeuze (wat er gekozen is)
+    groepen        – bestaande groepen
+    seizoenen      – voorstellen voor het seizoen van een nieuwe groep
+    dubbel         – 'overslaan' / 'zelfde' / 'nieuw'; dubbel_keuzes: (waarde, label, uitleg)
+  Werkt zonder JavaScript ('Regels toevoegen' vraagt de server om lege regels). Het script
+  voegt regels toe en haalt ze weg, verdeelt geplakte Excel-cellen over de tabel en
+  voorkomt dat je twee keer op Importeren drukt.
+#}
+{% extends "basis.html" %}
+{% block titel %}Groep importeren{% endblock %}
+
+{% block inhoud %}
+<article class="vel">
+  <header class="blok__kop">
+    <div>
+      <a class="terug" href="{{ url_for('importeren') }}">&larr; Importeren</a>
+      <h1 class="kop kop--pagina">Groep importeren</h1>
+      <p class="subkop">Zet de atleten in de tabel, kies de groep en klik op Importeren. AVS maakt de atleten aan
+        (of herkent ze) en haalt hun prestaties op van atletiek.nu.</p>
+    </div>
+  </header>
+
+  {% if resultaat %}
+    <section class="blok" aria-labelledby="kop-resultaat">
+      <h2 class="kop" id="kop-resultaat">Klaar</h2>
+      <p class="melding" role="status">{{ resultaat.tekst }}</p>
+      {% if resultaat.gelukt %}
+        <div class="tabelvak">
+          <table class="tabel">
+            <thead><tr><th scope="col">Atleet</th><th scope="col">Wat er gebeurde</th><th scope="col" class="rechts">Nieuwe prestaties</th></tr></thead>
+            <tbody>
+              {% for r in resultaat.gelukt %}
+                <tr>
+                  <td><a href="{{ url_for('atleet', master_id=r.uitkomst.atleet.master_id) }}">{{ r.uitkomst.atleet.naam }}</a></td>
+                  <td>{{ r.status }}</td>
+                  <td class="rechts getallen">{{ r.uitkomst.nieuw }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% endif %}
+      {% if resultaat.groep %}
+        <p><a class="knop knop--vol" href="{{ url_for('groep', groep_id=resultaat.groep.id) }}">Naar groep {{ resultaat.groep.naam }} &rarr;</a></p>
+      {% endif %}
+    </section>
+  {% endif %}
+
+  {% if fout and not resultaat %}<p class="melding melding--fout" role="alert">Niet geïmporteerd: {{ fout }}</p>{% endif %}
+
+  <form method="post" class="blok groepimport" id="groepimport" novalidate>
+    <section class="blok" aria-labelledby="kop-atleten">
+      <h2 class="kop" id="kop-atleten">{% if resultaat and resultaat.mislukt %}Nog niet geïmporteerd{% else %}Atleten{% endif %}</h2>
+      <p class="zacht">Eén atleet per regel. Verplicht: voornaam, achternaam en het atletiek.nu-nummer
+        (of de link naar het profiel, bijv. https://www.atletiek.nu/atleet/profiel/123456/).
+        Geboortedatum mag ook alleen een jaar zijn. Uit Excel kopiëren? Klik in de eerste cel en plak:
+        de kolommen worden in deze volgorde verdeeld.</p>
+
+      <div class="tabelvak">
+        <table class="tabel importtabel">
+          <thead>
+            <tr>
+              <th scope="col" class="importtabel__nr"><span class="verborgen">Regel</span>#</th>
+              {% for veld, kop, verplicht in kolommen %}
+                <th scope="col" class="importtabel__{{ veld }}">{{ kop }}{% if verplicht %} <span aria-label="verplicht">*</span>{% endif %}</th>
+              {% endfor %}
+              <th scope="col" class="importtabel__weg"><span class="verborgen">Weghalen</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for rij in rijen %}
+              {% set i = loop.index0 %}
+              <tr class="importrij{% if i in fouten %} importrij--fout{% endif %}">
+                <td class="importtabel__nr" aria-hidden="true"></td>
+                {% for veld, kop, verplicht in kolommen %}
+                  <td><input type="text" class="celveld" name="{{ veld }}" value="{{ rij[veld] }}" aria-label="{{ kop }}, regel {{ i + 1 }}"
+                       {%- if veld == "geboortedatum" %} placeholder="dd-mm-jjjj"{% elif veld == "geslacht" %} placeholder="M/V" maxlength="10"{% elif veld == "atletieknu" %} placeholder="123456"{% endif %} autocomplete="off"></td>
+                {% endfor %}
+                <td class="importtabel__weg"><button type="button" class="kruisje" data-weg aria-label="Regel {{ i + 1 }} weghalen" title="Regel weghalen">&times;</button></td>
+              </tr>
+              {% if i in fouten %}
+                <tr class="importfout"><td></td><td colspan="{{ kolommen | length + 1 }}"><span class="veld__fout">{{ fouten[i] }}</span></td></tr>
+              {% endif %}
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div class="knoppen">
+        <button class="knop" type="submit" name="actie" value="rijen" data-regel-erbij>+ Regel toevoegen</button>
+      </div>
+    </section>
+
+    <fieldset class="blok groepbestemming">
+      <legend class="kop">In welke groep?</legend>
+      <div class="keuzerij">
+        <label class="vinkje"><input type="radio" name="groepsoort" value="bestaand" id="soort-bestaand"
+          {%- if keuze.soort == "bestaand" and groepen %} checked{% endif %}{% if not groepen %} disabled{% endif %}> Bestaande groep</label>
+        <label class="vinkje"><input type="radio" name="groepsoort" value="nieuw" id="soort-nieuw"
+          {%- if keuze.soort == "nieuw" or not groepen %} checked{% endif %}> Nieuwe groep</label>
+      </div>
+      {% if groepen %}
+        <div class="velden alleen-bestaand">
+          <label class="veld veld--breed"><span>Groep</span>
+            <select name="groep_id">
+              <option value="">– kies een groep –</option>
+              {% for g in groepen %}
+                <option value="{{ g.id }}"{% if keuze.groep_id == g.id %} selected{% endif %}>{{ g.naam }}{% if g.seizoen %} ({{ g.seizoen }}){% endif %} · {{ g.leden | length }} {{ "atleet" if g.leden | length == 1 else "atleten" }}</option>
+              {% endfor %}
+            </select>
+          </label>
+        </div>
+        <p class="zacht alleen-bestaand">Wie al in de groep zit, blijft erin; de geïmporteerde atleten komen erbij en krijgen de trainingsdagen van de groep.</p>
+      {% else %}
+        <p class="zacht">Er zijn nog geen groepen, dus AVS maakt een nieuwe.</p>
+      {% endif %}
+      <div class="velden alleen-nieuw">
+        <label class="veld veld--breed"><span>Naam van de nieuwe groep</span>
+          <input type="text" name="groepnaam" value="{{ keuze.naam }}" maxlength="80" placeholder="bijv. U14 meisjes">
+        </label>
+        <label class="veld"><span>Seizoen</span>
+          <input type="text" name="seizoen" value="{{ keuze.seizoen }}" maxlength="20" list="seizoenen" placeholder="bijv. 2026-2027">
+          <datalist id="seizoenen">{% for s in seizoenen %}<option value="{{ s }}">{% endfor %}</datalist>
+        </label>
+      </div>
+      <p class="zacht alleen-nieuw">De trainingsdagen stel je daarna in op de pagina van de groep.</p>
+    </fieldset>
+
+    <fieldset class="blok">
+      <legend class="kop">Zelfde naam</legend>
+      <p class="zacht">Wat moet AVS doen als er al een atleet met dezelfde naam is die nog geen atletiek.nu-nummer heeft?
+        (Een atleet met hetzelfde nummer wordt altijd herkend.)</p>
+      <div class="dubbelkeuze">
+        {% for waarde, label, uitleg in dubbel_keuzes %}
+          <label class="vinkje"><input type="radio" name="dubbel" value="{{ waarde }}"{% if dubbel == waarde %} checked{% endif %}>
+            <span><strong>{{ label }}</strong> <span class="zacht">– {{ uitleg }}</span></span></label>
+        {% endfor %}
+      </div>
+    </fieldset>
+
+    <div class="opslaan opslaan--onder">
+      <p class="zacht importwacht" data-wacht>AVS haalt van elke atleet het profiel op atletiek.nu op; dat duurt een paar seconden per atleet.</p>
+      <a href="{{ url_for('importeren') }}">Annuleren</a>
+      <button class="knop knop--vol" type="submit" data-importeer>Importeren</button>
+    </div>
+  </form>
+
+  <footer class="vel__voet">Atleet Volg Systeem<br>Groep importeren</footer>
+</article>
+
+<script>
+(function () {
+  var form = document.getElementById("groepimport");
+  var tbody = form.querySelector(".importtabel tbody");
+  var velden = Array.prototype.map.call(form.querySelectorAll(".importtabel thead th[class^='importtabel__']"),
+    function (th) { return th.className.replace("importtabel__", ""); })
+    .filter(function (v) { return v !== "nr" && v !== "weg"; });
+
+  function regels() { return Array.prototype.slice.call(tbody.querySelectorAll("tr.importrij")); }
+
+  function leegmaken(tr) {
+    tr.classList.remove("importrij--fout");
+    tr.querySelectorAll("input").forEach(function (i) { i.value = ""; });
+  }
+
+  function foutWeg(tr) {
+    var volgende = tr.nextElementSibling;
+    if (volgende && volgende.classList.contains("importfout")) { volgende.remove(); }
+    tr.classList.remove("importrij--fout");
+  }
+
+  function nummeren() {
+    regels().forEach(function (tr, n) {
+      tr.querySelectorAll("input").forEach(function (inp, k) {
+        inp.setAttribute("aria-label", inp.getAttribute("aria-label").replace(/regel \d+$/, "regel " + (n + 1)));
+      });
+      tr.querySelector("[data-weg]").setAttribute("aria-label", "Regel " + (n + 1) + " weghalen");
+    });
+  }
+
+  function regelErbij() {
+    var alle = regels();
+    var nieuw = alle[alle.length - 1].cloneNode(true);
+    leegmaken(nieuw);
+    tbody.appendChild(nieuw);
+    nummeren();
+    return nieuw;
+  }
+
+  form.querySelector("[data-regel-erbij]").addEventListener("click", function (e) {
+    e.preventDefault();
+    regelErbij().querySelector("input").focus();
+  });
+
+  tbody.addEventListener("click", function (e) {
+    var knop = e.target.closest("[data-weg]");
+    if (!knop) { return; }
+    var tr = knop.closest("tr");
+    foutWeg(tr);
+    if (regels().length > 1) { tr.remove(); } else { leegmaken(tr); }
+    nummeren();
+  });
+
+  // Plakken uit Excel/Google Sheets: tabs = kolommen, regels = rijen.
+  tbody.addEventListener("paste", function (e) {
+    var cel = e.target.closest("input.celveld");
+    var tekst = (e.clipboardData || window.clipboardData).getData("text");
+    if (!cel || !/[\t\n]/.test(tekst.replace(/\n$/, ""))) { return; }
+    e.preventDefault();
+    var lijnen = tekst.replace(/\r/g, "").replace(/\n+$/, "").split("\n").map(function (l) { return l.split("\t"); });
+    if (lijnen.length > 1 && /naam/i.test(lijnen[0].join(" ")) && !/\d/.test(lijnen[0].join(""))) {
+      lijnen.shift();                                   // kopregel uit Excel overslaan
+    }
+    var tr = cel.closest("tr");
+    var start = velden.indexOf(cel.name);
+    lijnen.forEach(function (cellen, n) {
+      if (n > 0) {
+        var volgende = tr.nextElementSibling;
+        while (volgende && !volgende.classList.contains("importrij")) { volgende = volgende.nextElementSibling; }
+        tr = volgende || regelErbij();
+      }
+      foutWeg(tr);
+      cellen.forEach(function (waarde, k) {
+        var veld = velden[start + k];
+        var inp = veld && tr.querySelector("input[name='" + veld + "']");
+        if (inp) { inp.value = waarde.trim(); }
+      });
+    });
+  });
+
+  form.addEventListener("submit", function (e) {
+    if (e.submitter && e.submitter.name === "actie") { return; }
+    var knop = form.querySelector("[data-importeer]");
+    if (knop.disabled) { e.preventDefault(); return; }
+    var n = regels().filter(function (tr) {
+      return Array.prototype.some.call(tr.querySelectorAll("input"), function (i) { return i.value.trim(); });
+    }).length;
+    knop.disabled = true;
+    knop.textContent = "Bezig met importeren…";
+    var wacht = form.querySelector("[data-wacht]");
+    var sec = Math.max(5, n * 4);
+    wacht.textContent = "Bezig met " + n + (n === 1 ? " atleet" : " atleten") + ". Dit duurt ongeveer "
+      + (sec < 90 ? sec + " seconden" : Math.round(sec / 60) + " minuten") + "; laat deze pagina open.";
+  });
+})();
+</script>
+{% endblock %}

@@ -127,6 +127,9 @@ AVS/
 │   ├── groepen/
 │   │   ├── groep.py              ✅ new group, members, training times per weekday (pre-fills trainingsschema), weekly timetable
 │   │   ├── absentie.py           ✅ attendance list pre-filled from the training schedule, overview per athlete
+│   │   ├── groep_importeren.py   ✅ page 'Groep importeren': table (typed or pasted from Excel) → CSV in memory →
+│   │   │                         atleten_uit_csv (same checks + import) → successful athletes into an existing
+│   │   │                         or a new group. Table/group errors stop everything before anything is fetched
 │   │   └── periodeplan.py        📝
 │   │
 │   ├── leerlijnen/               📝
@@ -135,8 +138,8 @@ AVS/
 │       ├── app.py
 │       ├── markdown.py           ✅ safe markdown subset for training texts (Jinja filter `markdown`)
 │       ├── startpagina.py        ✅ start page: big tiles to Atleten, Groepen, Ploegen, Wedstrijden (counts only, no names)
-│       ├── importeren.py         ✅ page 'Importeren': three tiles to /importeren/atleet, /groep, /wedstrijd
-│       │                         (those three pages are still placeholders: 'Deze pagina komt nog')
+│       ├── importeren.py         ✅ page 'Importeren': three tiles. Atleet → 'Nieuwe atleet' (/atleten/nieuw),
+│       │                         Groep → 'Groep importeren' (/importeren/groep), Wedstrijd → 'Nieuwe wedstrijd' (/wedstrijden/nieuw)
 │       ├── templates/
 │       └── static/
 │
@@ -156,7 +159,8 @@ AVS/
     ├── test_atleet_inschrijven.py ✅ 4 tests ('+ Inschrijven' from an athlete: pick or create a meet, pre-ticked, back)
     ├── test_groep_starttijden.py ✅ 7 tests (training times, moving old data, duplicate migration numbers)
     ├── test_startpagina.py       ✅ 3 tests (tiles, counts, top bar with only Importeren + Instellingen)
-    ├── test_importeren.py        ✅ 4 tests (three tiles, sub-pages work and lead back to Importeren, no names)
+    ├── test_importeren.py        ✅ 5 tests (three tiles and their targets, redirects to the forms, group page, no names)
+    ├── test_groep_importeren.py  ✅ 10 tests (table → CSV, errors per row, new/existing group, re-import, failures, same name, page)
     ├── test_trainingen_inhoud.py ✅ 5 tests (training parts, variants, markdown, old `inhoud` → `notities`)
     ├── test_leerdoelen.py        ✅ 10 tests
     ├── test_importers.py         📝 on this branch

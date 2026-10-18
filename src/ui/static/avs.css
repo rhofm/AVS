@@ -760,3 +760,42 @@ th[aria-sort="descending"] .sorteer__naam::after { content: " \2193"; opacity: 1
   .tegel__cijfer { font-size: var(--maat-xl); }
 }
 @media (prefers-reduced-motion: reduce) { .tegel, .tegel:hover { transform: none; } }
+
+/* ---------- groep importeren (templates/groep_importeren.html) ---------- */
+.groepimport { gap: 2rem; }
+.importtabel { min-width: 56rem; counter-reset: importregel; }
+.importtabel th, .importtabel td { padding: .25rem .3rem; vertical-align: middle; }
+.importtabel thead th { padding: .45rem .5rem; white-space: nowrap; }
+.importtabel tr.importrij { counter-increment: importregel; }
+.importtabel td.importtabel__nr::before { content: counter(importregel); }
+.importtabel .importtabel__nr { width: 2.2rem; text-align: right; color: var(--tekst-zacht); font-variant-numeric: tabular-nums; }
+.importtabel thead .importtabel__nr { color: var(--op-zalm); }
+.importtabel .importtabel__weg { width: 2rem; text-align: center; }
+.importtabel .importtabel__tussenvoegsel { width: 5.5rem; }
+.importtabel .importtabel__geslacht { width: 4rem; }
+.importtabel .importtabel__geboortedatum { width: 8.5rem; }
+.celveld {
+  width: 100%; min-width: 0; box-sizing: border-box; font: inherit; font-size: var(--maat-s);
+  padding: .3rem .4rem; border: 1px solid transparent; background: var(--papier); color: var(--tekst);
+}
+.celveld:hover { border-color: var(--rand); }
+.celveld:focus-visible { outline: 2px solid var(--rood); outline-offset: 0; }
+.celveld::placeholder { color: var(--tekst-zacht); opacity: .7; }
+.importtabel tr.importrij--fout td { box-shadow: inset 0 -2px 0 var(--rood); }
+.importtabel tr.importrij--fout td:first-child { box-shadow: inset 4px 0 0 var(--rood), inset 0 -2px 0 var(--rood); }
+.importtabel tr.importfout td { background: var(--papier) !important; padding-top: .15rem; padding-bottom: .5rem; }
+.groepbestemming, .groepimport fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
+.groepimport legend { padding: 0; margin-bottom: .4rem; }
+.groepbestemming:has(#soort-nieuw:checked) .alleen-bestaand,
+.groepbestemming:has(#soort-bestaand:checked) .alleen-nieuw { display: none; }
+.groepbestemming .keuzerij .vinkje, .dubbelkeuze .vinkje { font-size: var(--maat-m); }
+.groepbestemming .vinkje input, .dubbelkeuze .vinkje input { accent-color: var(--rood); width: 1.05rem; height: 1.05rem; }
+.veld select {
+  font: inherit; font-size: var(--maat-m); font-weight: 400; color: var(--tekst); background: var(--papier);
+  border: 1px solid var(--rand); padding: .45rem .55rem; width: 100%; min-width: 0;
+}
+.veld select:focus-visible { outline: 2px solid var(--rood); outline-offset: 1px; }
+.dubbelkeuze { display: grid; gap: .5rem; }
+.dubbelkeuze .vinkje { align-items: flex-start; }
+.dubbelkeuze .vinkje input { margin-top: .2rem; flex: none; }
+.importwacht { margin: 0 auto 0 0; max-width: 34rem; }

@@ -38,6 +38,7 @@ from atleten.aanwezigheid import aanwezigheid
 from db.init_db import SleutelFout, init_db
 from db.queries import Opslag, OpslagFout
 from groepen import groep as groepsbeheer
+from groepen import groep_importeren
 from groepen.groepenoverzicht import GEEN_SEIZOEN, groepenoverzicht
 from groepen import landingspagina as groep_landingspagina
 from groepen import overzichten as groep_overzichten
@@ -836,12 +837,58 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
     def importeren():
         return render_template("importeren.html", keuzes=importeerpagina.KEUZES, actief_menu="importeren")
 
-    @app.get("/importeren/<any(" + ", ".join(importeerpagina.PER_SLEUTEL) + "):soort>")
+    @app.get("/importeren/<any(" + ", ".join(importeerpagina.DOORSTUREN) + "):soort>")
     def importeren_soort(soort: str):
-        """Eén soort import. De pagina's zelf komen nog; tot dan 'Deze pagina komt nog'."""
-        k = importeerpagina.PER_SLEUTEL[soort]
-        return render_template("binnenkort.html", titel=f"{k.titel} importeren", terug_url=url_for("importeren"),
-                               terug_naam="Importeren", actief_menu="importeren")
+        """Oude adressen (/importeren/atleet, /importeren/wedstrijd): door naar het formulier."""
+        return redirect(url_for(importeerpagina.DOORSTUREN[soort]))
+
+    def _haal_profiel():
+        """Profielpagina's van atletiek.nu ophalen (met pauze); tests zetten AVS_HAAL_PROFIEL."""
+        haal = app.config.get("AVS_HAAL_PROFIEL")
+        if haal is None:
+            from groepen.atleten_uit_csv import STANDAARD_PAUZE, maak_haal_html
+            haal = maak_haal_html(None, STANDAARD_PAUZE)
+        return haal
+
+    def _groepimport(rijen=None, keuze=None, dubbel="overslaan", *, fouten=None, fout=None, resultaat=None,
+                     status: int = 200):
+        groepen = sorted(db().groepen(), key=lambda g: ((g.seizoen or ""), g.naam.lower()), reverse=True)
+        if keuze is None:
+            gevraagd = request.args.get("groep", "")
+            keuze = groep_importeren.Groepkeuze(
+                "bestaand" if groepen else "nieuw",
+                int(gevraagd) if gevraagd.isdigit() else None,
+                seizoen=groepsbeheer.huidig_seizoen(date.today()))
+        return render_template(
+            "groep_importeren.html", rijen=groep_importeren.aangevuld(rijen or []), kolommen=groep_importeren.KOLOMMEN,
+            fouten=fouten or {}, fout=fout, resultaat=resultaat, keuze=keuze, dubbel=dubbel,
+            dubbel_keuzes=groep_importeren.DUBBEL_KEUZES, groepen=groepen,
+            seizoenen=groepsbeheer.seizoenkeuzes(db()), actief_menu="importeren"), status
+
+    @app.get("/importeren/groep")
+    def importeren_groep():
+        return _groepimport()
+
+    @app.post("/importeren/groep")
+    def importeren_groep_opslaan():
+        f = request.form
+        rijen = groep_importeren.rijen_uit_formulier(f)
+        keuze = groep_importeren.lees_groepkeuze(f)
+        dubbel = f.get("dubbel") if f.get("dubbel") in ("overslaan", "zelfde", "nieuw") else "overslaan"
+        if f.get("actie") == "rijen":                  # 'Regels toevoegen' zonder JavaScript
+            rijen = rijen + [groep_importeren.lege_rij() for _ in range(groep_importeren.RIJEN_ERBIJ)]
+            return _groepimport(rijen, keuze, dubbel)
+        try:
+            res = groep_importeren.importeren(db(), rijen, keuze, haal_html=_haal_profiel(), dubbel=dubbel)
+        except groep_importeren.TabelFout as e:
+            return _groepimport(rijen, keuze, dubbel, fouten=e.fouten, fout=str(e), status=400)
+        except OpslagFout as e:
+            return _groepimport(rijen, keuze, dubbel, fout=str(e), status=400)
+        # Mislukte regels staan weer in de tabel. Is er een groep, dan gaat een volgende poging naar díe groep.
+        if res.groep is not None:
+            keuze = groep_importeren.Groepkeuze("bestaand", res.groep.id, seizoen=keuze.seizoen)
+        return _groepimport([r.rij for r in res.mislukt], keuze, dubbel,
+                            fouten={i: r.reden for i, r in enumerate(res.mislukt)}, resultaat=res)
 
     # ---------------- nog te bouwen ----------------
     @app.get("/<any(" + ", ".join(BINNENKORT) + "):onderdeel>")
