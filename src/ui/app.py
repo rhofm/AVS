@@ -49,7 +49,7 @@ from ui import importeren as importeerpagina
 from ui import startpagina
 from ui.opmaak import registreer_filters
 from wedstrijden import detail as wedstrijddetail
-from wedstrijden import kalender, tijdschema_import
+from wedstrijden import kalender, tijdschema_import, uitslag_import
 from wedstrijden.overzicht import wedstrijdenoverzicht
 
 HOST = "127.0.0.1"
@@ -459,6 +459,45 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
                 tekst += f" De link is niet bewaard: {e}"
         flash(tekst)
         return redirect(url_for("wedstrijd", wedstrijd_id=wedstrijd_id) + "#kop-tijdschema")
+
+    @app.post("/wedstrijd/<int:wedstrijd_id>/uitslagen")
+    def wedstrijd_uitslagen(wedstrijd_id: int):
+        """Uitslag van atletiek.nu of Seltec ophalen en de prestaties van onze atleten opslaan.
+        Wie alleen op naam overeenkomt, controleert de trainer eerst (pagina 'Uitslagen controleren')."""
+        if db().wedstrijd(wedstrijd_id) is None:
+            abort(404)
+        try:
+            verslag = uitslag_import.uitslagen_importeren(db(), wedstrijd_id)
+        except OpslagFout as e:
+            return _wedstrijdpagina(wedstrijd_id, fout=f"Uitslagen niet geïmporteerd: {e}", status=400)
+        except Exception as e:                         # netwerk, onverwachte pagina, ...
+            app.logger.warning("Uitslagen ophalen mislukt: %s", type(e).__name__)
+            return _wedstrijdpagina(wedstrijd_id, fout=f"Uitslagen niet geïmporteerd: {NIET_BEREIKBAAR}",
+                                    status=502)
+        if verslag.te_controleren:
+            return render_template("wedstrijd_uitslagen.html", w=db().wedstrijd(wedstrijd_id), verslag=verslag,
+                                   naar_formulier=uitslag_import.naar_formulier, fout=None,
+                                   actief_menu="wedstrijden")
+        flash(verslag.tekst)
+        return redirect(url_for("wedstrijd", wedstrijd_id=wedstrijd_id) + "#kop-uitslagen")
+
+    @app.post("/wedstrijd/<int:wedstrijd_id>/uitslagen/bevestigen")
+    def wedstrijd_uitslagen_bevestigen(wedstrijd_id: int):
+        if db().wedstrijd(wedstrijd_id) is None:
+            abort(404)
+        try:
+            lijst = uitslag_import.uit_formulier(db(), wedstrijd_id, request.form)
+            keuzes = {t.sleutel: request.form.get(f"keuze-{t.sleutel}", "") for t in lijst}
+            nieuw, bekend, namen = uitslag_import.uitslagen_bevestigen(db(), wedstrijd_id, keuzes, lijst)
+        except OpslagFout as e:
+            return _wedstrijdpagina(wedstrijd_id, fout=f"Niet opgeslagen: {e}", status=400)
+        if namen:
+            tekst = (f"{nieuw} prestatie{'s' if nieuw != 1 else ''} opgeslagen voor {', '.join(namen)}."
+                     + (f" {bekend} stonden er al." if bekend else ""))
+        else:
+            tekst = "Niemand gekoppeld; er is niets extra opgeslagen."
+        flash(tekst)
+        return redirect(url_for("wedstrijd", wedstrijd_id=wedstrijd_id) + "#kop-uitslagen")
 
     def _bewerkpagina_wedstrijd(wedstrijd_id: int, g=None, fout: str | None = None, status: int = 200,
                                 formulier=None):

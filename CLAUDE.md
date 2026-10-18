@@ -228,6 +228,13 @@ python src/db/init_db.py --herstel <sleutel>  # restore the key (e.g. new comput
   (1st, 2nd, ...), `opmerking`. Who has to be where is computed by
   `wedstrijden/chronoloog.py` from the registrations and the athlete's
   category on the day of the meet; never store per-athlete times.
+- Results of a held meet are imported with `wedstrijden/uitslag_import.py`
+  (button 'Uitslagen importeren' on the meet page). Only certain matches are
+  saved automatically (`koppelen.py`, or the name of exactly one athlete
+  registered for the meet); name-only matches wait for the trainer. Between
+  import and confirmation nothing is kept on the server: the form carries the
+  candidate master_ids and the values (re-checked on submit); the name and club
+  from the site are only shown, never stored.
 - A planned meet and its results are the **same** `wedstrijd` row. Always pass
   meet links through `wedstrijden.planning.normaliseer_link()` before saving,
   so an atletiek.nu `/main/`, `/inschrijvingen/` or `/uitslagen/` link all

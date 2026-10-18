@@ -99,6 +99,8 @@ AVS/
 │   │                             later results import finds the same meet
 │   │   ├── kalender.py           ✅ planning of one athlete or a group as list and month calendar
 │   │   ├── chronoloog.py         ✅ timetable: personal schedule per athlete, participants per item, clashes / too little rest
+│   │   ├── uitslag_import.py     ✅ results of a held meet (atletiek.nu or Seltec) → prestaties of our athletes; name-only
+│   │   │                         matches are confirmed by the trainer ('Uitslagen controleren'); other clubs skipped
 │   │   ├── tijdschema_import.py  ✅ atletiek.nu or Seltec timetable → wedstrijd_programma (replaces it; events matched by name/code)
 │   │   │                         `wedstrijd_uit_link`: new meet (name, date, place + timetable) from a link
 │   │   ├── overzicht.py          ✅ page 'Wedstrijden': upcoming meets, past meets behind a checkbox (counts only, no names)
@@ -157,6 +159,7 @@ AVS/
     ├── test_wedstrijd_nieuw.py   ✅ 9 tests (new meet from a link or by hand, edit details, timetable button)
     ├── test_tijdschema_aanpassen.py ✅ 5 tests (move rows: time, duration, day; re-sorting; errors save nothing)
     ├── test_atleet_inschrijven.py ✅ 4 tests ('+ Inschrijven' from an athlete: pick or create a meet, pre-ticked, back)
+    ├── test_uitslag_import.py    ✅ 7 tests (meet results: matching, confirm step, re-import, Seltec birth year, page button)
     ├── test_groep_starttijden.py ✅ 7 tests (training times, moving old data, duplicate migration numbers)
     ├── test_startpagina.py       ✅ 3 tests (tiles, counts, top bar with only Importeren + Instellingen)
     ├── test_importeren.py        ✅ 5 tests (three tiles and their targets, redirects to the forms, group page, no names)

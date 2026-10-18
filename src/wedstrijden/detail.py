@@ -86,12 +86,36 @@ class Deelnemer:
 
 
 @dataclass
+class UitslagRij:
+    """Eén prestatie van een van onze atleten op deze wedstrijd."""
+    atleet: Atleet
+    onderdeel: str
+    prestatie: str                            # zoals trainers hem lezen: '12,93', '1:58,21', '4,80 m'
+    wind: float | None
+    pr: bool                                  # is dit (nu) het PR van de atleet op dit onderdeel?
+
+    @property
+    def wind_tekst(self) -> str:
+        return "" if self.wind is None else f"{self.wind:+.1f}".replace(".", ",")
+
+
+@dataclass
 class WedstrijdDetail:
     wedstrijd: Wedstrijd
     dagen: list[TijdschemaDag]
     deelnemers: list[Deelnemer]
     botsingen: list[chronoloog.Botsing]
     dagen_tot: int                            # 0 = vandaag, negatief = geweest
+    uitslagen: list[UitslagRij] = field(default_factory=list)   # op achternaam, dan onderdeel
+
+    @property
+    def uitslag_mogelijk(self) -> bool:
+        """Vanaf de wedstrijddag kun je de uitslag importeren."""
+        return self.dagen_tot <= 0
+
+    @property
+    def aantal_met_uitslag(self) -> int:
+        return len({r.atleet.master_id for r in self.uitslagen})
 
     @property
     def geweest(self) -> bool:
@@ -165,7 +189,25 @@ def wedstrijd_detail(db: Opslag, wedstrijd_id: int, peildatum: date | None = Non
     deelnemers.sort(key=lambda d: _sorteer(d.atleet))
 
     return WedstrijdDetail(w, dagen, deelnemers, chronoloog.botsingen(db, wedstrijd_id),
-                           (w.datum - vandaag).days)
+                           (w.datum - vandaag).days, _uitslagen(db, wedstrijd_id, alle_onderdelen))
+
+
+def _uitslagen(db: Opslag, wedstrijd_id: int, onderdelen: dict[int, Onderdeel]) -> list[UitslagRij]:
+    from atleten.prestaties import toon_waarde
+    uit, atleten, prs = [], {}, {}
+    for p in db.prestaties_van_wedstrijd(wedstrijd_id):
+        o = onderdelen.get(p.onderdeel_id)
+        if o is None:
+            continue
+        if p.atleet_id not in atleten:
+            atleten[p.atleet_id] = db.atleet(p.atleet_id)
+            prs[p.atleet_id] = {x.onderdeel_id: x.waarde for x in db.prs(p.atleet_id)}
+        a = atleten[p.atleet_id]
+        if a is None:
+            continue
+        uit.append(UitslagRij(a, o.naam, toon_waarde(p.waarde, o.eenheid), p.wind,
+                              prs[p.atleet_id].get(o.id) == p.waarde))
+    return sorted(uit, key=lambda r: (*_sorteer(r.atleet), r.onderdeel.lower()))
 
 
 # ============================================================

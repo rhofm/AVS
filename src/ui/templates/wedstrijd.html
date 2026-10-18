@@ -36,17 +36,61 @@
             {{- "Tijdschema bijwerken" if d.heeft_tijdschema else "Tijdschema importeren" -}}</button>
         </form>
       {% endif %}
-      <a class="knop knop--vol" href="{{ url_for('wedstrijd_inschrijven', wedstrijd_id=w.id) }}">+ Atleten inschrijven</a>
+      {% if d.uitslag_mogelijk and w.bron_url %}
+        <form method="post" action="{{ url_for('wedstrijd_uitslagen', wedstrijd_id=w.id) }}" class="uitslagknop">
+          <button class="knop knop--vol" type="submit" title="Haal de uitslag op van {{ w.bron_url }} (dit kan even duren)">
+            {{- "Uitslagen bijwerken" if d.uitslagen else "Uitslagen importeren" -}}</button>
+        </form>
+      {% endif %}
+      <a class="knop{{ '' if d.uitslag_mogelijk else ' knop--vol' }}" href="{{ url_for('wedstrijd_inschrijven', wedstrijd_id=w.id) }}">+ Atleten inschrijven</a>
     </div>
   </header>
 
   {% if melding %}<p class="melding" role="status">{{ melding }}</p>{% endif %}
   {% if fout %}<p class="melding melding--fout" role="alert">{{ fout }}</p>{% endif %}
 
-  {% if d.botsingen %}
+  {% if d.botsingen and not d.geweest %}
     <section class="melding melding--fout botsingen" aria-labelledby="kop-botsingen">
       <strong id="kop-botsingen">Let op: {{ d.botsingen | length }} botsing{{ "en" if d.botsingen | length != 1 }} in het tijdschema</strong>
       <ul>{% for b in d.botsingen %}<li>{{ b.tekst }}</li>{% endfor %}</ul>
+    </section>
+  {% endif %}
+
+  {# ---------------- Uitslagen (vanaf de wedstrijddag) ---------------- #}
+  {% if d.uitslag_mogelijk or d.uitslagen %}
+    <section class="blok" aria-labelledby="kop-uitslagen">
+      <h2 class="kop" id="kop-uitslagen">Uitslagen
+        {%- if d.uitslagen %} <span class="zacht getallen">({{ d.uitslagen | length }} prestatie{{ "s" if d.uitslagen | length != 1 }} van {{ d.aantal_met_uitslag }} {{ "atleet" if d.aantal_met_uitslag == 1 else "atleten" }})</span>{% endif %}</h2>
+      {% if d.uitslagen %}
+        <div class="tabelvak">
+          <table class="tabel" id="tabel-uitslagen">
+            <thead>
+              <tr>
+                <th scope="col">Atleet</th>
+                <th scope="col">Onderdeel</th>
+                <th scope="col" class="rechts">Prestatie</th>
+                <th scope="col" class="rechts">Wind</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for r in d.uitslagen %}
+                <tr>
+                  <th scope="row">{% if loop.first or loop.previtem.atleet.master_id != r.atleet.master_id %}{{ atleetlink(r.atleet) }}{% endif %}</th>
+                  <td>{{ r.onderdeel }}</td>
+                  <td class="rechts getallen nowrap"><strong>{{ r.prestatie }}</strong>{% if r.pr %} <span class="kenmerk kenmerk--pr" title="Persoonlijk record">PR</span>{% endif %}</td>
+                  <td class="rechts getallen">{{ r.wind_tekst or "–" }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% elif w.bron_url %}
+        <p class="leeg">Nog geen uitslagen. Staat de uitslag online? Haal hem op met &lsquo;Uitslagen importeren&rsquo; bovenaan
+          (dit kan even duren: elk onderdeel is een eigen pagina).</p>
+      {% else %}
+        <p class="leeg">Nog geen uitslagen. Vul bij <a href="{{ url_for('wedstrijd_bewerken', wedstrijd_id=w.id) }}">Gegevens wijzigen</a>
+          de link naar de wedstrijd op atletiek.nu of Seltec in; dan kun je de uitslag hier importeren.</p>
+      {% endif %}
     </section>
   {% endif %}
 

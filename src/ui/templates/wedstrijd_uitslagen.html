@@ -1,0 +1,76 @@
+{#
+  Uitslagen controleren: na het importeren van een uitslag staan hier de personen
+  van wie alleen de naam overeenkomt met een atleet van ons. De trainer kiest per
+  persoon de juiste atleet, of 'Niet van ons'. Wat zeker was, is al opgeslagen.
+  Context:
+    w       – models.Wedstrijd
+    verslag – wedstrijden.uitslag_import.UitslagVerslag
+    naar_formulier – functie: prestaties van één persoon als JSON (verborgen veld, zonder namen)
+    fout    – foutmelding (optioneel)
+#}
+{% extends "basis.html" %}
+{% block titel %}Uitslagen controleren · {{ w.naam }}{% endblock %}
+
+{% block inhoud %}
+<article class="vel">
+  <header class="blok__kop">
+    <div>
+      <a class="terug" href="{{ url_for('wedstrijd', wedstrijd_id=w.id) }}">&larr; {{ w.naam }}</a>
+      <h1 class="kop kop--pagina">Uitslagen controleren</h1>
+      <p class="subkop">Hoort deze uitslag bij een atleet van ons? Alleen de naam komt overeen.</p>
+    </div>
+  </header>
+
+  <p class="melding" role="status">{{ verslag.tekst }}</p>
+  {% if fout %}<p class="melding melding--fout" role="alert">{{ fout }}</p>{% endif %}
+
+  <form method="post" action="{{ url_for('wedstrijd_uitslagen_bevestigen', wedstrijd_id=w.id) }}" class="blok" style="gap: 1.5rem">
+    <div class="tabelvak">
+      <table class="tabel" id="tabel-controle">
+        <thead>
+          <tr>
+            <th scope="col">Op de uitslag</th>
+            <th scope="col">Club op de uitslag</th>
+            <th scope="col">Onderdelen</th>
+            <th scope="col">Is dit…</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for t in verslag.te_controleren %}
+            <tr>
+              <th scope="row">{{ t.naam }}
+                <input type="hidden" name="sleutel" value="{{ t.sleutel }}">
+                <input type="hidden" name="naam-{{ t.sleutel }}" value="{{ t.naam }}">
+                <input type="hidden" name="club-{{ t.sleutel }}" value="{{ t.club }}">
+                <input type="hidden" name="prestaties-{{ t.sleutel }}" value="{{ naar_formulier(t) }}">
+                {% for a in t.kandidaten %}<input type="hidden" name="kandidaat-{{ t.sleutel }}" value="{{ a.master_id }}">{% endfor %}
+              </th>
+              <td>{{ t.club or "–" }}</td>
+              <td>{{ t.samenvatting }}</td>
+              <td>
+                <fieldset class="keuzerij">
+                  <legend class="verborgen">Wie is {{ t.naam }}?</legend>
+                  {% for a in t.kandidaten %}
+                    <label class="vinkje"><input type="radio" name="keuze-{{ t.sleutel }}" value="{{ a.master_id }}"
+                      {%- if t.kandidaten | length == 1 %} checked{% endif %}>
+                      {{ a.naam }}{% if a.geboortejaar %} <span class="zacht">({{ a.geboortejaar }}{% if a.club %}, {{ a.club }}{% endif %})</span>{% elif a.club %} <span class="zacht">({{ a.club }})</span>{% endif %}</label>
+                  {% endfor %}
+                  <label class="vinkje"><input type="radio" name="keuze-{{ t.sleutel }}" value=""
+                    {%- if t.kandidaten | length != 1 %} checked{% endif %}> Niet van ons</label>
+                </fieldset>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="opslaan opslaan--onder">
+      <a href="{{ url_for('wedstrijd', wedstrijd_id=w.id) }}">Overslaan</a>
+      <button class="knop knop--vol" type="submit">Opslaan</button>
+    </div>
+  </form>
+
+  <footer class="vel__voet">Atleet Volg Systeem<br>{{ w.naam }}</footer>
+</article>
+{% endblock %}
