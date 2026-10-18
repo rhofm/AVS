@@ -3,6 +3,8 @@
     d = wedstrijd_detail(db, wedstrijd_id)          # voor ui/templates/wedstrijd.html
     f = inschrijfformulier(db, wedstrijd_id, regel_id=12)
     aantal = inschrijven_uit_formulier(db, wedstrijd_id, ["<master_id>", ...], [3, 7])
+    w = gegevens_opslaan(db, wedstrijd_id, Gegevens("Clubkampioenschappen", "2027-05-15"))  # wijzigen
+    w = gegevens_opslaan(db, None, Gegevens("Clubkampioenschappen", "2027-05-15"))          # nieuw, met de hand
 
 Wie bij welke regel van het tijdschema hoort, rekent wedstrijden/chronoloog.py
 uit (inschrijving + categorie van de atleet op de wedstrijddag); hier wordt het
@@ -20,7 +22,7 @@ Geen SQL: alles via `Opslag`.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import date
 from typing import Iterable
 
@@ -297,3 +299,183 @@ def afmelden(db: Opslag, wedstrijd_id: int, master_id: str, onderdeel_id: int | 
     if not [i for i in db.inschrijvingen(master_id) if i.wedstrijd_id == wedstrijd_id]:
         planning.inschrijven(db, wedstrijd_id, master_id)            # blijft mee, onderdelen volgen nog
     return f"{a.naam} is afgemeld voor {o.naam}."
+
+
+# ============================================================
+# Gegevens van de wedstrijd (nieuw met de hand, of wijzigen)
+# ============================================================
+@dataclass
+class Gegevens:
+    """Wat er in het formulier staat (ook na een fout, zodat niets opnieuw getypt hoeft)."""
+    naam: str = ""
+    datum: str = ""                    # 'YYYY-MM-DD' zoals <input type="date"> hem geeft
+    locatie: str = ""
+    link: str = ""
+    indoor: bool = False
+
+    @classmethod
+    def van(cls, w: Wedstrijd) -> Gegevens:
+        return cls(w.naam, w.datum.isoformat(), w.locatie or "", w.bron_url or "", w.indoor)
+
+
+def gegevens_opslaan(db: Opslag, wedstrijd_id: int | None, g: Gegevens) -> Wedstrijd:
+    """Nieuwe wedstrijd (wedstrijd_id None) of de gegevens van een bestaande wijzigen.
+
+    De link wordt genormaliseerd (zie planning.normaliseer_link) en mag niet al bij
+    een andere wedstrijd horen: dan zouden planning en uitslag uit elkaar lopen.
+    Het tijdschema verandert niet; werk dat bij met 'Tijdschema bijwerken'.
+    """
+    naam = " ".join(g.naam.split())
+    if not naam:
+        raise OpslagFout("Geef de wedstrijd een naam.")
+    try:
+        datum = date.fromisoformat(g.datum.strip())
+    except ValueError:
+        raise OpslagFout("Vul een geldige datum in.") from None
+    link = planning.normaliseer_link(g.link)
+    if link and not link.lower().startswith(("http://", "https://")):
+        raise OpslagFout("De link moet beginnen met https:// (bijv. een pagina op atletiek.nu of Seltec).")
+
+    oud = None
+    if wedstrijd_id is not None:
+        oud = db.wedstrijd(wedstrijd_id)
+        if oud is None:
+            raise OpslagFout(f"Wedstrijd {wedstrijd_id} bestaat niet.")
+    if link:
+        ander = next((w for w in db.wedstrijden() if w.bron_url == link and w.id != wedstrijd_id), None)
+        if ander is not None:
+            raise OpslagFout(f"Deze link hoort al bij de wedstrijd '{ander.naam}' van {ander.datum.isoformat()}.")
+    bron = planning.bron_uit_link(link)
+    if oud is not None and not link and oud.bron != "handmatig" and db.prestaties_van_wedstrijd(oud.id):
+        bron = oud.bron                  # uitslag al geïmporteerd: herkomst blijft kloppen
+    w = Wedstrijd(naam=naam, datum=datum, locatie=" ".join(g.locatie.split()) or None, bron=bron,
+                  bron_url=link, indoor=bool(g.indoor), id=wedstrijd_id)
+    return db.wedstrijd_opslaan(w)
+
+
+# ============================================================
+# Tijdschema aanpassen (tijd, duur en dag per regel)
+# ============================================================
+# Voor als één of een paar onderdelen wat verschuiven. Alleen de regels die echt
+# veranderen worden opgeslagen; de volgorde volgt daarna vanzelf uit dag en tijd
+# (Opslag.programma sorteert daarop). Let op: 'Tijdschema bijwerken' haalt alles
+# opnieuw op van de site en overschrijft deze aanpassingen.
+
+def _veld(soort: str, regel_id: int) -> str:
+    return f"{soort}-{regel_id}"
+
+
+@dataclass
+class RegelInvoer:
+    regel: ProgrammaOnderdeel           # zoals opgeslagen
+    dag: str                            # 'YYYY-MM-DD', zoals in het formulier
+    tijd: str                           # 'HH:MM'
+    duur: str                           # minuten als tekst; '' = onbekend
+
+    @property
+    def veld_dag(self) -> str:
+        return _veld("dag", self.regel.id)
+
+    @property
+    def veld_tijd(self) -> str:
+        return _veld("tijd", self.regel.id)
+
+    @property
+    def veld_duur(self) -> str:
+        return _veld("duur", self.regel.id)
+
+    @property
+    def details(self) -> str:
+        r = self.regel
+        return ", ".join(x for x in (r.ronde, f"groep {r.groep}" if r.groep else "") if x)
+
+
+@dataclass
+class TijdschemaFormulier:
+    regels: list[RegelInvoer]           # op dag en tijd zoals opgeslagen
+    dagen: list[date]                   # de dagen van de wedstrijd (voor de keuzelijst)
+
+    @property
+    def meerdaags(self) -> bool:
+        return len(self.dagen) > 1
+
+
+def tijdschemaformulier(db: Opslag, wedstrijd_id: int, formulier=None) -> TijdschemaFormulier:
+    """De regels om aan te passen; met `formulier` (na een fout) staan de ingevulde waarden erin."""
+    regels = db.programma(wedstrijd_id)
+    w = db.wedstrijd(wedstrijd_id)
+    dagen = sorted({r.datum for r in regels} | ({w.datum} if w else set()))
+    invoer = []
+    for r in regels:
+        f = formulier or {}
+        invoer.append(RegelInvoer(
+            r, f.get(_veld("dag", r.id), r.datum.isoformat()), f.get(_veld("tijd", r.id), r.starttijd),
+            f.get(_veld("duur", r.id), "" if r.duur is None else str(r.duur))))
+    return TijdschemaFormulier(invoer, dagen)
+
+
+@dataclass(frozen=True)
+class TijdWijziging:
+    oud: ProgrammaOnderdeel
+    nieuw: ProgrammaOnderdeel
+
+    @property
+    def tekst(self) -> str:
+        o, n = self.oud, self.nieuw
+        delen = []
+        if o.datum != n.datum:
+            delen.append(f"{o.datum.isoformat()} → {n.datum.isoformat()}")
+        if o.starttijd != n.starttijd:
+            delen.append(f"{o.starttijd} → {n.starttijd}")
+        if o.duur != n.duur:
+            delen.append(f"duur {o.duur or '?'} → {n.duur or '?'} min")
+        return f"{o.omschrijving}: {', '.join(delen)}"
+
+
+def tijdschema_wijzigingen(db: Opslag, wedstrijd_id: int, formulier) -> list[TijdWijziging]:
+    """Lees het formulier en controleer alles; geeft alleen de regels die echt veranderen.
+
+    Velden per regel: tijd-<id> ('HH:MM'), duur-<id> (minuten, leeg = onbekend) en
+    dag-<id> ('YYYY-MM-DD', alleen bij meerdaagse wedstrijden in het formulier).
+    Regels die niet in het formulier staan, blijven zoals ze zijn. Fout -> OpslagFout,
+    en dan is er nog niets opgeslagen.
+    """
+    uit = []
+    for r in db.programma(wedstrijd_id):
+        tijd = formulier.get(_veld("tijd", r.id))
+        duur = formulier.get(_veld("duur", r.id))
+        dag = formulier.get(_veld("dag", r.id))
+        if tijd is None and duur is None and dag is None:
+            continue
+        try:
+            datum = r.datum if dag is None else date.fromisoformat(dag.strip())
+        except ValueError:
+            raise OpslagFout(f"{r.omschrijving}: kies een geldige dag.") from None
+        if tijd is not None and not tijd.strip():
+            raise OpslagFout(f"{r.omschrijving}: vul een starttijd in.")
+        nieuwe_duur = r.duur
+        if duur is not None:
+            duur = duur.strip()
+            if not duur:
+                nieuwe_duur = None
+            elif duur.isdigit():
+                nieuwe_duur = int(duur)
+            else:
+                raise OpslagFout(f"{r.omschrijving}: de duur is een aantal minuten (of leeg).")
+        try:
+            nieuw = replace(r, datum=datum, starttijd=r.starttijd if tijd is None else tijd.strip(),
+                            duur=nieuwe_duur)
+        except ValueError as e:
+            raise OpslagFout(f"{r.omschrijving}: {e}") from None
+        if (nieuw.datum, nieuw.starttijd, nieuw.duur) != (r.datum, r.starttijd, r.duur):
+            uit.append(TijdWijziging(r, nieuw))
+    return uit
+
+
+def tijdschema_aanpassen(db: Opslag, wijzigingen: Iterable[TijdWijziging]) -> int:
+    """Sla de gecontroleerde wijzigingen op. Geeft het aantal aangepaste regels."""
+    n = 0
+    for w in wijzigingen:
+        db.programma_opslaan(w.nieuw)
+        n += 1
+    return n

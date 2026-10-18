@@ -116,12 +116,12 @@ def test_pagina():
         assert "Vorig seizoen" in afgelopen and "nog niet geïmporteerd" in afgelopen
         # Met ?afgelopen=1 staat het vinkje meteen aan.
         assert 'value="1" checked>' in c.get("/wedstrijden?afgelopen=1").get_data(as_text=True)
-        # Knop naar een nieuwe wedstrijd; die pagina komt later.
+        # Knop naar een nieuwe wedstrijd (zie test_wedstrijd_nieuw.py).
         assert 'href="/wedstrijden/nieuw">+ Nieuwe wedstrijd</a>' in html
         r = c.get("/wedstrijden/nieuw")
         assert r.status_code == 200
         nieuw = r.get_data(as_text=True)
-        assert "Nieuwe wedstrijd" in nieuw and "Deze pagina komt nog" in nieuw and "&larr; Wedstrijden" in nieuw
+        assert "Nieuwe wedstrijd" in nieuw and "Deze pagina komt nog" not in nieuw and "&larr; Wedstrijden" in nieuw
         # CSS voor het vinkje is er.
         css = c.get("/static/avs.css").get_data(as_text=True)
         assert ".afgelopen__vink:checked ~ .afgelopen__inhoud" in css

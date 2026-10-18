@@ -357,11 +357,49 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
         return render_template("wedstrijden.html", o=wedstrijdenoverzicht(db()),
                                toon_afgelopen=request.args.get("afgelopen") == "1", actief_menu="wedstrijden")
 
+    NIET_BEREIKBAAR = ("de website is niet bereikbaar of gaf iets onverwachts terug. Controleer de link en de "
+                       "internetverbinding en probeer het opnieuw.")
+
+    def _nieuw_pagina(*, link: str = "", g=None, open_: bool = False, fout: str | None = None, status: int = 200):
+        return render_template("wedstrijd_nieuw.html", link=link, g=g or wedstrijddetail.Gegevens(), open=open_,
+                               fout=fout, actief_menu="wedstrijden"), status
+
+    def _gegevens_uit_formulier():
+        f = request.form
+        return wedstrijddetail.Gegevens(f.get("naam", ""), f.get("datum", ""), f.get("locatie", ""),
+                                        f.get("link", ""), f.get("indoor") == "1")
+
     @app.get("/wedstrijden/nieuw")
     def wedstrijd_nieuw():
-        # Het formulier voor een nieuwe wedstrijd komt later.
-        return render_template("binnenkort.html", titel="Nieuwe wedstrijd", terug_url=url_for("wedstrijden"),
-                               terug_naam="Wedstrijden", actief_menu="wedstrijden")
+        return _nieuw_pagina()
+
+    @app.post("/wedstrijden/nieuw")
+    def wedstrijd_nieuw_opslaan():
+        """Nieuwe wedstrijd: van een link (gegevens + tijdschema ophalen) of met de hand. Daarna inschrijven."""
+        if request.form.get("soort") == "hand":
+            g = _gegevens_uit_formulier()
+            try:
+                w = wedstrijddetail.gegevens_opslaan(db(), None, g)
+            except OpslagFout as e:
+                return _nieuw_pagina(g=g, open_=True, fout=str(e), status=400)
+            flash(f"Wedstrijd {w.naam} aangemaakt. Schrijf nu de atleten in.")
+            return redirect(url_for("wedstrijd_inschrijven", wedstrijd_id=w.id))
+
+        link = request.form.get("link", "").strip()
+        try:
+            n = tijdschema_import.wedstrijd_uit_link(db(), link, indoor=request.form.get("indoor") == "1")
+        except OpslagFout as e:
+            return _nieuw_pagina(link=link, fout=f"Niet gelukt: {e}", status=400)
+        except Exception as e:                         # netwerk, onverwachte pagina, ...
+            app.logger.warning("Nieuwe wedstrijd ophalen mislukt: %s", type(e).__name__)
+            return _nieuw_pagina(link=link, fout=f"Niet gelukt: {NIET_BEREIKBAAR}", status=502)
+        w = n.wedstrijd
+        if n.bestond:
+            flash(f"Deze wedstrijd stond er al ({w.naam}); het tijdschema is bijgewerkt. {n.verslag.tekst}")
+        else:
+            flash(f"Wedstrijd {w.naam} ({w.datum.isoformat()}) aangemaakt. {n.verslag.tekst} "
+                  "Schrijf nu de atleten in.")
+        return redirect(url_for("wedstrijd_inschrijven", wedstrijd_id=w.id))
 
     def _wedstrijdpagina(wedstrijd_id: int, fout: str | None = None, status: int = 200):
         d = wedstrijddetail.wedstrijd_detail(db(), wedstrijd_id)
@@ -386,18 +424,76 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
             verslag = tijdschema_import.tijdschema_importeren(db(), wedstrijd_id, link)
         except OpslagFout as e:
             return _wedstrijdpagina(wedstrijd_id, fout=f"Tijdschema niet geïmporteerd: {e}", status=400)
-        except OSError:
-            return _wedstrijdpagina(wedstrijd_id, status=502, fout="Tijdschema niet geïmporteerd: de website is "
-                                    "niet bereikbaar. Controleer de internetverbinding en probeer het opnieuw.")
-        flash(verslag.tekst)
+        except Exception as e:                         # netwerk, onverwachte pagina, ...
+            app.logger.warning("Tijdschema ophalen mislukt: %s", type(e).__name__)
+            return _wedstrijdpagina(wedstrijd_id, fout=f"Tijdschema niet geïmporteerd: {NIET_BEREIKBAAR}",
+                                    status=502)
+        tekst = verslag.tekst
+        w = db().wedstrijd(wedstrijd_id)
+        if link and not w.bron_url and request.form.get("bewaar") == "1":
+            g = wedstrijddetail.Gegevens.van(w)
+            g.link = link
+            try:                                       # de link meteen bij de wedstrijd bewaren
+                wedstrijddetail.gegevens_opslaan(db(), wedstrijd_id, g)
+            except OpslagFout as e:
+                tekst += f" De link is niet bewaard: {e}"
+        flash(tekst)
         return redirect(url_for("wedstrijd", wedstrijd_id=wedstrijd_id) + "#kop-tijdschema")
+
+    def _bewerkpagina_wedstrijd(wedstrijd_id: int, g=None, fout: str | None = None, status: int = 200,
+                                formulier=None):
+        w = db().wedstrijd(wedstrijd_id)
+        if w is None:
+            abort(404)
+        ts = wedstrijddetail.tijdschemaformulier(db(), wedstrijd_id, formulier)
+        return render_template("wedstrijd_bewerken.html", w=w, g=g or wedstrijddetail.Gegevens.van(w), ts=ts,
+                               fout=fout, actief_menu="wedstrijden"), status
+
+    @app.get("/wedstrijd/<int:wedstrijd_id>/bewerken")
+    def wedstrijd_bewerken(wedstrijd_id: int):
+        return _bewerkpagina_wedstrijd(wedstrijd_id)
+
+    @app.post("/wedstrijd/<int:wedstrijd_id>/bewerken")
+    def wedstrijd_bewerken_opslaan(wedstrijd_id: int):
+        if db().wedstrijd(wedstrijd_id) is None:
+            abort(404)
+        g = _gegevens_uit_formulier()
+        try:                                           # eerst alles controleren, dan pas opslaan
+            wijzigingen = wedstrijddetail.tijdschema_wijzigingen(db(), wedstrijd_id, request.form)
+            w = wedstrijddetail.gegevens_opslaan(db(), wedstrijd_id, g)
+        except OpslagFout as e:
+            return _bewerkpagina_wedstrijd(wedstrijd_id, g, fout=f"Niet opgeslagen: {e}", status=400,
+                                           formulier=request.form)
+        tekst = "Gegevens opgeslagen."
+        if wijzigingen and request.form.get("bijwerken") != "1":
+            wedstrijddetail.tijdschema_aanpassen(db(), wijzigingen)
+            n = len(wijzigingen)
+            tekst += (f" {n} {'regel' if n == 1 else 'regels'} in het tijdschema aangepast: "
+                      + "; ".join(x.tekst for x in wijzigingen) + ".")
+        elif wijzigingen:
+            tekst += " De aanpassingen in het tijdschema zijn niet bewaard: het tijdschema is opnieuw opgehaald."
+        if request.form.get("bijwerken") == "1":
+            if not w.bron_url:
+                tekst += " Het tijdschema is niet bijgewerkt: er is geen link."
+            else:
+                try:
+                    tekst += " " + tijdschema_import.tijdschema_importeren(db(), wedstrijd_id).tekst
+                except OpslagFout as e:
+                    tekst += f" Tijdschema niet bijgewerkt: {e}"
+                except Exception as e:
+                    app.logger.warning("Tijdschema ophalen mislukt: %s", type(e).__name__)
+                    tekst += f" Tijdschema niet bijgewerkt: {NIET_BEREIKBAAR}"
+        flash(tekst)
+        return redirect(url_for("wedstrijd", wedstrijd_id=wedstrijd_id))
 
     def _inschrijfpagina(wedstrijd_id: int, regel_id: int | None, fout: str | None = None, status: int = 200,
                          onderdelen=(), gekozen=()):
         f = wedstrijddetail.inschrijfformulier(db(), wedstrijd_id, regel_id, onderdelen=onderdelen, gekozen=gekozen)
         if f is None:
             abort(404)
-        return render_template("wedstrijd_inschrijven.html", f=f, fout=fout, actief_menu="wedstrijden"), status
+        meldingen = get_flashed_messages()
+        return render_template("wedstrijd_inschrijven.html", f=f, fout=fout, actief_menu="wedstrijden",
+                               melding=meldingen[0] if meldingen else None), status
 
     def _regel_id(waarde: str | None) -> int | None:
         return int(waarde) if waarde and waarde.isdigit() else None

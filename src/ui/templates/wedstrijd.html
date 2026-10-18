@@ -28,7 +28,16 @@
         · <span class="zacht">{{ "geweest" if d.geweest else d.dagen_tot | over_dagen }}</span></p>
       {% if w.bron_url %}<p class="zacht wedstrijdlink"><a href="{{ w.bron_url }}" target="_blank" rel="noopener">Wedstrijdpagina &#8599;</a></p>{% endif %}
     </div>
-    <a class="knop knop--vol" href="{{ url_for('wedstrijd_inschrijven', wedstrijd_id=w.id) }}">+ Atleten inschrijven</a>
+    <div class="knoppen paginaknoppen">
+      <a class="knop" href="{{ url_for('wedstrijd_bewerken', wedstrijd_id=w.id) }}">Gegevens wijzigen</a>
+      {% if w.bron_url %}
+        <form method="post" action="{{ url_for('wedstrijd_tijdschema', wedstrijd_id=w.id) }}">
+          <button class="knop" type="submit" title="Haal het tijdschema opnieuw op van {{ w.bron_url }}">
+            {{- "Tijdschema bijwerken" if d.heeft_tijdschema else "Tijdschema importeren" -}}</button>
+        </form>
+      {% endif %}
+      <a class="knop knop--vol" href="{{ url_for('wedstrijd_inschrijven', wedstrijd_id=w.id) }}">+ Atleten inschrijven</a>
+    </div>
   </header>
 
   {% if melding %}<p class="melding" role="status">{{ melding }}</p>{% endif %}
@@ -46,13 +55,14 @@
     <div class="blok__kop">
       <h2 class="kop" id="kop-tijdschema">Tijdschema
         {%- if d.heeft_tijdschema %} <span class="zacht getallen">({{ d.aantal_met_atleten }} van {{ d.aantal_regels }} met onze atleten)</span>{% endif %}</h2>
-      <form method="post" action="{{ url_for('wedstrijd_tijdschema', wedstrijd_id=w.id) }}" class="importbalk">
-        {% if not w.bron_url %}
+      {% if not w.bron_url %}
+        <form method="post" action="{{ url_for('wedstrijd_tijdschema', wedstrijd_id=w.id) }}" class="importbalk">
           <label class="verborgen" for="tijdschema-link">Link naar de wedstrijd op atletiek.nu of Seltec</label>
           <input type="url" id="tijdschema-link" name="link" required placeholder="Link naar atletiek.nu of Seltec">
-        {% endif %}
-        <button class="knop" type="submit">{{ "Tijdschema opnieuw importeren" if d.heeft_tijdschema else "Tijdschema importeren" }}</button>
-      </form>
+          <label class="vinkje"><input type="checkbox" name="bewaar" value="1" checked> Link bewaren</label>
+          <button class="knop" type="submit">Tijdschema importeren</button>
+        </form>
+      {% endif %}
     </div>
 
     {% if d.heeft_tijdschema %}
@@ -113,7 +123,7 @@
       </div>
     {% else %}
       <p class="leeg">Nog geen tijdschema.
-        {%- if w.bron_url %} Importeer het met de knop hierboven van de wedstrijdpagina.{% else %} Plak de link van de wedstrijd op atletiek.nu of Seltec hierboven en importeer het.{% endif %}</p>
+        {%- if w.bron_url %} Haal het op met &lsquo;Tijdschema importeren&rsquo; bovenaan; staat het nog niet online, probeer het later opnieuw.{% else %} Plak de link van de wedstrijd op atletiek.nu of Seltec hierboven en importeer het.{% endif %}</p>
     {% endif %}
   </section>
 

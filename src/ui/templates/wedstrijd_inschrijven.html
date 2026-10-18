@@ -2,7 +2,8 @@
   Atleten inschrijven voor een wedstrijd: onderdelen kiezen en atleten aanvinken.
   Context:
     f    – wedstrijden.detail.InschrijfFormulier
-    fout – foutmelding (optioneel)
+    fout    – foutmelding (optioneel)
+    melding – bevestiging, bijv. na het aanmaken van de wedstrijd (optioneel)
   Vanuit een regel van het tijdschema (f.regel) staat het onderdeel al aan en
   zijn atleten uit een andere categorie verborgen tot 'Ook atleten uit andere
   categorieën' is aangevinkt (CSS :checked, zonder JavaScript). Geen onderdeel
@@ -37,6 +38,7 @@
     </div>
   </header>
 
+  {% if melding %}<p class="melding" role="status">{{ melding }}</p>{% endif %}
   {% if fout %}<p class="melding melding--fout" role="alert">{{ fout }}</p>{% endif %}
 
   <form method="post" class="blok" style="gap: 2rem">

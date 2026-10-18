@@ -33,7 +33,7 @@ from importers.base import Importer, ImportFout
 from importers.seltec_tijdschema import SeltecTijdschemaImporter
 from models import Onderdeel, ProgrammaOnderdeel, Wedstrijd
 
-from .planning import bron_uit_link
+from .planning import bron_uit_link, normaliseer_link
 
 
 def _sleutel(naam: str) -> str:
@@ -103,6 +103,35 @@ def site_van(bron: str, wedstrijd: Wedstrijd | None = None) -> str:
     raise OpslagFout("Dit is geen link naar een wedstrijd op atletiek.nu of Seltec.")
 
 
+def _ophalen(bron: str, wedstrijd: Wedstrijd | None = None,
+             importer: Importer | None = None) -> tuple[object, list[TijdschemaRegel]]:
+    """(wedstrijd zoals de site hem geeft, regels). OpslagFout bij een onbekende link of een leeg tijdschema."""
+    site = site_van(bron, wedstrijd)
+    importer = importer or (SeltecTijdschemaImporter() if site == "seltec" else AtletiekNuTijdschemaImporter())
+    try:
+        bron_wedstrijd, regels = importer.parse(bron)
+    except ImportFout as e:
+        raise OpslagFout(str(e)) from None
+    if not regels:
+        raise OpslagFout("Het tijdschema op de site is (nog) leeg; er is niets veranderd.")
+    return bron_wedstrijd, regels
+
+
+def _opslaan(db: Opslag, w: Wedstrijd, bron_wedstrijd, regels: list[TijdschemaRegel]) -> ImportVerslag:
+    """Regels koppelen aan de onderdelenlijst en het tijdschema van `w` ermee vervangen."""
+    programma, los = naar_programma(w.id, regels, db.onderdelen())
+    db.programma_vervangen(w.id, programma)
+
+    verslag = ImportVerslag(w.id, len(programma), sum(p.onderdeel_id is not None for p in programma),
+                            los, sum(p.duur is None for p in programma))
+    dagen = sorted({p.datum for p in programma})
+    if w.datum not in dagen:
+        verslag.waarschuwingen.append(
+            f"Let op: het tijdschema is van {', '.join(d.isoformat() for d in dagen)}, de wedstrijd staat op "
+            f"{w.datum.isoformat()} ('{bron_wedstrijd.naam}'). Klopt de link?")
+    return verslag
+
+
 def tijdschema_importeren(db: Opslag, wedstrijd_id: int, bron: str | None = None,
                           importer: Importer | None = None) -> ImportVerslag:
     """Haal het tijdschema op en vervang daarmee het tijdschema van de wedstrijd.
@@ -118,23 +147,59 @@ def tijdschema_importeren(db: Opslag, wedstrijd_id: int, bron: str | None = None
     if not bron:
         raise OpslagFout("Deze wedstrijd heeft geen link naar atletiek.nu of Seltec; "
                          "geef de link van het tijdschema op.")
-    site = site_van(bron, w)
-    importer = importer or (SeltecTijdschemaImporter() if site == "seltec" else AtletiekNuTijdschemaImporter())
+    bron_wedstrijd, regels = _ophalen(bron, w, importer)
+    return _opslaan(db, w, bron_wedstrijd, regels)
+
+
+# ============================================================
+# Nieuwe wedstrijd vanaf een link
+# ============================================================
+@dataclass
+class NieuweWedstrijd:
+    wedstrijd: Wedstrijd
+    verslag: ImportVerslag
+    bestond: bool                      # de link was al bekend: alleen het tijdschema is bijgewerkt
+
+
+def _link_van(bron: str, bron_wedstrijd) -> str | None:
+    """De link om bij de wedstrijd te bewaren: de echte webpagina, ook als er een opgeslagen bestand is ingelezen."""
+    for kandidaat in (bron, getattr(bron_wedstrijd, "url", "")):
+        if str(kandidaat or "").lower().startswith(("http://", "https://")):
+            return normaliseer_link(kandidaat)
+    return None
+
+
+def wedstrijd_uit_link(db: Opslag, bron: str, indoor: bool = False,
+                       importer: Importer | None = None) -> NieuweWedstrijd:
+    """Maak een wedstrijd van een link naar atletiek.nu of Seltec, met naam, datum, plaats en tijdschema.
+
+    Is er al een wedstrijd met deze link, dan blijven naam, datum en plaats zoals ze
+    zijn (misschien met de hand aangepast) en wordt alleen het tijdschema bijgewerkt.
+    Alles of niets: lukt het ophalen niet, dan wordt er ook geen wedstrijd aangemaakt.
+    """
+    bron = (bron or "").strip()
+    if not bron:
+        raise OpslagFout("Plak de link van de wedstrijd op atletiek.nu of Seltec.")
+    bron_wedstrijd, regels = _ophalen(bron, None, importer)
+    link = _link_van(bron, bron_wedstrijd)
+
+    bestaand = None
+    if link:
+        bestaand = next((w for w in db.wedstrijden() if w.bron_url == link), None)
+    if bestaand is not None:
+        return NieuweWedstrijd(bestaand, _opslaan(db, bestaand, bron_wedstrijd, regels), True)
+
     try:
-        bron_wedstrijd, regels = importer.parse(bron)
-    except ImportFout as e:
-        raise OpslagFout(str(e)) from None
-    if not regels:
-        raise OpslagFout("Het tijdschema op atletiek.nu is (nog) leeg; er is niets veranderd.")
-
-    programma, los = naar_programma(wedstrijd_id, regels, db.onderdelen())
-    db.programma_vervangen(wedstrijd_id, programma)
-
-    verslag = ImportVerslag(wedstrijd_id, len(programma), sum(p.onderdeel_id is not None for p in programma),
-                            los, sum(p.duur is None for p in programma))
-    dagen = sorted({p.datum for p in programma})
-    if w.datum not in dagen:
-        verslag.waarschuwingen.append(
-            f"Let op: het tijdschema is van {', '.join(d.isoformat() for d in dagen)}, de wedstrijd staat op "
-            f"{w.datum.isoformat()} ('{bron_wedstrijd.naam}'). Klopt de link?")
-    return verslag
+        datum = date.fromisoformat(bron_wedstrijd.datum)
+    except (TypeError, ValueError):
+        datum = min(date.fromisoformat(r.datum) for r in regels)
+    naam = (getattr(bron_wedstrijd, "naam", "") or "").strip() or "Wedstrijd"
+    plaats = (getattr(bron_wedstrijd, "plaats", "") or "").strip() or None
+    w = db.wedstrijd_opslaan(Wedstrijd(naam=naam, datum=datum, locatie=plaats, bron=bron_uit_link(link),
+                                       bron_url=link, indoor=indoor))
+    try:
+        verslag = _opslaan(db, w, bron_wedstrijd, regels)
+    except Exception:
+        db.wedstrijd_verwijderen(w.id)          # geen halve wedstrijd achterlaten
+        raise
+    return NieuweWedstrijd(w, verslag, False)

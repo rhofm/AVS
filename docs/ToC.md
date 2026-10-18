@@ -100,9 +100,11 @@ AVS/
 │   │   ├── kalender.py           ✅ planning of one athlete or a group as list and month calendar
 │   │   ├── chronoloog.py         ✅ timetable: personal schedule per athlete, participants per item, clashes / too little rest
 │   │   ├── tijdschema_import.py  ✅ atletiek.nu or Seltec timetable → wedstrijd_programma (replaces it; events matched by name/code)
+│   │   │                         `wedstrijd_uit_link`: new meet (name, date, place + timetable) from a link
 │   │   ├── overzicht.py          ✅ page 'Wedstrijden': upcoming meets, past meets behind a checkbox (counts only, no names)
 │   │   └── detail.py             ✅ page of one meet: timetable per day with our athletes (items without athletes behind a
-│   │                             checkbox), participants, clashes; register athletes (also from a timetable item), deregister
+│   │                             checkbox), participants, clashes; register athletes (also from a timetable item), deregister;
+│   │                             edit meet details and per timetable row the start time, duration and day
 │   │
 │   ├── importers/                📝 on this branch (see feature/importers)
 │   │   ├── base.py               common interface: can_handle(url), parse(url)
@@ -146,6 +148,8 @@ AVS/
     ├── test_seltec_tijdschema.py ✅ 6 tests (category codes, multi-category matching, 3-day NK, club meet, links, import)
     ├── test_wedstrijdenoverzicht.py ✅ 5 tests (upcoming/past, counts, checkbox, '+ Nieuwe wedstrijd')
     ├── test_wedstrijdpagina.py   ✅ 8 tests (timetable + athletes, hidden items, register/deregister, import route)
+    ├── test_wedstrijd_nieuw.py   ✅ 9 tests (new meet from a link or by hand, edit details, timetable button)
+    ├── test_tijdschema_aanpassen.py ✅ 5 tests (move rows: time, duration, day; re-sorting; errors save nothing)
     ├── test_groep_starttijden.py ✅ 7 tests (training times, moving old data, duplicate migration numbers)
     ├── test_startpagina.py       ✅ 3 tests (tiles, counts, top bar with only Importeren + Instellingen)
     ├── test_trainingen_inhoud.py ✅ 5 tests (training parts, variants, markdown, old `inhoud` → `notities`)

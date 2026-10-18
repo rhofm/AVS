@@ -1,0 +1,24 @@
+{#
+  Velden van een wedstrijd, gedeeld door 'Nieuwe wedstrijd' (met de hand) en 'Gegevens wijzigen'.
+  Gebruik: {% from "_wedstrijd_velden.html" import wedstrijdvelden %} en {{ wedstrijdvelden(g) }}
+  binnen een <form>; g = wedstrijden.detail.Gegevens.
+#}
+{% macro wedstrijdvelden(g, autofocus=false) %}
+  <div class="velden">
+    <label class="veld veld--breed"><span>Naam <span class="zacht">(verplicht)</span></span>
+      <input type="text" name="naam" value="{{ g.naam }}" required maxlength="120" placeholder="bijv. Clubkampioenschappen"{% if autofocus %} autofocus{% endif %}>
+    </label>
+    <label class="veld"><span>Datum <span class="zacht">(verplicht)</span></span>
+      <input type="date" name="datum" value="{{ g.datum }}" required>
+    </label>
+    <label class="veld"><span>Locatie</span>
+      <input type="text" name="locatie" value="{{ g.locatie }}" maxlength="120" placeholder="bijv. Nijmegen">
+    </label>
+  </div>
+  <div class="velden">
+    <label class="veld veld--breed"><span>Link naar de wedstrijd <span class="zacht">(atletiek.nu of Seltec; nodig voor tijdschema en uitslagen)</span></span>
+      <input type="url" name="link" value="{{ g.link }}" maxlength="300" placeholder="https://www.atletiek.nu/wedstrijd/main/…">
+    </label>
+  </div>
+  <label class="vinkje"><input type="checkbox" name="indoor" value="1"{% if g.indoor %} checked{% endif %}> Indoorwedstrijd</label>
+{% endmacro %}

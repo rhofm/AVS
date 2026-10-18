@@ -1,0 +1,61 @@
+{#
+  Nieuwe wedstrijd. Twee manieren:
+    * link plakken (atletiek.nu of Seltec): naam, datum, plaats en tijdschema worden
+      opgehaald (wedstrijden.tijdschema_import.wedstrijd_uit_link);
+    * met de hand: naam, datum, locatie, link (wedstrijden.detail.gegevens_opslaan).
+  Daarna door naar 'Atleten inschrijven'.
+  Context:
+    link    – ingevulde link (na een fout)
+    g       – wedstrijden.detail.Gegevens voor het formulier met de hand
+    open    – True: het formulier met de hand staat open (na een fout daarin)
+    fout    – foutmelding (optioneel)
+#}
+{% extends "basis.html" %}
+{% from "_wedstrijd_velden.html" import wedstrijdvelden %}
+{% block titel %}Nieuwe wedstrijd{% endblock %}
+
+{% block inhoud %}
+<article class="vel">
+  <header class="blok__kop">
+    <div>
+      <a class="terug" href="{{ url_for('wedstrijden') }}">&larr; Wedstrijden</a>
+      <h1 class="kop kop--pagina">Nieuwe wedstrijd</h1>
+      <p class="subkop">Plak de link van de wedstrijd; de rest haalt AVS zelf op.</p>
+    </div>
+  </header>
+
+  {% if fout %}<p class="melding melding--fout" role="alert">{{ fout }}</p>{% endif %}
+
+  <section class="blok" aria-labelledby="kop-link">
+    <h2 class="kop" id="kop-link">Van atletiek.nu of Seltec</h2>
+    <form method="post" class="blok linkformulier">
+      <input type="hidden" name="soort" value="link">
+      <label class="veld veld--breed"><span>Link naar de wedstrijd</span>
+        <input type="text" name="link" value="{{ link }}" required{% if not open %} autofocus{% endif %}
+               placeholder="https://www.atletiek.nu/wedstrijd/main/45678/  of  https://uitslagen.atletiek.nl/Competitions/Details/19133">
+      </label>
+      <p class="zacht">Elke pagina van de wedstrijd werkt (hoofdpagina, inschrijvingen, tijdschema, uitslagen).
+        AVS haalt de naam, datum, plaats en het tijdschema op. Je kunt alles daarna nog wijzigen.</p>
+      <div class="knoppen">
+        <label class="vinkje"><input type="checkbox" name="indoor" value="1"> Indoorwedstrijd</label>
+        <button class="knop knop--vol" type="submit">Ophalen en verder</button>
+      </div>
+    </form>
+  </section>
+
+  <details class="blok handmatig"{% if open %} open{% endif %}>
+    <summary class="kop">Of met de hand invullen</summary>
+    <form method="post" class="blok">
+      <input type="hidden" name="soort" value="hand">
+      {{ wedstrijdvelden(g, autofocus=open) }}
+      <p class="zacht">Zonder tijdschema. Heeft de wedstrijd een link, dan kun je het tijdschema later ophalen met &lsquo;Tijdschema bijwerken&rsquo;.</p>
+      <div class="opslaan opslaan--onder">
+        <a href="{{ url_for('wedstrijden') }}">Annuleren</a>
+        <button class="knop knop--vol" type="submit">Wedstrijd aanmaken</button>
+      </div>
+    </form>
+  </details>
+
+  <footer class="vel__voet">Atleet Volg Systeem<br>Nieuwe wedstrijd</footer>
+</article>
+{% endblock %}

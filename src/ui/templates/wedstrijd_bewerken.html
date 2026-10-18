@@ -1,0 +1,101 @@
+{#
+  Gegevens van een wedstrijd wijzigen: naam, datum, locatie, link en indoor, en per
+  regel van het tijdschema de starttijd, duur en (bij meer dagen) de dag.
+  Context:
+    w    – models.Wedstrijd (zoals hij nu is opgeslagen)
+    g    – wedstrijden.detail.Gegevens (wat in het formulier staat)
+    ts   – wedstrijden.detail.TijdschemaFormulier
+    fout – foutmelding (optioneel)
+  Alleen regels die echt veranderen worden opgeslagen; daarna staat het tijdschema
+  vanzelf weer op dag en tijd. Het script markeert alleen gewijzigde regels.
+#}
+{% extends "basis.html" %}
+{% from "_wedstrijd_velden.html" import wedstrijdvelden %}
+{% block titel %}Wijzigen · {{ w.naam }}{% endblock %}
+
+{% block inhoud %}
+<article class="vel">
+  <header class="blok__kop">
+    <div>
+      <a class="terug" href="{{ url_for('wedstrijd', wedstrijd_id=w.id) }}">&larr; {{ w.naam }}</a>
+      <h1 class="kop kop--pagina">Gegevens wijzigen</h1>
+      <p class="subkop">Pas de gegevens aan, of schuif een onderdeel in het tijdschema een stukje op.</p>
+    </div>
+  </header>
+
+  {% if fout %}<p class="melding melding--fout" role="alert">{{ fout }}</p>{% endif %}
+
+  <form method="post" class="blok" style="gap: 2rem">
+    <section class="blok" aria-labelledby="kop-gegevens">
+      <h2 class="kop" id="kop-gegevens">Gegevens</h2>
+      {{ wedstrijdvelden(g, autofocus=true) }}
+    </section>
+
+    <section class="blok" aria-labelledby="kop-tijdschema">
+      <h2 class="kop" id="kop-tijdschema">Tijdschema <span class="zacht getallen">({{ ts.regels | length }} regels)</span></h2>
+      {% if ts.regels %}
+        <p class="zacht">Verander de starttijd of duur van een onderdeel dat verschoven is. Na opslaan staat alles weer op volgorde.</p>
+        <div class="tabelvak">
+          <table class="tabel tijdenkeuze" id="tabel-tijden">
+            <thead>
+              <tr>
+                {% if ts.meerdaags %}<th scope="col">Dag</th>{% endif %}
+                <th scope="col">Starttijd</th>
+                <th scope="col">Duur <span class="zacht">(min)</span></th>
+                <th scope="col">Onderdeel</th>
+                <th scope="col">Categorie</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for r in ts.regels %}
+                <tr>
+                  {% if ts.meerdaags %}
+                    <td><label class="verborgen" for="{{ r.veld_dag }}">Dag van {{ r.regel.omschrijving }}</label>
+                      <select id="{{ r.veld_dag }}" name="{{ r.veld_dag }}" data-oud="{{ r.regel.datum.isoformat() }}">
+                        {% for d in ts.dagen %}<option value="{{ d.isoformat() }}"{% if d.isoformat() == r.dag %} selected{% endif %}>{{ d | datum_kort }}</option>{% endfor %}
+                      </select></td>
+                  {% endif %}
+                  <td><label class="verborgen" for="{{ r.veld_tijd }}">Starttijd van {{ r.regel.omschrijving }}</label>
+                    <input type="time" id="{{ r.veld_tijd }}" name="{{ r.veld_tijd }}" value="{{ r.tijd }}" required data-oud="{{ r.regel.starttijd }}"></td>
+                  <td><label class="verborgen" for="{{ r.veld_duur }}">Duur van {{ r.regel.omschrijving }} in minuten</label>
+                    <input type="number" id="{{ r.veld_duur }}" name="{{ r.veld_duur }}" value="{{ r.duur }}" min="1" max="720" step="1"
+                           inputmode="numeric" placeholder="?" data-oud="{{ r.regel.duur if r.regel.duur is not none else '' }}"></td>
+                  <td>{{ r.regel.naam }}{% if r.details %} <span class="zacht">· {{ r.details }}</span>{% endif %}</td>
+                  <td>{{ r.regel.categorie or "Alle" }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <p class="leeg">Nog geen tijdschema. Importeer het op de wedstrijdpagina met &lsquo;Tijdschema importeren&rsquo;.</p>
+      {% endif %}
+    </section>
+
+    <div class="opslaan">
+      <span class="zacht" id="samenvatting" aria-live="polite"></span>
+      <label class="vinkje"><input type="checkbox" name="bijwerken" value="1"> Daarna het tijdschema opnieuw ophalen van de link
+        <span class="zacht">(overschrijft aanpassingen hierboven)</span></label>
+      <a href="{{ url_for('wedstrijd', wedstrijd_id=w.id) }}">Annuleren</a>
+      <button class="knop knop--vol" type="submit">Opslaan</button>
+    </div>
+  </form>
+
+  <footer class="vel__voet">Atleet Volg Systeem<br>{{ w.naam }}</footer>
+</article>
+<script>
+  /* Gewijzigde regels markeren en tellen; opslaan werkt ook zonder dit script. */
+  (function () {
+    var velden = document.querySelectorAll("#tabel-tijden [data-oud]");
+    var uit = document.getElementById("samenvatting");
+    function tel() {
+      var rijen = new Set();
+      velden.forEach(function (v) { if (v.value !== v.dataset.oud) rijen.add(v.closest("tr")); });
+      document.querySelectorAll("#tabel-tijden tbody tr").forEach(function (r) { r.classList.toggle("gewijzigd", rijen.has(r)); });
+      uit.textContent = rijen.size ? rijen.size + (rijen.size === 1 ? " regel" : " regels") + " in het tijdschema gewijzigd" : "";
+    }
+    velden.forEach(function (v) { v.addEventListener("input", tel); v.addEventListener("change", tel); });
+    tel();
+  })();
+</script>
+{% endblock %}
