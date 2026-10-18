@@ -98,6 +98,7 @@
 
 * ~~Leerlijnen integreren en volgbaar maken~~ Gedaan: leerlijnen.db (215 leerdoelen) + leerdoelscores.db
 * Per atleet per leerdoel een score 1-5 met datum; geschiedenis blijft bewaard
+* Pagina 'Leerlijnen' (hoofdmenu): alle leerdoelen per onderdeel en/of leeftijdscategorie, met bron (NA/AU)
 * Nog te doen: scherm om een hele groep in één keer te scoren, voortgangsgrafiek per atleet
 
 

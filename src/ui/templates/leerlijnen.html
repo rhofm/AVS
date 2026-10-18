@@ -1,0 +1,168 @@
+{#
+  Leerlijnen: alle leerdoelen uit de catalogus (leerlijnen.db), per onderdeel of per categorie.
+  Context:
+    o        – leerlijnen.overzicht.Overzicht
+    bronnen  – {'NA': 'Leerlijn baanatletiek jeugd NA', ...}
+    fasen    – {'fundament': 'fundament', ...} (AU-fasen, leesbaar)
+  Kiezen gaat met gewone links (?onderdeel=SPR, ?categorie=U14, beide, en
+  &doorlopend=1 voor ook de eerdere categorieën), dus zonder JavaScript.
+  Geen keuze = een telling onderdelen x categorieën om mee te beginnen.
+#}
+{% extends "basis.html" %}
+{% block titel %}Leerlijnen{% if o.onderdeel_naam %} · {{ o.onderdeel_naam }}{% endif %}{% if o.categorie %} · {{ o.categorie }}{% endif %}{% endblock %}
+
+{% macro bron(d) -%}
+  <span class="kenmerk" title="{{ bronnen[d.bron] }}">{{ d.bron }}</span>
+  {%- if d.fase %}<span class="leerlijntabel__fase zacht">{{ fasen[d.fase] }}</span>{% endif %}
+{%- endmacro %}
+
+{% block inhoud %}
+<article class="vel">
+  <header class="blok__kop">
+    <div>
+      <h1 class="kop kop--pagina">Leerlijnen</h1>
+      <p class="subkop">{{ o.totaal }} leerdoelen · {{ o.leerlijnen | length }} onderdelen · {{ o.categorieen[0] }} t/m {{ o.categorieen[-1] }}</p>
+      <p class="zacht leerlijnen__uitleg">Kies een onderdeel, een leeftijdscategorie of allebei. De leerlijnen zijn doorlopend:
+        een leerdoel staat bij de categorie waarin het voor het eerst aan bod komt en blijft daarna gelden.</p>
+    </div>
+  </header>
+
+  <nav class="leerlijnkeuze" aria-label="Onderdeel en categorie kiezen">
+    <div class="leerlijnkeuze__rij">
+      <span class="label" id="keuze-onderdeel">Onderdeel</span>
+      <div class="pillen" role="group" aria-labelledby="keuze-onderdeel">
+        <a href="{{ o.link(onderdeel=None) }}"{% if not o.onderdeel %} aria-current="true"{% endif %}>Alle</a>
+        {% for code, naam in o.leerlijnen %}
+          <a href="{{ o.link(onderdeel=code) }}"{% if o.onderdeel == code %} aria-current="true"{% endif %}>{{ naam }}
+            <span class="zacht getallen">{{ o.per_onderdeel(code) }}</span></a>
+        {% endfor %}
+      </div>
+    </div>
+    <div class="leerlijnkeuze__rij">
+      <span class="label" id="keuze-categorie">Categorie</span>
+      <div class="pillen pillen--categorie" role="group" aria-labelledby="keuze-categorie">
+        <a href="{{ o.link(categorie=None) }}"{% if not o.categorie %} aria-current="true"{% endif %}>Alle</a>
+        {% for c in o.categorieen %}
+          <a href="{{ o.link(categorie=c) }}"{% if o.categorie == c %} aria-current="true"{% endif %}>{{ c }}</a>
+        {% endfor %}
+      </div>
+    </div>
+  </nav>
+
+  {% if not o.gekozen %}
+    {# ---------- begin: telling onderdelen x categorieën ---------- #}
+    <section class="blok" aria-labelledby="kop-telling">
+      <h2 class="subkop leerlijn__naam" id="kop-telling">Aantal leerdoelen per onderdeel en categorie</h2>
+      <div class="tabelvak">
+        <table class="tabel matrix leerlijnmatrix">
+          <thead>
+            <tr>
+              <th scope="col">Onderdeel</th>
+              {% for c in o.categorieen %}<th scope="col" class="midden"><a href="{{ o.link(categorie=c) }}">{{ c }}</a></th>{% endfor %}
+              <th scope="col" class="midden">Totaal</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for code, naam in o.leerlijnen %}
+              <tr>
+                <th scope="row"><a href="{{ o.link(onderdeel=code) }}">{{ naam }}</a></th>
+                {% for c in o.categorieen %}
+                  {% set n = o.telling.get((code, c), 0) %}
+                  <td class="midden getallen">{% if n %}<a href="{{ o.link(onderdeel=code, categorie=c) }}" aria-label="{{ naam }} {{ c }}: {{ n }} leerdoelen">{{ n }}</a>{% else %}<span class="zacht">–</span>{% endif %}</td>
+                {% endfor %}
+                <td class="midden getallen"><strong>{{ o.per_onderdeel(code) }}</strong></td>
+              </tr>
+            {% endfor %}
+          </tbody>
+          <tfoot>
+            <tr>
+              <th scope="row">Totaal</th>
+              {% for c in o.categorieen %}<td class="midden getallen">{{ o.per_categorie(c) }}</td>{% endfor %}
+              <td class="midden getallen">{{ o.totaal }}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </section>
+  {% else %}
+    {# ---------- gekozen: de leerdoelen ---------- #}
+    <section class="blok leerlijnen__resultaat" aria-labelledby="kop-resultaat">
+      <header class="blok__kop">
+        <div>
+          <h2 class="kop" id="kop-resultaat">
+            {%- if o.onderdeel_naam and o.categorie %}{{ o.onderdeel_naam }} · {{ o.categorie }}
+            {%- elif o.onderdeel_naam %}Leerlijn {{ o.onderdeel_naam | lower }}
+            {%- else %}Leerdoelen {{ o.categorie }}{% endif %}</h2>
+          <p class="subkop">{{ o.aantal }} {{ "leerdoel" if o.aantal == 1 else "leerdoelen" }}
+            {%- if o.categorie and o.doorlopend %} · {{ o.categorieen[0] }} t/m {{ o.categorie }}
+            {%- elif o.categorie %} · nieuw in {{ o.categorie }}
+            {%- else %} · {{ o.categorieen[0] }} t/m {{ o.categorieen[-1] }}{% endif %}</p>
+        </div>
+        {% if o.categorie %}<div class="categorie">{{ o.categorie }}<small>categorie</small></div>{% endif %}
+      </header>
+
+      <div class="leerlijnen__balk">
+        {% if o.categorie and o.categorie != o.categorieen[0] %}
+          <a class="terug" href="{{ o.link(doorlopend=None if o.doorlopend else '1') }}">
+            {{ "Alleen nieuwe doelen in " ~ o.categorie ~ " tonen" if o.doorlopend else "Ook doelen uit eerdere categorieën tonen" }}</a>
+        {% endif %}
+        <span class="leerlijnen__bronnen zacht">
+          {% for code in ("NA", "AU") %}<span class="nowrap"><span class="kenmerk">{{ code }}</span> {{ bronnen[code] }}</span>{% endfor %}
+        </span>
+      </div>
+
+      {% if o.groeperen_op == "categorie" and o.groepen | length > 1 %}
+        {# opbouw van één onderdeel over de categorieën #}
+        <ol class="fases leerlijnen__opbouw" aria-label="Opbouw per categorie">
+          {% for g in o.groepen %}
+            <li{% if g.sleutel == o.categorie %} aria-current="step"{% endif %}><a href="#ll-{{ g.sleutel }}">{{ g.titel }} <span class="getallen">({{ g.aantal }})</span></a></li>
+          {% endfor %}
+        </ol>
+      {% elif o.groepen | length > 1 %}
+        <nav class="sprongen" aria-label="Naar onderdeel">
+          {% for g in o.groepen %}
+            <a href="#ll-{{ g.sleutel }}">{{ g.titel }} <span class="zacht getallen">{{ g.aantal }}</span></a>
+          {% endfor %}
+        </nav>
+      {% endif %}
+
+      {% for g in o.groepen %}
+        <section class="blok leerlijn" id="ll-{{ g.sleutel }}" aria-labelledby="kop-{{ g.sleutel }}">
+          <div class="blok__kop">
+            <h3 class="subkop leerlijn__naam" id="kop-{{ g.sleutel }}">
+              {%- if o.groeperen_op == "categorie" %}{{ g.titel }}{% if o.categorie and g.sleutel != o.categorie %} <span class="zacht">(eerdere categorie)</span>{% endif %}
+              {%- else %}Leerlijn {{ g.titel | lower }}{% endif %}</h3>
+            <span class="zacht getallen" style="font-size: var(--maat-s)">{{ g.aantal }} {{ "leerdoel" if g.aantal == 1 else "leerdoelen" }}
+              {%- if o.groeperen_op == "onderdeel" and not o.onderdeel %} · <a href="{{ o.link(onderdeel=g.sleutel, categorie=None) }}">hele leerlijn</a>{% endif %}</span>
+          </div>
+          <div class="tabelvak">
+            <table class="tabel leerlijntabel">
+              <thead>
+                <tr>
+                  <th scope="col">Leerdoel</th>
+                  {% if o.toon_categorie %}<th scope="col" class="midden">Cat.</th>{% endif %}
+                  <th scope="col">Bron</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for d in g.doelen %}
+                  <tr{% if o.categorie and d.categorie != o.categorie %} class="eerder"{% endif %}>
+                    <th scope="row" title="{{ d.id }}">{{ d.omschrijving }}
+                      {%- if d.alleen_specialisten %} <span class="kenmerk kenmerk--licht">specialisten</span>{% endif %}</th>
+                    {% if o.toon_categorie %}<td class="midden">{{ d.categorie }}</td>{% endif %}
+                    <td class="leerlijntabel__bron">{{ bron(d) }}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      {% else %}
+        <p class="leeg">Geen leerdoelen voor deze keuze. Kies een andere categorie of zet &lsquo;Onderdeel&rsquo; op Alle.</p>
+      {% endfor %}
+    </section>
+  {% endif %}
+
+  <footer class="vel__voet">Atleet Volg Systeem<br>Leerlijnen</footer>
+</article>
+{% endblock %}

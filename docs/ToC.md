@@ -134,7 +134,10 @@ AVS/
 │   │   │                         or a new group. Table/group errors stop everything before anything is fetched
 │   │   └── periodeplan.py        📝
 │   │
-│   ├── leerlijnen/               📝
+│   ├── leerlijnen/
+│   │   ├── voortgang.py          ✅ leerdoelen of one athlete with latest scores; saving scores
+│   │   └── overzicht.py          ✅ page 'Leerlijnen': catalogue per onderdeel (grouped by category) and/or
+│   │                             category (grouped by onderdeel, optionally incl. earlier categories); no personal data
 │   │
 │   └── ui/                       📝 local web UI (Flask or FastAPI, not yet chosen)
 │       ├── app.py
@@ -166,6 +169,7 @@ AVS/
     ├── test_groep_importeren.py  ✅ 10 tests (table → CSV, errors per row, new/existing group, re-import, failures, same name, page)
     ├── test_trainingen_inhoud.py ✅ 5 tests (training parts, variants, markdown, old `inhoud` → `notities`)
     ├── test_leerdoelen.py        ✅ 10 tests
+    ├── test_leerlijnen_overzicht.py ✅ 10 tests: page 'Leerlijnen' (per onderdeel, per categorie, both)
     ├── test_importers.py         📝 on this branch
     ├── test_opstelling.py        📝
     └── fixtures/                 saved, anonymised atletiek.nu/Seltec pages (incl. atletieknu_tijdschema/, seltec_tijdschema/)

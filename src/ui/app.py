@@ -43,6 +43,7 @@ from groepen.groepenoverzicht import GEEN_SEIZOEN, groepenoverzicht
 from groepen import landingspagina as groep_landingspagina
 from groepen import overzichten as groep_overzichten
 from groepen import trainingen as trainingsbeheer
+from leerlijnen import overzicht as leerlijnoverzicht
 from leerlijnen import voortgang
 from ui import export as trainingsexport
 from ui import importeren as importeerpagina
@@ -58,7 +59,6 @@ VOORKEUR_POORT = 5050
 #: Menu-items en losse links die nog geen eigen pagina hebben: (pad, titel).
 BINNENKORT = {
     "ploegen": "Ploegen",
-    "leerlijnen": "Leerlijnen",
     "instellingen": "Instellingen",
 }
 ATLEET_BINNENKORT: dict[str, str] = {
@@ -928,6 +928,15 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
             keuze = groep_importeren.Groepkeuze("bestaand", res.groep.id, seizoen=keuze.seizoen)
         return _groepimport([r.rij for r in res.mislukt], keuze, dubbel,
                             fouten={i: r.reden for i, r in enumerate(res.mislukt)}, resultaat=res)
+
+    # ---------------- leerlijnen (catalogus) ----------------
+    @app.get("/leerlijnen")
+    def leerlijnen():
+        o = leerlijnoverzicht.leerlijnoverzicht(db(), onderdeel=request.args.get("onderdeel"),
+                                                categorie=request.args.get("categorie"),
+                                                doorlopend=request.args.get("doorlopend") == "1")
+        return render_template("leerlijnen.html", o=o, bronnen=leerlijnoverzicht.BRONNEN,
+                               fasen=leerlijnoverzicht.FASEN, actief_menu="leerlijnen")
 
     # ---------------- nog te bouwen ----------------
     @app.get("/<any(" + ", ".join(BINNENKORT) + "):onderdeel>")

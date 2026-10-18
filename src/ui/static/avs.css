@@ -800,3 +800,53 @@ th[aria-sort="descending"] .sorteer__naam::after { content: " \2193"; opacity: 1
 .dubbelkeuze .vinkje { align-items: flex-start; }
 .dubbelkeuze .vinkje input { margin-top: .2rem; flex: none; }
 .importwacht { margin: 0 auto 0 0; max-width: 34rem; }
+
+/* ---------- leerlijnen (templates/leerlijnen.html) ---------- */
+.leerlijnen__uitleg { margin: .6rem 0 0; max-width: 46rem; font-size: var(--maat-s); }
+.leerlijnkeuze { display: grid; gap: .9rem; padding: 1rem 1.1rem; background: var(--roze-licht); border-left: 4px solid var(--rood); }
+.leerlijnkeuze__rij { display: grid; grid-template-columns: 6.5rem 1fr; gap: .4rem 1rem; align-items: baseline; }
+.pillen { display: flex; flex-wrap: wrap; gap: .4rem; }
+.pillen a {
+  display: inline-flex; align-items: baseline; gap: .4rem;
+  padding: .3rem .7rem; font-size: var(--maat-s); text-decoration: none;
+  color: var(--tekst); background: var(--papier); border: 1px solid var(--rand);
+}
+.pillen a:hover { border-color: var(--rood); color: var(--rood); }
+.pillen a[aria-current="true"] { background: var(--rood); border-color: var(--rood); color: var(--op-zalm); font-weight: 700; }
+.pillen a[aria-current="true"] .zacht { color: inherit; opacity: .8; }
+.pillen--categorie a { min-width: 3.4rem; justify-content: center; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+.leerlijnmatrix { width: auto; min-width: min(100%, 40rem); }
+.leerlijnmatrix thead th a { color: var(--op-zalm); text-decoration: none; }
+.leerlijnmatrix thead th a:hover { text-decoration: underline; }
+.leerlijnmatrix td { min-width: 3.5rem; }
+.leerlijnmatrix td a { display: block; font-weight: 700; text-decoration: none; }
+.leerlijnmatrix td a:hover { text-decoration: underline; }
+
+.leerlijnen__resultaat { gap: 1.5rem; }
+.leerlijnen__balk { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: .5rem 1.5rem; }
+.leerlijnen__bronnen { display: flex; flex-wrap: wrap; gap: .25rem 1rem; font-size: var(--maat-xs); }
+.leerlijnen__opbouw a { color: inherit; text-decoration: none; }
+.leerlijnen__opbouw li[aria-current="step"] a { color: var(--op-zalm); }
+.leerlijnen__opbouw a:hover { text-decoration: underline; }
+.leerlijntabel tbody th { font-weight: 700; }
+.leerlijntabel tr.eerder th { background: var(--roze); color: var(--tekst); font-weight: 400; }
+.leerlijntabel thead th:last-child, .leerlijntabel__bron { width: 9rem; }
+.leerlijntabel__fase { display: block; margin-top: .2rem; font-size: var(--maat-xs); line-height: 1.25; }
+.leerlijntabel .kenmerk { background: var(--papier); color: var(--tekst); }
+@media (max-width: 40rem) {
+  .leerlijnkeuze__rij { grid-template-columns: 1fr; }
+  .leerlijntabel, .leerlijntabel tbody, .leerlijntabel tr, .leerlijntabel th, .leerlijntabel td { display: block; width: auto !important; }
+  .leerlijntabel thead { display: none; }
+  .leerlijntabel tr { border-bottom: 2px solid var(--lijn); }
+  .leerlijntabel td { border: 0; padding-top: .25rem; }
+  .leerlijntabel__bron { display: flex !important; gap: .5rem; align-items: baseline; }
+  .leerlijntabel__fase { display: inline; margin: 0; }
+}
+@media print {
+  .appbalk, .leerlijnkeuze, .leerlijnen__balk > a, .sprongen, .vel::after { display: none; }
+  .pagina { padding: 0; }
+  .vel { box-shadow: none; max-width: none; padding: 0 0 3rem; }
+  .leerlijn { break-inside: avoid-page; }
+  .leerlijntabel tr { break-inside: avoid; }
+}
