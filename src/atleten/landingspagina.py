@@ -20,6 +20,7 @@ from dataclasses import dataclass, field
 from datetime import date, timedelta
 
 from db.queries import Opslag
+from instellingen import dagvolgorde, tijd as toon_tijd, weekbegin
 from leerlijnen.voortgang import LeerlijnBlok, samenvatting
 from models import DAGEN, Atleet, Notitie, Trainingsschema, Wedstrijd
 
@@ -164,21 +165,22 @@ def fase_van(categorie: str | None) -> str | None:
 
 
 def _schema(db: Opslag, master_id: str, schema: Trainingsschema, vandaag: date) -> list[SchemaDag]:
-    """Trainingsdagen plus de gekozen groepstrainingen van deze week (maandag t/m zondag), met begintijd."""
-    maandag = vandaag - timedelta(days=vandaag.weekday())
-    zondag = maandag + timedelta(days=6)
+    """Trainingsdagen plus de gekozen groepstrainingen van deze week, met begintijd.
+    De week begint op de eerste dag uit Instellingen."""
+    begin = weekbegin(vandaag)
+    eind = begin + timedelta(days=6)
     gekoppeld: dict[str, list[str]] = {d: [] for d in DAGEN}
     for g in db.groepen_van_atleet(master_id):
-        for t in db.trainingen(g.id, van=maandag, tot=zondag):
+        for t in db.trainingen(g.id, van=begin, tot=eind):
             if not schema.traint_mee(t, g):          # andere training gekozen of geen trainingsdag
                 continue
             tijd = t.effectieve_starttijd(g)
             tekst = f"{g.naam} – {t.onderwerp}" if t.onderwerp else g.naam
-            tekst = f"{tijd} {tekst}" if tijd else tekst
+            tekst = f"{toon_tijd(tijd)} {tekst}" if tijd else tekst
             gekoppeld[DAGEN[t.datum.weekday()]].append(tekst)
     return [
-        SchemaDag(d, DAG_KORT[d], schema.traint_op(d), vandaag.weekday() == i, gekoppeld[d])
-        for i, d in enumerate(DAGEN)
+        SchemaDag(d, DAG_KORT[d], schema.traint_op(d), DAGEN[vandaag.weekday()] == d, gekoppeld[d])
+        for d in dagvolgorde()
     ]
 
 

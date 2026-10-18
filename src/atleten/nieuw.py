@@ -18,6 +18,7 @@ from datetime import date
 from typing import Mapping
 
 from db.queries import Opslag, OpslagFout
+from instellingen import dagvolgorde
 from models import DAGEN, GESLACHTEN, Atleet, Groep, Trainingsschema
 
 from .beheer import nieuwe_atleet
@@ -83,7 +84,7 @@ def formulier(db: Opslag, ingevuld: Mapping | None = None, *, peildatum: date | 
     return NieuwFormulier(
         waarden={v: str(ingevuld.get(v) or "") for v in VELDEN},
         groepen=[GroepKeuze(g, str(g.id) in gekozen_groepen) for g in sorted(db.groepen(), key=lambda g: g.naam.lower())],
-        dagen=[DagKeuze(d, DAG_KORT[d], d in gekozen_dagen) for d in DAGEN],
+        dagen=[DagKeuze(d, DAG_KORT[d], d in gekozen_dagen) for d in dagvolgorde()],
         vandaag=peildatum or date.today(),
     )
 

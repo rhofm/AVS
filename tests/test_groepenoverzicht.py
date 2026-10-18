@@ -39,7 +39,7 @@ def test_zoeken_en_filteren():
         assert o.seizoenen == ["2026-2027", "2025-2026"] and o.zonder_seizoen
         assert o.dagkeuzes == [("maandag", "Maandag"), ("dinsdag", "Dinsdag"), ("donderdag", "Donderdag")]
         sprint = o.rijen[1]
-        assert sprint.labels == ["Di 18:30", "Do 18:30"] and sprint.aantal == 3
+        assert sprint.labels == ["Di 18:30u", "Do 18:30u"] and sprint.aantal == 3
 
         zoek = lambda q: _namen(groepenoverzicht(db, zoek=q, peildatum=VANDAAG))  # noqa: E731
         assert zoek("zoe") == ["Sprint Zoë"]                          # zonder accent, hoofdletters maken niet uit

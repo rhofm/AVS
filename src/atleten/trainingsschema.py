@@ -20,6 +20,7 @@ from datetime import date, timedelta
 from typing import Iterable
 
 from db.queries import Opslag, OpslagFout
+from instellingen import dagvolgorde, tijd as toon_tijd
 from models import DAGEN, Atleet, Trainingsschema
 
 from .landingspagina import DAG_KORT
@@ -43,7 +44,12 @@ class Optie:
 
     @property
     def tekst(self) -> str:
-        return f"{self.groep} {self.tijd}"
+        return f"{self.groep} {toon_tijd(self.tijd)}"
+
+    @property
+    def tijd_tekst(self) -> str:
+        """De begintijd zoals Instellingen hem wil laten zien ('18:30u' / '6:30PM')."""
+        return toon_tijd(self.tijd)
 
 
 @dataclass
@@ -117,7 +123,7 @@ def schemaformulier(db: Opslag, master_id: str, *, peildatum: date | None = None
     per_dag = groepsdagen(db, master_id, peildatum)
     per_optie = opties(db, master_id)
     dagen = []
-    for d in DAGEN:
+    for d in dagvolgorde():
         keuze = schema.keuze.get(d)
         lijst = [Optie(gid, naam, tijd, schema.traint_op(d) and (not keuze or (gid, tijd) in keuze))
                  for gid, naam, tijd in per_optie[d]]
@@ -180,7 +186,7 @@ def schema_opslaan(db: Opslag, master_id: str, gekozen: Iterable[str],
     schema = db.trainingsschema(master_id)
     oud = set(schema.dagen)
     beschikbaar = opties(db, master_id)
-    namen = {(gid, tijd): f"{naam} {tijd}" for d in DAGEN for gid, naam, tijd in beschikbaar[d]}
+    namen = {(gid, tijd): f"{naam} {toon_tijd(tijd)}" for d in DAGEN for gid, naam, tijd in beschikbaar[d]}
 
     nieuwe_keuze = dict(schema.keuze)
     gekozen_tekst: dict[str, list[str]] = {}

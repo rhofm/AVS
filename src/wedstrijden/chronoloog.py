@@ -26,6 +26,7 @@ from itertools import combinations
 
 from atleten.landingspagina import leeftijdscategorie
 from db.queries import Opslag, OpslagFout
+from instellingen import tijd as toon_tijd
 from models import Atleet, ProgrammaOnderdeel, Wedstrijd, lees_categorie
 
 
@@ -169,7 +170,8 @@ class Botsing:
     @property
     def tekst(self) -> str:
         a, b = self.eerste, self.tweede
-        kern = f"{self.atleet.naam}: {a.starttijd} {a.omschrijving} en {b.starttijd} {b.omschrijving}"
+        kern = (f"{self.atleet.naam}: {toon_tijd(a.starttijd)} {a.omschrijving} "
+                f"en {toon_tijd(b.starttijd)} {b.omschrijving}")
         if self.pauze is None:
             return f"{kern} lopen tegelijk."
         return f"{kern}: maar {self.pauze} min ertussen."

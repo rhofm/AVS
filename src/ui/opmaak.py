@@ -64,8 +64,11 @@ def tekstdatum(tekst: str | None) -> str:
 
 
 def registreer_filters(env) -> None:
+    import instellingen                            # tijden: {{ t | tijd }}, {{ begin | tijdvak(eind) }}
     from ui.markdown import naar_html              # trainingsteksten: {{ tekst | markdown }}
     env.filters["markdown"] = naar_html
+    env.filters["tijd"] = instellingen.tijd
+    env.filters["tijdvak"] = instellingen.tijdvak
     env.filters["tekstdatum"] = tekstdatum
     env.filters["getal"] = getal
     env.filters["datum_kort"] = datum_kort

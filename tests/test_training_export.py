@@ -35,7 +35,7 @@ def test_markdown():
         e = export.trainingsexport(tp)
         assert e.bestandsnaam == "training-2026-10-20-sprintgroep"
         md = export.naar_markdown(e)
-        assert md.startswith("# Starts\n") and "**Sprintgroep · dinsdag 20 oktober 2026 · 18:30**" in md
+        assert md.startswith("# Starts\n") and "**Sprintgroep · dinsdag 20 oktober 2026 · 18:30u**" in md
         for kop in ("## Warming-up", "## Kern A", "## Kern B", "## Cooling-down", "## Notities"):
             assert kop in md, kop
         assert "### Starts" in md                                   # kopje in de tekst zakt onder 'Kern A'

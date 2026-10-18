@@ -86,7 +86,7 @@
           </div>
           <div class="tabelvak">
             <table class="kalender kalender--status">
-              <thead><tr>{% for d in ["Ma", "Di", "Wo", "Do", "Vr", "Za", "Zo"] %}<th scope="col">{{ d }}</th>{% endfor %}</tr></thead>
+              <thead><tr>{% for d in weekkoppen %}<th scope="col">{{ d }}</th>{% endfor %}</tr></thead>
               <tbody>
                 {# nieuwste week bovenaan, net als de maanden en de lijst #}
                 {% for week in m.weken | reverse %}

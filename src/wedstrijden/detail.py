@@ -28,6 +28,7 @@ from typing import Iterable
 
 from atleten.landingspagina import categorie_code, leeftijdscategorie
 from db.queries import Opslag, OpslagFout
+from instellingen import tijd as toon_tijd, tijdvak
 from models import Atleet, Onderdeel, ProgrammaOnderdeel, Wedstrijd
 
 from . import chronoloog, planning
@@ -48,9 +49,9 @@ class TijdschemaRij:
 
     @property
     def tijd(self) -> str:
-        """'10:30–10:50', of '10:30' zonder duur."""
+        """'10:30–10:50u', of '10:30u' zonder duur (notatie volgens Instellingen)."""
         r = self.regel
-        return f"{r.starttijd}–{r.eindtijd}" if r.eindtijd else r.starttijd
+        return tijdvak(r.starttijd, r.eindtijd) if r.eindtijd else toon_tijd(r.starttijd)
 
     @property
     def onderdeel(self) -> str:
@@ -468,7 +469,7 @@ class TijdWijziging:
         if o.datum != n.datum:
             delen.append(f"{o.datum.isoformat()} → {n.datum.isoformat()}")
         if o.starttijd != n.starttijd:
-            delen.append(f"{o.starttijd} → {n.starttijd}")
+            delen.append(f"{toon_tijd(o.starttijd)} → {toon_tijd(n.starttijd)}")
         if o.duur != n.duur:
             delen.append(f"duur {o.duur or '?'} → {n.duur or '?'} min")
         return f"{o.omschrijving}: {', '.join(delen)}"

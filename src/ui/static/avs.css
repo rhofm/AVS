@@ -843,6 +843,47 @@ th[aria-sort="descending"] .sorteer__naam::after { content: " \2193"; opacity: 1
   .leerlijntabel__bron { display: flex !important; gap: .5rem; align-items: baseline; }
   .leerlijntabel__fase { display: inline; margin: 0; }
 }
+/* ---------- Instellingen (templates/instellingen.html) ---------- */
+.instellingen { display: grid; gap: 2rem; }
+.instelling { border: 0; margin: 0; padding: 0; min-width: 0; display: grid; gap: .75rem; }
+.instelling__kop { padding: 0; display: grid; gap: .15rem; margin-bottom: .75rem; }
+.instelling__kop .zacht { font-size: var(--maat-s); }
+.instelling__keuzes { display: grid; gap: 4px; }
+.instelling__keuzes--dagen { grid-template-columns: minmax(9rem, 1.6fr) repeat(7, minmax(2.6rem, 1fr)); }
+.instelling__keuzes--thema, .instelling__keuzes--tijd { grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr)); gap: .6rem; }
+.instelling__radio { position: absolute; opacity: 0; pointer-events: none; }
+.instelling__optie {
+  display: grid; align-content: center; justify-items: center; gap: .3rem; cursor: pointer; text-align: center;
+  padding: .6rem .5rem; border: 1px solid var(--zalm); background: var(--papier); color: var(--tekst);
+  font-size: var(--maat-s); min-height: 3rem;
+}
+.instelling__optie--systeem { justify-items: start; text-align: left; padding-inline: .8rem; }
+.instelling__optie .zacht { font-size: var(--maat-xs); }
+.instelling__optie:hover { border-color: var(--rood); }
+.instelling__radio:checked + .instelling__optie { background: var(--rood); border-color: var(--rood); color: var(--op-zalm); }
+.instelling__radio:checked + .instelling__optie .zacht { color: inherit; opacity: .85; }
+.instelling__radio:focus-visible + .instelling__optie { outline: 2px solid var(--rood); outline-offset: 2px; }
+.tijdvoorbeeld { font-size: var(--maat-m); font-variant-numeric: tabular-nums; }
+
+/* de week in de gekozen volgorde */
+.weekvoorbeeld { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; max-width: 28rem; font-size: var(--maat-xs); }
+.weekvoorbeeld span { background: var(--roze-licht); padding: .3rem 0; text-align: center; font-weight: 700; }
+.weekvoorbeeld span:first-child { background: var(--zalm); color: var(--op-zalm); }
+
+/* klein voorbeeld van een vel in licht/donker; vaste kleuren, los van het actieve thema */
+.themavoorbeeld { display: flex; width: 100%; max-width: 9rem; height: 4rem; border: 1px solid var(--rand); overflow: hidden; }
+.themavoorbeeld__vel { flex: 1; display: grid; align-content: start; gap: 5px; padding: 8px; background: #ffffff; }
+.themavoorbeeld__vel i { display: block; height: 5px; background: #ffbfbf; }
+.themavoorbeeld__vel i:first-child { width: 55%; background: #c00000; }
+.themavoorbeeld__vel i:last-child { width: 75%; }
+.themavoorbeeld--donker .themavoorbeeld__vel, .themavoorbeeld__vel--donker { background: #232323; }
+.themavoorbeeld--donker .themavoorbeeld__vel i, .themavoorbeeld__vel--donker i { background: #34302f; }
+.themavoorbeeld--donker .themavoorbeeld__vel i:first-child, .themavoorbeeld__vel--donker i:first-child { background: #ff6b6b; }
+@media (max-width: 40rem) {
+  .instelling__keuzes--dagen { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+  .instelling__keuzes--dagen .instelling__optie--systeem { grid-column: 1 / -1; }
+  .instelling__keuzes--dagen .instelling__optie { padding-inline: .2rem; }
+}
 @media print {
   .appbalk, .leerlijnkeuze, .leerlijnen__balk > a, .sprongen, .vel::after { display: none; }
   .pagina { padding: 0; }

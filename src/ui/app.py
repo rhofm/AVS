@@ -35,6 +35,7 @@ from atleten import notities as notitiebeheer
 from atleten.overzicht import atletenoverzicht
 from atleten import trainingsschema as schemabeheer
 from atleten.aanwezigheid import aanwezigheid
+import instellingen
 from db.init_db import SleutelFout, init_db
 from db.queries import Opslag, OpslagFout
 from groepen import groep as groepsbeheer
@@ -59,7 +60,6 @@ VOORKEUR_POORT = 5050
 #: Menu-items en losse links die nog geen eigen pagina hebben: (pad, titel).
 BINNENKORT = {
     "ploegen": "Ploegen",
-    "instellingen": "Instellingen",
 }
 ATLEET_BINNENKORT: dict[str, str] = {
 }
@@ -102,6 +102,24 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
     def controleer_start():
         if startfout and request.endpoint != "static":
             return render_template("fout.html", titel="AVS kan niet starten", tekst=startfout), 500
+
+    @app.before_request
+    def instellingen_laden():
+        """Elke request de opgeslagen instellingen (eerste weekdag, thema, tijdnotatie) actief maken.
+        Het bestand is klein; zo telt een wijziging (ook 'zoals de computer') meteen mee."""
+        if request.endpoint != "static":
+            instellingen.activeer(instellingen.laad(app.config["AVS_MAP"]))
+
+    @app.teardown_request
+    def instellingen_terugzetten(_fout=None):
+        instellingen.activeer(instellingen.NEDERLANDS)     # niets laten doorlekken naar code buiten een request
+
+    @app.context_processor
+    def instellingen_in_templates():
+        inst = instellingen.actief()
+        dagen = inst.dagen()
+        return {"thema": inst.thema_attribuut,
+                "weekkoppen": [d[:2].capitalize() for d in dagen]}     # ['Ma', 'Di', …] of ['Zo', 'Ma', …]
 
     @app.before_request
     def trainingen_klaarzetten():
@@ -937,6 +955,37 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
                                                 doorlopend=request.args.get("doorlopend") == "1")
         return render_template("leerlijnen.html", o=o, bronnen=leerlijnoverzicht.BRONNEN,
                                fasen=leerlijnoverzicht.FASEN, actief_menu="leerlijnen")
+
+    # ---------------- instellingen ----------------
+    def _instellingenpagina(inst: instellingen.Instellingen, fout: str | None = None, status: int = 200):
+        return render_template("instellingen.html", inst=inst, fout=fout, meldingen=get_flashed_messages(),
+                               eerste_dag_keuzes=instellingen.EERSTE_DAG_KEUZES,
+                               thema_keuzes=instellingen.THEMA_KEUZES, tijd_keuzes=instellingen.TIJD_KEUZES,
+                               computer=instellingen.Instellingen(),        # alles 'systeem': wat de computer doet
+                               tijdnotaties={w: instellingen.Instellingen(tijdnotatie=w)
+                                             for w in instellingen.TIJD_KEUZES},
+                               voorbeeld_tijden=("09:30", "18:00", "14:00"),
+                               actief_menu="instellingen"), status
+
+    @app.get("/instellingen")
+    def instellingen_pagina():
+        return _instellingenpagina(instellingen.actief())
+
+    @app.post("/instellingen")
+    def instellingen_opslaan():
+        try:
+            nieuw = instellingen.uit_formulier(request.form)
+        except ValueError:
+            return _instellingenpagina(instellingen.actief(), fout="Niet opgeslagen: kies een van de opties.",
+                                       status=400)
+        try:
+            instellingen.opslaan(nieuw, app.config["AVS_MAP"])
+        except OSError as e:
+            return _instellingenpagina(nieuw, fout=f"Niet opgeslagen: het bestand kon niet worden geschreven ({e}).",
+                                       status=500)
+        instellingen.activeer(nieuw)
+        flash("Instellingen opgeslagen.")
+        return redirect(url_for("instellingen_pagina"))
 
     # ---------------- nog te bouwen ----------------
     @app.get("/<any(" + ", ".join(BINNENKORT) + "):onderdeel>")

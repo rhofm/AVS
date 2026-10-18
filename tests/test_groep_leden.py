@@ -138,11 +138,11 @@ def test_groep_met_trainingsdagen():
         # De landingspagina gebruikt de vaste dagen, ook zonder trainingen.
         lp = landingspagina.landingspagina(db, g.id, peildatum=VANDAAG)
         assert lp.dagen_bron == landingspagina.BRON_VAST
-        assert [(d.kort, d.starttijd) for d in lp.trainingsdagen] == [("Di", "09:15"), ("Do", "19:00"), ("Za", "09:00")]
+        assert [(d.kort, d.starttijd) for d in lp.trainingsdagen] == [("Di", "09:15u"), ("Do", "19:00u"), ("Za", "09:00u")]
         anna = lp.leden[0]                       # Anna traint di, do, za: alle drie met de groep
         assert [d.soort for d in anna.dagen] == [None, "groep", None, "groep", None, "groep", None]
         rijen = groepenoverzicht(db, peildatum=VANDAAG).rijen
-        assert {r.groep.naam: r.labels for r in rijen}["Avondgroep"] == ["Di 09:15", "Do 19:00", "Za 09:00"]
+        assert {r.groep.naam: r.labels for r in rijen}["Avondgroep"] == ["Di 09:15u", "Do 19:00u", "Za 09:00u"]
 
         # Ongeldige dagen/tijden: niets aangemaakt.
         aantal = len(db.groepen())
@@ -178,7 +178,7 @@ def test_trainingsdagen_wijzigen():
 
         w = groepsbeheer.leden_opslaan(db, gid, leden, {"donderdag": "19:00", "dinsdag": "18:30"})
         assert w.dagen == {"dinsdag": "18:30", "donderdag": "19:00"} and not w.toegevoegd
-        assert w.tekst == "Trainingsdagen nu: Di 18:30, Do 19:00."
+        assert w.tekst == "Trainingsdagen nu: Di 18:30u, Do 19:00u."
         assert db.groep(gid).trainingsdagen == {"dinsdag": "18:30", "donderdag": "19:00"}
         f = groepsbeheer.ledenformulier(db, gid, peildatum=VANDAAG)
         assert f.afgeleide_dagen == "" and [(d, t) for d, _, aan, t, _ in f.dagen if aan] == [
@@ -189,7 +189,7 @@ def test_trainingsdagen_wijzigen():
         assert groepsbeheer.leden_opslaan(db, gid, leden, {"dinsdag": "18:30", "donderdag": "19:00"}).leeg
         w = groepsbeheer.leden_opslaan(db, gid, [ids["anna"]], {"dinsdag": "18:30"})
         assert w.tekst == ("Atleten gewijzigd: 2 verwijderd (Cas Proef, Bram Test). "
-                           "Trainingsdagen nu: Di 18:30.")
+                           "Trainingsdagen nu: Di 18:30u.")
         # None = dagen niet aanpassen; {} = vaste dagen weghalen.
         groepsbeheer.leden_opslaan(db, gid, [ids["anna"], ids["bram"]])
         assert db.groep(gid).trainingsdagen == {"dinsdag": "18:30"}
@@ -230,7 +230,7 @@ def test_routes():
                                                 "tijd-dinsdag": "18:30", "tijd-donderdag": "19.00"})
         assert r.status_code == 302
         tekst = c.get(r.headers["Location"]).get_data(as_text=True)
-        assert "Trainingsdagen nu: Di 18:30, Do 19:00." in tekst and "Vaste trainingsdagen van de groep" in tekst
+        assert "Trainingsdagen nu: Di 18:30u, Do 19:00u." in tekst and "Vaste trainingsdagen van de groep" in tekst
         # Fout in een tijd: alles wat ingevuld was blijft staan, niets opgeslagen.
         r = c.post(f"/groep/{gid}/leden", data={"lid": [ids["anna"]], "dag-woensdag": "1", "tijd-woensdag": "31:00"})
         tekst = r.get_data(as_text=True)

@@ -40,7 +40,7 @@
       {% endif %}
       <h1 class="kop kop--pagina">Atleten inschrijven</h1>
       <p class="subkop">{{ w.naam }} · {{ w.datum | datum_kort }} {{ w.datum.year }}
-        {%- if f.regel %} · {{ f.regel.starttijd }} {{ f.regel.omschrijving }}{% endif %}</p>
+        {%- if f.regel %} · {{ f.regel.starttijd | tijd }} {{ f.regel.omschrijving }}{% endif %}</p>
     </div>
   </header>
 

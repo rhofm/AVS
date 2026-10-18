@@ -73,7 +73,7 @@ def test_detail():
         d = detail.wedstrijd_detail(db, ids["w"], peildatum=DAG - timedelta(days=8))
         assert d.dagen_tot == 8 and not d.geweest and d.heeft_tijdschema and not d.meerdaags
         rijen = d.dagen[0].rijen
-        assert [r.tijd for r in rijen] == ["10:00–10:30", "10:15–11:00", "10:30–11:00", "11:00", "11:30"]
+        assert [r.tijd for r in rijen] == ["10:00–10:30u", "10:15–11:00u", "10:30–11:00u", "11:00u", "11:30u"]
         assert [[a.voornaam for a in r.atleten] for r in rijen] == [["Anna"], ["Anna"], ["Bram"], [], []]
         assert rijen[0].details == "serie" and rijen[1].details == "groep 1"
         assert d.aantal_regels == 5 and d.aantal_met_atleten == 3 and d.aantal_zonder_atleten == 2

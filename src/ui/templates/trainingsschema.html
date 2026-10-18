@@ -32,7 +32,7 @@
             {% for o in d.opties %}
               <span class="dagkeuze__optie">
                 <input type="checkbox" id="tr-{{ d.dag }}-{{ loop.index }}" name="{{ d.veld }}" value="{{ o.waarde }}"{% if o.gekozen %} checked{% endif %}>
-                <label for="tr-{{ d.dag }}-{{ loop.index }}"><strong>{{ o.tijd }}</strong><span>{{ o.groep }}</span></label>
+                <label for="tr-{{ d.dag }}-{{ loop.index }}"><strong>{{ o.tijd_tekst }}</strong><span>{{ o.groep }}</span></label>
               </span>
             {% endfor %}
           {% else %}

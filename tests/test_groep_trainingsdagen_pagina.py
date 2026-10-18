@@ -71,7 +71,7 @@ def test_routes():
                                                           "tijd-zaterdag": "9.00", "lid": ["genegeerd"]})
         assert r.status_code == 302 and r.headers["Location"].endswith(f"/groep/{gid}#kop-dagen")
         tekst = c.get(r.headers["Location"]).get_data(as_text=True)
-        assert "Trainingsdagen nu: Di 18:30, Za 09:00." in tekst and "Trainingsschema aangevuld voor 2 atleten." in tekst
+        assert "Trainingsdagen nu: Di 18:30u, Za 09:00u." in tekst and "Trainingsschema aangevuld voor 2 atleten." in tekst
         assert "Vaste trainingsdagen van de groep" in tekst and "09:00" in tekst
         assert len(db.groep(gid).leden) == 3                                              # leden niet aangeraakt
 

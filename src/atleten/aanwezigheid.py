@@ -18,6 +18,7 @@ from dataclasses import dataclass, field
 from datetime import date, timedelta
 
 from db.queries import Opslag
+from instellingen import eerste_weekdag
 from models import ABSENTIE_STATUSSEN, Training
 
 NIET_INGEVULD = "niet_ingevuld"
@@ -116,7 +117,7 @@ def _maanden(regels: list[AanwezigheidRegel], van: date, tot: date, vandaag: dat
     per_dag: dict[date, list[AanwezigheidRegel]] = {}
     for r in sorted(regels, key=lambda r: (r.training.datum, r.groep)):
         per_dag.setdefault(r.training.datum, []).append(r)
-    kal = calendar.Calendar(firstweekday=0)
+    kal = calendar.Calendar(firstweekday=eerste_weekdag())     # zie Instellingen
     jaar, maand = tot.year, tot.month
     uit = []
     while (jaar, maand) >= (van.year, van.month):

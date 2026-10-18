@@ -17,7 +17,7 @@
     <div>
       <a class="terug" href="{{ url_for('training', training_id=h.id) }}">&larr; Training {{ h.datum | datum_kort }}</a>
       <h1 class="kop kop--pagina">{% if f.nieuw %}Afwijkende training{% elif f.is_variant %}Afwijkende training bewerken{% else %}Training bewerken{% endif %}</h1>
-      <p class="subkop">{{ f.groep.naam }} · {{ h.datum | datum_kort }} {{ h.datum.year }}{% if f.starttijd %} · {{ f.starttijd }}{% endif %}</p>
+      <p class="subkop">{{ f.groep.naam }} · {{ h.datum | datum_kort }} {{ h.datum.year }}{% if f.starttijd %} · {{ f.starttijd | tijd }}{% endif %}</p>
     </div>
   </header>
 

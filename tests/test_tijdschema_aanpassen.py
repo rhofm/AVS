@@ -38,7 +38,7 @@ def test_wijzigingen_en_volgorde():
         w = detail.tijdschema_wijzigingen(db, ids["w"], form)
         assert [x.oud.id for x in w] == [honderd_m, kogel]
         assert w[1].nieuw.starttijd == "09:45" and w[1].nieuw.duur == 20
-        assert "11:00 → 09:45" in w[1].tekst and "duur ? → 20 min" in w[1].tekst
+        assert "11:00u → 09:45u" in w[1].tekst and "duur ? → 20 min" in w[1].tekst
         assert w[0].tekst.endswith("duur 30 → 35 min")
         assert _volgorde(db, ids["w"])[0] == ("10:00", "100m")            # nog niets opgeslagen
         assert detail.tijdschema_aanpassen(db, w) == 2
@@ -91,7 +91,7 @@ def test_pagina():
         r = c.post(f"/wedstrijd/{ids['w']}/bewerken", data={**gegevens, f"tijd-{kogel}": "09:30"})
         assert r.status_code == 302
         html = c.get(r.headers["Location"] + "?alle=1").get_data(as_text=True)
-        assert "1 regel in het tijdschema aangepast: Kogelstoten Jongens U12: 11:00 → 09:30." in html
+        assert "1 regel in het tijdschema aangepast: Kogelstoten Jongens U12: 11:00u → 09:30u." in html
         assert html.index(f'id="regel-{kogel}"') < html.index(f'id="regel-{ids["regels"][0]}"')   # nu bovenaan
 
         # Fout in een tijd: niets opgeslagen (ook de naam niet), alles blijft ingevuld.

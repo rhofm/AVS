@@ -19,7 +19,8 @@ from datetime import date
 from atleten.landingspagina import DAG_KORT
 from atleten.overzicht import plat
 from db.queries import Opslag
-from models import DAGEN, Groep
+from instellingen import dagvolgorde, tijd as toon_tijd
+from models import Groep
 
 from .landingspagina import trainingsdagen
 
@@ -54,8 +55,10 @@ class GroepRij:
 
     @property
     def sort_dagen(self) -> str:
-        """'13' voor di + do: groepen die vroeg in de week beginnen eerst. Leeg = geen dagen (onderaan)."""
-        return "".join(str(DAGEN.index(d)) for d in self.dagen)
+        """'13' voor di + do: groepen die vroeg in de week beginnen eerst. Leeg = geen dagen (onderaan).
+        'Vroeg in de week' volgt de eerste dag uit Instellingen."""
+        volgorde = dagvolgorde()
+        return "".join(str(volgorde.index(d)) for d in self.dagen)
 
 
 @dataclass
@@ -92,8 +95,9 @@ def groepenoverzicht(db: Opslag, *, zoek: str = "", seizoen: str = "", dag: str 
     alle = []
     for g in db.groepen():
         dagen, _ = trainingsdagen(db, g, vandaag)
-        gesorteerd = [d for d in DAGEN if d in dagen]
-        labels = [f"{DAG_KORT[d]} {' & '.join(g.tijden(d))}" if g.tijden(d) else DAG_KORT[d] for d in gesorteerd]
+        gesorteerd = [d for d in dagvolgorde() if d in dagen]
+        labels = [f"{DAG_KORT[d]} {' & '.join(toon_tijd(t) for t in g.tijden(d))}" if g.tijden(d) else DAG_KORT[d]
+                  for d in gesorteerd]
         alle.append(GroepRij(g, gesorteerd, labels))
     alle.sort(key=lambda r: r.sort_naam)
 
@@ -110,5 +114,5 @@ def groepenoverzicht(db: Opslag, *, zoek: str = "", seizoen: str = "", dag: str 
         rijen=[r for r in alle if past(r, zoek, seizoen, dag)],
         totaal=len(alle), zoek=(zoek or "").strip(), seizoen=seizoen, dag=dag,
         seizoenen=seizoenen, zonder_seizoen=zonder,
-        dagkeuzes=[(d, d.capitalize()) for d in DAGEN if d in aanwezig],
+        dagkeuzes=[(d, d.capitalize()) for d in dagvolgorde() if d in aanwezig],
     )

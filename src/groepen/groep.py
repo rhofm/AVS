@@ -36,6 +36,7 @@ from typing import Iterable, Mapping
 
 from atleten.landingspagina import DAG_KORT, categorie_code, leeftijdscategorie
 from db.queries import Opslag, OpslagFout
+from instellingen import dagvolgorde, tijd as toon_tijd
 from models import DAGEN, Atleet, Groep, Trainingsschema
 
 from .landingspagina import trainingsdagen as afgeleide_trainingsdagen
@@ -72,9 +73,9 @@ class LedenFormulier:
 
     @property
     def dagen(self) -> list[tuple[str, str, bool, str, list[str]]]:
-        """Voor de dagkeuze: (dag, kort, aangevinkt, begintijd, extra tijden) van maandag t/m zondag."""
+        """Voor de dagkeuze: (dag, kort, aangevinkt, begintijd, extra tijden), in de weekvolgorde uit Instellingen."""
         td, ex = self.groep.trainingsdagen, self.groep.extra_tijden
-        return [(d, DAG_KORT[d], d in td, td.get(d) or "", list(ex.get(d, []))) for d in DAGEN]
+        return [(d, DAG_KORT[d], d in td, td.get(d) or "", list(ex.get(d, []))) for d in dagvolgorde()]
 
 
 MAX_NAAM = 80
@@ -155,7 +156,7 @@ def _controleer_extra(dagen: dict[str, str], extra: dict[str, list[str]] | None)
 
 def _alle_tijden(dagen: dict[str, str], extra: dict[str, list[str]]) -> dict[str, str]:
     """Voor meldingen: {'zaterdag': '09:00 en 10:30'}."""
-    return {d: " en ".join(sorted({t, *extra.get(d, [])})) for d, t in dagen.items()}
+    return {d: " en ".join(toon_tijd(x) for x in sorted({t, *extra.get(d, [])})) for d, t in dagen.items()}
 
 
 def nieuw_formulier(db: Opslag, *, naam: str = "", seizoen: str | None = None, gekozen: Iterable[str] = (),
@@ -201,8 +202,10 @@ def _controleer_dagen(trainingsdagen: dict[str, str | None]) -> dict[str, str]:
 
 
 def dagen_tekst(dagen: dict[str, str | None]) -> str:
-    """{'dinsdag': '18:30', 'donderdag': None} -> 'Di 18:30, Do'."""
-    return ", ".join(f"{DAG_KORT[d]} {t}" if t else DAG_KORT[d] for d, t in dagen.items())
+    """{'dinsdag': '18:30', 'donderdag': None} -> 'Di 18:30u, Do' (tijd en weekvolgorde volgens Instellingen)."""
+    volgorde = dagvolgorde()
+    return ", ".join(f"{DAG_KORT[d]} {toon_tijd(t)}" if t else DAG_KORT[d]
+                     for d, t in sorted(dagen.items(), key=lambda kv: volgorde.index(kv[0])))
 
 
 def _controleer_gegevens(db: Opslag, naam: str | None, seizoen: str | None,
@@ -430,4 +433,5 @@ def rooster(db: Opslag, master_id: str) -> list[RoosterRegel]:
     """Alle groepstrainingen van de atleet in een week, op dag en tijd gesorteerd."""
     regels = [RoosterRegel(d, t, g.id, g.naam)
               for g in db.groepen_van_atleet(master_id) for d, t in g.momenten]
-    return sorted(regels, key=lambda r: (DAGEN.index(r.dag), r.tijd, r.groep.lower()))
+    volgorde = dagvolgorde()
+    return sorted(regels, key=lambda r: (volgorde.index(r.dag), r.tijd, r.groep.lower()))

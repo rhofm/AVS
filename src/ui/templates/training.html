@@ -17,7 +17,7 @@
       <a class="terug" href="{{ url_for('groep_trainingen', groep_id=tp.groep.id) }}">&larr; Trainingen {{ tp.groep.naam }}</a>
       <span class="label" style="display: block">Training</span>
       <h1 class="kop kop--pagina">{{ t.onderwerp or "Training" }}</h1>
-      <p class="subkop">{{ t.datum | datum_kort }} {{ t.datum.year }}{% if tp.starttijd %} · {{ tp.starttijd }}{% endif %} · {% if tp.dagen_tot < 0 %}geweest{% else %}{{ tp.dagen_tot | over_dagen }}{% endif %}</p>
+      <p class="subkop">{{ t.datum | datum_kort }} {{ t.datum.year }}{% if tp.starttijd %} · {{ tp.starttijd | tijd }}{% endif %} · {% if tp.dagen_tot < 0 %}geweest{% else %}{{ tp.dagen_tot | over_dagen }}{% endif %}</p>
       <p class="atleetkop__feiten">
         <span><a href="{{ url_for('groep', groep_id=tp.groep.id) }}">{{ tp.groep.naam }}</a></span>
         {% if tp.periode %}<span>{{ tp.periode.naam }}</span>{% endif %}

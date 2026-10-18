@@ -101,7 +101,7 @@
           <h2 class="subkop maand__naam">{{ m.naam }}</h2>
           <div class="tabelvak">
             <table class="kalender">
-              <thead><tr>{% for d in ["Ma", "Di", "Wo", "Do", "Vr", "Za", "Zo"] %}<th scope="col">{{ d }}</th>{% endfor %}</tr></thead>
+              <thead><tr>{% for d in weekkoppen %}<th scope="col">{{ d }}</th>{% endfor %}</tr></thead>
               <tbody>
                 {% for week in m.weken %}
                   <tr>

@@ -51,6 +51,14 @@ This project holds personal data about athletes, many of them minors.
   `keyring` for the master key. Data lives in SQL; logic lives in Python.
 - **UI**: a local web UI — `src/ui/app.py` is to become a Flask/FastAPI server
   with `templates/` and `static/`. The framework choice is still open.
+- **Settings** (page Instellingen): `src/instellingen/` keeps first weekday, theme
+  and time notation in `data/instellingen.json` (no personal data, so plain JSON).
+  'systeem' = follow the computer (`instellingen/systeem.py` reads the Windows
+  registry; the theme follows the browser's `prefers-color-scheme`). Never loop
+  over `DAGEN` for *display*: use `instellingen.dagvolgorde()` (and `weekbegin()`,
+  `eerste_weekdag()` for calendars). Show times with `instellingen.tijd()` /
+  `tijdvak()` or the Jinja filters `| tijd` / `| tijdvak(eind)`, never raw
+  'HH:MM'. Storage and form values stay 'HH:MM' and Monday-first.
 - **Distribution**: PyInstaller, driven by `build.py` (one command → `.exe`).
   Code must work both from source and frozen: use `sys.frozen` checks as in
   `standaard_map()` and never assume the current working directory. The build

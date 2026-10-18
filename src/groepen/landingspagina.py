@@ -27,6 +27,7 @@ from datetime import date, timedelta
 
 from atleten.landingspagina import DAG_KORT, categorie_code, leeftijdscategorie
 from db.queries import Opslag
+from instellingen import dagvolgorde, tijd as toon_tijd
 from leerlijnen.voortgang import leerdoelenpagina
 from models import ABSENTIE_STATUSSEN, DAGEN, Atleet, Groep, Periodeplan, Training, Trainingsschema
 from wedstrijden.kalender import PlanningRegel, wedstrijdplanning
@@ -230,7 +231,7 @@ def _leden(db: Opslag, groep: Groep, groepsdagen: set[str], schemas: dict[str, T
         schema = schemas[mid]
         anderen = [g for g in db.groepen_van_atleet(mid) if g.id != groep.id]
         dagen = []
-        for d in DAGEN:
+        for d in dagvolgorde():                       # zelfde volgorde als de kop (GroepDag)
             if not schema.traint_op(d):
                 dagen.append(LidDag(None))
             elif d in groepsdagen:
@@ -304,7 +305,7 @@ def _aanwezigheid(db: Opslag, groep: Groep, van: date, tot: date) -> list[DagAan
             regel.ingevulde_trainingen += 1
         for a in statussen:
             regel.telling[a.status] += 1
-    return [per_dag[d] for d in DAGEN if d in per_dag]
+    return [per_dag[d] for d in dagvolgorde() if d in per_dag]
 
 
 # ============================================================
@@ -326,10 +327,10 @@ def landingspagina(db: Opslag, groep_id: int, *, peildatum: date | None = None,
     schemas = {m: db.trainingsschema(m) for m in groep.leden}
     groepsdagen, bron = trainingsdagen(db, groep, vandaag, schemas=schemas)
 
-    dagen = [GroepDag(d, DAG_KORT[d], d in groepsdagen, vandaag.weekday() == i,
+    dagen = [GroepDag(d, DAG_KORT[d], d in groepsdagen, DAGEN[vandaag.weekday()] == d,
                       sum(1 for s in schemas.values() if s.traint_op(d)) if d in groepsdagen else 0,
-                      " · ".join(groep.tijden(d)) or None)          # '09:00 · 10:30' bij meer trainingen
-             for i, d in enumerate(DAGEN)]
+                      " · ".join(toon_tijd(t) for t in groep.tijden(d)) or None)   # '09:00u · 10:30u'
+             for d in dagvolgorde()]
     leden = _leden(db, groep, groepsdagen, schemas, vandaag)
 
     komend = wedstrijdplanning(db, groep.leden, van=vandaag, peildatum=vandaag).komend if groep.leden else []

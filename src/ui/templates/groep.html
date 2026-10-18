@@ -188,7 +188,7 @@
               {% for k in pagina.trainingen %}
                 <tr{% if k.geweest %} class="status-niet_ingevuld nog-invullen"{% endif %}>
                   <td class="nowrap"><a href="{{ url_for('training', training_id=k.training.id) }}"><strong>{{ k.training.datum | datum_kort }}</strong>
-                    {%- set tijd = k.training.effectieve_starttijd(pagina.groep) %}{% if tijd %} {{ tijd }}{% endif %}</a><br><span class="zacht">{{ k.dagen_tot | over_dagen }}</span></td>
+                    {%- set tijd = k.training.effectieve_starttijd(pagina.groep) %}{% if tijd %} {{ tijd | tijd }}{% endif %}</a><br><span class="zacht">{{ k.dagen_tot | over_dagen }}</span></td>
                   <td><a href="{{ url_for('training', training_id=k.training.id) }}">{{ k.training.onderwerp or "Training" }}</a>{% if k.periode %}<br><span class="zacht">{{ k.periode }}</span>{% endif %}</td>
                   <td class="rechts" title="Atleten die deze dag volgens hun trainingsschema trainen">{{ k.verwacht }}</td>
                   <td>

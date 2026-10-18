@@ -18,7 +18,7 @@
           {% set s = r.stand %}
           <tr>
             <td class="nowrap"><a href="{{ url_for('training', training_id=r.training.id) }}"><strong>{{ r.training.datum | datum_kort }}</strong>
-              {%- set tijd = r.training.effectieve_starttijd(lijst.groep) %}{% if tijd %} {{ tijd }}{% endif %}</a><br>
+              {%- set tijd = r.training.effectieve_starttijd(lijst.groep) %}{% if tijd %} {{ tijd | tijd }}{% endif %}</a><br>
               <span class="zacht">{{ r.training.datum.year }}{% if not r.geweest %} · {{ r.dagen_tot | over_dagen }}{% endif %}</span></td>
             <td><a href="{{ url_for('training', training_id=r.training.id) }}">{{ r.training.onderwerp or "Training" }}</a></td>
             <td>{{ r.periode or "–" }}</td>

@@ -16,6 +16,7 @@ from datetime import date, timedelta
 from typing import Iterable
 
 from db.queries import Opslag
+from instellingen import eerste_weekdag
 from models import Wedstrijd
 
 MAANDNAMEN = ("januari", "februari", "maart", "april", "mei", "juni", "juli",
@@ -123,7 +124,7 @@ def _maanden(regels: list[PlanningRegel], vandaag: date, min_maanden: int) -> li
     for r in regels:
         per_dag.setdefault(r.wedstrijd.datum, []).append(r)
 
-    kal = calendar.Calendar(firstweekday=0)    # maandag eerst
+    kal = calendar.Calendar(firstweekday=eerste_weekdag())    # zie Instellingen
     uit = []
     for _ in range(aantal):
         weken = [[KalenderDag(d, d.month == maand, d == vandaag, per_dag.get(d, [])) for d in week]
