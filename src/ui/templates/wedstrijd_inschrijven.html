@@ -4,6 +4,8 @@
     f    – wedstrijden.detail.InschrijfFormulier
     fout    – foutmelding (optioneel)
     melding – bevestiging, bijv. na het aanmaken van de wedstrijd (optioneel)
+    van_atleet – models.Atleet als je komt van '+ Inschrijven' op zijn wedstrijdplanning (optioneel):
+                 die atleet staat al aangevinkt en na opslaan ga je terug naar zijn planning
   Vanuit een regel van het tijdschema (f.regel) staat het onderdeel al aan en
   zijn atleten uit een andere categorie verborgen tot 'Ook atleten uit andere
   categorieën' is aangevinkt (CSS :checked, zonder JavaScript). Geen onderdeel
@@ -31,7 +33,11 @@
 <article class="vel">
   <header class="blok__kop">
     <div>
-      <a class="terug" href="{{ url_for('wedstrijd', wedstrijd_id=w.id) }}">&larr; {{ w.naam }}</a>
+      {% if van_atleet %}
+        <a class="terug" href="{{ url_for('atleet_inschrijven', master_id=van_atleet.master_id) }}">&larr; Andere wedstrijd kiezen voor {{ van_atleet.naam }}</a>
+      {% else %}
+        <a class="terug" href="{{ url_for('wedstrijd', wedstrijd_id=w.id) }}">&larr; {{ w.naam }}</a>
+      {% endif %}
       <h1 class="kop kop--pagina">Atleten inschrijven</h1>
       <p class="subkop">{{ w.naam }} · {{ w.datum | datum_kort }} {{ w.datum.year }}
         {%- if f.regel %} · {{ f.regel.starttijd }} {{ f.regel.omschrijving }}{% endif %}</p>
@@ -43,6 +49,7 @@
 
   <form method="post" class="blok" style="gap: 2rem">
     {% if f.regel %}<input type="hidden" name="regel" value="{{ f.regel.id }}">{% endif %}
+    {% if van_atleet %}<input type="hidden" name="van_atleet" value="{{ van_atleet.master_id }}">{% endif %}
 
     <section class="blok" aria-labelledby="kop-onderdelen">
       <h2 class="kop" id="kop-onderdelen">Onderdelen</h2>
@@ -104,7 +111,7 @@
 
     <div class="opslaan">
       <span class="zacht" id="samenvatting" aria-live="polite"></span>
-      <a href="{{ url_for('wedstrijd', wedstrijd_id=w.id) }}">Annuleren</a>
+      <a href="{{ url_for('atleet_wedstrijden', master_id=van_atleet.master_id) if van_atleet else url_for('wedstrijd', wedstrijd_id=w.id) }}">Annuleren</a>
       <button class="knop knop--vol" type="submit">Inschrijven</button>
     </div>
   </form>

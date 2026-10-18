@@ -479,3 +479,52 @@ def tijdschema_aanpassen(db: Opslag, wijzigingen: Iterable[TijdWijziging]) -> in
         db.programma_opslaan(w.nieuw)
         n += 1
     return n
+
+
+# ============================================================
+# Een wedstrijd kiezen om één atleet in te schrijven
+# ============================================================
+# Vanaf de wedstrijdplanning van een atleet ('+ Inschrijven'): kies een komende
+# wedstrijd uit de lijst (of maak een nieuwe); daarna het gewone inschrijfformulier
+# van die wedstrijd, met deze atleet al aangevinkt.
+
+@dataclass
+class KeuzeWedstrijd:
+    wedstrijd: Wedstrijd
+    dagen_tot: int
+    ingeschreven: bool                 # staat al op de deelnemerslijst
+    onderdelen: list[str]              # waarvoor al ingeschreven ([] + ingeschreven = volgen nog)
+    heeft_tijdschema: bool
+
+    @property
+    def zoektekst(self) -> str:
+        w = self.wedstrijd
+        return " ".join(x for x in (w.naam, w.locatie or "", w.datum.isoformat(), *self.onderdelen)).lower()
+
+
+@dataclass
+class WedstrijdKeuze:
+    atleet: Atleet
+    categorie: str | None              # 'U16V' vandaag
+    wedstrijden: list[KeuzeWedstrijd]  # komende wedstrijden (vandaag meegerekend), vroegste eerst
+
+
+def wedstrijdkeuze(db: Opslag, master_id: str, peildatum: date | None = None) -> WedstrijdKeuze | None:
+    """Komende wedstrijden om de atleet voor in te schrijven; None als de atleet niet bestaat."""
+    a = db.atleet(master_id)
+    if a is None:
+        return None
+    vandaag = peildatum or date.today()
+    namen = {o.id: o.naam for o in db.onderdelen()}
+    per_wedstrijd: dict[int, list[str]] = {}
+    for i in db.inschrijvingen(master_id):
+        lijst = per_wedstrijd.setdefault(i.wedstrijd_id, [])
+        if i.onderdeel_id is not None and i.onderdeel_id in namen:
+            lijst.append(namen[i.onderdeel_id])
+    rijen = []
+    for w in db.wedstrijden(van=vandaag):
+        rijen.append(KeuzeWedstrijd(w, (w.datum - vandaag).days, w.id in per_wedstrijd,
+                                    sorted(per_wedstrijd.get(w.id, []), key=str.lower),
+                                    bool(db.programma(w.id))))
+    rijen.sort(key=lambda r: (r.wedstrijd.datum, r.wedstrijd.naam.lower()))
+    return WedstrijdKeuze(a, _code(a, vandaag), rijen)

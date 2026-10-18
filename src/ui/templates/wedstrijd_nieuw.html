@@ -9,6 +9,8 @@
     g       – wedstrijden.detail.Gegevens voor het formulier met de hand
     open    – True: het formulier met de hand staat open (na een fout daarin)
     fout    – foutmelding (optioneel)
+    van_atleet – models.Atleet als je komt van '+ Inschrijven' bij een atleet (optioneel):
+                 na aanmaken staat die atleet al aangevinkt in het inschrijfformulier
 #}
 {% extends "basis.html" %}
 {% from "_wedstrijd_velden.html" import wedstrijdvelden %}
@@ -18,9 +20,14 @@
 <article class="vel">
   <header class="blok__kop">
     <div>
-      <a class="terug" href="{{ url_for('wedstrijden') }}">&larr; Wedstrijden</a>
+      {% if van_atleet %}
+        <a class="terug" href="{{ url_for('atleet_inschrijven', master_id=van_atleet.master_id) }}">&larr; Inschrijven {{ van_atleet.naam }}</a>
+      {% else %}
+        <a class="terug" href="{{ url_for('wedstrijden') }}">&larr; Wedstrijden</a>
+      {% endif %}
       <h1 class="kop kop--pagina">Nieuwe wedstrijd</h1>
-      <p class="subkop">Plak de link van de wedstrijd; de rest haalt AVS zelf op.</p>
+      <p class="subkop">Plak de link van de wedstrijd; de rest haalt AVS zelf op.
+        {%- if van_atleet %} Daarna schrijf je {{ van_atleet.voornaam }} in.{% endif %}</p>
     </div>
   </header>
 
@@ -30,6 +37,7 @@
     <h2 class="kop" id="kop-link">Van atletiek.nu of Seltec</h2>
     <form method="post" class="blok linkformulier">
       <input type="hidden" name="soort" value="link">
+      {% if van_atleet %}<input type="hidden" name="van_atleet" value="{{ van_atleet.master_id }}">{% endif %}
       <label class="veld veld--breed"><span>Link naar de wedstrijd</span>
         <input type="text" name="link" value="{{ link }}" required{% if not open %} autofocus{% endif %}
                placeholder="https://www.atletiek.nu/wedstrijd/main/45678/  of  https://uitslagen.atletiek.nl/Competitions/Details/19133">
@@ -47,10 +55,11 @@
     <summary class="kop">Of met de hand invullen</summary>
     <form method="post" class="blok">
       <input type="hidden" name="soort" value="hand">
+      {% if van_atleet %}<input type="hidden" name="van_atleet" value="{{ van_atleet.master_id }}">{% endif %}
       {{ wedstrijdvelden(g, autofocus=open) }}
       <p class="zacht">Zonder tijdschema. Heeft de wedstrijd een link, dan kun je het tijdschema later ophalen met &lsquo;Tijdschema bijwerken&rsquo;.</p>
       <div class="opslaan opslaan--onder">
-        <a href="{{ url_for('wedstrijden') }}">Annuleren</a>
+        <a href="{{ url_for('atleet_inschrijven', master_id=van_atleet.master_id) if van_atleet else url_for('wedstrijden') }}">Annuleren</a>
         <button class="knop knop--vol" type="submit">Wedstrijd aanmaken</button>
       </div>
     </form>

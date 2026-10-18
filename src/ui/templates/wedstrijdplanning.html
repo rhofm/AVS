@@ -5,6 +5,7 @@
     kop_naam   – naam van de atleet of de groep
     terug_url  – link terug (bijv. de landingspagina van de atleet)
     nieuw_url  – link om in te schrijven / een wedstrijd te plannen (optioneel)
+    melding    – bevestiging, bijv. na inschrijven (optioneel)
     weergave   – 'lijst' (standaard) of 'kalender'
   Het wisselen gaat zonder JavaScript (twee radioknoppen); een klein script
   onthoudt alleen de laatste keuze.
@@ -14,7 +15,7 @@
 {% block titel %}Wedstrijdplanning {{ kop_naam }}{% endblock %}
 
 {% macro wedstrijdnaam(w) -%}
-  {% if w.bron_url %}<a href="{{ w.bron_url }}" target="_blank" rel="noopener">{{ w.naam }}</a>{% else %}{{ w.naam }}{% endif %}
+  <a href="/wedstrijd/{{ w.id }}">{{ w.naam }}</a>
   {%- if w.indoor %} <span class="kenmerk">indoor</span>{% endif %}
 {%- endmacro %}
 
@@ -67,6 +68,8 @@
     </div>
     {% if nieuw_url %}<a class="knop" href="{{ nieuw_url }}">+ Inschrijven</a>{% endif %}
   </header>
+
+  {% if melding %}<p class="melding" role="status">{{ melding }}</p>{% endif %}
 
   <div class="wissel">
     <input class="wissel__radio" type="radio" name="weergave" id="weergave-lijst" value="lijst"{% if not kalender_eerst %} checked{% endif %}>

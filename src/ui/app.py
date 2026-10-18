@@ -60,8 +60,7 @@ BINNENKORT = {
     "importeren": "Importeren",
     "instellingen": "Instellingen",
 }
-ATLEET_BINNENKORT = {
-    "inschrijven": "Inschrijven voor een wedstrijd",
+ATLEET_BINNENKORT: dict[str, str] = {
 }
 
 
@@ -210,8 +209,17 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
         return render_template(
             "wedstrijdplanning.html", planning=kalender.wedstrijdplanning(db(), master_id),
             kop_naam=a.naam, terug_url=url_for("atleet", master_id=master_id),
-            nieuw_url=url_for("atleet_binnenkort", master_id=master_id, onderdeel="inschrijven"),
-            weergave=request.args.get("weergave", "lijst"), actief_menu="atleten")
+            nieuw_url=url_for("atleet_inschrijven", master_id=master_id),
+            weergave=request.args.get("weergave", "lijst"), melding=(get_flashed_messages() or [None])[0],
+            actief_menu="atleten")
+
+    @app.get("/atleet/<master_id>/inschrijven")
+    def atleet_inschrijven(master_id: str):
+        """'+ Inschrijven' op de wedstrijdplanning: kies een komende wedstrijd of maak een nieuwe."""
+        k = wedstrijddetail.wedstrijdkeuze(db(), master_id)
+        if k is None:
+            abort(404)
+        return render_template("atleet_inschrijven.html", k=k, actief_menu="atleten")
 
     @app.get("/atleet/<master_id>/aanwezigheid")
     def atleet_aanwezigheid(master_id: str):
@@ -360,9 +368,20 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
     NIET_BEREIKBAAR = ("de website is niet bereikbaar of gaf iets onverwachts terug. Controleer de link en de "
                        "internetverbinding en probeer het opnieuw.")
 
+    def _van_atleet():
+        """De atleet vanaf wiens wedstrijdplanning je komt ('+ Inschrijven'): ?atleet= of het verborgen
+        veld van_atleet. Dan staat die atleet al aangevinkt en ga je na opslaan terug naar zijn planning."""
+        mid = request.args.get("atleet") or request.form.get("van_atleet") or ""
+        return db().atleet(mid) if len(mid) == 32 else None
+
     def _nieuw_pagina(*, link: str = "", g=None, open_: bool = False, fout: str | None = None, status: int = 200):
         return render_template("wedstrijd_nieuw.html", link=link, g=g or wedstrijddetail.Gegevens(), open=open_,
-                               fout=fout, actief_menu="wedstrijden"), status
+                               fout=fout, van_atleet=_van_atleet(), actief_menu="wedstrijden"), status
+
+    def _naar_inschrijven(w):
+        a = _van_atleet()
+        return redirect(url_for("wedstrijd_inschrijven", wedstrijd_id=w.id,
+                                **({"atleet": a.master_id} if a else {})))
 
     def _gegevens_uit_formulier():
         f = request.form
@@ -383,7 +402,7 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
             except OpslagFout as e:
                 return _nieuw_pagina(g=g, open_=True, fout=str(e), status=400)
             flash(f"Wedstrijd {w.naam} aangemaakt. Schrijf nu de atleten in.")
-            return redirect(url_for("wedstrijd_inschrijven", wedstrijd_id=w.id))
+            return _naar_inschrijven(w)
 
         link = request.form.get("link", "").strip()
         try:
@@ -399,7 +418,7 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
         else:
             flash(f"Wedstrijd {w.naam} ({w.datum.isoformat()}) aangemaakt. {n.verslag.tekst} "
                   "Schrijf nu de atleten in.")
-        return redirect(url_for("wedstrijd_inschrijven", wedstrijd_id=w.id))
+        return _naar_inschrijven(w)
 
     def _wedstrijdpagina(wedstrijd_id: int, fout: str | None = None, status: int = 200):
         d = wedstrijddetail.wedstrijd_detail(db(), wedstrijd_id)
@@ -488,11 +507,15 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
 
     def _inschrijfpagina(wedstrijd_id: int, regel_id: int | None, fout: str | None = None, status: int = 200,
                          onderdelen=(), gekozen=()):
+        van_atleet = _van_atleet()
+        if van_atleet is not None and not gekozen:
+            gekozen = [van_atleet.master_id]                 # vanaf de planning van de atleet: al aangevinkt
         f = wedstrijddetail.inschrijfformulier(db(), wedstrijd_id, regel_id, onderdelen=onderdelen, gekozen=gekozen)
         if f is None:
             abort(404)
         meldingen = get_flashed_messages()
-        return render_template("wedstrijd_inschrijven.html", f=f, fout=fout, actief_menu="wedstrijden",
+        return render_template("wedstrijd_inschrijven.html", f=f, fout=fout, van_atleet=van_atleet,
+                               actief_menu="atleten" if van_atleet else "wedstrijden",
                                melding=meldingen[0] if meldingen else None), status
 
     def _regel_id(waarde: str | None) -> int | None:
@@ -517,6 +540,9 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
         namen = [o.naam for o in db().onderdelen() if str(o.id) in onderdelen]
         wat = f"voor {', '.join(namen)}" if namen else "(onderdelen volgen nog)"
         flash(f"{aantal} {'atleet' if aantal == 1 else 'atleten'} ingeschreven {wat}.")
+        van_atleet = _van_atleet()
+        if van_atleet is not None:                           # terug naar de planning van de atleet
+            return redirect(url_for("atleet_wedstrijden", master_id=van_atleet.master_id) + f"#w-{wedstrijd_id}")
         anker = f"#regel-{regel_id}" if regel_id else "#kop-deelnemers"
         return redirect(url_for("wedstrijd", wedstrijd_id=wedstrijd_id) + anker)
 

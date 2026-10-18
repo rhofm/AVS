@@ -147,7 +147,7 @@
                 <tr>
                   <td><strong>{{ w.wedstrijd.datum | datum_kort }}</strong><br><span class="zacht">{{ w.dagen_tot | over_dagen }}</span></td>
                   <td>
-                    {% if w.wedstrijd.bron_url %}<a href="{{ w.wedstrijd.bron_url }}" target="_blank" rel="noopener">{{ w.wedstrijd.naam }}</a>{% else %}{{ w.wedstrijd.naam }}{% endif %}
+                    <a href="/wedstrijd/{{ w.wedstrijd.id }}">{{ w.wedstrijd.naam }}</a>
                     {% if w.wedstrijd.locatie %}<br><span class="zacht">{{ w.wedstrijd.locatie }}</span>{% endif %}
                   </td>
                   <td>{{ w.onderdelen | join(", ") if w.onderdelen else "volgt nog" }}</td>

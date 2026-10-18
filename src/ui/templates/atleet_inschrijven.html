@@ -1,0 +1,73 @@
+{#
+  Eén atleet inschrijven: kies een komende wedstrijd, of maak een nieuwe.
+  Daarna het inschrijfformulier van die wedstrijd met deze atleet al aangevinkt
+  (/wedstrijd/<id>/inschrijven?atleet=<master_id>); na opslaan terug naar de
+  wedstrijdplanning van de atleet.
+  Context:
+    k – wedstrijden.detail.WedstrijdKeuze
+  Zoeken (naam, plaats, datum) filtert al tijdens het typen (static/filter.js).
+#}
+{% extends "basis.html" %}
+{% set a = k.atleet %}
+{% block titel %}Inschrijven · {{ a.naam }}{% endblock %}
+
+{% block inhoud %}
+<article class="vel">
+  <header class="blok__kop">
+    <div>
+      <a class="terug" href="{{ url_for('atleet_wedstrijden', master_id=a.master_id) }}">&larr; Wedstrijdplanning {{ a.naam }}</a>
+      <h1 class="kop kop--pagina">Inschrijven voor een wedstrijd</h1>
+      <p class="subkop">{{ a.naam }}{% if k.categorie %} · {{ k.categorie }}{% endif %} · kies een wedstrijd of maak een nieuwe</p>
+    </div>
+    <a class="knop knop--vol" href="{{ url_for('wedstrijd_nieuw', atleet=a.master_id) }}">+ Nieuwe wedstrijd</a>
+  </header>
+
+  {% if k.wedstrijden %}
+    <form class="zoekbalk" data-filter="tabel-kies" role="search" onsubmit="return false">
+      <label class="verborgen" for="zoek-wedstrijd">Zoek een wedstrijd</label>
+      <input type="search" id="zoek-wedstrijd" placeholder="Zoek op naam, plaats of datum" autocomplete="off" data-filter-zoek>
+      <span class="zacht" data-filter-teller="wedstrijd wedstrijden">{{ k.wedstrijden | length }} {{ "wedstrijd" if k.wedstrijden | length == 1 else "wedstrijden" }}</span>
+    </form>
+
+    <div class="tabelvak">
+      <table class="tabel" id="tabel-kies">
+        <thead>
+          <tr>
+            <th scope="col">Datum</th>
+            <th scope="col">Wedstrijd</th>
+            <th scope="col">Locatie</th>
+            <th scope="col">{{ a.voornaam }} doet mee</th>
+            <th scope="col"><span class="verborgen">Kiezen</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in k.wedstrijden %}
+            <tr data-zoek="{{ r.zoektekst }}" id="kies-{{ r.wedstrijd.id }}">
+              <td class="nowrap"><strong>{{ r.wedstrijd.datum | datum_kort }}</strong><br>
+                <span class="zacht">{{ r.wedstrijd.datum.year }} · {{ r.dagen_tot | over_dagen }}</span></td>
+              <td><a href="{{ url_for('wedstrijd', wedstrijd_id=r.wedstrijd.id) }}">{{ r.wedstrijd.naam }}</a>
+                {%- if r.wedstrijd.indoor %} <span class="kenmerk">indoor</span>{% endif %}
+                {%- if not r.heeft_tijdschema %}<br><span class="zacht">nog geen tijdschema</span>{% endif %}</td>
+              <td>{{ r.wedstrijd.locatie or "–" }}</td>
+              <td>{% if r.onderdelen %}{{ r.onderdelen | join(", ") }}{% elif r.ingeschreven %}<span class="zacht">ja, onderdelen volgen nog</span>{% else %}<span class="zacht">–</span>{% endif %}</td>
+              <td class="rechts nowrap">
+                <a class="knop{{ '' if r.ingeschreven else ' knop--vol' }}"
+                   href="{{ url_for('wedstrijd_inschrijven', wedstrijd_id=r.wedstrijd.id, atleet=a.master_id) }}">
+                  {{- "Onderdelen toevoegen" if r.ingeschreven else "Inschrijven" -}}</a>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <p class="leeg" data-filter-leeg hidden>Geen wedstrijd gevonden. Staat hij er niet bij? Maak hem met
+      <a href="{{ url_for('wedstrijd_nieuw', atleet=a.master_id) }}">+ Nieuwe wedstrijd</a>.</p>
+  {% else %}
+    <p class="leeg">Er staan nog geen komende wedstrijden in AVS. Maak er een met
+      <a href="{{ url_for('wedstrijd_nieuw', atleet=a.master_id) }}">+ Nieuwe wedstrijd</a>; daarna schrijf je {{ a.voornaam }} meteen in.</p>
+  {% endif %}
+
+  <footer class="vel__voet">Atleet Volg Systeem<br>{{ a.naam }}</footer>
+</article>
+<script src="{{ static_pad | default('/static') }}/filter.js"></script>
+{% endblock %}

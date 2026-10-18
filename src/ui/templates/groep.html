@@ -154,7 +154,7 @@
                 <tr>
                   <td class="nowrap"><strong>{{ r.wedstrijd.datum | datum_kort }}</strong><br><span class="zacht">{{ r.dagen_tot | over_dagen }}</span></td>
                   <td>
-                    {% if r.wedstrijd.bron_url %}<a href="{{ r.wedstrijd.bron_url }}" target="_blank" rel="noopener">{{ r.wedstrijd.naam }}</a>{% else %}{{ r.wedstrijd.naam }}{% endif %}
+                    <a href="/wedstrijd/{{ r.wedstrijd.id }}">{{ r.wedstrijd.naam }}</a>
                     {% if r.wedstrijd.locatie %}<br><span class="zacht">{{ r.wedstrijd.locatie }}</span>{% endif %}
                   </td>
                   <td><strong>{{ r.deelnames | length }}</strong><br><span class="zacht">{{ r.deelnames | map(attribute="naam") | join(", ") }}</span></td>

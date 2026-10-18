@@ -210,6 +210,25 @@ def test_import_route():
         assert r.status_code == 400 and "Tijdschema niet geïmporteerd" in r.get_data(as_text=True)
 
 
+def test_links_vanaf_atleet_en_groep():
+    """Op de pagina's van een atleet en een groep linkt een wedstrijd naar de wedstrijdpagina in AVS,
+    niet naar atletiek.nu (die link staat op de wedstrijdpagina zelf)."""
+    from models import Groep
+    with opslag() as (db, tmp, ids):
+        g = db.groep_opslaan(Groep("U16 sprint", None, [ids["anna"], ids["bram"]]))
+        c = _client(tmp)
+        intern = f'href="/wedstrijd/{ids["w"]}"'
+        for pad in (f"/atleet/{ids['anna']}", f"/atleet/{ids['anna']}/wedstrijden",
+                    f"/atleet/{ids['anna']}/wedstrijden?weergave=kalender",
+                    f"/groep/{g.id}", f"/groep/{g.id}/wedstrijden"):
+            html = c.get(pad).get_data(as_text=True)
+            assert intern in html, pad
+            assert "atletiek.nu/wedstrijd" not in html, pad
+        assert c.get(f"/wedstrijd/{ids['w']}").status_code == 200
+        # Op de wedstrijdpagina zelf staat de link naar de site nog wel.
+        assert "atletiek.nu/wedstrijd/uitslagen/45678" in c.get(f"/wedstrijd/{ids['w']}").get_data(as_text=True)
+
+
 if __name__ == "__main__":
     for naam, fn in list(globals().items()):
         if naam.startswith("test_") and callable(fn):

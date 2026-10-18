@@ -104,7 +104,8 @@ AVS/
 │   │   ├── overzicht.py          ✅ page 'Wedstrijden': upcoming meets, past meets behind a checkbox (counts only, no names)
 │   │   └── detail.py             ✅ page of one meet: timetable per day with our athletes (items without athletes behind a
 │   │                             checkbox), participants, clashes; register athletes (also from a timetable item), deregister;
-│   │                             edit meet details and per timetable row the start time, duration and day
+│   │                             edit meet details and per timetable row the start time, duration and day;
+│   │                             `wedstrijdkeuze`: upcoming meets to register one athlete for
 │   │
 │   ├── importers/                📝 on this branch (see feature/importers)
 │   │   ├── base.py               common interface: can_handle(url), parse(url)
@@ -150,6 +151,7 @@ AVS/
     ├── test_wedstrijdpagina.py   ✅ 8 tests (timetable + athletes, hidden items, register/deregister, import route)
     ├── test_wedstrijd_nieuw.py   ✅ 9 tests (new meet from a link or by hand, edit details, timetable button)
     ├── test_tijdschema_aanpassen.py ✅ 5 tests (move rows: time, duration, day; re-sorting; errors save nothing)
+    ├── test_atleet_inschrijven.py ✅ 4 tests ('+ Inschrijven' from an athlete: pick or create a meet, pre-ticked, back)
     ├── test_groep_starttijden.py ✅ 7 tests (training times, moving old data, duplicate migration numbers)
     ├── test_startpagina.py       ✅ 3 tests (tiles, counts, top bar with only Importeren + Instellingen)
     ├── test_trainingen_inhoud.py ✅ 5 tests (training parts, variants, markdown, old `inhoud` → `notities`)
