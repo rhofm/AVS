@@ -44,6 +44,7 @@ from groepen import overzichten as groep_overzichten
 from groepen import trainingen as trainingsbeheer
 from leerlijnen import voortgang
 from ui import export as trainingsexport
+from ui import importeren as importeerpagina
 from ui import startpagina
 from ui.opmaak import registreer_filters
 from wedstrijden import detail as wedstrijddetail
@@ -57,7 +58,6 @@ VOORKEUR_POORT = 5050
 BINNENKORT = {
     "ploegen": "Ploegen",
     "leerlijnen": "Leerlijnen",
-    "importeren": "Importeren",
     "instellingen": "Instellingen",
 }
 ATLEET_BINNENKORT: dict[str, str] = {
@@ -830,6 +830,18 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
         # Post/Redirect/Get: verversen stuurt het formulier niet nog eens.
         return redirect(url_for("atleet_leerdoelen", master_id=master_id,
                                 **({"doorlopend": "1"} if request.args.get("doorlopend") == "1" else {})))
+
+    # ---------------- importeren ----------------
+    @app.get("/importeren")
+    def importeren():
+        return render_template("importeren.html", keuzes=importeerpagina.KEUZES, actief_menu="importeren")
+
+    @app.get("/importeren/<any(" + ", ".join(importeerpagina.PER_SLEUTEL) + "):soort>")
+    def importeren_soort(soort: str):
+        """Eén soort import. De pagina's zelf komen nog; tot dan 'Deze pagina komt nog'."""
+        k = importeerpagina.PER_SLEUTEL[soort]
+        return render_template("binnenkort.html", titel=f"{k.titel} importeren", terug_url=url_for("importeren"),
+                               terug_naam="Importeren", actief_menu="importeren")
 
     # ---------------- nog te bouwen ----------------
     @app.get("/<any(" + ", ".join(BINNENKORT) + "):onderdeel>")

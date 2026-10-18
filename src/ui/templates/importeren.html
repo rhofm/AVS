@@ -1,0 +1,43 @@
+{#
+  Importeerpagina: kies wat je wilt importeren. Drie grote tegels, elk naar een eigen pagina.
+  Context:
+    keuzes – lijst van ui.importeren.Importkeuze
+#}
+{% extends "basis.html" %}
+{% block titel %}Importeren{% endblock %}
+
+{% block inhoud %}
+<article class="vel startvel">
+  <header class="startkop">
+    <a class="terug" href="{{ url_for('start') }}">&larr; Start</a>
+    <h1 class="startkop__titel">Importeren</h1>
+    <p class="subkop">Wat wil je importeren?</p>
+    <p class="zacht">Opnieuw importeren is altijd veilig: wat er al staat, wordt herkend en niet dubbel opgeslagen.</p>
+  </header>
+
+  <nav class="tegels tegels--drie" aria-label="Soorten import">
+    {% for k in keuzes %}
+      <a class="tegel" href="{{ url_for('importeren_soort', soort=k.sleutel) }}">
+        <span class="tegel__icoon" aria-hidden="true">
+          {% if k.sleutel == "atleet" %}
+            <svg viewBox="0 0 48 48"><g fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><circle cx="29" cy="8" r="4"/><path d="M14 20l8-5 7 3 4 8 6 2M22 15l-3 12 8 5-2 11M19 27l-6 8-7 1"/></g></svg>
+          {% elif k.sleutel == "groep" %}
+            <svg viewBox="0 0 48 48"><g fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><circle cx="24" cy="14" r="6"/><path d="M12 40v-4a12 12 0 0 1 24 0v4"/><circle cx="10" cy="18" r="4"/><path d="M3 36v-2a8 8 0 0 1 9-8"/><circle cx="38" cy="18" r="4"/><path d="M45 36v-2a8 8 0 0 0-9-8"/></g></svg>
+          {% else %}
+            <svg viewBox="0 0 48 48"><g fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="9" width="38" height="33" rx="2"/><path d="M5 19h38M15 4v9M33 4v9"/><path d="M19 37V25l9 3.5-9 3.5"/></g></svg>
+          {% endif %}
+        </span>
+        <span class="tegel__titel">{{ k.titel }}</span>
+        <span class="tegel__uitleg">{{ k.uitleg }}</span>
+        <span class="tegel__voet">
+          <span class="tegel__label">Van {{ k.bron }}</span>
+          <span class="tegel__extra">Nodig: {{ k.nodig }}</span>
+        </span>
+        <span class="tegel__pijl" aria-hidden="true">&rarr;</span>
+      </a>
+    {% endfor %}
+  </nav>
+
+  <footer class="vel__voet">Atleet Volg Systeem<br>Importeren</footer>
+</article>
+{% endblock %}

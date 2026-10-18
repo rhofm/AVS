@@ -135,6 +135,8 @@ AVS/
 │       ├── app.py
 │       ├── markdown.py           ✅ safe markdown subset for training texts (Jinja filter `markdown`)
 │       ├── startpagina.py        ✅ start page: big tiles to Atleten, Groepen, Ploegen, Wedstrijden (counts only, no names)
+│       ├── importeren.py         ✅ page 'Importeren': three tiles to /importeren/atleet, /groep, /wedstrijd
+│       │                         (those three pages are still placeholders: 'Deze pagina komt nog')
 │       ├── templates/
 │       └── static/
 │
@@ -154,6 +156,7 @@ AVS/
     ├── test_atleet_inschrijven.py ✅ 4 tests ('+ Inschrijven' from an athlete: pick or create a meet, pre-ticked, back)
     ├── test_groep_starttijden.py ✅ 7 tests (training times, moving old data, duplicate migration numbers)
     ├── test_startpagina.py       ✅ 3 tests (tiles, counts, top bar with only Importeren + Instellingen)
+    ├── test_importeren.py        ✅ 4 tests (three tiles, sub-pages work and lead back to Importeren, no names)
     ├── test_trainingen_inhoud.py ✅ 5 tests (training parts, variants, markdown, old `inhoud` → `notities`)
     ├── test_leerdoelen.py        ✅ 10 tests
     ├── test_importers.py         📝 on this branch
