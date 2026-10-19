@@ -18,7 +18,7 @@ from atleten import beheer  # noqa: E402
 from db.init_db import init_db  # noqa: E402
 from db.queries import Opslag  # noqa: E402
 from groepen import landingspagina  # noqa: E402
-from models import Absentie, Groep, LeerdoelScore, Onderdeel, Periodeplan, Training, Trainingsschema  # noqa: E402
+from models import Absentie, Fase, Groep, LeerdoelScore, Mesocyclus, Onderdeel, Training, Trainingsschema  # noqa: E402
 from wedstrijden import planning  # noqa: E402
 
 TESTSLEUTEL = "55" * 32
@@ -53,12 +53,13 @@ def voorbeeldgroep(db: Opslag) -> dict:
     werp = db.groep_opslaan(Groep("Werpgroep", "2026-2027", [cas]))
     db.training_opslaan(Training(werp.id, MAANDAG, "Kogel"))
 
-    plan = db.periodeplan_opslaan(Periodeplan("Algemene voorbereiding", MAANDAG - timedelta(weeks=2),
-                                              MAANDAG + timedelta(weeks=5, days=6), g.id))
+    # Periodisering: V1 sinds twee weken (tot over zes weken), mesocyclus van 4 weken -> vandaag week 3 'Piek'.
+    db.groep_fasen_opslaan(g.id, [Fase(MAANDAG - timedelta(weeks=2), "V1"), Fase(MAANDAG + timedelta(weeks=6), "V2")])
+    db.mesocycli_opslaan(g.id, [Mesocyclus(MAANDAG - timedelta(weeks=2), 4, ["Opbouw", "Opbouw", "Piek", "Herstel"])])
     di_oud = db.training_opslaan(Training(g.id, MAANDAG - timedelta(days=6), "Starts"))     # vorige week di
     do_oud = db.training_opslaan(Training(g.id, MAANDAG - timedelta(days=4), "Horden"))     # vorige week do
     db.training_opslaan(Training(g.id, MAANDAG + timedelta(days=1), "Niet ingevuld"))       # deze week di
-    db.training_opslaan(Training(g.id, MAANDAG + timedelta(days=8), "Startblok", periodeplan_id=plan.id))
+    db.training_opslaan(Training(g.id, MAANDAG + timedelta(days=8), "Startblok"))
     db.training_opslaan(Training(g.id, MAANDAG + timedelta(days=10), None))
     db.training_opslaan(Training(g.id, MAANDAG - timedelta(weeks=20), "Te oud"))
     db.absenties_opslaan([Absentie(di_oud.id, anna, "aanwezig"), Absentie(di_oud.id, bram, "afwezig"),
@@ -89,7 +90,9 @@ def test_landingspagina():
         assert [d.aantal_atleten for d in lp.trainingsdagen] == [3, 3]
         assert [d.dag for d in lp.dagen if d.vandaag] == ["vrijdag"]
         assert lp.categorieen == ["U14", "U16"]
-        assert lp.periode.naam == "Algemene voorbereiding" and lp.periode_week == 3
+        assert lp.periode.fase.fase == "V1" and lp.periode.week.nummer == 3 and lp.periode.week.naam == "Piek"
+        assert lp.periode.kort == "V1 · wk 3 Piek"
+        assert [b.code for b in lp.jaar.fasen] == ["V1", "V2"] and lp.jaar.vandaag_pct is not None
 
         leden = {l.atleet.voornaam: l for l in lp.leden}
         assert [l.atleet.voornaam for l in lp.leden] == ["Cas", "Bram", "Anna"]   # op achternaam
@@ -106,8 +109,8 @@ def test_landingspagina():
         # Eerst de training van afgelopen dinsdag (nog niets ingevuld), dan de komende.
         # 'Horden'/'Starts' van vorige week vallen buiten de 7 dagen (en zijn ingevuld).
         assert [(k.training.onderwerp, k.dagen_tot, k.verwacht, k.periode, k.geweest) for k in lp.trainingen] == [
-            ("Niet ingevuld", -3, 3, None, True),
-            ("Startblok", 4, 3, "Algemene voorbereiding", False), (None, 6, 3, None, False)]
+            ("Niet ingevuld", -3, 3, "V1 · wk 3 Piek", True),
+            ("Startblok", 4, 3, "V1 · wk 4 Herstel", False), (None, 6, 3, "V1 · wk 4 Herstel", False)]
 
         assert [(b.code, b.gemiddelde_score, b.beoordeeld) for b in lp.leerdoelen] == [("SPR", 4.0, 2)]
         aantal = len(ids["spr"])
@@ -142,7 +145,7 @@ def test_dagen_uit_schema_en_lege_groep():
 
         leeg = db.groep_opslaan(Groep("Leeg", None, []))
         lp = landingspagina.landingspagina(db, leeg.id, peildatum=VANDAAG)
-        assert lp.dagen_bron is None and not lp.leden and lp.aanwezig_pct is None and lp.periode_week is None
+        assert lp.dagen_bron is None and not lp.leden and lp.aanwezig_pct is None and not lp.periode and lp.jaar is None
 
 
 def render(naam: str, **context) -> str:
@@ -159,12 +162,14 @@ def test_template():
         ids = voorbeeldgroep(db)
         html = render("groep.html", pagina=landingspagina.landingspagina(db, ids["groep"], peildatum=VANDAAG),
                       actief_menu="groepen")
-        assert "U16 sprint" in html and "U14 · U16" in html and "week 3 van 8" in html
+        assert "U16 sprint" in html and "U14 · U16" in html and "V1 · wk 3 Piek" in html
         assert html.count("dagcel--groep") == 1 + 6 and html.count("dagcel--elders") == 1 + 2   # legenda + cellen
         assert "Maandag: traint elders (Werpgroep)" in html
         assert "U16V" in html and "Werpen" in html
         assert "Clubkampioenschappen" in html and "Zonder groep" not in html and "Vorige maand" not in html
-        assert "Startblok" in html and "Algemene voorbereiding" in html
+        assert "Startblok" in html and "V1 · wk 4 Herstel" in html
+        assert "Nu: Algemene voorbereiding (V1) · week 3 van 4: Piek" in html and 'class="jaar__blok fase--v1"' in html
+        assert f'href="/groep/{ids["groep"]}/periodisering"' in html
         assert "3 dagen geleden" in html and "Nog invullen" in html and "1 van de afgelopen week nog in te vullen" in html
         assert "gem. 4 · 2/3 atl." in html
         assert "50%" in html and "67%" in html and "60%" in html
@@ -173,6 +178,7 @@ def test_template():
         leeg = db.groep_opslaan(Groep("Leeg", None, []))
         html = render("groep.html", pagina=landingspagina.landingspagina(db, leeg.id, peildatum=VANDAAG))
         assert "Nog geen atleten" in html and "Nog niet bekend" in html
+        assert "Nog niet ingesteld (optioneel)" in html and "jaar__balk" not in html
 
         from groepen.groepenoverzicht import GEEN_SEIZOEN, groepenoverzicht
         html = render("groepen.html", o=groepenoverzicht(db, peildatum=VANDAAG), geen_seizoen=GEEN_SEIZOEN)

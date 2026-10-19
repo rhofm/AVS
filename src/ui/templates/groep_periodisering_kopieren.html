@@ -1,0 +1,76 @@
+{#
+  Megacyclus en/of mesocycli van een groep kopiëren naar andere groepen.
+  Context:
+    k          – groepen.periodeplan.Kopieerpagina
+    gekozen    – gekozen groep-ids (na een post)
+    fasen      – megacyclus kopiëren (bool), cycli – mesocycli kopiëren (bool)
+    bevestigen – Kopieerdoelen waar iets wordt overschreven; niet leeg = eerst bevestigen
+    fout       – foutmelding (optioneel)
+  Kopiëren vervangt wat de andere groep had. Daarna zijn de groepen los van elkaar.
+#}
+{% extends "basis.html" %}
+{% set groep = k.bron %}
+{% block titel %}Periodisering kopiëren {{ groep.naam }}{% endblock %}
+
+{% block inhoud %}
+<article class="vel">
+  <header class="blok__kop">
+    <div>
+      <a class="terug" href="{{ url_for('groep_periodisering', groep_id=groep.id) }}">&larr; Periodisering {{ groep.naam }}</a>
+      <h1 class="kop kop--pagina">Periodisering kopiëren</h1>
+      <p class="subkop">Neem de periodisering van {{ groep.naam }} over in andere groepen. Daarna zijn ze los van elkaar: wijzigen in de ene groep verandert de andere niet.</p>
+    </div>
+  </header>
+
+  {% if fout %}<p class="melding melding--fout" role="alert">{{ fout }}</p>{% endif %}
+
+  {% if k.plan.leeg %}
+    <p class="leeg">{{ groep.naam }} heeft nog geen periodisering om te kopiëren. <a href="{{ url_for('groep_periodisering', groep_id=groep.id) }}">Stel die eerst in.</a></p>
+  {% elif not k.doelen %}
+    <p class="leeg">Er zijn geen andere groepen om naar te kopiëren.</p>
+  {% else %}
+    <form method="post" class="blok" style="gap: 1.5rem">
+      {% if bevestigen %}
+        <div class="melding melding--let-op" role="alert">
+          <p><strong>Let op: dit overschrijft wat er al staat bij:</strong></p>
+          <ul>
+            {% for d in bevestigen %}
+              <li>{{ d.groep.naam }}: {{ d.overschrijft(fasen, cycli) }}</li>
+            {% endfor %}
+          </ul>
+          <p>Klopt dat? Kies &lsquo;Ja, overschrijven&rsquo;, of pas je keuze hieronder aan.</p>
+        </div>
+      {% endif %}
+
+      <fieldset class="veld">
+        <legend>Wat kopiëren</legend>
+        <label><input type="checkbox" name="fasen" value="1"{% if fasen %} checked{% endif %}{% if not k.plan.fasen %} disabled{% endif %}>
+          Megacyclus <span class="zacht">({{ k.plan.fasen | length }} {{ "fasen" if k.plan.fasen | length != 1 else "fase" }})</span></label>
+        <label><input type="checkbox" name="cycli" value="1"{% if cycli %} checked{% endif %}{% if not k.plan.cycli %} disabled{% endif %}>
+          Mesocycli <span class="zacht">({{ k.plan.cycli | length }})</span></label>
+      </fieldset>
+
+      <fieldset class="veld">
+        <legend>Naar welke groepen</legend>
+        {% for d in k.doelen %}
+          <label><input type="checkbox" name="groep" value="{{ d.groep.id }}"{% if d.groep.id in gekozen %} checked{% endif %}>
+            {{ d.groep.naam }}{% if d.groep.seizoen %} <span class="zacht">{{ d.groep.seizoen }}</span>{% endif %}
+            {% if d.fasen or d.cycli %}<span class="kenmerk">heeft al {{ d.fasen }} {{ "fasen" if d.fasen != 1 else "fase" }}, {{ d.cycli }} {{ "mesocycli" if d.cycli != 1 else "mesocyclus" }}</span>{% endif %}
+          </label>
+        {% endfor %}
+      </fieldset>
+
+      <div class="opslaan">
+        <a href="{{ url_for('groep_periodisering', groep_id=groep.id) }}">Annuleren</a>
+        {% if bevestigen %}
+          <button class="knop knop--vol" type="submit" name="bevestigd" value="1">Ja, overschrijven</button>
+        {% else %}
+          <button class="knop knop--vol" type="submit">Kopiëren</button>
+        {% endif %}
+      </div>
+    </form>
+  {% endif %}
+
+  <footer class="vel__voet">Atleet Volg Systeem<br>{{ groep.naam }}</footer>
+</article>
+{% endblock %}

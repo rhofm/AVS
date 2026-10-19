@@ -14,7 +14,7 @@ from models import (  # noqa: E402
     Notitie,
     DAGEN, Trainingsschema,
     Absentie, Atleet, Groep, Leerlijn, LeerlijnStap, LeerlijnVoortgang,
-    Onderdeel, Periodeplan, Prestatie, heeft_windmeting,
+    Onderdeel, Prestatie, heeft_windmeting,
 )
 
 NEP_ID = "a" * 32
@@ -109,13 +109,6 @@ def test_groep_leden():
     g.verwijder(NEP_ID)
     assert g.leden == []
     assert Groep("A").leden is not Groep("B").leden
-
-
-def test_periodeplan():
-    p = Periodeplan("AV", date(2026, 10, 1), date(2026, 10, 28))
-    assert p.bevat(date(2026, 10, 15)) and not p.bevat(date(2026, 11, 1))
-    assert p.aantal_weken == 4
-    _verwacht_fout(lambda: Periodeplan("x", date(2026, 2, 1), date(2026, 1, 1)))
 
 
 def test_absentie():

@@ -343,6 +343,40 @@ def _groep_trainingstijden_samenvoegen(map: Path | None, hoofd: bytes) -> int:
     return len(tijden)
 
 
+def _verplaats_periodeplannen(map: Path | None, hoofd: bytes) -> int:
+    """Eenmalig: oude periodeplannen uit personen.db als doel naar prestaties.db. Geeft het aantal.
+
+    Een periodeplan wordt een doel zonder regels: titel = naam, beschrijving =
+    doel, startdatum, datum = einddatum, zelfde groep. Eerst alles in
+    prestaties.db zetten, pas daarna de oude tabel leegmaken (de tabel zelf
+    blijft: training.periodeplan_id verwijst ernaar, zie migratie personen/007).
+    Gaat het tussendoor mis, dan gaat het de volgende keer verder; een doel dat
+    al is overgezet (zelfde groep, titel, startdatum en datum) komt er niet nog eens bij.
+    """
+    with closing(verbind("personen", map, hoofd)) as personen, personen:
+        if huidige_versie(personen) < 7:
+            return 0
+        rijen = personen.execute(
+            "SELECT groep_id, naam, startdatum, einddatum, doel FROM periodeplan ORDER BY id").fetchall()
+        if not rijen:
+            return 0
+        with closing(verbind("prestaties", map, hoofd)) as prestaties:
+            with prestaties:
+                for r in rijen:
+                    al = prestaties.execute(
+                        """SELECT 1 FROM doel WHERE groep_id IS ? AND titel = ? AND startdatum = ? AND datum IS ?""",
+                        (r["groep_id"], r["naam"], r["startdatum"], r["einddatum"])).fetchone()
+                    if not al:
+                        prestaties.execute(
+                            """INSERT INTO doel (groep_id, titel, startdatum, datum, beschrijving)
+                               VALUES (?, ?, ?, ?, ?)""",
+                            (r["groep_id"], r["naam"], r["startdatum"], r["einddatum"], r["doel"]))
+        with personen:
+            personen.execute("DELETE FROM periodeplan")    # zet training.periodeplan_id op NULL
+    print(f"Periodeplannen overgezet naar doelen (prestaties.db): {len(rijen)}")
+    return len(rijen)
+
+
 def init_db(map: Path | None = None, hoofd: str | bytes | None = None) -> Path:
     """Maak de databases aan en/of breng ze naar de nieuwste versie. Geeft de map terug.
 
@@ -369,6 +403,7 @@ def init_db(map: Path | None = None, hoofd: str | bytes | None = None) -> Path:
         print(f"{database}.db up-to-date: versie {versie}")
     _verplaats_absentie(map, hoofd)
     _groep_trainingstijden_samenvoegen(map, hoofd)
+    _verplaats_periodeplannen(map, hoofd)
     return map
 
 

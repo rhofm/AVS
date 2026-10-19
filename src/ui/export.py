@@ -65,7 +65,7 @@ def trainingsexport(tp: TrainingPagina, *, namen: bool = False) -> Trainingsexpo
     uit = Trainingsexport(
         titel=t.onderwerp or "Training", groep=tp.groep.naam,
         datum=f"{DAGEN_LANG[d.weekday()]} {d.day} {MAANDEN_LANG[d.month - 1]} {d.year}",
-        starttijd=toon_tijd(tp.starttijd) if tp.starttijd else None, periode=tp.periode.naam if tp.periode else None,
+        starttijd=toon_tijd(tp.starttijd) if tp.starttijd else None, periode=tp.periode.lang if tp.periode else None,
         bestandsnaam=f"training-{d.isoformat()}-{_slug(tp.groep.naam)}")
     uit.delen.append(Deel("Training", _onderdelen(t)))
     for v, atleten in tp.varianten:

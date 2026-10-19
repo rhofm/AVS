@@ -1,4 +1,6 @@
-"""Dataclasses Groep, Training, Absentie, Periodeplan.
+"""Dataclasses Groep, Training, Absentie.
+
+De periodisering (fasen, mesocycli) staat in models/periodisering.py.
 
 Horen bij personen.db. Atleten worden aangeduid met hun master_id.
 """
@@ -70,27 +72,6 @@ class Groep:
             self.leden.remove(master_id)
 
 
-@dataclass(slots=True)
-class Periodeplan:
-    naam: str                       # bijv. 'Algemene voorbereiding'
-    startdatum: date
-    einddatum: date
-    groep_id: int | None = None
-    doel: str | None = None
-    id: int | None = None
-
-    def __post_init__(self) -> None:
-        if self.einddatum < self.startdatum:
-            raise ValueError("einddatum ligt voor startdatum.")
-
-    def bevat(self, datum: date) -> bool:
-        return self.startdatum <= datum <= self.einddatum
-
-    @property
-    def aantal_weken(self) -> int:
-        return (self.einddatum - self.startdatum).days // 7 + 1
-
-
 #: De onderdelen van een training, in volgorde: (veldnaam, titel in de app).
 TRAININGSONDERDELEN: tuple[tuple[str, str], ...] = (
     ("warming_up", "Warming-up"),
@@ -115,7 +96,6 @@ class Training:
     datum: date
     onderwerp: str | None = None
     notities: str | None = None
-    periodeplan_id: int | None = None
     id: int | None = None
     warming_up: str | None = None
     kern_a: str | None = None

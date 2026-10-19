@@ -31,8 +31,8 @@
 
 * Gemaakt voor SQL, versleuteld met SQLCipher
 * Wat staat waar:
-  * personen.db: persoonsgegevens, groepen, trainingen, periodeplannen, leerlijnen, ploegen
-  * prestaties.db: onderdelen, wedstrijden, prestaties, PR's
+  * personen.db: persoonsgegevens, groepen, trainingen, periodisering (megacyclus en mesocycli), leerlijnen, ploegen
+  * prestaties.db: onderdelen, wedstrijden, prestaties, PR's, doelen (groep of atleet, meestal bij een wedstrijd)
   * testen.db: testen en testresultaten
   * trainingsschema.db: per atleet een kolom per weekdag (maandag t/m zondag) of hij/zij die dag traint
   * leerlijnen.db: leerlijnen en leerdoelen van de club (Leerlijn baanatletiek jeugd NA), aangevuld met de Atletiekunie-leerlijnen (dec 2013), per categorie U10 t/m U20, elk met een vaste id (bijv. SPR-U10-01). Geen persoonsgegevens
@@ -87,7 +87,14 @@
 * Tijden invullen: bij 'Nieuwe groep' en 'Wijzigen' op de groepspagina
 * Nog te doen: weekrooster tonen op de atleetpagina
 * Absentie tool: lijst per training, vooraf ingevuld met 'aanwezig' volgens het trainingsschema; trainer past alleen de uitzonderingen aan
-* Tool voor opstellen periodeplannen en dergelijke op basis van tijd in jaar en leerlijnen
+* Periodisering per groep (optioneel), pagina 'Periodisering' vanaf de groepspagina:
+  * Megacyclus: fasen V1 (algemene voorbereiding), V2 (specifieke voorbereiding), WP (wedstrijdperiode), Rust en 'Geen' (einde). Per fase alleen een startdatum; een fase geldt tot de volgende begint en mag vaker per jaar voorkomen
+  * Mesocycli: startdatum (begin van de week), aantal weken (1-12) en een naam per week; herhaalt zich tot de volgende mesocyclus
+  * Jaaroverzicht (twaalf maanden, bladeren): fasen als gekleurde balk, mesoweken eronder, streep op vandaag. Ook op de groepspagina
+  * Trainingen tonen de fase en mesoweek van hun datum ('V1 · wk 3 Piek'); dat wordt uitgerekend, niet opgeslagen
+  * Kopiëren naar andere groepen (megacyclus en/of mesocycli): vervangt wat die groep had, na bevestigen; daarna los van elkaar
+  * Ontwerp: docs/Ontwerp_rooster_periodisering_doelen.md
+* Nog te doen: rooster (trainingsinhoud per week, ook via CSV) en doelen (tabel doel staat al in prestaties.db; de oude periodeplannen zijn daarheen overgezet)
 * Trainingen: per training groep, datum, warming-up, kern A, kern B, cooling-down en notities. Tekstvelden met meerdere regels; eenvoudige markdown (**vet**, *schuin*, - lijstjes, # kopjes) wordt opgemaakt getoond
 * Afwijkende training voor enkele atleten: een variant van de gewone training met eigen inhoud en een lijst atleten (één rij per atleet). Aanwezigheid blijft bij de gewone training
 * Nog te doen: formulier om de inhoud van een training en de varianten in te vullen

@@ -20,7 +20,7 @@
       <p class="subkop">{{ t.datum | datum_kort }} {{ t.datum.year }}{% if tp.starttijd %} · {{ tp.starttijd | tijd }}{% endif %} · {% if tp.dagen_tot < 0 %}geweest{% else %}{{ tp.dagen_tot | over_dagen }}{% endif %}</p>
       <p class="atleetkop__feiten">
         <span><a href="{{ url_for('groep', groep_id=tp.groep.id) }}">{{ tp.groep.naam }}</a></span>
-        {% if tp.periode %}<span>{{ tp.periode.naam }}</span>{% endif %}
+        {% if tp.periode %}<span>{{ tp.periode.lang }}</span>{% endif %}
       </p>
     </div>
     <span class="knoppen">

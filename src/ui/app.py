@@ -42,6 +42,7 @@ from groepen import groep as groepsbeheer
 from groepen import groep_importeren
 from groepen.groepenoverzicht import GEEN_SEIZOEN, groepenoverzicht
 from groepen import landingspagina as groep_landingspagina
+from groepen import periodeplan as periodisering
 from groepen import overzichten as groep_overzichten
 from groepen import trainingen as trainingsbeheer
 from leerlijnen import overzicht as leerlijnoverzicht
@@ -377,6 +378,57 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
             return _trainingsdagen(groep_id, fout=f"Niet opgeslagen: {e}", status=400)
         flash(w.tekst + _extra_melding(w))
         return redirect(url_for("groep", groep_id=groep_id) + "#kop-dagen")
+
+    # ---------------- periodisering (megacyclus en mesocycli) ----------------
+    def _periodisering(groep_id: int, fout: str | None = None, status: int = 200):
+        f = periodisering.formulier(db(), groep_id, ingevuld=request.form if fout else None)
+        if f is None:
+            abort(404)
+        try:
+            van = date.fromisoformat(request.args.get("van", "") + "-01") if request.args.get("van") else None
+        except ValueError:
+            van = None
+        jaar = periodisering.jaaroverzicht(db().periodisering(groep_id), van=van)
+        return render_template("groep_periodisering.html", f=f, jaar=jaar, fout=fout,
+                               actief_menu="groepen"), status
+
+    @app.get("/groep/<int:groep_id>/periodisering")
+    def groep_periodisering(groep_id: int):
+        return _periodisering(groep_id)
+
+    @app.post("/groep/<int:groep_id>/periodisering")
+    def groep_periodisering_opslaan(groep_id: int):
+        haal_groep(groep_id)
+        try:
+            w = periodisering.opslaan(db(), groep_id, request.form)
+        except (OpslagFout, ValueError) as e:
+            return _periodisering(groep_id, fout=f"Niet opgeslagen: {e}", status=400)
+        flash(w.tekst)
+        return redirect(url_for("groep", groep_id=groep_id) + "#kop-periodisering")
+
+    @app.route("/groep/<int:groep_id>/periodisering/kopieren", methods=["GET", "POST"])
+    def groep_periodisering_kopieren(groep_id: int):
+        k = periodisering.kopieerpagina(db(), groep_id)
+        if k is None:
+            abort(404)
+        gekozen = [int(x) for x in request.form.getlist("groep") if x.isdigit()]
+        fasen, cycli = request.form.get("fasen") == "1", request.form.get("cycli") == "1"
+        fout, bevestigen = None, []
+        if request.method == "POST":
+            # Eerst bevestigen als er bij een gekozen groep iets wordt overschreven.
+            bevestigen = [d for d in k.doelen if d.groep.id in gekozen and d.overschrijft(fasen, cycli)]
+            if not bevestigen or request.form.get("bevestigd") == "1":
+                try:
+                    w = periodisering.kopieren(db(), groep_id, gekozen, fasen=fasen, cycli=cycli)
+                except OpslagFout as e:
+                    fout, bevestigen = f"Niet gekopieerd: {e}", []
+                else:
+                    flash(w.tekst)
+                    return redirect(url_for("groep", groep_id=groep_id) + "#kop-periodisering")
+        elif not k.plan.leeg:
+            fasen, cycli = bool(k.plan.fasen), bool(k.plan.cycli)
+        return render_template("groep_periodisering_kopieren.html", k=k, gekozen=gekozen, fasen=fasen, cycli=cycli,
+                               bevestigen=bevestigen, fout=fout, actief_menu="groepen"), (400 if fout else 200)
 
     # ---------------- wedstrijden ----------------
     @app.get("/wedstrijden")

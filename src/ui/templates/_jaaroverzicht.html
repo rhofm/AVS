@@ -1,0 +1,46 @@
+{#
+  Jaaroverzicht van de periodisering: fasen als gekleurde balk over twaalf maanden,
+  daaronder de mesoweken (nummer; naam in de tooltip), en een streep op vandaag.
+  Context: jaar – groepen.periodeplan.Jaaroverzicht
+  Kleuren: .fase--v1 / v2 / wp / rust (tokens --fase-* in avs.css). De fase staat er
+  ook als tekst in (code in het blok, naam in title en in de legenda), niet alleen als kleur.
+#}
+{% macro jaaroverzicht(jaar, navigatie=none) %}
+  <div class="jaar">
+    {% if navigatie %}
+      <div class="jaar__navigatie">
+        <a class="knop knop--klein" href="{{ navigatie }}?van={{ jaar.vorige.strftime('%Y-%m') }}">&larr; Eerder</a>
+        <span class="zacht">{{ jaar.van | datum_lang }} – {{ jaar.tot | datum_lang }}</span>
+        <a class="knop knop--klein" href="{{ navigatie }}?van={{ jaar.volgende.strftime('%Y-%m') }}">Later &rarr;</a>
+      </div>
+    {% endif %}
+    <div class="jaar__vak">
+      <div class="jaar__binnen" role="img" aria-label="Periodisering van {{ jaar.van | datum_lang }} tot {{ jaar.tot | datum_lang }}{% for b in jaar.fasen %}; {{ b.uitleg }}{% endfor %}">
+        <div class="jaar__maanden" aria-hidden="true">
+          {% for naam, links in jaar.maanden %}<span style="left: {{ links }}%">{{ naam }}</span>{% endfor %}
+        </div>
+        <div class="jaar__balk" aria-hidden="true">
+          {% for b in jaar.fasen %}
+            <span class="jaar__blok fase--{{ b.code | lower }}" style="left: {{ b.links }}%; width: {{ b.breedte }}%" title="{{ b.uitleg }}">{{ b.titel }}</span>
+          {% else %}
+            <span class="jaar__geen">geen fasen in deze periode</span>
+          {% endfor %}
+        </div>
+        {% if jaar.weken %}
+          <div class="jaar__balk jaar__balk--weken" aria-hidden="true">
+            {% for b in jaar.weken %}
+              <span class="jaar__week{{ ' jaar__week--anders' if b.afwisselend }}{{ ' jaar__week--eerste' if b.titel == '1' }}" style="left: {{ b.links }}%; width: {{ b.breedte }}%" title="{{ b.uitleg }}">{{ b.titel }}</span>
+            {% endfor %}
+          </div>
+        {% endif %}
+        {% if jaar.vandaag_pct is not none %}<span class="jaar__vandaag" style="left: {{ jaar.vandaag_pct }}%" title="Vandaag" aria-hidden="true"></span>{% endif %}
+      </div>
+    </div>
+    <ul class="legenda" aria-label="Fasen">
+      {% for code, naam in jaar.legenda %}
+        <li><span class="jaar__stip fase--{{ code | lower }}" aria-hidden="true"></span>{{ code }} {{ naam | lower }}</li>
+      {% endfor %}
+      {% if jaar.weken %}<li><span class="jaar__stip jaar__stip--week" aria-hidden="true"></span>mesoweek (nummer)</li>{% endif %}
+    </ul>
+  </div>
+{% endmacro %}

@@ -1,0 +1,120 @@
+{#
+  Periodisering van een groep wijzigen: megacyclus (fasen) en mesocycli.
+  Context:
+    f    – groepen.periodeplan.Formulier
+    jaar – groepen.periodeplan.Jaaroverzicht (bladeren met ?van=YYYY-MM)
+    fout – foutmelding (optioneel); dan staat er nog wat er was ingevuld
+  Opslaan: groepen.periodeplan.opslaan() vervangt de hele megacyclus en alle mesocycli.
+  Velden: fase-<i>, fasestart-<i>; meso-<i>-start, meso-<i>-weken, meso-<i>-naam-<n> (n = 1..12).
+  Zonder JavaScript staan alle twaalf naamvelden er; namen na het aantal weken tellen niet mee.
+#}
+{% extends "basis.html" %}
+{% from "_jaaroverzicht.html" import jaaroverzicht %}
+{% set groep = f.groep %}
+{% block titel %}Periodisering {{ groep.naam }}{% endblock %}
+
+{% block inhoud %}
+<article class="vel">
+  <header class="blok__kop">
+    <div>
+      <a class="terug" href="{{ url_for('groep', groep_id=groep.id) }}">&larr; {{ groep.naam }}</a>
+      <h1 class="kop kop--pagina">Periodisering</h1>
+      <p class="subkop">Megacyclus (fasen over het jaar) en mesocycli (blokken van een paar weken). Allebei optioneel.</p>
+    </div>
+    <a class="knop" href="{{ url_for('groep_periodisering_kopieren', groep_id=groep.id) }}">Kopiëren naar andere groepen</a>
+  </header>
+
+  {% if fout %}<p class="melding melding--fout" role="alert">{{ fout }}</p>{% endif %}
+
+  <section class="blok" aria-labelledby="kop-jaar">
+    <h2 class="kop" id="kop-jaar">Overzicht</h2>
+    {% if jaar.nu %}<p class="zacht" style="margin: 0">Vandaag: <strong>{{ jaar.nu.lang }}</strong></p>{% endif %}
+    {{ jaaroverzicht(jaar, navigatie=url_for('groep_periodisering', groep_id=groep.id)) }}
+  </section>
+
+  <form method="post" class="blok" style="gap: 2rem">
+    <section class="blok" aria-labelledby="kop-mega">
+      <div>
+        <h2 class="kop" id="kop-mega">Megacyclus</h2>
+        <p class="subkop">Een fase geldt vanaf de startdatum tot de volgende fase begint. Een fase mag vaker per jaar voorkomen.</p>
+      </div>
+      <div class="tabelvak">
+        <table class="tabel tijdenkeuze periodekeuze">
+          <thead><tr><th scope="col">Fase</th><th scope="col">Vanaf</th></tr></thead>
+          <tbody>
+            {% for r in f.fasen %}
+              <tr>
+                <td>
+                  <label class="verborgen" for="fase-{{ loop.index0 }}">Fase rij {{ loop.index }}</label>
+                  <select id="fase-{{ loop.index0 }}" name="fase-{{ loop.index0 }}">
+                    <option value="">– kies –</option>
+                    {% for code, tekst in f.fase_keuzes %}<option value="{{ code }}"{% if r.fase == code %} selected{% endif %}>{{ tekst }}</option>{% endfor %}
+                  </select>
+                </td>
+                <td>
+                  <label class="verborgen" for="fasestart-{{ loop.index0 }}">Startdatum rij {{ loop.index }}</label>
+                  <input type="date" id="fasestart-{{ loop.index0 }}" name="fasestart-{{ loop.index0 }}" value="{{ r.start }}">
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <p class="zacht" style="font-size: var(--maat-s); margin: 0">Rij weghalen: maak de datum leeg. Meer rijen nodig? Sla op; er komen weer lege rijen bij. &lsquo;Geen&rsquo; stopt de periodisering (bijv. einde seizoen); anders loopt de laatste fase door.</p>
+    </section>
+
+    <section class="blok" aria-labelledby="kop-meso">
+      <div>
+        <h2 class="kop" id="kop-meso">Mesocycli</h2>
+        <p class="subkop">Een blok van 1 tot {{ f.max_weken }} weken dat zich herhaalt tot de volgende mesocyclus begint. De start wordt het begin van de week.</p>
+      </div>
+      {% for c in f.cycli %}
+        {% set i = loop.index0 %}
+        <fieldset class="mesocyclus" data-mesocyclus>
+          <legend>Mesocyclus {{ loop.index }}{% if not c.start %} <span class="zacht">(nieuw)</span>{% endif %}</legend>
+          <div class="velden">
+            <div class="veld">
+              <label for="meso-{{ i }}-start">Vanaf</label>
+              <input type="date" id="meso-{{ i }}-start" name="meso-{{ i }}-start" value="{{ c.start }}">
+            </div>
+            <div class="veld">
+              <label for="meso-{{ i }}-weken">Aantal weken</label>
+              <input type="number" id="meso-{{ i }}-weken" name="meso-{{ i }}-weken" value="{{ c.weken }}" min="1" max="{{ f.max_weken }}" data-weken>
+            </div>
+          </div>
+          <div class="mesocyclus__namen">
+            {% for naam in c.namen %}
+              <div class="veld" data-week="{{ loop.index }}">
+                <label for="meso-{{ i }}-naam-{{ loop.index }}">Week {{ loop.index }}</label>
+                <input type="text" id="meso-{{ i }}-naam-{{ loop.index }}" name="meso-{{ i }}-naam-{{ loop.index }}" value="{{ naam }}" maxlength="40" placeholder="bijv. {{ ['Opbouw', 'Opbouw', 'Piek', 'Herstel'][loop.index0 % 4] }}">
+              </div>
+            {% endfor %}
+          </div>
+        </fieldset>
+      {% endfor %}
+      <p class="zacht" style="font-size: var(--maat-s); margin: 0">Mesocyclus weghalen: maak de datum leeg. Een week zonder naam heet &lsquo;Week 1&rsquo;, &lsquo;Week 2&rsquo;, ….</p>
+    </section>
+
+    <div class="opslaan">
+      <a href="{{ url_for('groep', groep_id=groep.id) }}">Annuleren</a>
+      <button class="knop knop--vol" type="submit">Opslaan</button>
+    </div>
+  </form>
+
+  <footer class="vel__voet">Atleet Volg Systeem<br>{{ groep.naam }}</footer>
+</article>
+<script>
+  // Alleen de naamvelden tot het gekozen aantal weken tonen.
+  document.querySelectorAll("[data-mesocyclus]").forEach(function (cyclus) {
+    var weken = cyclus.querySelector("[data-weken]");
+    function bijwerken() {
+      var n = parseInt(weken.value, 10) || 0;
+      cyclus.querySelectorAll("[data-week]").forEach(function (veld) {
+        veld.hidden = parseInt(veld.dataset.week, 10) > n;
+      });
+    }
+    weken.addEventListener("input", bijwerken);
+    bijwerken();
+  });
+</script>
+{% endblock %}

@@ -55,7 +55,9 @@ from models import (
     LeerlijnVoortgang,
     Notitie,
     Onderdeel,
-    Periodeplan,
+    Fase,
+    Mesocyclus,
+    Periodisering,
     Prestatie,
     ProgrammaOnderdeel,
     Test,
@@ -710,7 +712,7 @@ class Opslag:
         return ids
 
     # ============================================================
-    # Groepen, periodeplannen, trainingen, absentie (personen.db)
+    # Groepen, periodisering, trainingen, absentie (personen.db)
     # ============================================================
     def groep_opslaan(self, g: Groep) -> Groep:
         """Groep en ledenlijst opslaan. De leden in de database worden precies g.leden.
@@ -827,28 +829,66 @@ class Opslag:
         ).fetchall()
         return [self._groep(r) for r in rijen]
 
-    def periodeplan_opslaan(self, p: Periodeplan) -> Periodeplan:
-        waarden = (p.groep_id, p.naam, _naar_tekst(p.startdatum), _naar_tekst(p.einddatum), p.doel)
+    # ---------- periodisering: megacyclus (groep_fase) en mesocycli ----------
+    def groep_fasen(self, groep_id: int) -> list[Fase]:
+        """De megacyclus van een groep: de faseovergangen, oudste eerst."""
+        return [Fase(_naar_datum(r["startdatum"]), r["fase"]) for r in self.personen.execute(
+            "SELECT startdatum, fase FROM groep_fase WHERE groep_id = ? ORDER BY startdatum", (groep_id,))]
+
+    def groep_fasen_opslaan(self, groep_id: int, fasen: Iterable[Fase]) -> list[Fase]:
+        """Vervangt de hele megacyclus van een groep door `fasen` ([] = geen megacyclus). Geeft ze gesorteerd."""
+        fasen = sorted(fasen, key=lambda f: f.startdatum)
+        dubbel = sorted({f.startdatum for f in fasen if sum(g.startdatum == f.startdatum for g in fasen) > 1})
+        if dubbel:
+            raise OpslagFout("Twee fasen beginnen op dezelfde dag: " + ", ".join(d.isoformat() for d in dubbel) + ".")
+        if self.groep(groep_id) is None:
+            raise OpslagFout(f"Groep {groep_id} bestaat niet.")
         with self.personen:
-            if p.id is None:
-                p.id = self.personen.execute(
-                    "INSERT INTO periodeplan (groep_id, naam, startdatum, einddatum, doel) VALUES (?, ?, ?, ?, ?)",
-                    waarden,
-                ).lastrowid
-            else:
-                self.personen.execute(
-                    "UPDATE periodeplan SET groep_id = ?, naam = ?, startdatum = ?, einddatum = ?, doel = ? WHERE id = ?",
-                    (*waarden, p.id),
-                )
-        return p
+            self.personen.execute("DELETE FROM groep_fase WHERE groep_id = ?", (groep_id,))
+            self.personen.executemany("INSERT INTO groep_fase (groep_id, startdatum, fase) VALUES (?, ?, ?)",
+                                      [(groep_id, _naar_tekst(f.startdatum), f.fase) for f in fasen])
+        return fasen
 
-    def periodeplannen(self, groep_id: int) -> list[Periodeplan]:
-        return [Periodeplan(r["naam"], _naar_datum(r["startdatum"]), _naar_datum(r["einddatum"]),
-                            r["groep_id"], r["doel"], r["id"])
-                for r in self.personen.execute(
-                    "SELECT * FROM periodeplan WHERE groep_id = ? ORDER BY startdatum", (groep_id,))]
+    def mesocycli(self, groep_id: int) -> list[Mesocyclus]:
+        """De mesocycli van een groep met hun weeknamen, oudste eerst."""
+        uit = []
+        for r in self.personen.execute(
+                "SELECT * FROM mesocyclus WHERE groep_id = ? ORDER BY startdatum", (groep_id,)).fetchall():
+            namen = {w["weeknummer"]: w["naam"] for w in self.personen.execute(
+                "SELECT weeknummer, naam FROM mesocyclus_week WHERE mesocyclus_id = ?", (r["id"],))}
+            uit.append(Mesocyclus(_naar_datum(r["startdatum"]), r["aantal_weken"],
+                                  [namen.get(i, "") for i in range(1, r["aantal_weken"] + 1)],
+                                  r["groep_id"], r["id"]))
+        return uit
 
-    _TRAINING_VELDEN = ("groep_id", "periodeplan_id", "datum", "onderwerp", "warming_up", "kern_a",
+    def mesocycli_opslaan(self, groep_id: int, cycli: Iterable[Mesocyclus]) -> list[Mesocyclus]:
+        """Vervangt alle mesocycli van een groep door `cycli` ([] = geen). Geeft ze gesorteerd, met id."""
+        cycli = sorted(cycli, key=lambda m: m.startdatum)
+        starts = [m.startdatum for m in cycli]
+        dubbel = sorted({d for d in starts if starts.count(d) > 1})
+        if dubbel:
+            raise OpslagFout("Twee mesocycli beginnen op dezelfde dag: "
+                             + ", ".join(d.isoformat() for d in dubbel) + ".")
+        if self.groep(groep_id) is None:
+            raise OpslagFout(f"Groep {groep_id} bestaat niet.")
+        with self.personen:
+            self.personen.execute("DELETE FROM mesocyclus WHERE groep_id = ?", (groep_id,))   # weken: CASCADE
+            for m in cycli:
+                m.groep_id = groep_id
+                m.id = self.personen.execute(
+                    "INSERT INTO mesocyclus (groep_id, startdatum, aantal_weken) VALUES (?, ?, ?)",
+                    (groep_id, _naar_tekst(m.startdatum), m.aantal_weken)).lastrowid
+                self.personen.executemany(
+                    "INSERT INTO mesocyclus_week (mesocyclus_id, weeknummer, naam) VALUES (?, ?, ?)",
+                    [(m.id, i, naam) for i, naam in enumerate(m.weeknamen, start=1)])
+        return cycli
+
+    def periodisering(self, groep_id: int) -> Periodisering:
+        """Megacyclus en mesocycli van een groep samen (leeg als de groep ze niet gebruikt)."""
+        return Periodisering(self.groep_fasen(groep_id), self.mesocycli(groep_id))
+
+    # training.periodeplan_id bestaat nog in de database maar wordt niet meer gebruikt (migratie 007).
+    _TRAINING_VELDEN = ("groep_id", "datum", "onderwerp", "warming_up", "kern_a",
                         "kern_b", "cooling_down", "notities", "hoofdtraining_id", "starttijd")   # vaste kolomnamen
 
     def _training(self, r) -> Training:
@@ -857,7 +897,7 @@ class Opslag:
                FROM training_atleet ta JOIN atleet a ON a.master_id = ta.atleet_id
                WHERE ta.training_id = ?""", (r["id"],)))
         return Training(r["groep_id"], _naar_datum(r["datum"]), r["onderwerp"], r["notities"],
-                        r["periodeplan_id"], r["id"], r["warming_up"], r["kern_a"], r["kern_b"],
+                        r["id"], r["warming_up"], r["kern_a"], r["kern_b"],
                         r["cooling_down"], r["hoofdtraining_id"], atleten, r["starttijd"])
 
     def training_opslaan(self, t: Training) -> Training:

@@ -893,3 +893,58 @@ th[aria-sort="descending"] .sorteer__naam::after { content: " \2193"; opacity: 1
   .leerlijn { break-inside: avoid-page; }
   .leerlijntabel tr { break-inside: avoid; }
 }
+
+/* ---------- periodisering: jaaroverzicht en invullen ---------- */
+:root {
+  --fase-v1: #c8e6bf;   /* algemene voorbereiding: groen */
+  --fase-v2: #ffd3a1;   /* specifieke voorbereiding: oranje */
+  --fase-wp: #ff9f9f;   /* wedstrijdperiode: rood */
+  --fase-rust: #e3e3e3; /* overgang / rust: grijs */
+  --week: #ffdfdf;
+  --week-anders: #ffc9c9;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --fase-v1: #2a4a2c; --fase-v2: #5e3c14; --fase-wp: #6e2a2d; --fase-rust: #3a3a3a;
+    --week: #34302f; --week-anders: #463c3b;
+  }
+}
+:root[data-theme="dark"] {
+  --fase-v1: #2a4a2c; --fase-v2: #5e3c14; --fase-wp: #6e2a2d; --fase-rust: #3a3a3a;
+  --week: #34302f; --week-anders: #463c3b;
+}
+.fase--v1 { background: var(--fase-v1); }
+.fase--v2 { background: var(--fase-v2); }
+.fase--wp { background: var(--fase-wp); }
+.fase--rust { background: var(--fase-rust); }
+
+.jaar { display: grid; gap: .5rem; min-width: 0; }
+.jaar__navigatie { display: flex; align-items: center; justify-content: space-between; gap: 1rem; font-size: var(--maat-s); }
+.jaar__vak { overflow-x: auto; min-width: 0; }
+.jaar__binnen { position: relative; min-width: 40rem; padding-top: 1.3rem; display: grid; gap: 3px; }
+.jaar__maanden { position: absolute; inset: 0 0 auto 0; height: 1.2rem; font-size: var(--maat-xs); color: var(--tekst-zacht); }
+.jaar__maanden span { position: absolute; top: 0; padding-left: .25rem; border-left: 1px solid var(--rand); line-height: 1.2rem; }
+.jaar__balk { position: relative; height: 2rem; background: var(--leeg-vlak); }
+.jaar__balk--weken { height: 1.4rem; background: transparent; }
+.jaar__blok, .jaar__week {
+  position: absolute; top: 0; bottom: 0; overflow: hidden; white-space: nowrap;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--tekst); border-right: 2px solid var(--papier);
+}
+.jaar__blok { font-size: var(--maat-s); font-weight: 700; }
+.jaar__week { font-size: var(--maat-xs); background: var(--week); border-right-width: 1px; }
+.jaar__week--anders { background: var(--week-anders); }
+.jaar__week--eerste { box-shadow: inset 2px 0 0 var(--rood); }
+.jaar__geen { position: absolute; inset: 0; display: flex; align-items: center; padding-left: .6rem; font-size: var(--maat-xs); color: var(--tekst-zacht); }
+.jaar__vandaag { position: absolute; top: 1.1rem; bottom: 0; width: 2px; margin-left: -1px; background: var(--rood); }
+.jaar__stip { display: inline-block; width: 1rem; height: 1rem; border: 1px solid var(--rand); }
+.jaar__stip--week { background: var(--week); box-shadow: inset 2px 0 0 var(--rood); }
+
+.periodekeuze { width: auto; }
+.periodekeuze select { min-width: 16rem; }
+@media (max-width: 40rem) { .periodekeuze select { min-width: 0; width: 100%; max-width: 11rem; } .periodekeuze input[type="date"] { max-width: 9.5rem; } }
+.mesocyclus { display: grid; gap: .8rem; margin: 0; padding: .9rem 1rem 1rem; border: 1px solid var(--rand); }
+.mesocyclus legend { font-weight: 700; padding: 0 .3rem; }
+.mesocyclus input[type="number"] { font: inherit; padding: .45rem .6rem; border: 1px solid var(--rand); background: var(--papier); color: var(--tekst); width: 6rem; }
+.mesocyclus__namen { display: grid; gap: .6rem 1rem; grid-template-columns: repeat(auto-fill, minmax(min(100%, 10rem), 1fr)); }
+.mesocyclus__namen .veld[hidden] { display: none; }

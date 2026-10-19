@@ -7,6 +7,7 @@ Opbouw:
     Trainingsdagen   ma di wo do vr za zo   (+ hoeveel atleten die dag)
     Atleten: naam, categorie, specialisatie en per weekdag of de atleet traint:
              met deze groep, of ergens anders (andere groep of zelf)
+    Periodisering: jaaroverzicht met fasen en mesoweken (als de groep die gebruikt)
     Komende wedstrijden              Komende trainingen
     Leerdoelen (gemiddeld)           Aanwezigheid per trainingsdag
     daaronder een link naar het overzicht met PR's en testresultaten
@@ -29,8 +30,10 @@ from atleten.landingspagina import DAG_KORT, categorie_code, leeftijdscategorie
 from db.queries import Opslag
 from instellingen import dagvolgorde, tijd as toon_tijd
 from leerlijnen.voortgang import leerdoelenpagina
-from models import ABSENTIE_STATUSSEN, DAGEN, Atleet, Groep, Periodeplan, Training, Trainingsschema
+from models import ABSENTIE_STATUSSEN, DAGEN, Atleet, Groep, Periode, Periodisering, Training, Trainingsschema
 from wedstrijden.kalender import PlanningRegel, wedstrijdplanning
+
+from .periodeplan import Jaaroverzicht, jaaroverzicht
 
 #: Waar de trainingsdagen vandaan komen.
 BRON_VAST = "vast"                    # ingesteld bij de groep (tabel groep_trainingstijden)
@@ -95,7 +98,7 @@ class KomendeTraining:
     training: Training
     dagen_tot: int
     verwacht: int                     # leden die die weekdag volgens hun schema trainen
-    periode: str | None = None        # naam van het periodeplan
+    periode: str | None = None        # fase en mesoweek, kort: 'V2 · wk 3 Piek'
     ingevuld: int = 0                 # al opgeslagen statussen (aanwezigheid)
 
     @property
@@ -150,7 +153,8 @@ class GroepLandingspagina:
     leerdoelen: list[LeerlijnGemiddelde]
     aanwezigheid: list[DagAanwezigheid]
     aanwezigheid_van: date
-    periode: Periodeplan | None = None   # het periodeplan waar vandaag in valt
+    periode: Periode = field(default_factory=Periode)   # fase en mesoweek van vandaag (kan leeg zijn)
+    jaar: Jaaroverzicht | None = None  # periodisering over twaalf maanden; None = de groep gebruikt het niet
     vandaag: date = field(default_factory=date.today)
 
     @property
@@ -174,13 +178,6 @@ class GroepLandingspagina:
         aanwezig = sum(d.telling["aanwezig"] for d in self.aanwezigheid)
         ingevuld = sum(d.ingevuld for d in self.aanwezigheid)
         return round(100 * aanwezig / ingevuld, 1) if ingevuld else None
-
-    @property
-    def periode_week(self) -> int | None:
-        """In welke week van het huidige periodeplan we zitten (1 = eerste week)."""
-        if self.periode is None:
-            return None
-        return (self.vandaag - self.periode.startdatum).days // 7 + 1
 
 
 # ============================================================
@@ -246,10 +243,9 @@ def _leden(db: Opslag, groep: Groep, groepsdagen: set[str], schemas: dict[str, T
 # Komend: wedstrijden en trainingen
 # ============================================================
 def _trainingen(db: Opslag, groep: Groep, schemas: dict[str, Trainingsschema], vandaag: date,
-                weken: int, aantal: int, dagen_terug: int = 7) -> list[KomendeTraining]:
+                weken: int, aantal: int, plan: Periodisering, dagen_terug: int = 7) -> list[KomendeTraining]:
     """De komende trainingen (max. `aantal`), met daarvoor de trainingen van de afgelopen
     `dagen_terug` dagen waarvan de aanwezigheid nog helemaal niet is ingevuld."""
-    plannen = {p.id: p.naam for p in db.periodeplannen(groep.id)}
     open_trainingen = [t for t in db.trainingen(groep.id, van=vandaag - timedelta(days=dagen_terug),
                                                 tot=vandaag - timedelta(days=1))
                        if not db.absenties(t.id)]
@@ -257,7 +253,7 @@ def _trainingen(db: Opslag, groep: Groep, schemas: dict[str, Trainingsschema], v
     uit = []
     for t in open_trainingen + komend:
         verwacht = sum(1 for s in schemas.values() if s.traint_mee(t, groep))
-        uit.append(KomendeTraining(t, (t.datum - vandaag).days, verwacht, plannen.get(t.periodeplan_id),
+        uit.append(KomendeTraining(t, (t.datum - vandaag).days, verwacht, plan.op(t.datum).kort or None,
                                    len(db.absenties(t.id))))
     return uit
 
@@ -335,7 +331,7 @@ def landingspagina(db: Opslag, groep_id: int, *, peildatum: date | None = None,
 
     komend = wedstrijdplanning(db, groep.leden, van=vandaag, peildatum=vandaag).komend if groep.leden else []
     van_aanwezigheid = vandaag - timedelta(weeks=weken_aanwezigheid)
-    periode = next((p for p in db.periodeplannen(groep.id) if p.bevat(vandaag)), None)
+    plan = db.periodisering(groep.id)
 
     return GroepLandingspagina(
         groep=groep,
@@ -344,10 +340,11 @@ def landingspagina(db: Opslag, groep_id: int, *, peildatum: date | None = None,
         leden=leden,
         wedstrijden=komend[:aantal_wedstrijden],
         aantal_wedstrijden=len(komend),
-        trainingen=_trainingen(db, groep, schemas, vandaag, weken_trainingen, aantal_trainingen),
+        trainingen=_trainingen(db, groep, schemas, vandaag, weken_trainingen, aantal_trainingen, plan),
         leerdoelen=_leerdoelen(db, leden),
         aanwezigheid=_aanwezigheid(db, groep, van_aanwezigheid, vandaag),
         aanwezigheid_van=van_aanwezigheid,
-        periode=periode,
+        periode=plan.op(vandaag),
+        jaar=None if plan.leeg else jaaroverzicht(plan, vandaag=vandaag),
         vandaag=vandaag,
     )

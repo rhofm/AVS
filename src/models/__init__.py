@@ -9,10 +9,11 @@ blijven binnen db/.
 """
 
 from .atleet import GESLACHTEN, Atleet, Geslacht
-from .groep import ABSENTIE_STATUSSEN, Absentie, AbsentieStatus, Groep, Periodeplan, TRAININGSONDERDELEN, Training, normaliseer_tijd
+from .groep import ABSENTIE_STATUSSEN, Absentie, AbsentieStatus, Groep, TRAININGSONDERDELEN, Training, normaliseer_tijd
 from .leerdoel import CATEGORIEEN, LEERDOEL_BRONNEN, Categorie, Leerdoel, LeerdoelScore
 from .leerlijn import Leerlijn, LeerlijnStap, LeerlijnVoortgang
 from .notitie import Notitie
+from .periodisering import FASE_CODES, FASEN, Fase, Mesocyclus, MesoWeek, Periode, Periodisering
 from .programma import ProgrammaOnderdeel, lees_categorie
 from .prestatie import (
     BRONNEN,
@@ -35,7 +36,8 @@ __all__ = [
     "Atleet", "Geslacht", "GESLACHTEN",
     "Onderdeel", "Wedstrijd", "Prestatie", "Inschrijving", "PR", "Test", "Testresultaat",
     "Bron", "BRONNEN", "Eenheid", "EENHEDEN", "MAX_WIND", "heeft_windmeting",
-    "Groep", "normaliseer_tijd", "Training", "TRAININGSONDERDELEN", "Absentie", "AbsentieStatus", "ABSENTIE_STATUSSEN", "Periodeplan",
+    "Groep", "normaliseer_tijd", "Training", "TRAININGSONDERDELEN", "Absentie", "AbsentieStatus", "ABSENTIE_STATUSSEN",
+    "Fase", "FASEN", "FASE_CODES", "Mesocyclus", "MesoWeek", "Periode", "Periodisering",
     "Leerlijn", "LeerlijnStap", "LeerlijnVoortgang",
     "Leerdoel", "LeerdoelScore", "Categorie", "CATEGORIEEN", "LEERDOEL_BRONNEN",
     "Trainingsschema", "DAGEN",

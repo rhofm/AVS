@@ -151,7 +151,7 @@ def test_oude_variant_kolommen_op_groep():
             init_db(map_, hoofd=TESTSLEUTEL)                     # tweede keer: niets meer te doen
         assert uit.getvalue().count("overgezet") == 1
         with Opslag(map=map_, hoofd=TESTSLEUTEL) as db:
-            assert huidige_versie(db.personen) == 6      # 004 tijden, 005 trainingsonderdelen, 006 meerdere per dag
+            assert huidige_versie(db.personen) == 7      # 004 tijden, 005 trainingsonderdelen, 006 meerdere per dag, 007 periodisering
             assert db.groep(1).trainingsdagen == {"dinsdag": "18:30", "donderdag": "18:30"}
             assert db.groep(2).trainingsdagen == {}
             kolommen = {r[1] for r in db.personen.execute("PRAGMA table_info(groep)")}

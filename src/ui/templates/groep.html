@@ -9,6 +9,7 @@
   ook als tekst bij (title en verborgen tekst), dus niet alleen in de kleur.
 #}
 {% extends "basis.html" %}
+{% from "_jaaroverzicht.html" import jaaroverzicht %}
 {% set groep = pagina.groep %}
 {% set basis = "/groep/" ~ groep.id %}
 {% block titel %}{{ groep.naam }}{% endblock %}
@@ -26,7 +27,7 @@
         {% if groep.seizoen %}<span>seizoen {{ groep.seizoen }}</span>{% endif %}
         {% if pagina.categorieen %}<span>{{ pagina.categorieen | join(" · ") }}</span>{% endif %}
         {% if pagina.trainingsdagen %}<span>{{ pagina.trainingsdagen | length }}× per week</span>{% endif %}
-        {% if pagina.periode %}<span>{{ pagina.periode.naam }} · week {{ pagina.periode_week }} van {{ pagina.periode.aantal_weken }}</span>{% endif %}
+        {% if pagina.periode %}<span title="{{ pagina.periode.lang }}">{{ pagina.periode.kort }}</span>{% endif %}
       </p>
       <a class="knop atleetkop__aanpassen" href="{{ basis }}/gegevens">
         <svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M11.7 1.3a1 1 0 0 1 1.4 0l1.6 1.6a1 1 0 0 1 0 1.4L5.4 13.6 1.5 14.5l.9-3.9z"/></svg>
@@ -81,6 +82,24 @@
         </tbody>
       </table>
     </div>
+  </section>
+
+  {# ---------------- Periodisering (optioneel) ---------------- #}
+  <section class="blok" aria-labelledby="kop-periodisering">
+    <div class="blok__kop">
+      <div>
+        <h2 class="kop" id="kop-periodisering">Periodisering</h2>
+        <p class="subkop">
+          {%- if pagina.periode %}Nu: {{ pagina.periode.lang }}
+          {%- elif pagina.jaar %}Vandaag in geen fase of mesocyclus
+          {%- else %}Nog niet ingesteld (optioneel): fasen over het jaar en mesocycli van een paar weken{% endif %}</p>
+      </div>
+      <a class="knop" href="{{ basis }}/periodisering">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M11.7 1.3a1 1 0 0 1 1.4 0l1.6 1.6a1 1 0 0 1 0 1.4L5.4 13.6 1.5 14.5l.9-3.9z"/></svg>
+        {{ "Wijzigen" if pagina.jaar else "Instellen" }}
+      </a>
+    </div>
+    {% if pagina.jaar %}{{ jaaroverzicht(pagina.jaar) }}{% endif %}
   </section>
 
   {# ---------------- Atleten ---------------- #}

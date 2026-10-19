@@ -18,7 +18,7 @@ from db.init_db import DB_DIR, init_db, pseudoniem, verbind  # noqa: E402
 from db.queries import Opslag, OpslagFout  # noqa: E402
 from models import (  # noqa: E402
     PR, heeft_windmeting, Absentie, Atleet, Groep, Inschrijving, Leerlijn, LeerlijnStap, LeerlijnVoortgang,
-    Onderdeel, Periodeplan, Prestatie, Test, Testresultaat, Training, Trainingsschema, Wedstrijd, Notitie,
+    Onderdeel, Prestatie, Test, Testresultaat, Training, Trainingsschema, Wedstrijd, Notitie,
 )
 
 TESTSLEUTEL = "11" * 32
@@ -216,7 +216,7 @@ def test_migratie_op_bestaande_database():
         with contextlib.redirect_stdout(io.StringIO()):
             init_db(Path(tmp), hoofd=TESTSLEUTEL)
         with Opslag(map=Path(tmp), hoofd=TESTSLEUTEL) as db:
-            assert db.prestaties_db.execute("SELECT MAX(versie) FROM schema_version").fetchone()[0] == 3   # 002 + 003 (tijdschema)
+            assert db.prestaties_db.execute("SELECT MAX(versie) FROM schema_version").fetchone()[0] == 4   # 002 + 003 (tijdschema) + 004 (doelen)
             assert db.prs(anna.master_id) == []                  # te veel wind / geen meting
             assert len(db.prestaties(anna.master_id)) == 2       # de prestaties zelf zijn er nog
             sql = {o.naam: o.windmeting for o in db.onderdelen()}
@@ -311,13 +311,11 @@ def test_groepen_trainingen_absentie():
         assert db.groep(g.id).leden == [anna.master_id]
         assert [x.naam for x in db.groepen_van_atleet(anna.master_id)] == ["Junioren C"]
 
-        plan = db.periodeplan_opslaan(Periodeplan("AV", date(2026, 10, 1), date(2026, 11, 30), g.id))
-        tr = db.training_opslaan(Training(g.id, date(2026, 10, 14), "Starts", periodeplan_id=plan.id))
+        tr = db.training_opslaan(Training(g.id, date(2026, 10, 14), "Starts"))
         db.absentie_opslaan(Absentie(tr.id, anna.master_id, "afgemeld", "school"))
         db.absentie_opslaan(Absentie(tr.id, anna.master_id, "aanwezig"))  # bijwerken
         assert [(a.status, a.reden) for a in db.absenties(tr.id)] == [("aanwezig", None)]
         assert len(db.trainingen(g.id, van=date(2026, 10, 1))) == 1
-        assert db.periodeplannen(g.id)[0].aantal_weken == 9
 
 
 def test_absentie_eigen_database():

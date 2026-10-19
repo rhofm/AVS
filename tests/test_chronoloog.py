@@ -192,14 +192,16 @@ def test_migratie_op_bestaande_database():
             init_db(Path(tmp), hoofd=TESTSLEUTEL)
         with verbind("prestaties", Path(tmp), TESTSLEUTEL) as c:
             c.execute("DROP TABLE wedstrijd_programma")
-            c.execute("DELETE FROM schema_version WHERE versie = 3")
+            c.execute("DROP TABLE doel_regel")                  # 004 (doelen) kwam later
+            c.execute("DROP TABLE doel")
+            c.execute("DELETE FROM schema_version WHERE versie >= 3")
             c.execute("INSERT INTO wedstrijd (naam, datum) VALUES ('Oud', '2026-09-01')")
             c.commit()
             assert huidige_versie(c) == 2
         with contextlib.redirect_stdout(io.StringIO()):
             init_db(Path(tmp), hoofd=TESTSLEUTEL)
         with Opslag(map=Path(tmp), hoofd=TESTSLEUTEL) as db:
-            assert huidige_versie(db.prestaties_db) == 3
+            assert huidige_versie(db.prestaties_db) == 4      # 003 tijdschema + 004 doelen
             w = db.wedstrijden()[0]
             db.programma_opslaan(ProgrammaOnderdeel(w.id, w.datum, "10:00", None, "Verspringen", groep=1, duur=45))
             assert db.programma(w.id)[0].eindtijd == "10:45"
