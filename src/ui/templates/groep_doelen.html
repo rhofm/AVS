@@ -1,0 +1,56 @@
+{#
+  Doelen van een groep: komend en geweest.
+  Context:
+    o       – groepen.doelen.Doelenoverzicht
+    melding – bevestiging (optioneel)
+#}
+{% extends "basis.html" %}
+{% from "_doel.html" import telling %}
+{% set groep = o.groep %}
+{% block titel %}Doelen {{ groep.naam }}{% endblock %}
+
+{% macro lijst(doelen) %}
+  <div class="tabelvak">
+    <table class="tabel">
+      <thead><tr><th scope="col">Datum</th><th scope="col">Doel</th><th scope="col">Wedstrijd</th><th scope="col">Stand</th></tr></thead>
+      <tbody>
+        {% for s in doelen %}
+          <tr>
+            <td class="nowrap"><strong>{{ s.einde | datum_kort }}</strong> {{ s.einde.year }}<br><span class="zacht">{{ s.dagen_tot | over_dagen }}</span></td>
+            <td><a href="{{ url_for('doel', doel_id=s.doel.id) }}"><strong>{{ s.doel.titel }}</strong></a>
+              {% if s.doel.beschrijving %}<br><span class="zacht">{{ s.doel.beschrijving | truncate(90) }}</span>{% endif %}</td>
+            <td>{% if s.wedstrijd %}<a href="/wedstrijd/{{ s.wedstrijd.id }}">{{ s.wedstrijd.naam }}</a>{% else %}–{% endif %}</td>
+            <td>{{ telling(s) or "–" }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endmacro %}
+
+{% block inhoud %}
+<article class="vel">
+  <header class="blok__kop">
+    <div>
+      <a class="terug" href="{{ url_for('groep', groep_id=groep.id) }}">&larr; {{ groep.naam }}</a>
+      <h1 class="kop kop--pagina">Doelen</h1>
+      <p class="subkop">Wat {{ groep.naam }} wil bereiken, meestal bij een wedstrijd. Prestatie- en leerdoelen worden vanzelf nagekeken.</p>
+    </div>
+    <a class="knop knop--vol" href="{{ url_for('groep_doel_nieuw', groep_id=groep.id) }}">+ Nieuw doel</a>
+  </header>
+
+  {% if melding %}<p class="melding" role="status">{{ melding }}</p>{% endif %}
+
+  <section class="blok" aria-labelledby="kop-komend">
+    <h2 class="kop" id="kop-komend">Komend</h2>
+    {% if o.komend %}{{ lijst(o.komend) }}{% else %}<p class="leeg">Geen komende doelen. Maak er een met &lsquo;+ Nieuw doel&rsquo;.</p>{% endif %}
+  </section>
+
+  <section class="blok" aria-labelledby="kop-geweest">
+    <h2 class="kop" id="kop-geweest">Geweest</h2>
+    {% if o.geweest %}{{ lijst(o.geweest) }}{% else %}<p class="leeg">Nog geen afgelopen doelen.</p>{% endif %}
+  </section>
+
+  <footer class="vel__voet">Atleet Volg Systeem<br>Doelen {{ groep.naam }}</footer>
+</article>
+{% endblock %}

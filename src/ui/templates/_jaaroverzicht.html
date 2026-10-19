@@ -15,7 +15,7 @@
       </div>
     {% endif %}
     <div class="jaar__vak">
-      <div class="jaar__binnen" role="img" aria-label="Periodisering van {{ jaar.van | datum_lang }} tot {{ jaar.tot | datum_lang }}{% for b in jaar.fasen %}; {{ b.uitleg }}{% endfor %}">
+      <div class="jaar__binnen" role="img" aria-label="Periodisering van {{ jaar.van | datum_lang }} tot {{ jaar.tot | datum_lang }}{% for b in jaar.fasen %}; {{ b.uitleg }}{% endfor %}{% for b in jaar.doelen %}; {{ b.uitleg }}{% endfor %}">
         <div class="jaar__maanden" aria-hidden="true">
           {% for naam, links in jaar.maanden %}<span style="left: {{ links }}%">{{ naam }}</span>{% endfor %}
         </div>
@@ -33,6 +33,9 @@
             {% endfor %}
           </div>
         {% endif %}
+        {% for b in jaar.doelen %}
+          <span class="jaar__doel" style="left: {{ b.links }}%" title="{{ b.uitleg }}" aria-hidden="true"></span>
+        {% endfor %}
         {% if jaar.vandaag_pct is not none %}<span class="jaar__vandaag" style="left: {{ jaar.vandaag_pct }}%" title="Vandaag" aria-hidden="true"></span>{% endif %}
       </div>
     </div>
@@ -41,6 +44,7 @@
         <li><span class="jaar__stip fase--{{ code | lower }}" aria-hidden="true"></span>{{ code }} {{ naam | lower }}</li>
       {% endfor %}
       {% if jaar.weken %}<li><span class="jaar__stip jaar__stip--week" aria-hidden="true"></span>mesoweek (nummer)</li>{% endif %}
+      {% if jaar.doelen %}<li><span class="jaar__doel jaar__doel--legenda" aria-hidden="true"></span>doel</li>{% endif %}
     </ul>
   </div>
 {% endmacro %}

@@ -1,0 +1,63 @@
+{#
+  Eén doel met de stand per regel.
+  Context:
+    s       – groepen.doelen.DoelStand
+    melding – bevestiging (optioneel)
+#}
+{% extends "basis.html" %}
+{% from "_doel.html" import regeltabel, telling %}
+{% set d = s.doel %}
+{% block titel %}{{ d.titel }}{% endblock %}
+
+{% block inhoud %}
+<article class="vel">
+  <header class="blok__kop">
+    <div>
+      {% if s.groep %}
+        <a class="terug" href="{{ url_for('groep_doelen', groep_id=s.groep.id) }}">&larr; Doelen {{ s.groep.naam }}</a>
+      {% elif s.standen and s.standen[0].atleet %}
+        <a class="terug" href="{{ url_for('atleet', master_id=s.standen[0].atleet.master_id) }}#kop-wed">&larr; {{ s.standen[0].atleet.naam }}</a>
+      {% endif %}
+      <span class="label" style="display: block">{{ "Doel van de groep" if s.groep else "Persoonlijk doel" }}</span>
+      <h1 class="kop kop--pagina">{{ d.titel }}</h1>
+      <p class="subkop">{{ s.einde | datum_kort }} {{ s.einde.year }} · {% if s.geweest %}geweest{% else %}{{ s.dagen_tot | over_dagen }}{% endif %}
+        {%- if s.wedstrijd %} · <a href="/wedstrijd/{{ s.wedstrijd.id }}">{{ s.wedstrijd.naam }}</a>{% endif %}</p>
+      <p class="atleetkop__feiten">
+        {% if s.groep %}<span><a href="{{ url_for('groep', groep_id=s.groep.id) }}">{{ s.groep.naam }}</a></span>{% endif %}
+        {% if d.startdatum %}<span>resultaten vanaf {{ d.startdatum | datum_kort }} {{ d.startdatum.year }}</span>{% endif %}
+        <span>{{ telling(s) }}</span>
+      </p>
+    </div>
+    <a class="knop" href="{{ url_for('doel_bewerken', doel_id=d.id) }}">
+      <svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M11.7 1.3a1 1 0 0 1 1.4 0l1.6 1.6a1 1 0 0 1 0 1.4L5.4 13.6 1.5 14.5l.9-3.9z"/></svg>
+      Bewerken
+    </a>
+  </header>
+
+  {% if melding %}<p class="melding" role="status">{{ melding }}</p>{% endif %}
+
+  {% if d.beschrijving %}
+    <section class="blok" aria-labelledby="kop-beschrijving">
+      <h2 class="kop" id="kop-beschrijving">Waarom</h2>
+      <div class="inhoudtekst">{{ d.beschrijving }}</div>
+    </section>
+  {% endif %}
+
+  <section class="blok" aria-labelledby="kop-regels">
+    <h2 class="kop" id="kop-regels">Doelen en stand</h2>
+    {{ regeltabel(s, wie=s.groep is not none) }}
+    <p class="zacht" style="font-size: var(--maat-xs); margin: 0">Prestatiedoelen tellen met de beste windlegale prestatie {% if s.wedstrijd %}op deze wedstrijd{% else %}tussen de startdatum en de streefdatum{% endif %}; leerdoelen met de laatste score tot de streefdatum. Een beoordeling met de hand (bij Bewerken) gaat altijd voor.</p>
+  </section>
+
+  {% if d.evaluatie %}
+    <section class="blok" aria-labelledby="kop-evaluatie">
+      <h2 class="kop" id="kop-evaluatie">Terugblik</h2>
+      <div class="inhoudtekst">{{ d.evaluatie }}</div>
+    </section>
+  {% elif s.geweest %}
+    <p class="leeg">Nog geen terugblik. Schrijf bij <a href="{{ url_for('doel_bewerken', doel_id=d.id) }}">Bewerken</a> hoe het ging.</p>
+  {% endif %}
+
+  <footer class="vel__voet">Atleet Volg Systeem<br>{{ d.titel }}</footer>
+</article>
+{% endblock %}

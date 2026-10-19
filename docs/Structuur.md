@@ -10,7 +10,7 @@
 * Testresultaten
 * Trainingsschema: op welke dagen van de week de atleet traint
 * Notities: vrije tekst per atleet per datum (wat opviel op training of wedstrijd), zoekbaar op tekst en datum
-* Geplande/verwachte prestaties (?) (eigen database?)
+* Doelen: eigen regels uit groepsdoelen en persoonlijke doelen, met de stand (zie Groepen)
 
 
 
@@ -99,7 +99,12 @@
   * Koppelen aan een groep vanaf een datum (begin van week 1), met herhalen of één keer, en eventueel een einddatum; geldt tot de volgende koppeling. Weeknummers staan los van de mesocyclus
   * Invullen per cel in een tabel weken × trainingen, of importeren: tabel plakken uit Excel of een CSV-bestand (week + dag, of datum), eerst controleren met waarschuwingen, dan opslaan. Voorbeeld-CSV te downloaden
   * Trainingen krijgen de inhoud vanzelf (gekopieerd). Met de hand aanpassen kan altijd; de training staat dan 'afwijkend van rooster', met een knop om terug te zetten. Wijzigingen in het rooster gaan alleen naar toekomstige trainingen die nog uit het rooster komen
-* Nog te doen: doelen (tabel doel staat al in prestaties.db; de oude periodeplannen zijn daarheen overgezet)
+* Doelen (optioneel), voor een groep of persoonlijk voor één atleet, meestal bij een wedstrijd (tabellen doel en doel_regel in prestaties.db; de oude periodeplannen zijn hierheen overgezet):
+  * Per doel: titel, wedstrijd of streefdatum, vanaf wanneer resultaten tellen, toelichting en na afloop een terugblik
+  * Regels: per atleet of voor de hele groep een prestatiedoel (onderdeel + streefwaarde), leerdoel (code + score 1-5) of vrij doel (omschrijving)
+  * 'Aanvullen uit inschrijvingen': een regel per ingeschreven atleet en onderdeel van de gekozen wedstrijd, met het PR erbij
+  * Status wordt uitgerekend: beste windlegale prestatie op de wedstrijd (of in de periode), of de laatste leerdoelscore; met de hand beoordelen gaat voor
+  * Te zien op de groepspagina (komende doelen, markering in het jaaroverzicht), de atleetpagina (eigen regels, '+ Persoonlijk doel') en de wedstrijdpagina
 * Trainingen: per training groep, datum, warming-up, kern A, kern B, cooling-down en notities. Tekstvelden met meerdere regels; eenvoudige markdown (**vet**, *schuin*, - lijstjes, # kopjes) wordt opgemaakt getoond
 * Afwijkende training voor enkele atleten: een variant van de gewone training met eigen inhoud en een lijst atleten (één rij per atleet). Aanwezigheid blijft bij de gewone training
 * Nog te doen: formulier om de inhoud van een training en de varianten in te vullen

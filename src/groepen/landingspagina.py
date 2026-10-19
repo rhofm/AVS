@@ -33,6 +33,7 @@ from leerlijnen.voortgang import leerdoelenpagina
 from models import ABSENTIE_STATUSSEN, DAGEN, Atleet, Groep, Periode, Periodisering, Training, Trainingsschema
 from wedstrijden.kalender import PlanningRegel, wedstrijdplanning
 
+from .doelen import DoelStand, doelenoverzicht
 from .periodeplan import Jaaroverzicht, jaaroverzicht
 
 #: Waar de trainingsdagen vandaan komen.
@@ -155,6 +156,8 @@ class GroepLandingspagina:
     aanwezigheid_van: date
     periode: Periode = field(default_factory=Periode)   # fase en mesoweek van vandaag (kan leeg zijn)
     jaar: Jaaroverzicht | None = None  # periodisering over twaalf maanden; None = de groep gebruikt het niet
+    doelen: list[DoelStand] = field(default_factory=list)   # komende doelen (ingekort)
+    aantal_doelen: int = 0            # alle komende doelen
     vandaag: date = field(default_factory=date.today)
 
     @property
@@ -308,7 +311,7 @@ def _aanwezigheid(db: Opslag, groep: Groep, van: date, tot: date) -> list[DagAan
 # Alles bij elkaar
 # ============================================================
 def landingspagina(db: Opslag, groep_id: int, *, peildatum: date | None = None,
-                   aantal_wedstrijden: int = 5, aantal_trainingen: int = 6,
+                   aantal_wedstrijden: int = 5, aantal_trainingen: int = 6, aantal_doelen: int = 4,
                    weken_trainingen: int = 4, weken_aanwezigheid: int = 12) -> GroepLandingspagina | None:
     """Alles voor de landingspagina van één groep, of None als de groep niet bestaat.
 
@@ -332,6 +335,8 @@ def landingspagina(db: Opslag, groep_id: int, *, peildatum: date | None = None,
     komend = wedstrijdplanning(db, groep.leden, van=vandaag, peildatum=vandaag).komend if groep.leden else []
     van_aanwezigheid = vandaag - timedelta(weeks=weken_aanwezigheid)
     plan = db.periodisering(groep.id)
+    overzicht = doelenoverzicht(db, groep.id, vandaag=vandaag)
+    doelen_komend, doelen_alle = overzicht.komend, overzicht.komend + overzicht.geweest
 
     return GroepLandingspagina(
         groep=groep,
@@ -345,6 +350,9 @@ def landingspagina(db: Opslag, groep_id: int, *, peildatum: date | None = None,
         aanwezigheid=_aanwezigheid(db, groep, van_aanwezigheid, vandaag),
         aanwezigheid_van=van_aanwezigheid,
         periode=plan.op(vandaag),
-        jaar=None if plan.leeg else jaaroverzicht(plan, vandaag=vandaag),
+        jaar=None if plan.leeg and not doelen_alle else jaaroverzicht(
+            plan, vandaag=vandaag, doelen=[(s.einde, s.doel.titel) for s in doelen_alle]),
+        doelen=doelen_komend[:aantal_doelen],
+        aantal_doelen=len(doelen_komend),
         vandaag=vandaag,
     )

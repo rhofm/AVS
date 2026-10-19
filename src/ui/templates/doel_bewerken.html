@@ -1,0 +1,164 @@
+{#
+  Doel maken of bewerken (van een groep, of persoonlijk voor één atleet).
+  Context:
+    f    – groepen.doelen.Doelformulier
+    fout – foutmelding (optioneel); dan staat er nog wat er was ingevuld
+  Knoppen: stap=aanvullen (regels uit de inschrijvingen van de gekozen wedstrijd) of opslaan.
+  Regelvelden: regel-<i>-atleet, -soort, -onderdeel, -leerdoel, -streef, -omschrijving, -beoordeling.
+  Een regel zonder streefwaarde, omschrijving en beoordeling telt niet mee.
+#}
+{% extends "basis.html" %}
+{% set w = f.waarden %}
+{% block titel %}{{ "Nieuw doel" if f.nieuw else "Doel bewerken" }}{% endblock %}
+
+{% block inhoud %}
+<article class="vel">
+  <header class="blok__kop">
+    <div>
+      {% if not f.nieuw %}<a class="terug" href="{{ url_for('doel', doel_id=f.doel.id) }}">&larr; {{ f.doel.titel }}</a>
+      {% elif f.groep %}<a class="terug" href="{{ url_for('groep_doelen', groep_id=f.groep.id) }}">&larr; Doelen {{ f.groep.naam }}</a>
+      {% else %}<a class="terug" href="{{ url_for('atleet', master_id=f.atleet.master_id) }}#kop-wed">&larr; {{ f.atleet.naam }}</a>{% endif %}
+      <h1 class="kop kop--pagina">{{ "Nieuw doel" if f.nieuw else "Doel bewerken" }}</h1>
+      <p class="subkop">{% if f.groep %}Voor {{ f.groep.naam }}: per atleet of voor de hele groep.{% else %}Persoonlijk doel van {{ f.atleet.naam }}.{% endif %}</p>
+    </div>
+  </header>
+
+  {% if fout %}<p class="melding melding--fout" role="alert">{{ fout }}</p>{% endif %}
+  {% if f.melding %}<p class="melding" role="status">{{ f.melding }}</p>{% endif %}
+
+  <form method="post" class="blok doelform" style="gap: 1.5rem">
+    <div class="velden">
+      <div class="veld veld--breed">
+        <label for="doel-titel">Titel</label>
+        <input type="text" id="doel-titel" name="titel" value="{{ w.titel }}" maxlength="120" required placeholder="bijv. Competitiefinale of NK indoor">
+      </div>
+      <div class="veld">
+        <label for="doel-wedstrijd">Wedstrijd <span class="zacht">(optioneel)</span></label>
+        <select id="doel-wedstrijd" name="wedstrijd">
+          <option value="">– geen –</option>
+          {% for x in f.wedstrijden %}<option value="{{ x.id }}"{% if w.wedstrijd == x.id | string %} selected{% endif %}>{{ x.datum | datum_kort }} {{ x.datum.year }} – {{ x.naam }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="veld">
+        <label for="doel-datum">Streefdatum <span class="zacht">(leeg = datum van de wedstrijd)</span></label>
+        <input type="date" id="doel-datum" name="datum" value="{{ w.datum }}">
+      </div>
+      <div class="veld">
+        <label for="doel-start">Resultaten tellen vanaf</label>
+        <input type="date" id="doel-start" name="startdatum" value="{{ w.startdatum }}">
+      </div>
+    </div>
+    <div class="veld veld--breed">
+      <label for="doel-beschrijving">Waarom / toelichting <span class="zacht">(optioneel; geen namen van andere atleten)</span></label>
+      <textarea id="doel-beschrijving" name="beschrijving" rows="2" maxlength="4000">{{ w.beschrijving }}</textarea>
+    </div>
+
+    <section class="blok" aria-labelledby="kop-doelregels">
+      <div class="blok__kop">
+        <div>
+          <h2 class="kop" id="kop-doelregels">Wat en voor wie</h2>
+          <p class="subkop">Prestatie: onderdeel + streefwaarde (12,80 · 2:05,00 · 5,20). Leerdoel: code + score 1–5. Vrij: alleen een omschrijving.</p>
+        </div>
+        <button class="knop" type="submit" name="stap" value="aanvullen" formnovalidate>Aanvullen uit inschrijvingen</button>
+      </div>
+      <div class="tabelvak">
+        <table class="tabel doelregels">
+          <thead><tr>
+            {% if f.groep %}<th scope="col">Wie</th>{% endif %}
+            <th scope="col">Soort</th><th scope="col">Onderdeel / leerdoel</th><th scope="col">Streef</th>
+            <th scope="col">Omschrijving</th><th scope="col">Beoordeling</th>
+          </tr></thead>
+          <tbody>
+            {% for r in f.regels %}
+              {% set i = loop.index0 %}
+              <tr data-doelregel>
+                {% if f.groep %}
+                  <td>
+                    <label class="verborgen" for="regel-{{ i }}-atleet">Wie, regel {{ loop.index }}</label>
+                    <select id="regel-{{ i }}-atleet" name="regel-{{ i }}-atleet">
+                      <option value="">Hele groep</option>
+                      {% for a in f.atleten %}<option value="{{ a.master_id }}"{% if r.atleet == a.master_id %} selected{% endif %}>{{ a.naam }}</option>{% endfor %}
+                    </select>
+                  </td>
+                {% endif %}
+                <td>
+                  <label class="verborgen" for="regel-{{ i }}-soort">Soort, regel {{ loop.index }}</label>
+                  <select id="regel-{{ i }}-soort" name="regel-{{ i }}-soort" data-soort>
+                    {% for code, tekst in f.soorten %}<option value="{{ code }}"{% if r.soort == code %} selected{% endif %}>{{ tekst }}</option>{% endfor %}
+                  </select>
+                </td>
+                <td>
+                  <span data-voor="prestatie">
+                    <label class="verborgen" for="regel-{{ i }}-onderdeel">Onderdeel, regel {{ loop.index }}</label>
+                    <select id="regel-{{ i }}-onderdeel" name="regel-{{ i }}-onderdeel">
+                      <option value="">– onderdeel –</option>
+                      {% for o in f.onderdelen %}<option value="{{ o.id }}"{% if r.onderdeel == o.id | string %} selected{% endif %}>{{ o.naam }}</option>{% endfor %}
+                    </select>
+                    {% if r.pr %}<span class="pr">PR {{ r.pr }}</span>{% endif %}
+                  </span>
+                  <span data-voor="leerdoel">
+                    <label class="verborgen" for="regel-{{ i }}-leerdoel">Leerdoel, regel {{ loop.index }}</label>
+                    <input type="text" id="regel-{{ i }}-leerdoel" name="regel-{{ i }}-leerdoel" value="{{ r.leerdoel }}" list="leerdoelen" placeholder="bijv. SPR-U14-02" maxlength="20" autocomplete="off">
+                  </span>
+                </td>
+                <td>
+                  <label class="verborgen" for="regel-{{ i }}-streef">Streefwaarde, regel {{ loop.index }}</label>
+                  <input type="text" id="regel-{{ i }}-streef" name="regel-{{ i }}-streef" value="{{ r.streef }}" maxlength="12" inputmode="decimal" data-niet-voor="vrij">
+                </td>
+                <td>
+                  <label class="verborgen" for="regel-{{ i }}-omschrijving">Omschrijving, regel {{ loop.index }}</label>
+                  <input type="text" id="regel-{{ i }}-omschrijving" name="regel-{{ i }}-omschrijving" value="{{ r.omschrijving }}" maxlength="400">
+                </td>
+                <td>
+                  <label class="verborgen" for="regel-{{ i }}-beoordeling">Beoordeling, regel {{ loop.index }}</label>
+                  <select id="regel-{{ i }}-beoordeling" name="regel-{{ i }}-beoordeling">
+                    <option value="">Automatisch / open</option>
+                    {% for code, tekst in f.beoordelingen %}<option value="{{ code }}"{% if r.beoordeling == code %} selected{% endif %}>{{ tekst }}</option>{% endfor %}
+                  </select>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <datalist id="leerdoelen">{% for l in f.leerdoelen %}<option value="{{ l.id }}">{{ l.omschrijving | truncate(80) }}</option>{% endfor %}</datalist>
+      <p class="zacht" style="font-size: var(--maat-xs); margin: 0">Een regel zonder streefwaarde, omschrijving en beoordeling wordt niet opgeslagen; zo haal je een regel weg. Meer regels nodig? Sla op; er komen weer lege regels bij.</p>
+    </section>
+
+    {% if not f.nieuw %}
+      <div class="veld veld--breed">
+        <label for="doel-evaluatie">Terugblik <span class="zacht">(na afloop: hoe ging het?)</span></label>
+        <textarea id="doel-evaluatie" name="evaluatie" rows="3" maxlength="4000">{{ w.evaluatie }}</textarea>
+      </div>
+    {% else %}
+      <input type="hidden" name="evaluatie" value="{{ w.evaluatie }}">
+    {% endif %}
+
+    <div class="opslaan opslaan--onder">
+      <a href="{{ url_for('doel', doel_id=f.doel.id) if not f.nieuw else (url_for('groep_doelen', groep_id=f.groep.id) if f.groep else url_for('atleet', master_id=f.atleet.master_id)) }}">Annuleren</a>
+      <button class="knop knop--vol" type="submit" name="stap" value="opslaan">Opslaan</button>
+    </div>
+  </form>
+
+  {% if not f.nieuw %}
+    <form method="post" action="{{ url_for('doel_verwijderen', doel_id=f.doel.id) }}" class="blok verwijderen"
+          onsubmit="return confirm('Dit doel verwijderen? Dat kan niet ongedaan worden gemaakt.');">
+      <button class="knop knop--gevaar" type="submit">Doel verwijderen</button>
+    </form>
+  {% endif %}
+
+  <footer class="vel__voet">Atleet Volg Systeem</footer>
+</article>
+<script>
+  // Per regel alleen de velden van de gekozen soort tonen.
+  document.querySelectorAll("[data-doelregel]").forEach(function (rij) {
+    var soort = rij.querySelector("[data-soort]");
+    function bijwerken() {
+      rij.querySelectorAll("[data-voor]").forEach(function (el) { el.hidden = el.dataset.voor !== soort.value; });
+      rij.querySelectorAll("[data-niet-voor]").forEach(function (el) { el.hidden = el.dataset.nietVoor === soort.value; });
+    }
+    soort.addEventListener("change", bijwerken);
+    bijwerken();
+  });
+</script>
+{% endblock %}

@@ -7,6 +7,7 @@
   Filters uit ui/opmaak.py (registreer_filters).
 #}
 {% extends "basis.html" %}
+{% from "_doel.html" import status %}
 {% set atleet = pagina.atleet %}
 {% set p = pagina.profiel %}
 {% set basis = "/atleet/" ~ atleet.master_id %}
@@ -159,9 +160,33 @@
       {% else %}
         <p class="leeg">Niet ingeschreven voor komende wedstrijden.</p>
       {% endif %}
-      <h3 class="subkop">Doelen</h3>
-      {# Nog geen tabel voor doelen; zie de vraag in docs/Structuur.md ("Geplande/verwachte prestaties"). #}
-      <p class="leeg">Nog geen doelen vastgelegd.</p>
+      <div class="blok__kop">
+        <h3 class="subkop">Doelen</h3>
+        <a class="knop knop--klein" href="{{ basis }}/doel/nieuw">+ Persoonlijk doel</a>
+      </div>
+      {% if pagina.doelen %}
+        <div class="tabelvak">
+          <table class="tabel">
+            <thead><tr><th scope="col">Datum</th><th scope="col">Doel</th><th scope="col">Stand</th></tr></thead>
+            <tbody>
+              {% for s in pagina.doelen %}
+                {% for r in s.standen %}
+                  <tr{% if s.geweest %} class="geweest"{% endif %}>
+                    {% if loop.first %}
+                      <td class="nowrap" rowspan="{{ s.standen | length }}"><strong>{{ s.einde | datum_kort }}</strong><br><span class="zacht">{{ s.dagen_tot | over_dagen }}</span></td>
+                    {% endif %}
+                    <td>{% if loop.first %}<a href="{{ url_for('doel', doel_id=s.doel.id) }}"><strong>{{ s.doel.titel }}</strong></a>{% if s.groep %} <span class="zacht">({{ s.groep.naam }})</span>{% endif %}<br>{% endif %}
+                      {{ r.wat }}{% if r.resultaat %} <span class="zacht">→ {{ r.resultaat }}</span>{% endif %}</td>
+                    <td>{{ status(r) }}</td>
+                  </tr>
+                {% endfor %}
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <p class="leeg">Nog geen doelen. Maak een persoonlijk doel, of zet de atleet in een doel van zijn groep.</p>
+      {% endif %}
     </section>
   </div>
 

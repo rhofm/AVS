@@ -210,6 +210,7 @@ class Jaaroverzicht:
     maanden: list[tuple[str, float]]  # ('okt', links in %)
     vandaag: date
     nu: Periode
+    doelen: list[Blok] = field(default_factory=list)   # streefdatums van doelen (titel = naam van het doel)
 
     @property
     def vandaag_pct(self) -> float | None:
@@ -225,7 +226,7 @@ class Jaaroverzicht:
 
     @property
     def leeg(self) -> bool:
-        return not self.fasen and not self.weken
+        return not self.fasen and not self.weken and not self.doelen
 
     @property
     def legenda(self) -> list[tuple[str, str]]:
@@ -247,8 +248,10 @@ def _blok(van: date, tot: date, begin: date, eind: date, **kw) -> Blok:
     return Blok(begin, eind, _pct(van, tot, begin), round(_pct(van, tot, eind + timedelta(days=1)) - _pct(van, tot, begin), 3), **kw)
 
 
-def jaaroverzicht(plan: Periodisering, *, vandaag: date | None = None, van: date | None = None) -> Jaaroverzicht:
-    """Twaalf maanden vanaf `van` (de eerste van een maand; standaard MAANDEN_TERUG maanden voor vandaag)."""
+def jaaroverzicht(plan: Periodisering, *, vandaag: date | None = None, van: date | None = None,
+                  doelen: list[tuple[date, str]] = ()) -> Jaaroverzicht:
+    """Twaalf maanden vanaf `van` (de eerste van een maand; standaard MAANDEN_TERUG maanden voor vandaag).
+    doelen: (streefdatum, titel) om als markering te tonen."""
     vandaag = vandaag or date.today()
     van = date(van.year, van.month, 1) if van else _maand_erbij(date(vandaag.year, vandaag.month, 1), -MAANDEN_TERUG)
     tot = _maand_erbij(van, 12) - timedelta(days=1)
@@ -267,7 +270,9 @@ def jaaroverzicht(plan: Periodisering, *, vandaag: date | None = None, van: date
                                afwisselend=nr % 2 == 1))
         week += timedelta(weeks=1)
     maanden = [(MAANDEN[_maand_erbij(van, i).month - 1], _pct(van, tot, _maand_erbij(van, i))) for i in range(12)]
-    return Jaaroverzicht(van, tot, fasen, weken, maanden, vandaag, plan.op(vandaag))
+    markeringen = [_blok(van, tot, d, d, titel=t, uitleg=f"Doel: {t} ({d.isoformat()})")
+                   for d, t in sorted(doelen) if van <= d <= tot]
+    return Jaaroverzicht(van, tot, fasen, weken, maanden, vandaag, plan.op(vandaag), markeringen)
 
 
 # ============================================================

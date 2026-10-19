@@ -45,6 +45,8 @@ from models import (
     PR,
     Absentie,
     Atleet,
+    Doel,
+    DoelRegel,
     Groep,
     Inschrijving,
     CATEGORIEEN,
@@ -227,6 +229,10 @@ class Opslag:
         with self.prestaties_db:
             self.prestaties_db.execute("DELETE FROM prestatie WHERE atleet_ref = ?", (ref_p,))
             self.prestaties_db.execute("DELETE FROM inschrijving WHERE atleet_ref = ?", (ref_p,))
+            self.prestaties_db.execute("DELETE FROM doel_regel WHERE atleet_ref = ?", (ref_p,))
+            # Persoonlijke doelen zonder regels hebben geen eigenaar meer.
+            self.prestaties_db.execute(
+                "DELETE FROM doel WHERE groep_id IS NULL AND id NOT IN (SELECT doel_id FROM doel_regel)")
         with self.testen_db:
             self.testen_db.execute("DELETE FROM testresultaat WHERE atleet_ref = ?", (ref_t,))
         with self.trainingsschema_db:
@@ -485,7 +491,107 @@ class Opslag:
         ).fetchone():
             raise OpslagFout(f"Wedstrijd {wedstrijd_id} heeft al prestaties en wordt niet verwijderd.")
         with self.prestaties_db:   # inschrijvingen en tijdschema gaan mee (ON DELETE CASCADE)
+            # Doelen bij deze wedstrijd houden de datum (wedstrijd_id wordt NULL door ON DELETE SET NULL).
+            self.prestaties_db.execute(
+                """UPDATE doel SET datum = (SELECT datum FROM wedstrijd WHERE id = ?)
+                   WHERE wedstrijd_id = ? AND datum IS NULL""", (wedstrijd_id, wedstrijd_id))
             self.prestaties_db.execute("DELETE FROM wedstrijd WHERE id = ?", (wedstrijd_id,))
+
+    # ============================================================
+    # Doelen (prestaties.db: doel, doel_regel)
+    # ============================================================
+    def _doel(self, r) -> Doel:
+        regels = []
+        for x in self.prestaties_db.execute("SELECT * FROM doel_regel WHERE doel_id = ? ORDER BY id", (r["id"],)):
+            mid = self._master_id(x["atleet_ref"], "prestaties") if x["atleet_ref"] else None
+            if x["atleet_ref"] and mid is None:
+                continue                                  # atleet bestaat niet meer
+            regels.append(DoelRegel(x["soort"], mid, x["onderdeel_id"], x["leerdoel_id"], x["streefwaarde"],
+                                    x["omschrijving"], x["beoordeling"], x["doel_id"], x["id"]))
+        return Doel(r["titel"], r["groep_id"], r["wedstrijd_id"], _naar_datum(r["startdatum"]),
+                    _naar_datum(r["datum"]), r["beschrijving"], r["evaluatie"], regels, r["id"], r["aangemaakt_op"])
+
+    def doel(self, doel_id: int) -> Doel | None:
+        r = self.prestaties_db.execute("SELECT * FROM doel WHERE id = ?", (doel_id,)).fetchone()
+        return self._doel(r) if r else None
+
+    def _einddatum_sql(self) -> str:
+        """De streefdatum van een doel: zijn eigen datum, anders die van de wedstrijd."""
+        return "COALESCE(d.datum, (SELECT w.datum FROM wedstrijd w WHERE w.id = d.wedstrijd_id), d.startdatum)"
+
+    def doelen_van_groep(self, groep_id: int) -> list[Doel]:
+        """De doelen van een groep, op streefdatum (vroegste eerst)."""
+        return [self._doel(r) for r in self.prestaties_db.execute(
+            f"SELECT d.* FROM doel d WHERE d.groep_id = ? ORDER BY {self._einddatum_sql()}, d.id", (groep_id,))]
+
+    def doelen_van_atleet(self, master_id: str) -> list[Doel]:
+        """Alle doelen met minstens één regel voor deze atleet (van een groep of persoonlijk)."""
+        return [self._doel(r) for r in self.prestaties_db.execute(
+            f"""SELECT d.* FROM doel d WHERE d.id IN (SELECT doel_id FROM doel_regel WHERE atleet_ref = ?)
+                ORDER BY {self._einddatum_sql()}, d.id""", (self._ref(master_id, "prestaties"),))]
+
+    def doelen_van_wedstrijd(self, wedstrijd_id: int) -> list[Doel]:
+        return [self._doel(r) for r in self.prestaties_db.execute(
+            "SELECT * FROM doel WHERE wedstrijd_id = ? ORDER BY id", (wedstrijd_id,))]
+
+    def doel_opslaan(self, d: Doel) -> Doel:
+        """Doel met al zijn regels opslaan (de regels in de database worden precies d.regels).
+
+        Controleert wat SQLite tussen bestanden niet kan: groep, atleten, leerdoelen.
+        Een persoonlijk doel (geen groep) heeft alleen regels voor één atleet.
+        """
+        if d.groep_id is not None and self.groep(d.groep_id) is None:
+            raise OpslagFout(f"Groep {d.groep_id} bestaat niet.")
+        if d.wedstrijd_id is not None and self.wedstrijd(d.wedstrijd_id) is None:
+            raise OpslagFout(f"Wedstrijd {d.wedstrijd_id} bestaat niet.")
+        if d.datum is None and d.wedstrijd_id is None:
+            raise OpslagFout("Kies een wedstrijd of een streefdatum.")
+        if d.startdatum is None:
+            d.startdatum = date.today()
+        einde = d.datum or self.wedstrijd(d.wedstrijd_id).datum
+        if einde < d.startdatum:
+            raise OpslagFout("De streefdatum ligt voor de startdatum.")
+        if d.persoonlijk:
+            atleten = {x.atleet_id for x in d.regels}
+            if None in atleten or len(atleten) != 1:
+                raise OpslagFout("Een persoonlijk doel hoort bij precies één atleet.")
+        groep = self.groep(d.groep_id) if d.groep_id is not None else None
+        oud = self.doel(d.id) if d.id is not None else None
+        al_in_doel = {x.atleet_id for x in oud.regels} if oud else set()      # wie de groep verliet, mag blijven
+        for x in d.regels:
+            if x.atleet_id is not None:
+                if self.atleet(x.atleet_id) is None:
+                    raise OpslagFout("Een atleet in dit doel bestaat niet.")
+                if groep is not None and x.atleet_id not in groep.leden and x.atleet_id not in al_in_doel:
+                    raise OpslagFout("Een doel van een groep is alleen voor atleten uit die groep.")
+            if x.onderdeel_id is not None and self.onderdeel(x.onderdeel_id) is None:
+                raise OpslagFout(f"Onderdeel {x.onderdeel_id} bestaat niet.")
+            if x.leerdoel_id is not None and self.leerdoel(x.leerdoel_id) is None:
+                raise OpslagFout(f"Leerdoel {x.leerdoel_id} bestaat niet.")
+        kop = (d.groep_id, d.titel, d.wedstrijd_id, _naar_tekst(d.startdatum), _naar_tekst(d.datum),
+               d.beschrijving, d.evaluatie)
+        with self.prestaties_db:
+            if d.id is None:
+                d.id = self.prestaties_db.execute(
+                    """INSERT INTO doel (groep_id, titel, wedstrijd_id, startdatum, datum, beschrijving, evaluatie)
+                       VALUES (?, ?, ?, ?, ?, ?, ?)""", kop).lastrowid
+            else:
+                self.prestaties_db.execute(
+                    """UPDATE doel SET groep_id = ?, titel = ?, wedstrijd_id = ?, startdatum = ?, datum = ?,
+                       beschrijving = ?, evaluatie = ? WHERE id = ?""", (*kop, d.id))
+            self.prestaties_db.execute("DELETE FROM doel_regel WHERE doel_id = ?", (d.id,))
+            for x in d.regels:
+                x.doel_id = d.id
+                x.id = self.prestaties_db.execute(
+                    """INSERT INTO doel_regel (doel_id, atleet_ref, soort, onderdeel_id, leerdoel_id, streefwaarde,
+                                               omschrijving, beoordeling) VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                    (d.id, self._ref(x.atleet_id, "prestaties") if x.atleet_id else None, x.soort, x.onderdeel_id,
+                     x.leerdoel_id, x.streefwaarde, x.omschrijving, x.beoordeling)).lastrowid
+        return d
+
+    def doel_verwijderen(self, doel_id: int) -> None:
+        with self.prestaties_db:                          # regels gaan mee (CASCADE)
+            self.prestaties_db.execute("DELETE FROM doel WHERE id = ?", (doel_id,))
 
     # ============================================================
     # Tijdschema / chronoloog (prestaties.db: wedstrijd_programma)

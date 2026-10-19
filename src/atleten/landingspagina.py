@@ -20,6 +20,7 @@ from dataclasses import dataclass, field
 from datetime import date, timedelta
 
 from db.queries import Opslag
+from groepen.doelen import doelen_van_atleet
 from instellingen import dagvolgorde, tijd as toon_tijd, weekbegin
 from leerlijnen.voortgang import LeerlijnBlok, samenvatting
 from models import DAGEN, Atleet, Notitie, Trainingsschema, Wedstrijd
@@ -92,6 +93,7 @@ class AtleetLandingspagina:
     prs: list[PRTekst]
     leerdoelen: list[LeerlijnBlok] = field(default_factory=list)   # stand per leerlijn (leerdoelscores.db)
     aanwezig_pct: float | None = None   # aanwezig op ingevulde trainingen, laatste 12 weken
+    doelen: list = field(default_factory=list)   # groepen.doelen.DoelStand, alleen de regels van deze atleet
 
     @property
     def atleet(self) -> Atleet:
@@ -237,4 +239,5 @@ def landingspagina(db: Opslag, master_id: str, *, peildatum: date | None = None,
              for r in p.prs],
         leerdoelen=samenvatting(db, master_id, categorie),
         aanwezig_pct=aanwezigheid(db, master_id, peildatum=vandaag).percentage,
+        doelen=doelen_van_atleet(db, master_id, vandaag=vandaag),
     )

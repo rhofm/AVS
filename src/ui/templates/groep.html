@@ -10,6 +10,7 @@
 #}
 {% extends "basis.html" %}
 {% from "_jaaroverzicht.html" import jaaroverzicht %}
+{% from "_doel.html" import telling %}
 {% set groep = pagina.groep %}
 {% set basis = "/groep/" ~ groep.id %}
 {% block titel %}{{ groep.naam }}{% endblock %}
@@ -100,6 +101,38 @@
       </a>
     </div>
     {% if pagina.jaar %}{{ jaaroverzicht(pagina.jaar) }}{% endif %}
+  </section>
+
+  {# ---------------- Doelen ---------------- #}
+  <section class="blok" aria-labelledby="kop-doelen">
+    <div class="blok__kop">
+      <div>
+        <h2 class="kop" id="kop-doelen">Doelen</h2>
+        {% if pagina.aantal_doelen %}<p class="subkop">{{ pagina.aantal_doelen }} komend</p>{% endif %}
+      </div>
+      <span class="knoppen">
+        <a class="knop" href="{{ basis }}/doel/nieuw">+ Nieuw doel</a>
+        <a class="knop" href="{{ basis }}/doelen">Alle doelen &rarr;</a>
+      </span>
+    </div>
+    {% if pagina.doelen %}
+      <div class="tabelvak">
+        <table class="tabel">
+          <thead><tr><th scope="col">Datum</th><th scope="col">Doel</th><th scope="col">Stand</th></tr></thead>
+          <tbody>
+            {% for s in pagina.doelen %}
+              <tr>
+                <td class="nowrap"><strong>{{ s.einde | datum_kort }}</strong><br><span class="zacht">{{ s.dagen_tot | over_dagen }}</span></td>
+                <td><a href="{{ url_for('doel', doel_id=s.doel.id) }}"><strong>{{ s.doel.titel }}</strong></a>{% if s.wedstrijd %}<br><span class="zacht">{{ s.wedstrijd.naam }}</span>{% endif %}</td>
+                <td>{{ telling(s) or "–" }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="leeg">Geen komende doelen. Leg vast wat de groep of een atleet wil bereiken, bijvoorbeeld bij een wedstrijd.</p>
+    {% endif %}
   </section>
 
   {# ---------------- Atleten ---------------- #}

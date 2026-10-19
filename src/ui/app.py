@@ -44,6 +44,7 @@ from groepen.groepenoverzicht import GEEN_SEIZOEN, groepenoverzicht
 from groepen import landingspagina as groep_landingspagina
 from groepen import periodeplan as periodisering
 from groepen import rooster as roosterbeheer
+from groepen import doelen as doelbeheer
 from groepen import overzichten as groep_overzichten
 from groepen import trainingen as trainingsbeheer
 from leerlijnen import overzicht as leerlijnoverzicht
@@ -389,7 +390,8 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
             van = date.fromisoformat(request.args.get("van", "") + "-01") if request.args.get("van") else None
         except ValueError:
             van = None
-        jaar = periodisering.jaaroverzicht(db().periodisering(groep_id), van=van)
+        jaar = periodisering.jaaroverzicht(db().periodisering(groep_id), van=van,
+                                           doelen=doelbeheer.markeringen(db(), groep_id))
         return render_template("groep_periodisering.html", f=f, jaar=jaar, fout=fout,
                                actief_menu="groepen"), status
 
@@ -553,6 +555,72 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
         flash("De training staat weer zoals in het rooster.")
         return redirect(url_for("training", training_id=t.id))
 
+    # ---------------- doelen ----------------
+    @app.get("/groep/<int:groep_id>/doelen")
+    def groep_doelen(groep_id: int):
+        o = doelbeheer.doelenoverzicht(db(), groep_id)
+        if o is None:
+            abort(404)
+        meldingen = get_flashed_messages()
+        return render_template("groep_doelen.html", o=o, melding=meldingen[0] if meldingen else None,
+                               actief_menu="groepen")
+
+    def _doelformulier(*, groep_id=None, master_id=None, doel_id=None):
+        """Formulier tonen (GET), aanvullen uit inschrijvingen, of opslaan (POST)."""
+        post = request.method == "POST"
+        f = doelbeheer.doelformulier(db(), groep_id=groep_id, master_id=master_id, doel_id=doel_id,
+                                     ingevuld=request.form if post else None)
+        if f is None:
+            abort(404)
+        fout = None
+        if post and request.form.get("stap") == "aanvullen":
+            f = doelbeheer.aanvullen(db(), f)
+        elif post:
+            try:
+                d = doelbeheer.opslaan(db(), request.form, groep_id=groep_id, master_id=master_id, doel_id=doel_id)
+            except (OpslagFout, ValueError) as e:
+                fout = f"Niet opgeslagen: {e}"
+            else:
+                flash(f"Doel '{d.titel}' opgeslagen.")
+                return redirect(url_for("doel", doel_id=d.id))
+        actief = "atleten" if f.persoonlijk else "groepen"
+        return render_template("doel_bewerken.html", f=f, fout=fout, actief_menu=actief), (400 if fout else 200)
+
+    @app.route("/groep/<int:groep_id>/doel/nieuw", methods=["GET", "POST"])
+    def groep_doel_nieuw(groep_id: int):
+        haal_groep(groep_id)
+        return _doelformulier(groep_id=groep_id)
+
+    @app.route("/atleet/<master_id>/doel/nieuw", methods=["GET", "POST"])
+    def atleet_doel_nieuw(master_id: str):
+        haal_atleet(master_id)
+        return _doelformulier(master_id=master_id)
+
+    @app.route("/doel/<int:doel_id>/bewerken", methods=["GET", "POST"])
+    def doel_bewerken(doel_id: int):
+        return _doelformulier(doel_id=doel_id)
+
+    @app.get("/doel/<int:doel_id>")
+    def doel(doel_id: int):
+        d = db().doel(doel_id)
+        if d is None:
+            abort(404)
+        meldingen = get_flashed_messages()
+        return render_template("doel.html", s=doelbeheer.doelstand(db(), d), melding=meldingen[0] if meldingen else None,
+                               actief_menu="atleten" if d.persoonlijk else "groepen")
+
+    @app.post("/doel/<int:doel_id>/verwijderen")
+    def doel_verwijderen(doel_id: int):
+        try:
+            d = doelbeheer.verwijderen(db(), doel_id)
+        except OpslagFout:
+            abort(404)
+        flash(f"Doel '{d.titel}' verwijderd.")
+        if d.groep_id is not None:
+            return redirect(url_for("groep_doelen", groep_id=d.groep_id))
+        mid = d.regels[0].atleet_id if d.regels else None
+        return redirect(url_for("atleet", master_id=mid) + "#kop-wed" if mid else url_for("atleten"))
+
     # ---------------- wedstrijden ----------------
     @app.get("/wedstrijden")
     def wedstrijden():
@@ -620,6 +688,7 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
             abort(404)
         meldingen = get_flashed_messages()
         return render_template("wedstrijd.html", d=d, alle=request.args.get("alle") == "1",
+                               doelen=doelbeheer.wedstrijddoelen(db(), wedstrijd_id),
                                melding=meldingen[0] if meldingen else None, fout=fout,
                                actief_menu="wedstrijden"), status
 

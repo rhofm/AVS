@@ -10,6 +10,7 @@
   onthoudt alleen de laatste keuze.
 #}
 {% extends "basis.html" %}
+{% from "_doel.html" import regeltabel, telling %}
 {% set w = d.wedstrijd %}
 {% block titel %}{{ w.naam }}{% endblock %}
 
@@ -91,6 +92,20 @@
         <p class="leeg">Nog geen uitslagen. Vul bij <a href="{{ url_for('wedstrijd_bewerken', wedstrijd_id=w.id) }}">Gegevens wijzigen</a>
           de link naar de wedstrijd op atletiek.nu of Seltec in; dan kun je de uitslag hier importeren.</p>
       {% endif %}
+    </section>
+  {% endif %}
+
+  {# ---------------- Doelen bij deze wedstrijd ---------------- #}
+  {% if doelen %}
+    <section class="blok" aria-labelledby="kop-doelen">
+      <h2 class="kop" id="kop-doelen">Doelen</h2>
+      {% for s in doelen %}
+        <div class="blok__kop">
+          <h3 class="subkop"><a href="{{ url_for('doel', doel_id=s.doel.id) }}">{{ s.doel.titel }}</a>{% if s.groep %} <span class="zacht">· {{ s.groep.naam }}</span>{% endif %}</h3>
+          {{ telling(s) }}
+        </div>
+        {{ regeltabel(s) }}
+      {% endfor %}
     </section>
   {% endif %}
 

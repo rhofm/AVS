@@ -1,0 +1,38 @@
+{#
+  Gedeelde stukjes voor doelen.
+    status(stand)          – statuslabel van een regel (groepen.doelen.RegelStand); kleur + tekst
+    telling(doelstand)     – '3 van 5 behaald'
+    regeltabel(s, wie)     – tabel met de regels van een doel (groepen.doelen.DoelStand); wie=False verbergt de kolom
+#}
+{% macro status(r) -%}
+  <span class="doelstatus doelstatus--{{ r.status }}">{{ r.status_tekst }}</span>
+{%- endmacro %}
+
+{% macro telling(s) -%}
+  {% if s.standen %}<span class="doeltelling">{{ s.behaald }} van {{ s.standen | length }} behaald</span>{% endif %}
+{%- endmacro %}
+
+{% macro regeltabel(s, wie=true) %}
+  {% if s.standen %}
+    <div class="tabelvak">
+      <table class="tabel">
+        <thead><tr>
+          {% if wie %}<th scope="col">Wie</th>{% endif %}
+          <th scope="col">Doel</th><th scope="col">Resultaat</th><th scope="col">Status</th>
+        </tr></thead>
+        <tbody>
+          {% for r in s.standen %}
+            <tr>
+              {% if wie %}<td>{% if r.atleet %}<a href="{{ url_for('atleet', master_id=r.atleet.master_id) }}">{{ r.atleet.naam }}</a>{% else %}<em>{{ r.wie }}</em>{% endif %}</td>{% endif %}
+              <td>{{ r.wat }}</td>
+              <td class="getallen nowrap">{% if r.resultaat %}<strong>{{ r.resultaat }}</strong>{% if r.resultaat_datum %}<br><span class="zacht">{{ r.resultaat_datum | datum_kort }}</span>{% endif %}{% elif r.uitleg %}<span class="zacht">{{ r.uitleg }}</span>{% else %}–{% endif %}</td>
+              <td>{{ status(r) }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <p class="leeg">Nog niets vastgelegd voor dit doel.</p>
+  {% endif %}
+{% endmacro %}

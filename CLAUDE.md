@@ -71,11 +71,11 @@ This project holds personal data about athletes, many of them minors.
 
 | Package       | Purpose |
 |---------------|---------|
-| `models/`     | Data classes: `atleet`, `prestatie`, `groep`, `leerlijn`, `periodisering`, `rooster` |
+| `models/`     | Data classes: `atleet`, `prestatie`, `groep`, `leerlijn`, `periodisering`, `rooster`, `doel` |
 | `db/`         | `schema_<database>.sql`, `init_db.py` (keys, connect, create/migrate), `queries.py`, `migrations/<database>/` |
 | `importers/`  | Import results from links: atletiek.nu PRs, atletiek.nu competitions, Seltec competitions |
 | `ploeg/`      | Team selection: `vergelijk` (compare athletes), `regels` (rules), `opstelling` (lineup), `strategieen/` (selection "mentalities") |
-| `groepen/`    | Groups, `absentie`, `periodeplan` (periodisering pages: mega/meso cycle, year view, copy), `rooster` (planned training content, import, apply to trainings) |
+| `groepen/`    | Groups, `absentie`, `periodeplan` (periodisering pages: mega/meso cycle, year view, copy), `rooster` (planned training content, import, apply to trainings), `doelen` (goals: status, forms) |
 | `wedstrijden/` | `planning`: upcoming meets, who goes, which events (uses `wedstrijd` + `inschrijving` in `prestaties.db`) |
 | `atleten/`, `leerlijnen/` | Feature logic for athletes and learning pathways |
 | `ui/`         | Web UI |
@@ -201,6 +201,18 @@ python src/db/init_db.py --herstel <sleutel>  # restore the key (e.g. new comput
   `trainingen_opruimen`. Before deleting a rule, clear its linked future
   trainings (`regel_opslaan` does): `ON DELETE SET NULL` would otherwise make
   them look hand-written.
+- Doelen (`models/doel.py`, `groepen/doelen.py`, tables `doel` + `doel_regel`
+  in `prestaties.db`): a goal belongs to a group (`groep_id`, cross-file, checked
+  in Python) or is personal (`groep_id` NULL, all rows for one athlete). Rows
+  name the athlete as `atleet_ref` (prestaties pseudonym; NULL = whole group).
+  The target date is `datum`, else the meet's date. Whether a row is achieved
+  is **derived**, never stored: best wind-legal result on the event (at the
+  meet, or between `startdatum` and the target date), or the latest leerdoel
+  score up to the target date; a manual `beoordeling` always wins.
+  `atleet_verwijderen` removes the athlete's rows (and personal goals left
+  empty); `wedstrijd_verwijderen` copies the meet date into goals that had no
+  own date. Free text in goals follows the notes rule: factual, no other
+  athletes' names, no diagnoses.
 - The old `periodeplan` table was replaced (migration personen/007):
   `init_db` copies its rows to `doel` in `prestaties.db` and empties it. The
   table and `training.periodeplan_id` stay because SQLite refuses inserts into

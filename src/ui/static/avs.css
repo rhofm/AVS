@@ -978,3 +978,26 @@ th[aria-sort="descending"] .sorteer__naam::after { content: " \2193"; opacity: 1
   border: 1px solid var(--rand); background: var(--papier); color: var(--tekst); resize: vertical; tab-size: 12;
 }
 .importtabel:focus-visible { outline: 2px solid var(--rood); outline-offset: 1px; }
+
+/* ---------- doelen ---------- */
+.jaar__doel { position: absolute; top: .95rem; width: 0; height: 0; margin-left: -.4rem;
+  border-left: .4rem solid transparent; border-right: .4rem solid transparent; border-top: .55rem solid var(--tekst); }
+.jaar__doel--legenda { position: static; display: inline-block; margin: 0; }
+.doelstatus { display: inline-flex; align-items: center; gap: .35rem; white-space: nowrap; font-size: var(--maat-s); }
+.doelstatus::before { content: ""; width: .7rem; height: .7rem; border-radius: 50%; background: var(--leeg-st); }
+.doelstatus--behaald::before { background: var(--aanwezig); }
+.doelstatus--deels::before { background: var(--afgemeld); }
+.doelstatus--niet::before { background: var(--afwezig); }
+.doelstatus--te_beoordelen::before { background: transparent; border: 2px solid var(--afgemeld); width: .5rem; height: .5rem; }
+.doeltelling { font-size: var(--maat-s); color: var(--tekst-zacht); white-space: nowrap; }
+.doelregels td { vertical-align: middle; }
+.doelregels select, .doelregels input[type="text"] { font: inherit; font-size: var(--maat-s); padding: .3rem .4rem;
+  border: 1px solid var(--rand); background: var(--papier); color: var(--tekst); width: 100%; min-width: 6rem; }
+.doelregels input[name$="-streef"] { min-width: 5.5rem; }
+.doelregels input[name$="-omschrijving"] { min-width: 12rem; }
+.doelregels select:focus-visible, .doelregels input:focus-visible { outline: 2px solid var(--rood); outline-offset: 1px; }
+.doelregels [hidden] { display: none; }
+.doelregels .pr { font-size: var(--maat-xs); color: var(--tekst-zacht); white-space: nowrap; }
+.doelform textarea { width: 100%; font: inherit; font-size: var(--maat-s); padding: .45rem .6rem; border: 1px solid var(--rand);
+  background: var(--papier); color: var(--tekst); resize: vertical; }
+.doelform select { font: inherit; padding: .45rem .6rem; border: 1px solid var(--rand); background: var(--papier); color: var(--tekst); }

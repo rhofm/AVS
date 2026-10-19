@@ -1,6 +1,6 @@
 # Design: Rooster, Periodisering & Doelen
 
-Status: periodisering built (§2.1, §2.4, §3, §4); rooster built (§2.2, §5); doelen UI still to do. Based on the requirements in
+Status: built. Periodisering (§2.1, §2.4, §3, §4), rooster (§2.2, §5) and doelen (§2.3, §6). Prestatiedoelen count wind-legal results only. Based on the requirements in
 `Rooster_en_Periodisering.md` and the decisions of 2026-10-19:
 
 1. The old `periodeplan` table makes way for the mega cycle; its purpose
