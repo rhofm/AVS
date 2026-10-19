@@ -15,6 +15,7 @@ from .leerdoel import CATEGORIEEN, LEERDOEL_BRONNEN, Categorie, Leerdoel, Leerdo
 from .leerlijn import Leerlijn, LeerlijnStap, LeerlijnVoortgang
 from .notitie import Notitie
 from .periodisering import FASE_CODES, FASEN, Fase, Mesocyclus, MesoWeek, Periode, Periodisering
+from .ploeg import BESCHIKBAAR, ROLLEN, Beschikbaar, Inzet, PloegLid, Rol
 from .programma import ProgrammaOnderdeel, lees_categorie
 from .rooster import INHOUD, INHOUD_VELDEN, GroepRooster, Rooster, RoosterRegel
 from .prestatie import (
@@ -47,4 +48,5 @@ __all__ = [
     "Trainingsschema", "DAGEN",
     "Notitie",
     "ProgrammaOnderdeel", "lees_categorie",
+    "PloegLid", "Inzet", "Rol", "ROLLEN", "Beschikbaar", "BESCHIKBAAR",
 ]

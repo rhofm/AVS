@@ -69,9 +69,14 @@ ploeg/export.py           └ csv voor atletiek.nu
 
 ## 2. Regels: één YAML per competitie per seizoen
 
-Bestanden: `config/ploeg_regels/<competitie>_<seizoen>.yaml`, bijvoorbeeld
-`u14_u16_2026.yaml`, `u18_u20_2026.yaml`, `masters_2026.yaml`,
-`senioren_2026.yaml`, `nk_teams_2026.yaml`.
+Bestanden: `config/ploeg_regels/<competitie>_<seizoen>.yaml`, met het seizoen
+van de wedstrijdbepalingen, bijvoorbeeld `u14_u16_2026-2027.yaml` (bestaat),
+`u18_u20_2026-2027.yaml`, `masters_2026-2027.yaml`, `senioren_2026-2027.yaml`,
+`nk_teams_2026-2027.yaml`. Programma's heten `wedstrijd_1` … `wedstrijd_3`,
+`finale_2026`, `finale_2027`. Het echte bestand wijkt op een paar punten af van
+de schets hieronder (zie `u14_u16_2026-2027.yaml`): `puntentelling` +
+`puntentabel` apart, specificaties onder `onderdelen` per categorie met
+`materiaal: ploeg` of `eigen`, en `samenstelling` voor gemengde estafettes.
 
 ```yaml
 naam: U14/U16-competitie
@@ -233,8 +238,14 @@ gezet, zodat de wedstrijdpagina en de botsingencontrole meteen werken.
    `zweedse`, `verspringen`); de regelbestanden gebruiken dezelfde sleutels.
    `ploeg/config.py` vindt `config/` vanuit de broncode en naast de .exe
    (anders de meegebouwde kopie): `build.py` moet `config/` meenemen.
-2. `u14_u16_2026.yaml` + `regels.py` (U14/U16 heeft de interessantste
-   telregel, goede test voor het ontwerp).
+2. ✅ `u14_u16_2026-2027.yaml` + `regels.py` + `models/ploeg.py`
+   (`PloegLid`, `Inzet`); tests in `tests/test_regels.py`. `Regelset.controleer()`
+   geeft `Overtreding`en (fout of waarschuwing) voor: categorie niet toegestaan,
+   te veel reserves (9.3), reserve met onderdeel, niet op het programma, te veel
+   op een onderdeel, meer dan 3 onderdelen (4.1), estafette onvolledig of te
+   veel lopers, samenstelling gemengde estafette, één atleet per groep (9.1).
+   `controleer_dag()`: één ploeg per dag (10.10). Seizoensregels (10.5, 10.9)
+   volgen als er opgeslagen ploegen zijn (stap 4).
 3. Matrix + handmatige opstelling + regelcontrole in de UI.
 4. Csv-export.
 5. Optimalisatie + de drie strategieën.

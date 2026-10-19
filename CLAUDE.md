@@ -71,7 +71,7 @@ This project holds personal data about athletes, many of them minors.
 
 | Package       | Purpose |
 |---------------|---------|
-| `models/`     | Data classes: `atleet`, `prestatie`, `groep`, `leerlijn`, `periodisering`, `rooster`, `doel` |
+| `models/`     | Data classes: `atleet`, `prestatie`, `groep`, `leerlijn`, `periodisering`, `rooster`, `doel`, `ploeg` |
 | `db/`         | `schema_<database>.sql`, `init_db.py` (keys, connect, create/migrate), `queries.py`, `migrations/<database>/` |
 | `importers/`  | Import results from links: atletiek.nu PRs, atletiek.nu competitions, Seltec competitions |
 | `ploeg/`      | Team selection: `vergelijk` (compare athletes), `regels` (rules), `opstelling` (lineup), `strategieen/` (selection "mentalities") |
@@ -304,6 +304,14 @@ python src/db/init_db.py --herstel <sleutel>  # restore the key (e.g. new comput
   constants live in `config/puntentelling/`, never in Python. Points are
   truncated (`INT`), never negative; hand times are corrected with
   `handtijd_correctie()`. A new AU edition is a new YAML file, not an edit.
+- `ploeg/regels.py` loads a rule file into a `Regelset` (validated on load,
+  also against the scoring table: every programme event needs a points
+  formula) and checks a lineup with `controleer()` / `controleer_dag()`.
+  Event keys in rule files are the keys of the scoring table (`80mH`,
+  `kogelstoten`, `4x80m`); categories are codes like `U14-V`, `U16-M`, `SEN-V`
+  (`categorie_code()`). A lineup is `models.ploeg`: `PloegLid` (who is on the
+  form, `rol` deelnemer/reserve) and `Inzet` (athlete + event key). Violations
+  name athletes only by master_id; the UI adds names.
 - Strategies ("mentaliteiten") are pluggable modules in `ploeg/strategieen/`.
 - `ploeg.regelset` stores the rule file name and `ploeg.strategie` the strategy
   used, so a lineup can be explained afterwards.

@@ -1,0 +1,97 @@
+# Regels U14/U16-competitie - Wedstrijdbepalingen Competitie 2026-2027
+# (Atletiekunie, april 2026). Bepalingen 4, 9, 10, 18 en 70-75.
+#
+# Dit bestand mag een ploegleider aanpassen. Na het opslaan leest AVS het
+# opnieuw in; een fout (tikfout, onbekend onderdeel) wordt in gewone taal gemeld.
+#
+# Onderdeelsleutels zijn dezelfde als in config/puntentelling/au_2025.yaml.
+# Categorieën: <leeftijd>-<geslacht>, bijv. U14-V (meisjes), U16-M (jongens).
+
+naam: U14/U16-competitie
+seizoen: 2026-2027
+bron: Wedstrijdbepalingen Competitie 2026-2027 (april 2026)
+puntentelling: au_2025          # bestand in config/puntentelling/
+puntentabel: au_u14_u16          # zelfde tabel voor jongens en meisjes
+puntentoekenning: prestatie      # 18.1: punten naar prestatie
+
+algemeen:
+  max_onderdelen_per_atleet: 3   # 4.1, estafettes tellen mee
+  max_reserves: 4                # 9.3
+  een_ploeg_per_dag: true        # 10.10: niet in twee ploegen op één dag (ook niet U14 + U16)
+  een_atleet_per_groep: true     # 9.1: per groep van een technisch onderdeel één atleet per ploeg
+  tellend:                       # 70 *): zoveel beste atleten per onderdeel tellen
+    loop: 2
+    technisch: 1
+  materiaal: ploeg               # werpmateriaal en hordehoogte van de ploeg, niet van de atleet
+
+ploegen:
+  U14-V:
+    naam: U14 meisjes
+    geslacht: V
+    toegestaan: [U14-V]
+    programma:
+      wedstrijd_1: {60m: 3, 1000m: 3, 60mH: 3, 4x60m: 1, hoogspringen: 2, verspringen: 2, kogelstoten: 2, discuswerpen: 2, speerwerpen: 2}
+      wedstrijd_2: {60m: 3, 600m: 3, 60mH: 3, 4x60m: 1, hoogspringen: 2, verspringen: 2, kogelstoten: 2, speerwerpen: 2}
+      wedstrijd_3: {60m: 3, 1000m: 3, 60mH: 3, 4x60m: 1, hoogspringen: 2, verspringen: 2, kogelstoten: 2, discuswerpen: 2}
+      finale_2026: {60m: 3, 1000m: 3, 60mH: 3, 4x60m: 1, hoogspringen: 2, verspringen: 2, kogelstoten: 2, discuswerpen: 2}
+      finale_2027: {60m: 3, 600m: 3, 60mH: 3, 4x60m: 1, hoogspringen: 2, verspringen: 2, kogelstoten: 2, speerwerpen: 2}
+
+  U14-M:
+    naam: U14 jongens
+    geslacht: M
+    toegestaan: [U14-M]
+    programma:
+      wedstrijd_1: {80m: 3, 1000m: 3, 80mH: 3, 4x80m: 1, hoogspringen: 2, verspringen: 2, kogelstoten: 2, speerwerpen: 2}
+      wedstrijd_2: {80m: 3, 600m: 3, 80mH: 3, 4x80m: 1, hoogspringen: 2, verspringen: 2, kogelstoten: 2, discuswerpen: 2}
+      wedstrijd_3: {80m: 3, 1000m: 3, 80mH: 3, 4x80m: 1, hoogspringen: 2, verspringen: 2, kogelstoten: 2, discuswerpen: 2, speerwerpen: 2}
+      finale_2026: {80m: 3, 600m: 3, 80mH: 3, 4x80m: 1, hoogspringen: 2, verspringen: 2, kogelstoten: 2, speerwerpen: 2}
+      finale_2027: {80m: 3, 1000m: 3, 80mH: 3, 4x80m: 1, hoogspringen: 2, verspringen: 2, kogelstoten: 2, discuswerpen: 2}
+
+  U16-V:
+    naam: U16 meisjes
+    geslacht: V
+    toegestaan: [U14-V, U16-V]   # een U14 mag in de U16-ploeg (10.10, opmerking)
+    programma:
+      wedstrijd_1: {80m: 3, 800m: 3, 80mH: 3, 4x80m: 1, hoogspringen: 2, verspringen: 2, kogelstoten: 2, discuswerpen: 2}
+      wedstrijd_2: {150m: 3, 1500m: 3, 80mH: 3, 4x80m: 1, hoogspringen: 2, verspringen: 2, kogelstoten: 2, discuswerpen: 2, speerwerpen: 2}
+      wedstrijd_3: {80m: 3, 800m: 3, 300mH: 3, 4x80m: 1, hoogspringen: 2, verspringen: 2, kogelstoten: 2, speerwerpen: 2}
+      finale_2026: {80m: 3, 1500m: 3, 80mH: 3, 4x80m: 1, hoogspringen: 2, verspringen: 2, kogelstoten: 2, speerwerpen: 2}
+      finale_2027: {150m: 3, 800m: 3, 300mH: 3, 4x80m: 1, hoogspringen: 2, verspringen: 2, kogelstoten: 2, discuswerpen: 2}
+
+  U16-M:
+    naam: U16 jongens
+    geslacht: M
+    toegestaan: [U14-M, U16-M]
+    programma:
+      wedstrijd_1: {100m: 3, 800m: 3, 100mH: 3, 4x100m: 1, hoogspringen: 2, verspringen: 2, kogelstoten: 2, discuswerpen: 2, speerwerpen: 2}
+      wedstrijd_2: {150m: 3, 1500m: 3, 100mH: 3, 4x100m: 1, hoogspringen: 2, verspringen: 2, kogelstoten: 2, speerwerpen: 2}
+      wedstrijd_3: {100m: 3, 800m: 3, 300mH: 3, 4x100m: 1, hoogspringen: 2, verspringen: 2, kogelstoten: 2, discuswerpen: 2}
+      finale_2026: {100m: 3, 1500m: 3, 100mH: 3, 4x100m: 1, hoogspringen: 2, verspringen: 2, kogelstoten: 2, discuswerpen: 2}
+      finale_2027: {150m: 3, 800m: 3, 300mH: 3, 4x100m: 1, hoogspringen: 2, verspringen: 2, kogelstoten: 2, speerwerpen: 2}
+
+# Hoe de onderdelen heten bij de prestaties (zoals atletiek.nu ze noemt) en
+# welke specificatie (hordehoogte, gewicht) bij welke categorie hoort.
+# Met 'materiaal: ploeg' telt de categorie van de ploeg: een U14-meisje in de
+# U16-ploeg gooit met de U16-kogel.
+# CONTROLEREN: gewichten en hoogtes volgens het wedstrijdreglement.
+onderdelen:
+  60m:    {naam: 60 meter}
+  80m:    {naam: 80 meter}
+  100m:   {naam: 100 meter}
+  150m:   {naam: 150 meter}
+  600m:   {naam: 600 meter}
+  800m:   {naam: 800 meter}
+  1000m:  {naam: 1000 meter}
+  1500m:  {naam: 1500 meter}
+  60mH:   {naam: 60 meter horden,  specificatie: {U14-V: 76.2cm}}
+  80mH:   {naam: 80 meter horden,  specificatie: {U14-M: 76.2cm, U16-V: 76.2cm}}
+  100mH:  {naam: 100 meter horden, specificatie: {U16-M: 84cm}}
+  300mH:  {naam: 300 meter horden, specificatie: {U16-V: 76.2cm, U16-M: 76.2cm}}
+  4x60m:  {naam: 4 x 60 meter,  lopers: 4}
+  4x80m:  {naam: 4 x 80 meter,  lopers: 4}
+  4x100m: {naam: 4 x 100 meter, lopers: 4}
+  hoogspringen: {naam: Hoogspringen}
+  verspringen:  {naam: Verspringen}
+  kogelstoten:  {naam: Kogelstoten,  specificatie: {U14-V: 2kg, U14-M: 3kg, U16-V: 3kg, U16-M: 4kg}}
+  discuswerpen: {naam: Discuswerpen, specificatie: {U14-V: 0.75kg, U14-M: 0.75kg, U16-V: 1kg, U16-M: 1kg}}
+  speerwerpen:  {naam: Speerwerpen,  specificatie: {U14-V: 400g, U14-M: 400g, U16-V: 500g, U16-M: 600g}}
