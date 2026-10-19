@@ -38,7 +38,9 @@
     </div>
     <p class="zacht">Punten uit: {{ pg.basis_tekst }}
       (windlegaal, tot de wedstrijddag). Per onderdeel tellen de beste atleten zoals het reglement zegt.
-      {%- if pg.stand.estafettes_zonder_punten %} Estafettes tellen nog niet mee in het totaal.{% endif %}</p>
+      Waarden met ≈ zijn voorspeld (geen eigen prestatie op dat onderdeel); de bron staat erbij als je de muis erop houdt.
+      Een estafette telt met de geschatte tijd: de beentijden van de lopers samen, plus de wissels.
+      {%- if pg.stand.estafettes_zonder_punten %} <strong>Een estafette telt nog niet mee</strong>: er staan niet precies genoeg lopers op, of niet iedereen heeft een tijd op zijn been.{% endif %}</p>
     {% if pg.fouten %}
       <div class="melding melding--fout" role="alert">
         <strong>Dit mag nog niet ({{ pg.fouten | length }}):</strong>
@@ -118,14 +120,18 @@
                   {% if c.nvt and not gekozen %}
                   <td class="ploegcel ploegcel--nvt"><span class="verborgen">niet voor deze atleet</span></td>
                   {% else %}
-                  <td class="ploegcel{{ ' ploegcel--gekozen' if gekozen }}{{ ' ploegcel--telt' if telt }}{{ ' ploegcel--leeg' if c.waarde is none }}">
+                  <td class="ploegcel{{ ' ploegcel--gekozen' if gekozen }}{{ ' ploegcel--telt' if telt }}{{ ' ploegcel--leeg' if c.waarde is none and not c.beentijd }}{{ ' ploegcel--voorspeld' if c.voorspeld }}">
                     <label title="{{ c.onderdeel_naam }}{% if c.datum %} · {{ c.datum | datum_lang }}{% endif %}">
                       <input type="checkbox" name="inzet" value="{{ mid }}|{{ r.sleutel }}"{% if gekozen %} checked{% endif %}>
-                      {% if c.waarde is not none %}
+                      {% if c.waarde is not none and c.voorspeld %}
+                        <span class="ploegcel__waarde" title="{{ c.bron }}">≈{{ c.tekst }}</span>
+                        <span class="ploegcel__punten" title="{{ c.bron }}">{{ c.punten }}</span>
+                        <span class="verborgen">{{ c.bron }}</span>
+                      {% elif c.waarde is not none %}
                         <span class="ploegcel__waarde">{{ c.tekst }}</span>
                         <span class="ploegcel__punten">{{ c.punten }}</span>
                       {% elif r.soort == "estafette" %}
-                        <span class="zacht">loper</span>
+                        <span class="zacht" title="Tijd op het estafettebeen (≈ = voorspeld)">{{ c.beentijd or "loper" }}</span>
                       {% elif c.hint %}
                         <span class="zacht" title="Andere specificatie, geen punten">{{ c.hint }}</span>
                       {% else %}
@@ -144,7 +150,8 @@
               <th scope="row" colspan="3">Punten</th>
               {% for r in m.regels %}
                 {% set s = pg.stand.onderdelen[r.sleutel] %}
-                <td class="midden getallen"><strong>{{ s.punten if r.soort != "estafette" else "–" }}</strong><br>
+                <td class="midden getallen"><strong>{{ s.punten if r.soort != "estafette" or s.schatting else "–" }}</strong><br>
+                  {% if s.schatting %}<span class="zacht">Geschat: {{ s.schatting.tekst }}</span><br>{% endif %}
                   <span class="zacht">{{ s.ingezet | length }}/{{ r.max_atleten * (r.onderdeel.lopers or 1) }}</span></td>
               {% endfor %}
               <td class="rechts getallen"><strong>{{ pg.stand.totaal }}</strong></td>

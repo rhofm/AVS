@@ -6,7 +6,8 @@ Nu: de opstelling die de trainer met de hand maakt.
   van een toegestane categorie op de wedstrijddag), plus wie er al in staat.
 - `stand()`: punten per onderdeel en het totaal. Per onderdeel tellen de beste
   `tellend` atleten (regelbestand: bij U14/U16 twee bij lopen, één bij
-  technisch). Estafettes hebben nog geen punten (geen prestatie per atleet).
+  technisch). Een estafette met precies één ploeg lopers krijgt de punten van
+  de geschatte tijd (ploeg/estafettes.py).
 - `controleer()`: de competitieregels (ploeg/regels.py), één ploeg per dag
   met de andere ploegen op dezelfde dag, en waarschuwingen voor wie op een
   onderdeel staat zonder prestatie (0 punten).
@@ -23,7 +24,9 @@ from typing import Iterable, Mapping
 
 from db.queries import Opslag
 from models import Atleet, Inzet, Ploeg, PloegLid
+from ploeg import estafettes as _estafettes
 from ploeg import regels as _regels
+from ploeg.estafettes import Schatting
 from ploeg.regels import Overtreding, Programmaregel, Regelset
 from ploeg.vergelijk import Matrix, categorie_op
 
@@ -52,6 +55,7 @@ class OnderdeelStand:
     ingezet: list[str] = field(default_factory=list)      # master_ids op dit onderdeel
     tellend: list[str] = field(default_factory=list)      # wie meetelt (beste eerst)
     punten: int = 0
+    schatting: Schatting | None = None                    # estafette: geschatte tijd en punten
 
     @property
     def vol(self) -> bool:
@@ -65,7 +69,7 @@ class Stand:
     onderdelen: dict[str, OnderdeelStand]
     totaal: int
     per_atleet: dict[str, int]                              # aantal onderdelen per atleet (estafette telt mee)
-    estafettes_zonder_punten: bool = False                  # er staat een estafette op die nog niet telt
+    estafettes_zonder_punten: bool = False                  # een estafette met lopers maar zonder schatting
 
     def punten(self, onderdeel: str) -> int:
         s = self.onderdelen.get(onderdeel)
@@ -85,7 +89,11 @@ def stand(matrix: Matrix, inzet: Iterable[Inzet]) -> Stand:
     estafette = False
     for s in per.values():
         if s.regel.soort == "estafette":
-            estafette = estafette or bool(s.ingezet)
+            s.schatting = _estafettes.schat(matrix, s.regel.sleutel, s.ingezet) if s.ingezet else None
+            if s.schatting is not None:
+                s.tellend, s.punten = list(s.schatting.lopers), s.schatting.punten
+            elif s.ingezet:
+                estafette = True
             continue
         met_punten = sorted((m for m in s.ingezet if matrix.punten(m, s.regel.sleutel) > 0),
                             key=lambda m: -matrix.punten(m, s.regel.sleutel))
@@ -114,10 +122,16 @@ def controleer(db: Opslag, regelset: Regelset, ploeg: Ploeg, leden: Iterable[Plo
     soorten = {r.sleutel: r for r in matrix.regels}
     for i in inzet:
         r = soorten.get(i.onderdeel)
-        if r is not None and r.soort != "estafette" and matrix.punten(i.atleet_id, i.onderdeel) == 0:
+        if r is None or r.soort == "estafette":
+            continue
+        c = matrix.cel(i.atleet_id, i.onderdeel)
+        if matrix.punten(i.atleet_id, i.onderdeel) == 0:
             uit.append(Overtreding("geen_prestatie",
                                    f"Geen prestatie op {r.naam} (dit seizoen): telt voor 0 punten.",
                                    "waarschuwing", i.atleet_id, i.onderdeel))
+        elif c is not None and c.voorspeld:
+            uit.append(Overtreding("voorspeld", f"Geen prestatie op {r.naam}: de punten zijn een schatting "
+                                                f"({c.bron}).", "waarschuwing", i.atleet_id, i.onderdeel))
     return uit
 
 

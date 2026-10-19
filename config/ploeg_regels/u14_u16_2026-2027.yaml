@@ -23,6 +23,7 @@ algemeen:
     loop: 2
     technisch: 1
   materiaal: ploeg               # werpmateriaal en hordehoogte van de ploeg, niet van de atleet
+  voorspelling_factor: 0.95      # voorspelde punten = punten van de bron x 0.95 (0 = niet voorspellen)
 
 ploegen:
   U14-V:
@@ -73,24 +74,37 @@ ploegen:
 # welke specificatie (hordehoogte, gewicht) bij welke categorie hoort.
 # Met 'materiaal: ploeg' telt de categorie van de ploeg: een U14-meisje in de
 # U16-ploeg gooit met de U16-kogel.
+#
+# Voorspellen (ploeg/voorspeller.py) als een atleet het onderdeel nog niet deed:
+#   buren:      voorspel uit deze onderdelen, via gelijke punten (80m -> 100m)
+#   verhouding: omrekenen tussen specificaties: prestatie x verhouding[doel] / verhouding[bron]
+#               (kogel 9,00 m met 2kg -> 9,00 x 0.87 = 7,83 m met 3kg). Ruwe schattingen.
+# Estafettes (ploeg/estafettes.py):
+#   benen:       welk onderdeel elke loper loopt; tijd = som van hun tijden + correctie_s
+#   correctie_s: winst door de wissels (vliegende start), ruwe schatting
 onderdelen:
-  60m:    {naam: 60 meter}
-  80m:    {naam: 80 meter}
-  100m:   {naam: 100 meter}
-  150m:   {naam: 150 meter}
-  600m:   {naam: 600 meter}
-  800m:   {naam: 800 meter}
-  1000m:  {naam: 1000 meter}
-  1500m:  {naam: 1500 meter}
-  60mH:   {naam: 60 meter horden,  specificatie: {U14-V: 76.2cm}}
-  80mH:   {naam: 80 meter horden,  specificatie: {U14-M: 76.2cm, U16-V: 76.2cm}}
-  100mH:  {naam: 100 meter horden, specificatie: {U16-M: 84cm}}
-  300mH:  {naam: 300 meter horden, specificatie: {U16-V: 76.2cm, U16-M: 76.2cm}}
-  4x60m:  {naam: 4 x 60 meter,  lopers: 4}
-  4x80m:  {naam: 4 x 80 meter,  lopers: 4}
-  4x100m: {naam: 4 x 100 meter, lopers: 4}
+  60m:    {naam: 60 meter,   buren: [80m]}
+  80m:    {naam: 80 meter,   buren: [60m, 100m, 150m]}
+  100m:   {naam: 100 meter,  buren: [80m, 150m]}
+  150m:   {naam: 150 meter,  buren: [100m, 80m]}
+  600m:   {naam: 600 meter,  buren: [800m, 1000m]}
+  800m:   {naam: 800 meter,  buren: [600m, 1000m, 1500m]}
+  1000m:  {naam: 1000 meter, buren: [800m, 1500m, 600m]}
+  1500m:  {naam: 1500 meter, buren: [1000m, 800m]}
+  60mH:   {naam: 60 meter horden,  specificatie: {U14-V: 76.2cm}, buren: [80mH],
+           verhouding: {68.6cm: 0.97, 76.2cm: 1.0, 84cm: 1.03}}
+  80mH:   {naam: 80 meter horden,  specificatie: {U14-M: 76.2cm, U16-V: 76.2cm}, buren: [60mH],
+           verhouding: {68.6cm: 0.97, 76.2cm: 1.0, 84cm: 1.03}}
+  100mH:  {naam: 100 meter horden, specificatie: {U16-M: 84cm}, verhouding: {76.2cm: 0.97, 84cm: 1.0, 91.4cm: 1.03}}
+  300mH:  {naam: 300 meter horden, specificatie: {U16-V: 76.2cm, U16-M: 76.2cm}, verhouding: {76.2cm: 1.0, 84cm: 1.02}}
+  4x60m:  {naam: 4 x 60 meter,  lopers: 4, benen: [60m, 60m, 60m, 60m],     correctie_s: -0.8}
+  4x80m:  {naam: 4 x 80 meter,  lopers: 4, benen: [80m, 80m, 80m, 80m],     correctie_s: -1.0}
+  4x100m: {naam: 4 x 100 meter, lopers: 4, benen: [100m, 100m, 100m, 100m], correctie_s: -1.2}
   hoogspringen: {naam: Hoogspringen}
   verspringen:  {naam: Verspringen}
-  kogelstoten:  {naam: Kogelstoten,  specificatie: {U14-V: 2kg, U14-M: 3kg, U16-V: 3kg, U16-M: 4kg}}
-  discuswerpen: {naam: Discuswerpen, specificatie: {U14-V: 0.75kg, U14-M: 1kg, U16-V: 1kg, U16-M: 1kg}}
-  speerwerpen:  {naam: Speerwerpen,  specificatie: {U14-V: 400g, U14-M: 400g, U16-V: 500g, U16-M: 600g}}
+  kogelstoten:  {naam: Kogelstoten,  specificatie: {U14-V: 2kg, U14-M: 3kg, U16-V: 3kg, U16-M: 4kg},
+                 verhouding: {2kg: 1.0, 2.5kg: 0.93, 3kg: 0.87, 4kg: 0.77, 5kg: 0.70}}
+  discuswerpen: {naam: Discuswerpen, specificatie: {U14-V: 0.75kg, U14-M: 1kg, U16-V: 1kg, U16-M: 1kg},
+                 verhouding: {0.6kg: 1.06, 0.75kg: 1.0, 1kg: 0.88, 1.5kg: 0.76}}
+  speerwerpen:  {naam: Speerwerpen,  specificatie: {U14-V: 400g, U14-M: 400g, U16-V: 500g, U16-M: 600g},
+                 verhouding: {400g: 1.0, 500g: 0.93, 600g: 0.87, 700g: 0.82}}

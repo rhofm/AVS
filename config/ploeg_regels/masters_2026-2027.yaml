@@ -31,6 +31,7 @@ algemeen:
     loop: 1
     technisch: 1
   materiaal: eigen               # 65.1: materiaal van de eigen leeftijdsklasse
+  voorspelling_factor: 0.95      # voorspelde punten = punten van de bron x 0.95 (0 = niet voorspellen)
 
 ploegen:
   MAS-V:
@@ -57,28 +58,38 @@ ploegen:
       finale: {100m: 2, 400m: 2, 1500m: 2, 5000m: 2, 4x200m: 1, hoogspringen: 2, verspringen: 2,
                kogelstoten: 2, discuswerpen: 1, speerwerpen: 1, kogelslingeren: 1}
 
+# Voorspellen (ploeg/voorspeller.py): 'buren' = voorspel uit deze onderdelen via
+# gelijke punten; 'verhouding' = omrekenen tussen werpgewichten (prestatie x
+# verhouding[doel] / verhouding[bron]), handig als een master net een klasse
+# ouder is. Estafettes (ploeg/estafettes.py): tijd = som van de beentijden
+# ('benen') + 'correctie_s' (wissels). Ruwe schattingen.
 onderdelen:
-  100m:    {naam: 100 meter}
-  200m:    {naam: 200 meter}
-  400m:    {naam: 400 meter}
-  800m:    {naam: 800 meter}
-  1500m:   {naam: 1500 meter}
-  3000m:   {naam: 3000 meter}
-  5000m:   {naam: 5000 meter}
-  4x100m:  {naam: 4 x 100 meter, lopers: 4}
-  4x200m:  {naam: 4 x 200 meter, lopers: 4}
-  zweedse: {naam: Zweedse estafette, lopers: 4}
+  100m:    {naam: 100 meter,  buren: [200m]}
+  200m:    {naam: 200 meter,  buren: [100m, 400m]}
+  300m:    {naam: 300 meter,  buren: [200m, 400m, 100m]}          # alleen voor de Zweedse estafette
+  400m:    {naam: 400 meter,  buren: [200m, 800m]}
+  800m:    {naam: 800 meter,  buren: [400m, 1500m]}
+  1500m:   {naam: 1500 meter, buren: [800m, 3000m]}
+  3000m:   {naam: 3000 meter, buren: [1500m, 5000m]}
+  5000m:   {naam: 5000 meter, buren: [3000m]}
+  4x100m:  {naam: 4 x 100 meter, lopers: 4, benen: [100m, 100m, 100m, 100m], correctie_s: -1.5}
+  4x200m:  {naam: 4 x 200 meter, lopers: 4, benen: [200m, 200m, 200m, 200m], correctie_s: -1.5}
+  zweedse: {naam: Zweedse estafette, lopers: 4, benen: [100m, 200m, 300m, 400m], correctie_s: -1.5}
   hoogspringen: {naam: Hoogspringen}
   verspringen:  {naam: Verspringen}
   kogelstoten:
     naam: Kogelstoten
     specificatie: {V35+: 4kg, V50+: 3kg, V75+: 2kg, M35+: 7.26kg, M50+: 6kg, M60+: 5kg, M70+: 4kg, M80+: 3kg}
+    verhouding: {2kg: 1.0, 3kg: 0.87, 4kg: 0.77, 5kg: 0.70, 6kg: 0.64, 7.26kg: 0.57}
   discuswerpen:
     naam: Discuswerpen
     specificatie: {V35+: 1kg, V75+: 0.75kg, M35+: 2kg, M50+: 1.5kg, M60+: 1kg}
+    verhouding: {0.75kg: 1.0, 1kg: 0.88, 1.5kg: 0.76, 2kg: 0.68}
   speerwerpen:
     naam: Speerwerpen
     specificatie: {V35+: 600g, V50+: 500g, V75+: 400g, M35+: 800g, M50+: 700g, M60+: 600g, M70+: 500g, M80+: 400g}
+    verhouding: {400g: 1.0, 500g: 0.93, 600g: 0.87, 700g: 0.82, 800g: 0.77}
   kogelslingeren:
     naam: Kogelslingeren
     specificatie: {V35+: 4kg, V50+: 3kg, V75+: 2kg, M35+: 7.26kg, M50+: 6kg, M60+: 5kg, M70+: 4kg, M80+: 3kg}
+    verhouding: {2kg: 1.08, 3kg: 1.0, 4kg: 0.90, 5kg: 0.82, 6kg: 0.76, 7.26kg: 0.69}

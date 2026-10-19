@@ -13,10 +13,14 @@ hand of later met een strategie).
   (`Regelset.onderdeel_naam`), bijv. 'Kogelstoten 3kg' in de U16-ploeg, ook
   voor een U14-atleet. Een handtijd op dat onderdeel ('100 meter Handtijd')
   telt mee, met de handtijdcorrectie (zonder windmeting toegestaan).
-- Geen prestatie op het juiste onderdeel maar wel op dezelfde soort met een
-  andere specificatie (een U14 met de 2 kg-kogel)? Dan staat die als `hint` in
-  de cel, zonder punten. Voorspellen komt later (ploeg/voorspeller.py).
-- Estafettes hebben geen prestatie per atleet: die cellen blijven leeg.
+- Geen prestatie op het juiste onderdeel? Dan een voorspelling
+  (ploeg/voorspeller.py): uit een buuronderdeel of een andere specificatie
+  (een U14 met de 2 kg-kogel), gemarkeerd met `voorspeld` en de `bron`. Kan
+  dat niet, maar is er wel een prestatie met een andere specificatie, dan
+  staat die als `hint` in de cel, zonder punten.
+- Estafettes hebben geen prestatie per atleet. De matrix bewaart per atleet
+  de tijd op elk estafettebeen (`beentijden`); ploeg/estafettes.py rekent
+  daarmee een kwartet uit. In de cel staat die beentijd ter informatie.
 
 Alleen lezen; er wordt niets opgeslagen.
 """
@@ -34,6 +38,7 @@ from db.queries import Opslag
 from models import PRESTATIEBASIS, Atleet, Onderdeel, Prestatie
 from ploeg import punten as _punten
 from ploeg.regels import Programmaregel, Regelset, categorie_code, masters_code
+from ploeg.voorspeller import Beentijd, beentijd, voorspel
 
 _SPEC = re.compile(r"^[\d.]+(kg|g|cm)$")          # rest na de naam: '3kg', '76.2cm', '600g'
 
@@ -59,6 +64,9 @@ class Cel:
     eenheid: str = "tijd"
     hint: str | None = None              # prestatie met een andere specificatie, zonder punten
     nvt: bool = False                    # atleet mag dit onderdeel niet doen (ander geslacht, alleen U18, ...)
+    voorspeld: bool = False              # waarde/punten zijn een voorspelling (geen echte prestatie)
+    bron: str | None = None              # waar de voorspelling vandaan komt
+    beentijd: str | None = None          # estafette: tijd(en) van de atleet op de benen, als tekst
 
     @property
     def tekst(self) -> str:
@@ -89,6 +97,10 @@ class Matrix:
     prestatiebasis: str
     regels: list[Programmaregel]
     rijen: list[Rij]
+    beentijden: dict[str, dict[str, Beentijd]] = field(default_factory=dict)   # atleet -> been -> tijd
+
+    def regel(self, sleutel: str) -> Programmaregel | None:
+        return next((r for r in self.regels if r.sleutel == sleutel), None)
 
     def rij(self, master_id: str) -> Rij | None:
         return next((r for r in self.rijen if r.master_id == master_id), None)
@@ -131,11 +143,13 @@ def matrix(db: Opslag, regelset: Regelset, ploeg: str, programma: str, peildatum
     if prestatiebasis not in PRESTATIEBASIS:
         raise ValueError(f"Onbekende prestatiebasis {prestatiebasis!r}.")
     regels = regelset.programma(ploeg, programma)
-    ploeg_geslacht = regelset.ploeg(ploeg).geslacht
     pt = _punten.puntentelling(regelset.puntentelling)
     onderdelen: dict[int, Onderdeel] = {o.id: o for o in db.onderdelen()}
 
+    benen = list(dict.fromkeys(b for r in regels if r.soort == "estafette" for b in r.onderdeel.benen))
+
     rijen = []
+    beentijden: dict[str, dict[str, Beentijd]] = {}
     for a in atleten:
         cat = categorie_op(a, peildatum, regelset)
         rij = Rij(a, cat, regelset.mag_meedoen(ploeg, cat))
@@ -151,6 +165,18 @@ def matrix(db: Opslag, regelset: Regelset, ploeg: str, programma: str, peildatum
                 continue
             per_naam.setdefault(n, []).append(p)
 
+        def beste(naam, sleutel, lager, per_naam=per_naam):
+            b = _beste(per_naam, naam, sleutel, lager)
+            return (b[0].waarde, b[1], onderdelen[b[0].onderdeel_id].eenheid) if b else None
+
+        def specificaties(basisnaam, lager, per_naam=per_naam):
+            return _specificaties(per_naam, basisnaam, onderdelen, lager)
+
+        eigen = {b: t for b in benen
+                 if (t := beentijd(regelset, ploeg, b, cat, beste, specificaties)) is not None}
+        if eigen:
+            beentijden[a.master_id] = eigen
+
         for r in regels:
             info = r.onderdeel
             naam = regelset.onderdeel_naam(ploeg, r.sleutel, cat or ploeg)
@@ -160,20 +186,23 @@ def matrix(db: Opslag, regelset: Regelset, ploeg: str, programma: str, peildatum
                 cel.nvt = True
                 continue
             if r.soort == "estafette":
+                cel.beentijd = _beentekst(regelset, info.benen, eigen)
                 continue
-            beste = _beste(per_naam, naam, info.punten_sleutel, r.soort != "technisch")
-            if beste is not None:
-                p, handtijd = beste
+            gevonden = _beste(per_naam, naam, info.punten_sleutel, r.soort != "technisch")
+            if gevonden is not None:
+                p, handtijd = gevonden
                 cel.waarde, cel.datum, cel.handtijd = p.waarde, p.datum, handtijd
                 cel.eenheid = onderdelen[p.onderdeel_id].eenheid
-                g = info.geslacht if info.geslacht in ("M", "V") else (
-                    ploeg_geslacht if ploeg_geslacht in ("M", "V") else "M")
+                g = regelset.punten_geslacht(ploeg, r.sleutel)
                 cel.punten = pt.punten(regelset.puntentabel, info.punten_sleutel, g, p.waarde, handtijd=handtijd)
-            else:
-                cel.hint = _hint(per_naam, regelset.onderdelen[r.sleutel].naam, naam, onderdelen,
-                                 r.soort != "technisch")
+                continue
+            cel.hint = _hint(per_naam, regelset.onderdelen[r.sleutel].naam, naam, onderdelen,
+                             r.soort != "technisch")
+            v = voorspel(regelset, ploeg, r.sleutel, cat, beste, specificaties)
+            if v is not None:
+                cel.waarde, cel.punten, cel.voorspeld, cel.bron = v.waarde, v.punten, True, v.bron
         rijen.append(rij)
-    return Matrix(regelset, ploeg, programma, peildatum, prestatiebasis, regels, rijen)
+    return Matrix(regelset, ploeg, programma, peildatum, prestatiebasis, regels, rijen, beentijden)
 
 
 def _beste(per_naam: dict[str, list[Prestatie]], naam: str, sleutel: str,
@@ -210,3 +239,31 @@ def _hint(per_naam: dict[str, list[Prestatie]], basisnaam: str, naam: str, onder
     o = onderdelen[beste.onderdeel_id]
     spec = o.naam[len(basisnaam):].strip() if o.naam.lower().startswith(basisnaam.lower()) else o.naam
     return f"{spec}: {toon_waarde(beste.waarde, o.eenheid)}"
+
+
+def _specificaties(per_naam: dict[str, list[Prestatie]], basisnaam: str, onderdelen: dict[int, Onderdeel],
+                   lager_is_beter: bool) -> list[tuple[str, str, float, str]]:
+    """Beste prestatie per specificatie van een onderdeel: [('3kg', '3kg', 9.12, 'afstand'), ...]."""
+    basis = normaliseer(basisnaam)
+    uit = []
+    for n, lijst in per_naam.items():
+        rest = n[len(basis):]
+        if not n.startswith(basis) or not _SPEC.match(rest):
+            continue
+        p = min(lijst, key=lambda q: q.waarde) if lager_is_beter else max(lijst, key=lambda q: q.waarde)
+        o = onderdelen[p.onderdeel_id]
+        tekst = o.naam[len(basisnaam):].strip() if o.naam.lower().startswith(basisnaam.lower()) else rest
+        uit.append((rest, tekst, p.waarde, o.eenheid))
+    return uit
+
+
+def _beentekst(regelset: Regelset, benen: tuple[str, ...], tijden: dict[str, Beentijd]) -> str | None:
+    """'10,85' (alle benen hetzelfde) of '400 meter: 58,10 · 200 meter: ≈26,02' (Zweedse)."""
+    soorten = list(dict.fromkeys(benen))
+    delen = []
+    for b in soorten:
+        t = tijden.get(b)
+        if t is not None:
+            tijd = f"{'≈' if t.voorspeld else ''}{toon_waarde(t.tijd, 'tijd')}"
+            delen.append(tijd if len(soorten) == 1 else f"{regelset.onderdelen[b].naam}: {tijd}")
+    return " · ".join(delen) or None

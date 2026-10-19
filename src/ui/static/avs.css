@@ -1033,6 +1033,9 @@ th[aria-sort="descending"] .sorteer__naam::after { content: " \2193"; opacity: 1
 .ploegmatrix tbody tr td.ploegcel--telt { box-shadow: inset 0 0 0 2px var(--rood); }
 .ploegcel--telt .ploegcel__punten { color: var(--rood); font-weight: 700; }
 .ploegcel--leeg label > .zacht { white-space: nowrap; }
+.ploegcel--voorspeld .ploegcel__waarde,
+.ploegcel--voorspeld .ploegcel__punten { font-style: italic; }
+.ploegcel--voorspeld .ploegcel__waarde { text-decoration: underline dotted; cursor: help; }
 .ploegmatrix tfoot th, .ploegmatrix tfoot td { background: var(--zalm); color: var(--op-zalm); border: 2px solid var(--lijn); padding: .4rem .5rem; }
 .ploegmatrix tfoot .zacht { color: inherit; opacity: .85; }
 .ploegmatrix tbody tr td.ploegcel--nvt { background: var(--leeg-vlak); }

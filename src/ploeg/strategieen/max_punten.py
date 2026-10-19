@@ -13,4 +13,4 @@ class Strategie:
     uitleg = "De sterkste opstelling; een atleet mag ook maar één onderdeel doen."
 
     def bouw(self, model) -> list[dict[int, float]]:
-        return [model.puntendoel(), {v: -1 for v in model.x.values()}]
+        return [model.puntendoel(), {v: -n for v, n in model.inschrijvingen().items()}]

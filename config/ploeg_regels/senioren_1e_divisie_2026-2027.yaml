@@ -28,6 +28,7 @@ algemeen:
     loop: 1
     technisch: 1
   materiaal: ploeg               # seniorenmateriaal voor iedereen
+  voorspelling_factor: 0.95      # voorspelde punten = punten van de bron x 0.95 (0 = niet voorspellen)
 
 programmanamen:
   pd_nk_teams: Promotie/degradatie met NK Teams (programma NK Teams, 42.3)
@@ -85,32 +86,47 @@ ploegen:
          kogelstoten-M: 2, discuswerpen-M: 1, kogelslingeren-V: 2, kogelslingeren-M: 1,
          speerwerpen-V: 2}
 
+# Voorspellen (ploeg/voorspeller.py): 'buren' = voorspel uit deze onderdelen via
+# gelijke punten; 'verhouding' = omrekenen tussen specificaties (prestatie x
+# verhouding[doel] / verhouding[bron]), bijv. een U18 met een lichtere kogel.
+# Estafettes (ploeg/estafettes.py): tijd = som van de beentijden ('benen') +
+# 'correctie_s' (wissels). Ruwe schattingen.
 onderdelen:
   # ---- lopen (V = vrouwen, M = mannen); 'punten' = naam in de puntentelling ----
-  100m-V:    {naam: 100 meter,  punten: 100m,  geslacht: V}
-  100m-M:    {naam: 100 meter,  punten: 100m,  geslacht: M}
-  200m-V:    {naam: 200 meter,  punten: 200m,  geslacht: V}
-  200m-M:    {naam: 200 meter,  punten: 200m,  geslacht: M}
-  400m-V:    {naam: 400 meter,  punten: 400m,  geslacht: V}
-  400m-M:    {naam: 400 meter,  punten: 400m,  geslacht: M}
-  800m-V:    {naam: 800 meter,  punten: 800m,  geslacht: V}
-  800m-M:    {naam: 800 meter,  punten: 800m,  geslacht: M}
-  1500m-V:   {naam: 1500 meter, punten: 1500m, geslacht: V}
-  1500m-M:   {naam: 1500 meter, punten: 1500m, geslacht: M}
-  3000m-V:   {naam: 3000 meter, punten: 3000m, geslacht: V}
-  5000m-M:   {naam: 5000 meter, punten: 5000m, geslacht: M}
-  100mH-V:   {naam: 100 meter horden, punten: 100mH, geslacht: V, specificatie: 84cm}
-  110mH-M:   {naam: 110 meter horden, punten: 110mH, geslacht: M, specificatie: 106.7cm}
-  400mH-V:   {naam: 400 meter horden, punten: 400mH, geslacht: V, specificatie: 76.2cm}
-  400mH-M:   {naam: 400 meter horden, punten: 400mH, geslacht: M, specificatie: 91.4cm}
+  100m-V:    {naam: 100 meter,  punten: 100m,  geslacht: V, buren: [200m-V]}
+  100m-M:    {naam: 100 meter,  punten: 100m,  geslacht: M, buren: [200m-M]}
+  200m-V:    {naam: 200 meter,  punten: 200m,  geslacht: V, buren: [100m-V, 400m-V]}
+  200m-M:    {naam: 200 meter,  punten: 200m,  geslacht: M, buren: [100m-M, 400m-M]}
+  300m-V:    {naam: 300 meter,  punten: 300m,  geslacht: V, buren: [200m-V, 400m-V, 100m-V]}   # voor de Zweedse
+  300m-M:    {naam: 300 meter,  punten: 300m,  geslacht: M, buren: [200m-M, 400m-M, 100m-M]}   # voor de Zweedse
+  400m-V:    {naam: 400 meter,  punten: 400m,  geslacht: V, buren: [200m-V, 800m-V]}
+  400m-M:    {naam: 400 meter,  punten: 400m,  geslacht: M, buren: [200m-M, 800m-M]}
+  800m-V:    {naam: 800 meter,  punten: 800m,  geslacht: V, buren: [400m-V, 1500m-V]}
+  800m-M:    {naam: 800 meter,  punten: 800m,  geslacht: M, buren: [400m-M, 1500m-M]}
+  1500m-V:   {naam: 1500 meter, punten: 1500m, geslacht: V, buren: [800m-V, 3000m-V]}
+  1500m-M:   {naam: 1500 meter, punten: 1500m, geslacht: M, buren: [800m-M, 5000m-M]}
+  3000m-V:   {naam: 3000 meter, punten: 3000m, geslacht: V, buren: [1500m-V]}
+  5000m-M:   {naam: 5000 meter, punten: 5000m, geslacht: M, buren: [1500m-M]}
+  100mH-V:   {naam: 100 meter horden, punten: 100mH, geslacht: V, specificatie: 84cm,
+              verhouding: {76.2cm: 0.97, 84cm: 1.0}}
+  110mH-M:   {naam: 110 meter horden, punten: 110mH, geslacht: M, specificatie: 106.7cm,
+              verhouding: {91.4cm: 0.94, 99.1cm: 0.97, 106.7cm: 1.0}}
+  400mH-V:   {naam: 400 meter horden, punten: 400mH, geslacht: V, specificatie: 76.2cm, buren: [400m-V]}
+  400mH-M:   {naam: 400 meter horden, punten: 400mH, geslacht: M, specificatie: 91.4cm, buren: [400m-M],
+              verhouding: {84cm: 0.98, 91.4cm: 1.0}}
   3000mSC-V: {naam: 3000 meter steeple, punten: 3000mSC, geslacht: V, specificatie: 76.2cm}
   3000mSC-M: {naam: 3000 meter steeple, punten: 3000mSC, geslacht: M, specificatie: 91.4cm}
   # ---- estafettes ----
-  4x100m-V:  {naam: 4 x 100 meter, punten: 4x100m, geslacht: V, lopers: 4}
-  4x100m-M:  {naam: 4 x 100 meter, punten: 4x100m, geslacht: M, lopers: 4}
-  zweedse-V: {naam: Zweedse estafette, punten: zweedse, geslacht: V, lopers: 4}
-  zweedse-M: {naam: Zweedse estafette, punten: zweedse, geslacht: M, lopers: 4}
-  4x400m-gemengd: {naam: 4 x 400 meter gemengd, geslacht: gemengd, lopers: 4, samenstelling: {M: 2, V: 2}}
+  4x100m-V:  {naam: 4 x 100 meter, punten: 4x100m, geslacht: V, lopers: 4,
+              benen: [100m-V, 100m-V, 100m-V, 100m-V], correctie_s: -2.0}
+  4x100m-M:  {naam: 4 x 100 meter, punten: 4x100m, geslacht: M, lopers: 4,
+              benen: [100m-M, 100m-M, 100m-M, 100m-M], correctie_s: -2.0}
+  zweedse-V: {naam: Zweedse estafette, punten: zweedse, geslacht: V, lopers: 4,
+              benen: [100m-V, 200m-V, 300m-V, 400m-V], correctie_s: -1.5}
+  zweedse-M: {naam: Zweedse estafette, punten: zweedse, geslacht: M, lopers: 4,
+              benen: [100m-M, 200m-M, 300m-M, 400m-M], correctie_s: -1.5}
+  4x400m-gemengd: {naam: 4 x 400 meter gemengd, geslacht: gemengd, lopers: 4, samenstelling: {M: 2, V: 2},
+                   benen: [400m-M, 400m-V, 400m-V, 400m-M], correctie_s: -2.0}
   # ---- springen ----
   hoogspringen-V:         {naam: Hoogspringen,         punten: hoogspringen,         geslacht: V}
   hoogspringen-M:         {naam: Hoogspringen,         punten: hoogspringen,         geslacht: M}
@@ -121,11 +137,18 @@ onderdelen:
   hinkstapspringen-V:     {naam: Hink-stap-springen,   punten: hinkstapspringen,     geslacht: V}
   hinkstapspringen-M:     {naam: Hink-stap-springen,   punten: hinkstapspringen,     geslacht: M}
   # ---- werpen (seniorenmateriaal, ook voor U18/U20 in deze competitie) ----
-  kogelstoten-V:    {naam: Kogelstoten,    punten: kogelstoten,    geslacht: V, specificatie: 4kg}
-  kogelstoten-M:    {naam: Kogelstoten,    punten: kogelstoten,    geslacht: M, specificatie: 7.26kg}
+  kogelstoten-V:    {naam: Kogelstoten,    punten: kogelstoten,    geslacht: V, specificatie: 4kg,
+                     verhouding: {3kg: 0.87, 4kg: 0.77}}
+  kogelstoten-M:    {naam: Kogelstoten,    punten: kogelstoten,    geslacht: M, specificatie: 7.26kg,
+                     verhouding: {5kg: 0.70, 6kg: 0.64, 7.26kg: 0.57}}
   discuswerpen-V:   {naam: Discuswerpen,   punten: discuswerpen,   geslacht: V, specificatie: 1kg}
-  discuswerpen-M:   {naam: Discuswerpen,   punten: discuswerpen,   geslacht: M, specificatie: 2kg}
-  kogelslingeren-V: {naam: Kogelslingeren, punten: kogelslingeren, geslacht: V, specificatie: 4kg}
-  kogelslingeren-M: {naam: Kogelslingeren, punten: kogelslingeren, geslacht: M, specificatie: 7.26kg}
-  speerwerpen-V:    {naam: Speerwerpen,    punten: speerwerpen,    geslacht: V, specificatie: 600g}
-  speerwerpen-M:    {naam: Speerwerpen,    punten: speerwerpen,    geslacht: M, specificatie: 800g}
+  discuswerpen-M:   {naam: Discuswerpen,   punten: discuswerpen,   geslacht: M, specificatie: 2kg,
+                     verhouding: {1.5kg: 0.76, 1.75kg: 0.72, 2kg: 0.68}}
+  kogelslingeren-V: {naam: Kogelslingeren, punten: kogelslingeren, geslacht: V, specificatie: 4kg,
+                     verhouding: {3kg: 1.0, 4kg: 0.90}}
+  kogelslingeren-M: {naam: Kogelslingeren, punten: kogelslingeren, geslacht: M, specificatie: 7.26kg,
+                     verhouding: {5kg: 0.82, 6kg: 0.76, 7.26kg: 0.69}}
+  speerwerpen-V:    {naam: Speerwerpen,    punten: speerwerpen,    geslacht: V, specificatie: 600g,
+                     verhouding: {500g: 0.93, 600g: 0.87}}
+  speerwerpen-M:    {naam: Speerwerpen,    punten: speerwerpen,    geslacht: M, specificatie: 800g,
+                     verhouding: {700g: 0.82, 800g: 0.77}}

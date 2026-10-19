@@ -25,4 +25,4 @@ class Strategie:
             # som x + estafettes >= 2 z   en   som x <= maximaal * z
             model.eis({**{v: 1 for v in eigen}, z: -MINIMUM}, -estafettes, float("inf"))
             model.eis({**{v: 1 for v in eigen}, z: -maximaal}, float("-inf"), 0)
-        return [model.puntendoel(), {v: -1 for v in model.x.values()}]
+        return [model.puntendoel(), {v: -n for v, n in model.inschrijvingen().items()}]

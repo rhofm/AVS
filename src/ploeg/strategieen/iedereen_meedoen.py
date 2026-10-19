@@ -23,4 +23,4 @@ class Strategie:
             z = model.variabele()                               # atleet doet mee
             model.eis({z: 1, **{v: -1 for v in eigen}}, -math.inf, 0)   # z <= som x
             meedoen[z] = 1
-        return [meedoen, {v: 1 for v in model.x.values()}, model.puntendoel()]
+        return [meedoen, model.inschrijvingen(), model.puntendoel()]

@@ -31,6 +31,7 @@ algemeen:
     loop: 1
     technisch: 1
   materiaal: eigen               # U18 met U18-materiaal, U20 met U20-materiaal
+  voorspelling_factor: 0.95      # voorspelde punten = punten van de bron x 0.95 (0 = niet voorspellen)
 
 ploegen:
   U18U20-V:
@@ -69,25 +70,38 @@ ploegen:
 
 # Namen zoals atletiek.nu ze geeft en specificatie per categorie. Met
 # 'materiaal: eigen' telt de categorie van de atleet (een U16 als U18).
+#
+# Voorspellen (ploeg/voorspeller.py): 'buren' = voorspel uit deze onderdelen via
+# gelijke punten; 'verhouding' = omrekenen tussen specificaties (prestatie x
+# verhouding[doel] / verhouding[bron]). Estafettes (ploeg/estafettes.py): tijd =
+# som van de beentijden ('benen') + 'correctie_s' (wissels). Ruwe schattingen.
 onderdelen:
-  100m:    {naam: 100 meter}
-  200m:    {naam: 200 meter}
-  400m:    {naam: 400 meter}
-  800m:    {naam: 800 meter}
-  1500m:   {naam: 1500 meter}
-  3000m:   {naam: 3000 meter}
-  100mH:   {naam: 100 meter horden, specificatie: {U18-V: 76.2cm, U20-V: 84cm}}
-  110mH:   {naam: 110 meter horden, specificatie: {U18-M: 91.4cm, U20-M: 99.1cm}}
-  400mH:   {naam: 400 meter horden, specificatie: {U18-V: 76.2cm, U20-V: 76.2cm, U18-M: 84cm, U20-M: 91.4cm}}
+  100m:    {naam: 100 meter,  buren: [200m]}
+  200m:    {naam: 200 meter,  buren: [100m, 400m]}
+  300m:    {naam: 300 meter,  buren: [200m, 400m, 100m]}          # alleen voor de Zweedse estafette
+  400m:    {naam: 400 meter,  buren: [200m, 800m]}
+  800m:    {naam: 800 meter,  buren: [400m, 1500m]}
+  1500m:   {naam: 1500 meter, buren: [800m, 3000m]}
+  3000m:   {naam: 3000 meter, buren: [1500m]}
+  100mH:   {naam: 100 meter horden, specificatie: {U18-V: 76.2cm, U20-V: 84cm},
+            verhouding: {76.2cm: 0.97, 84cm: 1.0}}
+  110mH:   {naam: 110 meter horden, specificatie: {U18-M: 91.4cm, U20-M: 99.1cm},
+            verhouding: {91.4cm: 0.97, 99.1cm: 1.0, 106.7cm: 1.03}}
+  400mH:   {naam: 400 meter horden, specificatie: {U18-V: 76.2cm, U20-V: 76.2cm, U18-M: 84cm, U20-M: 91.4cm},
+            buren: [400m], verhouding: {76.2cm: 0.98, 84cm: 1.0, 91.4cm: 1.02}}
   2000mSC: {naam: 2000 meter steeple, specificatie: {U18-V: 76.2cm, U18-M: 91.4cm}, alleen: [U18-V, U18-M]}
-  4x100m:  {naam: 4 x 100 meter, lopers: 4}
-  4x400m:  {naam: 4 x 400 meter, lopers: 4}
-  zweedse: {naam: Zweedse estafette, lopers: 4}
+  4x100m:  {naam: 4 x 100 meter, lopers: 4, benen: [100m, 100m, 100m, 100m], correctie_s: -1.5}
+  4x400m:  {naam: 4 x 400 meter, lopers: 4, benen: [400m, 400m, 400m, 400m], correctie_s: -2.0}
+  zweedse: {naam: Zweedse estafette, lopers: 4, benen: [100m, 200m, 300m, 400m], correctie_s: -1.5}
   hoogspringen:         {naam: Hoogspringen}
   polsstokhoogspringen: {naam: Polsstokhoogspringen}
   verspringen:          {naam: Verspringen}
   hinkstapspringen:     {naam: Hink-stap-springen}
-  kogelstoten:    {naam: Kogelstoten,    specificatie: {U18-V: 3kg,  U20-V: 4kg,   U18-M: 5kg,   U20-M: 6kg}}
-  discuswerpen:   {naam: Discuswerpen,   specificatie: {U18-V: 1kg,  U20-V: 1kg,   U18-M: 1.5kg, U20-M: 1.75kg}}
-  speerwerpen:    {naam: Speerwerpen,    specificatie: {U18-V: 500g, U20-V: 600g,  U18-M: 700g,  U20-M: 800g}}
-  kogelslingeren: {naam: Kogelslingeren, specificatie: {U18-V: 3kg,  U20-V: 4kg,   U18-M: 5kg,   U20-M: 6kg}}
+  kogelstoten:    {naam: Kogelstoten,    specificatie: {U18-V: 3kg,  U20-V: 4kg,   U18-M: 5kg,   U20-M: 6kg},
+                   verhouding: {3kg: 0.87, 4kg: 0.77, 5kg: 0.70, 6kg: 0.64, 7.26kg: 0.57}}
+  discuswerpen:   {naam: Discuswerpen,   specificatie: {U18-V: 1kg,  U20-V: 1kg,   U18-M: 1.5kg, U20-M: 1.75kg},
+                   verhouding: {1kg: 0.88, 1.5kg: 0.76, 1.75kg: 0.72, 2kg: 0.68}}
+  speerwerpen:    {naam: Speerwerpen,    specificatie: {U18-V: 500g, U20-V: 600g,  U18-M: 700g,  U20-M: 800g},
+                   verhouding: {500g: 0.93, 600g: 0.87, 700g: 0.82, 800g: 0.77}}
+  kogelslingeren: {naam: Kogelslingeren, specificatie: {U18-V: 3kg,  U20-V: 4kg,   U18-M: 5kg,   U20-M: 6kg},
+                   verhouding: {3kg: 1.0, 4kg: 0.90, 5kg: 0.82, 6kg: 0.76, 7.26kg: 0.69}}

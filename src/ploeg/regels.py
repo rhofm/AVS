@@ -56,9 +56,11 @@ _PLOEGSLEUTEL = re.compile(r"^[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*$")    # U16-V, U18U
 _SLEUTELS = {"naam", "seizoen", "bron", "puntentelling", "puntentabel", "puntentoekenning",
              "leeftijdsklassen", "programmanamen", "algemeen", "ploegen", "onderdelen"}
 _ALGEMEEN = {"max_onderdelen_per_atleet", "max_reserves", "een_ploeg_per_dag",
-             "een_atleet_per_groep", "tellend", "materiaal"}
+             "een_atleet_per_groep", "tellend", "materiaal", "voorspelling_factor"}
 _PLOEG = {"naam", "geslacht", "toegestaan", "programma", "materiaal_als"}
-_ONDERDEEL = {"naam", "specificatie", "lopers", "samenstelling", "punten", "geslacht", "alleen"}
+_ONDERDEEL = {"naam", "specificatie", "lopers", "samenstelling", "punten", "geslacht", "alleen",
+              "buren", "verhouding", "benen", "correctie_s"}
+VOORSPELLING_FACTOR = 0.95                     # voorspelde punten = punten van de bron x deze factor
 
 
 class RegelFout(ValueError):
@@ -110,6 +112,10 @@ class OnderdeelInfo:
     punten: str = ""                              # sleutel in de puntentelling (standaard = sleutel)
     geslacht: str | None = None                   # 'M', 'V' of 'gemengd' bij een gemengde ploeg (senioren)
     alleen: tuple[str, ...] = ()                  # alleen voor deze (materiaal)categorieën, bijv. U18 (steeple)
+    buren: tuple[str, ...] = ()                   # voorspellen uit deze onderdelen (80m -> 100m), zie voorspeller
+    verhouding: Mapping[str, float] = field(default_factory=dict)   # specificatie -> factor ('3kg': 0.87)
+    benen: tuple[str, ...] = ()                   # estafette: onderdeel per loper, bijv. (80m, 80m, 80m, 80m)
+    correctie_s: float = 0.0                      # estafette: tijd = som van de benen + correctie (wissels)
 
     @property
     def is_estafette(self) -> bool:
@@ -219,6 +225,7 @@ class Regelset:
     programmanamen: Mapping[str, str]
     ploegen: Mapping[str, Ploegsoort]
     onderdelen: Mapping[str, OnderdeelInfo]
+    voorspelling_factor: float = VOORSPELLING_FACTOR   # 0 = niet voorspellen
     _programmas: Mapping[tuple[str, str], tuple[Programmaregel, ...]] = field(repr=False, default_factory=dict)
 
     # ---------------- opvragen ----------------
@@ -254,6 +261,15 @@ class Regelset:
         if self.materiaal == "eigen":
             return p.materiaal_als.get(categorie, categorie)
         return p.sleutel
+
+    def punten_geslacht(self, ploeg: str, sleutel: str) -> str:
+        """Welke puntentabel (M/V) een onderdeel gebruikt: die van het onderdeel (gemengde ploeg),
+        anders die van de ploeg; een gemengd onderdeel gebruikt 'M' (de tabel 'alle')."""
+        info = self.onderdelen[sleutel]
+        if info.geslacht in ("M", "V"):
+            return info.geslacht
+        g = self.ploeg(ploeg).geslacht
+        return g if g in ("M", "V") else "M"
 
     def onderdeel_naam(self, ploeg: str, sleutel: str, categorie: str) -> str:
         """Naam (+ specificatie) van het onderdeel dat deze atleet in deze ploeg doet."""
@@ -430,11 +446,17 @@ class Regelset:
         materiaal = alg.get("materiaal", "ploeg")
         if materiaal not in MATERIAAL:
             raise RegelFout(f"{waar}: materiaal moet {' of '.join(MATERIAAL)} zijn.")
+        factor = alg.get("voorspelling_factor", VOORSPELLING_FACTOR)
+        if isinstance(factor, bool) or not isinstance(factor, (int, float)) or not 0 <= factor <= 1:
+            raise RegelFout(f"{waar}: voorspelling_factor is een getal van 0 (niet voorspellen) tot 1, "
+                            f"bijv. 0.95 (nu {factor!r}).")
 
         # onderdelen
         if not isinstance(ruw["onderdelen"], dict) or not ruw["onderdelen"]:
             raise RegelFout(f"{waar}: 'onderdelen' is leeg.")
         onderdelen = {str(k): _onderdeel(f"{waar}: onderdelen.{k}", str(k), v) for k, v in ruw["onderdelen"].items()}
+        for info in onderdelen.values():
+            _verwijzingen(f"{waar}: onderdelen.{info.sleutel}", info, onderdelen)
 
         # ploegen en programma's
         if not isinstance(ruw["ploegen"], dict) or not ruw["ploegen"]:
@@ -475,7 +497,7 @@ class Regelset:
             een_ploeg_per_dag=bool(alg.get("een_ploeg_per_dag", True)),
             een_atleet_per_groep=bool(alg.get("een_atleet_per_groep", True)),
             tellend=tellend, materiaal=materiaal, leeftijdsklassen=klassen, programmanamen=namen,
-            ploegen=ploegen, onderdelen=onderdelen, _programmas=programmas,
+            ploegen=ploegen, onderdelen=onderdelen, voorspelling_factor=float(factor), _programmas=programmas,
         )
 
 
@@ -528,8 +550,40 @@ def _onderdeel(waar: str, sleutel: str, d) -> OnderdeelInfo:
         if sum(samenstelling.values()) != lopers:
             raise RegelFout(f"{waar}: samenstelling telt op tot {sum(samenstelling.values())}, "
                             f"niet tot {lopers} lopers.")
+    buren = d.get("buren") or []
+    if not isinstance(buren, list) or not all(isinstance(b, str) for b in buren):
+        raise RegelFout(f"{waar}: buren is een lijst onderdelen, bijv. [80m, 150m].")
+    verhouding = d.get("verhouding") or {}
+    if not isinstance(verhouding, dict) or not all(
+            isinstance(v, (int, float)) and not isinstance(v, bool) and v > 0 for v in verhouding.values()):
+        raise RegelFout(f"{waar}: verhouding is per specificatie een getal boven 0, bijv. {{2kg: 1.0, 3kg: 0.87}}.")
+    benen = d.get("benen") or []
+    correctie = d.get("correctie_s", 0)
+    if (benen or "correctie_s" in d) and lopers is None:
+        raise RegelFout(f"{waar}: benen en correctie_s horen bij een estafette (met lopers).")
+    if not isinstance(benen, list) or not all(isinstance(b, str) for b in benen) or \
+            (benen and len(benen) != lopers):
+        raise RegelFout(f"{waar}: benen is een lijst met één onderdeel per loper ({lopers}), "
+                        f"bijv. [80m, 80m, 80m, 80m].")
+    if isinstance(correctie, bool) or not isinstance(correctie, (int, float)):
+        raise RegelFout(f"{waar}: correctie_s is een aantal seconden, bijv. -1.2.")
     return OnderdeelInfo(sleutel, d["naam"].strip(), specs, lopers, samenstelling, punten_sleutel.strip(),
-                         geslacht, alleen)
+                         geslacht, alleen, tuple(buren), {str(k): float(v) for k, v in verhouding.items()},
+                         tuple(benen), float(correctie))
+
+
+def _verwijzingen(waar: str, info: OnderdeelInfo, onderdelen: Mapping[str, OnderdeelInfo]) -> None:
+    """Buren en benen moeten onderdelen uit hetzelfde bestand zijn (geen estafettes)."""
+    for soort, lijst in (("buren", info.buren), ("benen", info.benen)):
+        for b in lijst:
+            if b not in onderdelen:
+                raise RegelFout(f"{waar}: {soort} noemt {b!r}, maar dat staat niet onder 'onderdelen'.")
+            if onderdelen[b].is_estafette or b == info.sleutel:
+                raise RegelFout(f"{waar}: {soort} kan geen estafette of het onderdeel zelf zijn ({b!r}).")
+    if info.benen and info.samenstelling:
+        per = {g: sum(1 for b in info.benen if onderdelen[b].geslacht == g) for g in ("M", "V")}
+        if sum(per.values()) and any(per.get(g, 0) != n for g, n in info.samenstelling.items()):
+            raise RegelFout(f"{waar}: de benen passen niet bij de samenstelling {dict(info.samenstelling)}.")
 
 
 def _ploeg(waar: str, sleutel: str, d) -> Ploegsoort:

@@ -179,9 +179,13 @@ def test_matrix_handtijd_en_ander_materiaal():
         assert cato.punten == int(19933.0 / (10.80 + 0.24) - 1193)
         assert "hand" in cato.tekst
         kogel = m.cel(ids["cato"], "kogelstoten")             # U14 in de U16-ploeg: 3 kg nodig
-        assert kogel.onderdeel_naam == "Kogelstoten 3kg" and kogel.waarde is None
+        assert kogel.onderdeel_naam == "Kogelstoten 3kg" and kogel.datum is None
         assert kogel.hint == "2kg: 9,80 m"
-        assert m.cel(ids["cato"], "4x80m").waarde is None and m.cel(ids["cato"], "4x80m").hint is None
+        # geen 3 kg-prestatie: voorspeld uit de 2 kg (9,80 x 0.87 = 8,53 m; punten x 0.95), zie test_voorspeller
+        assert kogel.voorspeld and kogel.bron == "voorspeld uit Kogelstoten 2kg: 9,80 m" and kogel.waarde < 8.53
+        estafette = m.cel(ids["cato"], "4x80m")
+        assert estafette.waarde is None and estafette.hint is None
+        assert estafette.beentijd == "11,04"                     # handtijd 10,80 + 0,24
 
 
 def test_matrix_prestatiebasis():

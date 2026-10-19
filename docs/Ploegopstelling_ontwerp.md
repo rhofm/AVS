@@ -104,6 +104,10 @@ estafettes:
   4x80m: {benen: [80m, 80m, 80m, 80m], correctie_s: -1.2}
 ```
 
+(Gebouwd in stap 6 als velden bij het onderdeel zelf: `4x80m: {naam: 4 x 80
+meter, lopers: 4, benen: [80m, 80m, 80m, 80m], correctie_s: -1.0}`, plus
+`buren` en `verhouding` voor de voorspeller.)
+
 Waarom de `onderdelen`-koppeling: een U16 die in de U18/U20-ploeg uitkomt, of
 een U18 met de 5 kg-kogel in een U18/U20-ploeg, vult **hetzelfde
 programmaonderdeel** met een ander `onderdeel` (naam + specificatie).
@@ -280,7 +284,7 @@ gezet, zodat de wedstrijdpagina en de botsingencontrole meteen werken.
    Pagina's `/ploegen`, `/ploegen/nieuw`, `/ploeg/<id>` (+ `/gegevens`,
    `/verwijderen`). Code: `ploeg/vergelijk.py` (matrix), `ploeg/opstelling.py`
    (punten, controle, formulier), `ploeg/paginas.py` (pagina-gegevens). Tests:
-   `tests/test_ploegen.py`. Nog niet: punten voor estafettes (stap 6),
+   `tests/test_ploegen.py`. Nog niet: punten voor estafettes (✅ stap 6),
    beschikbaarheid per dagdeel en groepen bij technische onderdelen in de UI,
    inschrijvingen in `prestaties.db` bij opslaan (stap 4).
 4. ✅ Csv-export (`ploeg/export.py`, `/ploeg/<id>/atletieknu.csv`, puntkomma + BOM,
@@ -301,16 +305,35 @@ gezet, zodat de wedstrijdpagina en de botsingencontrole meteen werken.
    blijven staan en tellen mee voor de 3 onderdelen. Het resultaat wordt
    opgeslagen (ook op de gekoppelde wedstrijd) en `ploeg.strategie` bewaart de
    strategie. Tests: `tests/test_optimaliseer.py` (o.a. vergelijking met brute
-   kracht). Nog niet: estafettes optimaliseren (stap 6), botsingen en dagdelen
+   kracht). Nog niet: estafettes optimaliseren (✅ stap 6), botsingen en dagdelen
    (stap 7), meer ploegen tegelijk.
-6. Voorspeller en estafettes.
+6. ✅ Voorspeller en estafettes. `ploeg/voorspeller.py`: zonder prestatie een
+   voorspelling uit een buuronderdeel (`buren` in het regelbestand, via gelijke
+   punten) of een andere specificatie (`verhouding`: prestatie x
+   verhouding[doel] / verhouding[bron]), in beide gevallen punten x
+   `algemeen.voorspelling_factor` (standaard 0.95; 0 = uit). In de matrix
+   gemarkeerd (`Cel.voorspeld`, `Cel.bron`; ≈ en cursief op de pagina) met een
+   waarschuwing 'voorspeld' in de controle; de csv zet bij een voorspelling 'x'
+   in plaats van een waarde. `ploeg/estafettes.py`: tijd van een kwartet = de
+   beste verdeling over de `benen` (beentijd = eigen tijd of voorspeld) +
+   `correctie_s`; punten uit de puntentelling van de estafette; gemengde
+   samenstelling en benen met een geslacht worden gecontroleerd. `stand()` telt
+   een estafette met precies één ploeg lopers mee. De optimalisatie rekent
+   kwartetten voor (de 10 snelsten per been om de beurt, alle combinaties) met
+   een keuze `w[e, k]` per kwartet; een estafette blijft staan als hij is
+   vastgezet of als er geen kwartet te schatten is. Alle meegeleverde
+   regelbestanden hebben `buren`, `verhouding`, `benen` en `correctie_s`
+   (300 m als extra onderdeel voor de Zweedse). Tests: `tests/test_voorspeller.py`
+   (o.a. brute kracht met estafette). Nog niet: voorspellingen in meer stappen
+   (alleen uit echte prestaties), twee estafetteploegen op één estafette.
 7. Meer ploegen, botsingen uit de chronoloog, U18/U20 (werpmateriaal),
    masters (age grading), senioren (gemengd), 1e divisie / NK Teams.
 
 ## Open punten
 
 - Masters age-grading-factoren controleren tegen de spreadsheet.
-- Standaardwaarden voor de voorspeller (veiligheidsfactor, estafettecorrectie)
-  bepalen met echte data.
+- Standaardwaarden voor de voorspeller (`voorspelling_factor`, `verhouding` per
+  werpgewicht/hordehoogte, `correctie_s` per estafette) zijn ruwe schattingen;
+  bepalen met echte data (eigen estafettetijden vs. som van de vlakke tijden).
 - Later mogelijk: een "verzekering"-optie (tweede atleet op hoog/polsstok voor
   het geval de eerste geen hoogte haalt).

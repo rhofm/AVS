@@ -80,6 +80,8 @@ def atletieknu_csv(db: Opslag, ploeg_id: int) -> Export | None:
                 regel.append("")
                 continue
             c = rij.cellen[r.sleutel]
-            regel.append(_waarde(c.waarde, c.eenheid) if c.waarde is not None else "x")
+            # alleen een echte prestatie; een voorspelling of estafette wordt 'x' (ingeschreven)
+            echt = c.waarde is not None and not c.voorspeld
+            regel.append(_waarde(c.waarde, c.eenheid) if echt else "x")
         schrijver.writerow(regel)
     return Export(_bestandsnaam(p.naam, p.datum), ("﻿" + uit.getvalue()).encode("utf-8"), len(volgorde))

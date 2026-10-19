@@ -74,7 +74,7 @@ This project holds personal data about athletes, many of them minors.
 | `models/`     | Data classes: `atleet`, `prestatie`, `groep`, `leerlijn`, `periodisering`, `rooster`, `doel`, `ploeg` |
 | `db/`         | `schema_<database>.sql`, `init_db.py` (keys, connect, create/migrate), `queries.py`, `migrations/<database>/` |
 | `importers/`  | Import results from links: atletiek.nu PRs, atletiek.nu competitions, Seltec competitions |
-| `ploeg/`      | Team selection: `vergelijk` (compare athletes), `regels` (rules), `opstelling` (lineup), `strategieen/` (selection "mentalities") |
+| `ploeg/`      | Team selection: `vergelijk` (compare athletes), `voorspeller` (predictions), `estafettes` (relays), `regels` (rules), `opstelling` (lineup), `optimaliseer` + `strategieen/` (selection "mentalities") |
 | `groepen/`    | Groups, `absentie`, `periodeplan` (periodisering pages: mega/meso cycle, year view, copy), `rooster` (planned training content, import, apply to trainings), `doelen` (goals: status, forms) |
 | `wedstrijden/` | `planning`: upcoming meets, who goes, which events (uses `wedstrijd` + `inschrijving` in `prestaties.db`) |
 | `atleten/`, `leerlijnen/` | Feature logic for athletes and learning pathways |
@@ -338,6 +338,14 @@ python src/db/init_db.py --herstel <sleutel>  # restore the key (e.g. new comput
   `ploeg/optimaliseer.py` (`scipy.optimize.milp`). Register a new one in
   `STRATEGIEEN` (explicit imports, so PyInstaller bundles it). scipy is a
   runtime dependency of the optimiser only; the rest of AVS works without it.
+- Missing performances are predicted (`ploeg/voorspeller.py`) from the rule
+  file's `buren` (neighbour events, via equal points) and `verhouding`
+  (implement/hurdle-height ratios), times `algemeen.voorspelling_factor`.
+  Predictions only use real performances (no chains), are always flagged
+  (`Cel.voorspeld`, `Cel.bron`) and are never exported as a performance (the
+  CSV gets 'x'). Relays (`ploeg/estafettes.py`): sum of the leg times
+  (`benen`) + `correctie_s`; the optimiser chooses among precomputed quartets.
+  All these numbers are configuration, not code.
 - `ploeg.regelset` stores the rule file name and `ploeg.strategie` the strategy
   used, so a lineup can be explained afterwards.
 
