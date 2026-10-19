@@ -29,9 +29,10 @@ def profiel(_nummer: str) -> str:
     return PROFIEL
 
 
-def rij(voornaam="", achternaam="", atletieknu="", tussenvoegsel="", geboortedatum="", geslacht=""):
+def rij(voornaam="", achternaam="", atletieknu="", tussenvoegsel="", geboortedatum="", geslacht="", licentie=""):
     return {"voornaam": voornaam, "tussenvoegsel": tussenvoegsel, "achternaam": achternaam,
-            "geboortedatum": geboortedatum, "geslacht": geslacht, "atletieknu": atletieknu}
+            "geboortedatum": geboortedatum, "geslacht": geslacht, "atletieknu": atletieknu,
+            "au_licentienummer": licentie}
 
 
 def formulier(rijen, **extra):
@@ -55,7 +56,7 @@ def test_rijen_uit_formulier_en_csv():
     assert len(rijen) == 2                                   # lege regel valt weg
     assert rijen[0]["tussenvoegsel"] == "de"
     tekst = gi.maak_csv(rijen)
-    assert tekst.splitlines()[0] == "voornaam;tussenvoegsel;achternaam;geboortedatum;geslacht;atletieknu"
+    assert tekst.splitlines()[0] == "voornaam;tussenvoegsel;achternaam;geboortedatum;geslacht;atletieknu;au_licentienummer"
     assert '"Jansen; Smit"' in tekst                         # ; in een waarde wordt netjes ingepakt
     assert len(gi.aangevuld(rijen)) == gi.LEGE_RIJEN
     assert len(gi.aangevuld([rij("a")] * 10)) == 12           # altijd een paar lege regels erbij
@@ -81,6 +82,25 @@ def test_controleer_meldt_fouten_per_regel():
     r = lees.regels[0]
     assert (r.voornaam, r.tussenvoegsel, r.achternaam, r.atletieknu_id, r.geboortedatum, r.geslacht) == \
         ("Test", "de", "Vries", "999999", "2011", "V")
+
+
+def test_licentienummer_in_de_tabel():
+    assert gi.VELDEN[-1] == "au_licentienummer"              # als laatste: oude plak-volgorde blijft gelijk
+    lees = gi.controleer([rij("Test", "Vries", "999999", licentie="12 34 567"), rij("Proef", "Jansen", "888888")])
+    assert [r.au_licentienummer for r in lees.regels] == ["1234567", None]
+    try:
+        gi.controleer([rij("Test", "Vries", "999999", licentie="AU12")])
+        raise AssertionError("TabelFout verwacht")
+    except gi.TabelFout as e:
+        assert "AU-licentienummer" in e.fouten[0]
+
+
+def test_importeren_met_licentienummer():
+    with opslag(met_voorbeeld=False) as (db, _):
+        res = gi.importeren(db, [rij("Test", "Vries", "999999", licentie="1234567")],
+                            gi.Groepkeuze("nieuw", naam="Licenties"), haal_html=profiel)
+        assert len(res.gelukt) == 1
+        assert db.atleet_op_au_licentienummer("1234567").atletieknu_id == "999999"
 
 
 # ----------------------------------------------------------------- importeren

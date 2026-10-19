@@ -775,6 +775,7 @@ th[aria-sort="descending"] .sorteer__naam::after { content: " \2193"; opacity: 1
 .importtabel .importtabel__tussenvoegsel { width: 5.5rem; }
 .importtabel .importtabel__geslacht { width: 4rem; }
 .importtabel .importtabel__geboortedatum { width: 8.5rem; }
+.importtabel .importtabel__au_licentienummer { width: 7.5rem; }
 .celveld {
   width: 100%; min-width: 0; box-sizing: border-box; font: inherit; font-size: var(--maat-s);
   padding: .3rem .4rem; border: 1px solid transparent; background: var(--papier); color: var(--tekst);

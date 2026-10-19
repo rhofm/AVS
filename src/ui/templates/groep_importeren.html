@@ -64,7 +64,7 @@
       <h2 class="kop" id="kop-atleten">{% if resultaat and resultaat.mislukt %}Nog niet geïmporteerd{% else %}Atleten{% endif %}</h2>
       <p class="zacht">Eén atleet per regel. Verplicht: voornaam, achternaam en het atletiek.nu-nummer
         (of de link naar het profiel, bijv. https://www.atletiek.nu/atleet/profiel/123456/).
-        Geboortedatum mag ook alleen een jaar zijn. Uit Excel kopiëren? Klik in de eerste cel en plak:
+        Geboortedatum mag ook alleen een jaar zijn; het AU-licentienummer mag leeg blijven. Uit Excel kopiëren? Klik in de eerste cel en plak:
         de kolommen worden in deze volgorde verdeeld.</p>
 
       <div class="tabelvak">
@@ -85,7 +85,7 @@
                 <td class="importtabel__nr" aria-hidden="true"></td>
                 {% for veld, kop, verplicht in kolommen %}
                   <td><input type="text" class="celveld" name="{{ veld }}" value="{{ rij[veld] }}" aria-label="{{ kop }}, regel {{ i + 1 }}"
-                       {%- if veld == "geboortedatum" %} placeholder="dd-mm-jjjj"{% elif veld == "geslacht" %} placeholder="M/V" maxlength="10"{% elif veld == "atletieknu" %} placeholder="123456"{% endif %} autocomplete="off"></td>
+                       {%- if veld == "geboortedatum" %} placeholder="dd-mm-jjjj"{% elif veld == "geslacht" %} placeholder="M/V" maxlength="10"{% elif veld == "atletieknu" %} placeholder="123456"{% elif veld == "au_licentienummer" %} placeholder="optioneel" inputmode="numeric"{% endif %} autocomplete="off"></td>
                 {% endfor %}
                 <td class="importtabel__weg"><button type="button" class="kruisje" data-weg aria-label="Regel {{ i + 1 }} weghalen" title="Regel weghalen">&times;</button></td>
               </tr>

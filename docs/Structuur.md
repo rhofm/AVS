@@ -5,6 +5,7 @@
 ## Atleet
 
 * Persoonsgegevens (Naam, Geslacht, Leeftijd/Geboortejaar/Geboortedatum, ...)
+* AU-licentienummer (licentienummer van de Atletiekunie): optioneel, alleen cijfers, uniek; in te vullen bij 'Nieuwe atleet' en 'Gegevens aanpassen', of mee te importeren met 'Groep importeren' / de CSV-import (kolom 'licentienummer'; alleen met kopregel). Een bestaande atleet krijgt het nummer alleen als hij er nog geen heeft; hoort het al bij een andere atleet, dan wordt die regel niet geïmporteerd. Zichtbaar op de pagina van de atleet. Staat alleen in personen.db
 * PR's
 * Specialisatie (?)
 * Testresultaten

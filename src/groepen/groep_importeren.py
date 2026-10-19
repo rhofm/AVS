@@ -1,8 +1,8 @@
 """Een groep atleten importeren vanuit de app (pagina 'Groep importeren', /importeren/groep).
 
 De trainer vult een tabel in (of plakt een lijst uit Excel): per atleet voornaam,
-tussenvoegsel, achternaam, geboortedatum, geslacht en het atletiek.nu-nummer of
-de profiel-link. Daarvan maakt `maak_csv()` dezelfde CSV als die voor
+tussenvoegsel, achternaam, geboortedatum, geslacht, het atletiek.nu-nummer of
+de profiel-link, en (optioneel) het AU-licentienummer. Daarvan maakt `maak_csv()` dezelfde CSV als die voor
 `groepen/atleten_uit_csv.py`, zodat precies dezelfde controles en dezelfde import
 gebruikt worden (`lees_csv` + `importeer_regels`). De CSV bestaat alleen in het
 geheugen: er wordt niets met namen of geboortedata naar schijf geschreven.
@@ -47,6 +47,7 @@ KOLOMMEN: tuple[tuple[str, str, bool], ...] = (
     ("geboortedatum", "Geboortedatum", False),
     ("geslacht", "M/V", False),
     ("atletieknu", "atletiek.nu-nummer of link", True),
+    ("au_licentienummer", "AU-licentie", False),        # als laatste: oude plak-volgorde blijft werken
 )
 VELDEN = tuple(k for k, _, _ in KOLOMMEN)
 

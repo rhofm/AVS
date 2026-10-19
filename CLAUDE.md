@@ -35,8 +35,8 @@ This project holds personal data about athletes, many of them minors.
 - **Never commit, print or log keys.** The master key lives only in the OS
   keyring; the recovery key is shown only on explicit request
   (`--herstelsleutel`). Do not write keys to files, config or test fixtures.
-- **Keep the split intact.** Names, birth dates, `master_id` and `atletieknu_id`
-  live only in `personen.db`. Never copy them into `prestaties.db`,
+- **Keep the split intact.** Names, birth dates, `master_id`, `atletieknu_id` and
+  `au_licentienummer` (Atletiekunie licence number) live only in `personen.db`. Never copy them into `prestaties.db`,
   `testen.db`, `trainingsschema.db`, `absentie.db`, `leerlijnen.db`,
   `leerdoelscores.db` or `notities.db`, and never store anything there that points back to a person
   (e.g. a per-athlete atletiek.nu URL).

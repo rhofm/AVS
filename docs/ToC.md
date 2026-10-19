@@ -68,8 +68,10 @@ AVS/
 │   │       │   ├── 002_absentie_naar_eigen_database.sql  ✅ moves absence out of personen.db (init_db copies the rows)
 │   │       │   ├── 004_groep_trainingstijden.sql         ✅ groep_trainingstijden: one row per group, start time per weekday or empty
 │   │       │                                             (there is no 003: two clashing 003s were replaced; init_db moves their data)
-│   │       │   └── 005_training_onderdelen.sql           ✅ training: warming-up, kern A/B, cooling-down, notities; deviating
-│   │       │                                                variants (hoofdtraining_id + training_atleet)
+│   │       │   ├── 005_training_onderdelen.sql           ✅ training: warming-up, kern A/B, cooling-down, notities; deviating
+│   │       │   │                                            variants (hoofdtraining_id + training_atleet)
+│   │       │   └── 009_au_licentienummer.sql             ✅ atleet.au_licentienummer: licence number of the Atletiekunie
+│   │       │                                                (optional, digits only, unique)
 │   │       └── prestaties/
 │   │           ├── 002_pr_alleen_windlegaal.sql       ✅ PR view: windmeting per event (sprint/hurdles ≤200 m,
 │   │           │                                         long/triple jump), max +2.0, indoor always counts
@@ -131,7 +133,8 @@ AVS/
 │   │   ├── absentie.py           ✅ attendance list pre-filled from the training schedule, overview per athlete
 │   │   ├── groep_importeren.py   ✅ page 'Groep importeren': table (typed or pasted from Excel) → CSV in memory →
 │   │   │                         atleten_uit_csv (same checks + import) → successful athletes into an existing
-│   │   │                         or a new group. Table/group errors stop everything before anything is fetched
+│   │   │                         or a new group. Table/group errors stop everything before anything is fetched.
+│   │   │                         Optional last column: AU-licentienummer
 │   │   └── periodeplan.py        📝
 │   │
 │   ├── leerlijnen/
@@ -156,6 +159,7 @@ AVS/
     ├── test_wedstrijden.py       ✅ 5 tests
     ├── test_chronoloog.py        ✅ 5 tests (timetable storage, groups/duration, category matching, clashes, migration)
     ├── test_tijdschema_import.py ✅ 6 tests (parse two meets, links/detection, import into the database)
+    ├── test_au_licentienummer.py  ✅ 6 tests (model, save/look up, migration on an existing database, new/edit forms, pages)
     ├── test_seltec_tijdschema.py ✅ 6 tests (category codes, multi-category matching, 3-day NK, club meet, links, import)
     ├── test_wedstrijdenoverzicht.py ✅ 5 tests (upcoming/past, counts, checkbox, '+ Nieuwe wedstrijd')
     ├── test_wedstrijdpagina.py   ✅ 8 tests (timetable + athletes, hidden items, register/deregister, import route)
@@ -166,7 +170,8 @@ AVS/
     ├── test_groep_starttijden.py ✅ 7 tests (training times, moving old data, duplicate migration numbers)
     ├── test_startpagina.py       ✅ 3 tests (tiles, counts, top bar with only Importeren + Instellingen)
     ├── test_importeren.py        ✅ 5 tests (three tiles and their targets, redirects to the forms, group page, no names)
-    ├── test_groep_importeren.py  ✅ 10 tests (table → CSV, errors per row, new/existing group, re-import, failures, same name, page)
+    ├── test_groep_importeren.py  ✅ 12 tests (table → CSV, errors per row, new/existing group, re-import, failures, same name,
+    │                             page, AU-licentienummer)
     ├── test_trainingen_inhoud.py ✅ 5 tests (training parts, variants, markdown, old `inhoud` → `notities`)
     ├── test_leerdoelen.py        ✅ 10 tests
     ├── test_leerlijnen_overzicht.py ✅ 10 tests: page 'Leerlijnen' (per onderdeel, per categorie, both)

@@ -24,8 +24,13 @@ Bij voorkeur met een kopregel. Herkende kolomnamen (hoofdletters/spaties maken n
     voornaam;tussenvoegsel;achternaam;geboortedatum;atletieknu
 of met de naam in één kolom:
     naam;geboortedatum;atletieknu
-Optioneel: geslacht (M/V/X, man/vrouw, jongen/meisje) en club.
+Optioneel: geslacht (M/V/X, man/vrouw, jongen/meisje), club en het licentienummer
+van de Atletiekunie (kolom 'licentienummer', 'AU-licentie', 'licentie nr', ...).
 In de atletiek.nu-kolom mag het nummer staan of de link naar het profiel.
+Het licentienummer wordt alleen gelezen als er een kopregel is (zonder kopregel is
+het niet van het atletiek.nu-nummer te onderscheiden). Een bestaande atleet krijgt
+het nummer alleen als hij er nog geen heeft; hoort het nummer al bij een andere
+atleet, dan wordt die regel niet geïmporteerd.
 Geboortedatum: 25-03-2011, 25/03/2011, 2011-03-25 of alleen 2011.
 
 Zonder kopregel wordt op inhoud gekeken: de kolom met het nummer is het
@@ -73,7 +78,7 @@ TUSSENVOEGSELS = {
 }
 
 VELDEN = ("voornaam", "tussenvoegsel", "achternaam", "naam", "geboortedatum",
-          "atletieknu_id", "geslacht", "club")
+          "atletieknu_id", "geslacht", "club", "au_licentienummer")
 
 
 # --------------------------------------------------------------------------- één CSV-regel
@@ -89,6 +94,7 @@ class Regel:
     geboortedatum: str | None = field(default=None, repr=False)
     geslacht: str | None = None
     club: str | None = None
+    au_licentienummer: str | None = field(default=None, repr=False)
     ruw: list[str] = field(default_factory=list, repr=False)   # originele cellen, voor _mislukt.csv
 
     @property
@@ -143,6 +149,21 @@ def lees_atletieknu_id(tekst: str) -> str:
     return atleet_id_uit(tekst)
 
 
+def lees_licentienummer(tekst: str) -> str | None:
+    """AU-licentienummer: alleen cijfers, spaties weg ('12 34 567' -> '1234567'). None als leeg.
+
+    Excel maakt van een nummer soms '1234567.0'. Iets anders dan cijfers geeft ValueError.
+    """
+    t = "".join(tekst.split())
+    if re.fullmatch(r"\d+\.0", t):
+        t = t[:-2]
+    if not t:
+        return None
+    if not t.isdigit():
+        raise ValueError(f"onbekend AU-licentienummer {tekst.strip()!r}; alleen cijfers.")
+    return t
+
+
 def splits_naam(volledig: str) -> tuple[str, str | None, str]:
     """'Jan de Vries' / 'Vries, Jan de' / 'de Vries, Jan' -> ('Jan', 'de', 'Vries')."""
     volledig = " ".join(volledig.split())
@@ -182,6 +203,9 @@ def veld_van_kop(kop: str) -> str | None:
     k = _sleutel(kop)
     if not k:
         return None
+    # Vóór atletiek.nu: 'Atletiekunie licentienummer' bevat ook 'atletiek'.
+    if "licentie" in k or "licence" in k or "license" in k or k in ("aunummer", "aunr", "knaunummer"):
+        return "au_licentienummer"
     if "atletiek" in k or k in ("id", "nummer", "nr", "profiel", "link", "url", "anid", "atleetid"):
         return "atletieknu_id"
     if k.startswith("geb") or "birth" in k or k in ("dob", "geboren"):
@@ -290,6 +314,7 @@ def lees_csv(bron: Path | str, *, tekst: str | None = None) -> Leesresultaat:
         return rij[i].strip() if i is not None and i < len(rij) else ""
 
     gezien: dict[str, int] = {}
+    licenties: dict[str, int] = {}
     for n, rij in rijen:
         try:
             if "voornaam" in k and "achternaam" in k:
@@ -316,15 +341,21 @@ def lees_csv(bron: Path | str, *, tekst: str | None = None) -> Leesresultaat:
             if ruw_geslacht and not geslacht:
                 raise ValueError(f"onbekend geslacht {ruw_geslacht!r}; gebruik M, V of X.")
 
+            licentie = lees_licentienummer(cel(rij, "au_licentienummer"))
+
             if atletieknu_id in gezien:
                 raise ValueError(f"atletiek.nu-nummer {atletieknu_id} staat ook al op regel {gezien[atletieknu_id]}.")
+            if licentie is not None and licentie in licenties:
+                raise ValueError(f"AU-licentienummer {licentie} staat ook al op regel {licenties[licentie]}.")
             gezien[atletieknu_id] = n
+            if licentie is not None:
+                licenties[licentie] = n
         except ValueError as fout:
             uit.fouten.append((n, str(fout)))
             continue
         uit.regels.append(Regel(n, voornaam, achternaam, atletieknu_id, tussenvoegsel=tussenvoegsel,
                                 geboortedatum=geboortedatum, geslacht=geslacht,
-                                club=cel(rij, "club") or None, ruw=rij))
+                                club=cel(rij, "club") or None, au_licentienummer=licentie, ruw=rij))
     return uit
 
 
@@ -352,6 +383,7 @@ def importeer_regels(db: Opslag, regels: list[Regel], *,
     for nr, regel in enumerate(regels, 1):
         kop = f"[{nr}/{len(regels)}] {regel.naam}"
         try:
+            _controleer_licentie(db, regel)
             html = haal_html(regel.atletieknu_id)
             u = voeg_toe(db, regel.voornaam, regel.achternaam, regel.atletieknu_id,
                          tussenvoegsel=regel.tussenvoegsel, html=html, bevestig=bevestig,
@@ -373,11 +405,26 @@ def importeer_regels(db: Opslag, regels: list[Regel], *,
     return verslag
 
 
+def _controleer_licentie(db: Opslag, regel: Regel) -> None:
+    """ValueError als het licentienummer al bij een andere atleet hoort (vóór er iets wordt opgeslagen).
+
+    'Een andere atleet' = een atleet met een ander of geen atletiek.nu-nummer. Bij hetzelfde
+    nummer is het dezelfde persoon en is er niets aan de hand.
+    """
+    if regel.au_licentienummer is None:
+        return
+    eigenaar = db.atleet_op_au_licentienummer(regel.au_licentienummer)
+    if eigenaar is not None and eigenaar.atletieknu_id != regel.atletieknu_id:
+        raise ValueError(f"AU-licentienummer {regel.au_licentienummer} hoort al bij {eigenaar.naam}"
+                         + (f" (atletiek.nu-nummer {eigenaar.atletieknu_id})." if eigenaar.atletieknu_id
+                            else " (zonder atletiek.nu-nummer). Vul daar eerst het atletiek.nu-nummer in."))
+
+
 def _vul_lege_velden_aan(db: Opslag, atleet: Atleet, regel: Regel) -> None:
-    """Stond de atleet er al, vul dan geboortedatum/geslacht/club aan als die nog leeg zijn.
-    Bestaande gegevens worden nooit overschreven."""
+    """Vul geboortedatum/geslacht/club/licentienummer aan als die bij de atleet nog leeg zijn
+    (bij een nieuwe atleet: het licentienummer). Bestaande gegevens worden nooit overschreven."""
     veranderd = False
-    for veld in ("geboortedatum", "geslacht", "club"):
+    for veld in ("geboortedatum", "geslacht", "club", "au_licentienummer"):
         waarde = getattr(regel, veld)
         if waarde and getattr(atleet, veld) is None:
             setattr(atleet, veld, waarde)
@@ -469,10 +516,11 @@ def maak_haal_html(html_map: Path | None, pauze: float) -> Callable[[str], str]:
 def toon_proef(lees: Leesresultaat) -> None:
     kolommen = ", ".join(f"{veld}=kolom {i + 1}" for veld, i in sorted(lees.kolommen.items(), key=lambda x: x[1]))
     print(f"Kopregel: {'ja' if lees.kopregel else 'nee (kolommen geraden)'}; {kolommen}\n")
-    print(f"{'regel':>5}  {'voornaam':<15} {'tussenv.':<9} {'achternaam':<20} {'geboren':<11} {'nummer':<9} gesl.")
+    print(f"{'regel':>5}  {'voornaam':<15} {'tussenv.':<9} {'achternaam':<20} {'geboren':<11} {'nummer':<9} "
+          f"{'gesl.':<6} licentie")
     for r in lees.regels:
         print(f"{r.regelnummer:>5}  {r.voornaam:<15} {r.tussenvoegsel or '':<9} {r.achternaam:<20} "
-              f"{r.geboortedatum or '':<11} {r.atletieknu_id:<9} {r.geslacht or ''}")
+              f"{r.geboortedatum or '':<11} {r.atletieknu_id:<9} {r.geslacht or '':<6} {r.au_licentienummer or ''}")
 
 
 def main(argv: list[str] | None = None) -> int:

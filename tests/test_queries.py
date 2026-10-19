@@ -204,7 +204,12 @@ def test_migratie_op_bestaande_database():
                     [(n,) for n in WINDNAMEN],
                 )
             honderd = db.prestaties_db.execute("SELECT id FROM onderdeel WHERE naam = '100m'").fetchone()[0]
-            anna = db.atleet_opslaan(Atleet("Anna", "Voorbeeld"))
+            # Ook de atleet rechtstreeks: personen.db op versie 1 kent nieuwere kolommen
+            # (zoals au_licentienummer, migratie 009) nog niet.
+            with db.personen:
+                db.personen.execute("INSERT INTO atleet (master_id, voornaam, achternaam) VALUES (?, 'Anna', 'Voorbeeld')",
+                                    ("b" * 32,))
+            anna = Atleet("Anna", "Voorbeeld", master_id="b" * 32)
             # Ook prestaties rechtstreeks: versie 1 kent de kolom indoor nog niet.
             ref = pseudoniem(anna.master_id, "prestaties", TESTSLEUTEL)
             with db.prestaties_db:

@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS atleet (
     geboortedatum   TEXT,              -- ISO 'YYYY-MM-DD' (of alleen jaar: 'YYYY')
     club            TEXT,
     atletieknu_id   TEXT UNIQUE,       -- om imports aan de juiste atleet te koppelen
+    -- au_licentienummer (licentienummer Atletiekunie) komt erbij in migratie 009
     specialisatie   TEXT,
     actief          INTEGER NOT NULL DEFAULT 1,
     notities        TEXT,

@@ -159,6 +159,7 @@ class Opslag:
             geslacht=r["geslacht"],
             geboortedatum=r["geboortedatum"], club=r["club"], atletieknu_id=r["atletieknu_id"],
             specialisatie=r["specialisatie"], actief=bool(r["actief"]), notities=r["notities"],
+            au_licentienummer=r["au_licentienummer"],
             master_id=r["master_id"], aangemaakt_op=r["aangemaakt_op"],
         )
 
@@ -170,17 +171,18 @@ class Opslag:
         with self.personen:
             self.personen.execute(
                 """INSERT INTO atleet (master_id, voornaam, tussenvoegsel, achternaam, geslacht,
-                                       geboortedatum, club, atletieknu_id, specialisatie, actief, notities)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                       geboortedatum, club, atletieknu_id, specialisatie, actief, notities,
+                                       au_licentienummer)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                    ON CONFLICT (master_id) DO UPDATE SET
                        voornaam = excluded.voornaam, tussenvoegsel = excluded.tussenvoegsel,
                        achternaam = excluded.achternaam,
                        geslacht = excluded.geslacht, geboortedatum = excluded.geboortedatum,
                        club = excluded.club, atletieknu_id = excluded.atletieknu_id,
                        specialisatie = excluded.specialisatie, actief = excluded.actief,
-                       notities = excluded.notities""",
+                       notities = excluded.notities, au_licentienummer = excluded.au_licentienummer""",
                 (a.master_id, a.voornaam, a.tussenvoegsel, a.achternaam, a.geslacht, a.geboortedatum,
-                 a.club, a.atletieknu_id, a.specialisatie, int(a.actief), a.notities),
+                 a.club, a.atletieknu_id, a.specialisatie, int(a.actief), a.notities, a.au_licentienummer),
             )
         if nieuw:
             self._vergeet_pseudoniemen()
@@ -191,6 +193,13 @@ class Opslag:
 
     def atleet(self, master_id: str) -> Atleet | None:
         r = self.personen.execute("SELECT * FROM atleet WHERE master_id = ?", (master_id,)).fetchone()
+        return self._atleet(r) if r else None
+
+    def atleet_op_au_licentienummer(self, nummer: str) -> Atleet | None:
+        """De atleet met dit licentienummer van de Atletiekunie, of None."""
+        r = self.personen.execute(
+            "SELECT * FROM atleet WHERE au_licentienummer = ?", ("".join(str(nummer).split()),)
+        ).fetchone()
         return self._atleet(r) if r else None
 
     def atleet_op_atletieknu_id(self, atletieknu_id: str) -> Atleet | None:

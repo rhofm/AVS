@@ -54,6 +54,7 @@
         {{ tekstveld("specialisatie", "Specialisatie", extra='list="specialisaties" autocomplete="off"', hint="kies of typ zelf") }}
         <datalist id="specialisaties">{% for s in f.specialisaties %}<option value="{{ s }}">{% endfor %}</datalist>
         {{ tekstveld("atletieknu_id", "atletiek.nu-id", extra='inputmode="numeric" autocomplete="off"', hint="het nummer uit de link van het atletenprofiel; voor het koppelen van uitslagen") }}
+        {{ tekstveld("au_licentienummer", "AU-licentienummer", extra='inputmode="numeric" autocomplete="off"', hint="licentienummer van de Atletiekunie (alleen cijfers)") }}
         {{ tekstveld("club", "Club", extra='autocomplete="off"', hint="alleen als het een andere club is") }}
       </div>
     </section>

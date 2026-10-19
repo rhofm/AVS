@@ -1,12 +1,12 @@
 """Een nieuwe atleet met de hand toevoegen (pagina 'Nieuwe atleet' bij het atletenoverzicht).
 
-Het formulier vraagt de persoonsgegevens, de specialisatie, het atletiek.nu-id
-en meteen de groepen en trainingsdagen, zodat de atleet direct op de juiste
+Het formulier vraagt de persoonsgegevens, de specialisatie, het atletiek.nu-id,
+het licentienummer van de Atletiekunie en meteen de groepen en trainingsdagen, zodat de atleet direct op de juiste
 absentielijsten komt. `lees_formulier()` controleert de invoer, `aanmaken()`
 slaat alles op. Bestaat er al iemand met dezelfde naam (en hetzelfde
 geboortejaar), dan volgt `beheer.DubbeleAtleet` en vraagt de pagina om bevestiging.
 
-Privacy: namen, geboortedatum en atletiek.nu-id gaan alleen naar personen.db
+Privacy: namen, geboortedatum, atletiek.nu-id en licentienummer gaan alleen naar personen.db
 (via `Opslag`); het trainingsschema krijgt alleen het pseudoniem.
 Geen SQL: alles via `Opslag`.
 """
@@ -28,7 +28,7 @@ from .landingspagina import DAG_KORT
 SPECIALISATIES: tuple[str, ...] = ("Sprint", "Horden", "Midden- en lange afstand", "Springen", "Werpen",
                                    "Meerkamp")
 VELDEN: tuple[str, ...] = ("voornaam", "tussenvoegsel", "achternaam", "geslacht", "geboortedatum",
-                           "geboortejaar", "specialisatie", "atletieknu_id", "club")
+                           "geboortejaar", "specialisatie", "atletieknu_id", "au_licentienummer", "club")
 
 
 class InvoerFout(OpslagFout):
@@ -48,6 +48,7 @@ class NieuweAtleetInvoer:
     geboortedatum: str | None = None              # 'YYYY-MM-DD' of 'YYYY'
     specialisatie: str | None = None
     atletieknu_id: str | None = None
+    au_licentienummer: str | None = None
     club: str | None = None
     groep_ids: list[int] = field(default_factory=list)
     dagen: list[str] = field(default_factory=list)
@@ -98,7 +99,8 @@ def lees_formulier(db: Opslag, form: Mapping, *, peildatum: date | None = None,
                    eigen_master_id: str | None = None) -> NieuweAtleetInvoer:
     """Controleer het formulier. Geeft InvoerFout met een melding per veld als er iets niet klopt.
 
-    eigen_master_id: bij aanpassen de atleet zelf, zodat zijn eigen atletiek.nu-id niet als 'al in gebruik' telt.
+    eigen_master_id: bij aanpassen de atleet zelf, zodat zijn eigen atletiek.nu-id en licentienummer
+    niet als 'al in gebruik' tellen.
     """
     vandaag = peildatum or date.today()
     lijst = (lambda k: form.getlist(k)) if hasattr(form, "getlist") else (lambda k: form.get(k) or [])
@@ -139,6 +141,15 @@ def lees_formulier(db: Opslag, form: Mapping, *, peildatum: date | None = None,
             if bestaand is not None and bestaand.master_id != eigen_master_id:
                 fouten["atletieknu_id"] = f"Dit atletiek.nu-id hoort al bij {bestaand.naam}."
 
+    licentie = "".join(str(form.get("au_licentienummer") or "").split()) or None   # '12 34 567' -> '1234567'
+    if licentie is not None:
+        if not licentie.isdigit():
+            fouten["au_licentienummer"] = "Het AU-licentienummer bestaat alleen uit cijfers."
+        else:
+            bestaand = db.atleet_op_au_licentienummer(licentie)
+            if bestaand is not None and bestaand.master_id != eigen_master_id:
+                fouten["au_licentienummer"] = f"Dit licentienummer hoort al bij {bestaand.naam}."
+
     groep_ids: list[int] = []
     bekend = {g.id for g in db.groepen()}
     for g in lijst("groep"):
@@ -156,7 +167,7 @@ def lees_formulier(db: Opslag, form: Mapping, *, peildatum: date | None = None,
     return NieuweAtleetInvoer(
         voornaam=voornaam, achternaam=achternaam, tussenvoegsel=_schoon(form.get("tussenvoegsel")),
         geslacht=geslacht, geboortedatum=geboortedatum, specialisatie=_schoon(form.get("specialisatie")),
-        atletieknu_id=atletieknu_id, club=_schoon(form.get("club")),
+        atletieknu_id=atletieknu_id, au_licentienummer=licentie, club=_schoon(form.get("club")),
         groep_ids=list(dict.fromkeys(groep_ids)), dagen=dagen,
     )
 
@@ -167,7 +178,8 @@ def aanmaken(db: Opslag, invoer: NieuweAtleetInvoer, *, toch_aanmaken: bool = Fa
     Geeft beheer.DubbeleAtleet als er al iemand met dezelfde naam bestaat (tenzij toch_aanmaken).
     """
     gegevens = {k: getattr(invoer, k) for k in ("tussenvoegsel", "geslacht", "geboortedatum", "specialisatie",
-                                                "atletieknu_id", "club") if getattr(invoer, k) is not None}
+                                                "atletieknu_id", "au_licentienummer", "club")
+                if getattr(invoer, k) is not None}
     atleet = nieuwe_atleet(db, invoer.voornaam, invoer.achternaam, toch_aanmaken=toch_aanmaken, **gegevens)
     for gid in invoer.groep_ids:
         g = db.groep(gid)

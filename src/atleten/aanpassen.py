@@ -26,7 +26,7 @@ from .nieuw import NieuweAtleetInvoer, NieuwFormulier, formulier, lees_formulier
 VELDNAMEN = {
     "voornaam": "voornaam", "tussenvoegsel": "tussenvoegsel", "achternaam": "achternaam", "geslacht": "geslacht",
     "geboortedatum": "geboortedatum", "specialisatie": "specialisatie", "atletieknu_id": "atletiek.nu-id",
-    "club": "club", "actief": "actief",
+    "au_licentienummer": "AU-licentienummer", "club": "club", "actief": "actief",
 }
 
 
@@ -38,7 +38,7 @@ def ingevuld_uit(db: Opslag, atleet: Atleet) -> dict:
         "geslacht": atleet.geslacht or "",
         "geboortedatum": gd if len(gd) == 10 else "", "geboortejaar": gd if len(gd) == 4 else "",
         "specialisatie": atleet.specialisatie or "", "atletieknu_id": atleet.atletieknu_id or "",
-        "club": atleet.club or "",
+        "au_licentienummer": atleet.au_licentienummer or "", "club": atleet.club or "",
         "groep": [str(g.id) for g in db.groepen_van_atleet(atleet.master_id)],
     }
 
@@ -87,7 +87,7 @@ def opslaan(db: Opslag, master_id: str, invoer: NieuweAtleetInvoer, *, actief: b
         voornaam=invoer.voornaam, achternaam=invoer.achternaam, tussenvoegsel=invoer.tussenvoegsel,
         geslacht=invoer.geslacht, geboortedatum=invoer.geboortedatum, club=invoer.club,
         atletieknu_id=invoer.atletieknu_id, specialisatie=invoer.specialisatie, actief=actief,
-        notities=atleet.notities, master_id=master_id, aangemaakt_op=atleet.aangemaakt_op,
+        notities=atleet.notities, au_licentienummer=invoer.au_licentienummer, master_id=master_id, aangemaakt_op=atleet.aangemaakt_op,
     )
     velden = [naam for veld, naam in VELDNAMEN.items() if getattr(atleet, veld) != getattr(nieuw, veld)]
     if velden:

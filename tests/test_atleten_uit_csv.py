@@ -17,7 +17,8 @@ from atleten import beheer  # noqa: E402
 from db.init_db import init_db  # noqa: E402
 from db.queries import Opslag  # noqa: E402
 from groepen.atleten_uit_csv import (  # noqa: E402
-    BevestigingNodig, lees_csv, lees_datum, importeer_regels, maak_bevestig, schrijf_mislukt, splits_naam,
+    BevestigingNodig, lees_csv, lees_datum, lees_licentienummer, importeer_regels, maak_bevestig, schrijf_mislukt,
+    splits_naam, veld_van_kop,
 )
 from importers.base import ImportFout  # noqa: E402
 
@@ -107,6 +108,25 @@ def test_csv_fouten():
     assert "geboortedatum" in lees.fouten[0][1] and "regel 2" in lees.fouten[1][1]
 
 
+def test_csv_met_licentienummer():
+    for kop in ("Licentienummer", "AU-licentie", "Licentie nr", "Atletiekunie licentienummer", "AU nummer"):
+        assert veld_van_kop(kop) == "au_licentienummer", kop
+    assert veld_van_kop("Atletiek.nu nummer") == "atletieknu_id"
+    assert lees_licentienummer(" 12 34 567 ") == "1234567" and lees_licentienummer("1234567.0") == "1234567"
+    assert lees_licentienummer("") is None
+    tekst = ("naam;atletieknu;licentienummer\n"
+             "Test de Vries;999999;1234567\n"
+             "Proef Jansen;888888;\n"
+             "Fout Een;777777;AU-12\n"
+             "Fout Twee;666666;1234567\n")
+    lees = lees_csv("x.csv", tekst=tekst)
+    assert [(r.atletieknu_id, r.au_licentienummer) for r in lees.regels] == [("999999", "1234567"), ("888888", None)]
+    assert [n for n, _ in lees.fouten] == [4, 5]
+    assert "alleen cijfers" in lees.fouten[0][1] and "regel 2" in lees.fouten[1][1]
+    # Zonder kopregel wordt geen licentienummer gelezen (niet te onderscheiden van het atletiek.nu-nummer).
+    assert lees_csv("x.csv", tekst="Test de Vries;999999\n").regels[0].au_licentienummer is None
+
+
 # ----------------------------------------------------------------- importeren
 
 def test_importeer_en_opnieuw():
@@ -168,6 +188,35 @@ def test_zonder_toetsenbord_wordt_dubbele_naam_overgeslagen():
         v = importeer_regels(db, lees.regels, haal_html=lambda _: PROFIEL, bevestig=bevestig, log=stil)
         assert not v.gelukt and len(v.mislukt) == 1
         assert len(db.atleten(alleen_actief=False)) == 1
+
+
+def test_importeer_licentienummer():
+    with opslag() as db:
+        lees = lees_csv("x.csv", tekst="naam;atletieknu;licentie\nTest de Vries;999999;1234567\n")
+        v = importeer_regels(db, lees.regels, haal_html=lambda _: PROFIEL, log=stil)
+        assert len(v.gelukt) == 1
+        a = db.atleet_op_au_licentienummer("1234567")
+        assert a.atletieknu_id == "999999" and a.naam == "Test de Vries"
+        # Opnieuw met hetzelfde nummer: dezelfde atleet, niets aan de hand.
+        assert len(importeer_regels(db, lees.regels, haal_html=lambda _: PROFIEL, log=stil).gelukt) == 1
+        # Een bestaande licentie wordt niet overschreven.
+        lees2 = lees_csv("x.csv", tekst="naam;atletieknu;licentie\nTest de Vries;999999;7654321\n")
+        importeer_regels(db, lees2.regels, haal_html=lambda _: PROFIEL, log=stil)
+        assert db.atleet(a.master_id).au_licentienummer == "1234567"
+
+
+def test_licentie_van_een_ander_wordt_niet_geimporteerd():
+    with opslag() as db:
+        bas = beheer.nieuwe_atleet(db, "Bas", "Proef", au_licentienummer="1234567")
+        opgehaald = []
+        lees = lees_csv("x.csv", tekst="naam;atletieknu;licentie\nTest de Vries;999999;1234567\n")
+        v = importeer_regels(db, lees.regels, haal_html=lambda n: opgehaald.append(n) or PROFIEL, log=stil)
+        assert not v.gelukt and "Bas Proef" in v.mislukt[0][1] and "atletiek.nu-nummer in" in v.mislukt[0][1]
+        assert opgehaald == [] and db.atleet_op_atletieknu_id("999999") is None   # niets half opgeslagen
+        bas.atletieknu_id = "555555"
+        db.atleet_opslaan(bas)
+        v = importeer_regels(db, lees.regels, haal_html=lambda _: PROFIEL, log=stil)
+        assert "555555" in v.mislukt[0][1]
 
 
 if __name__ == "__main__":

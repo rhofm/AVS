@@ -9,8 +9,8 @@ Hoort bij de tabel `atleet` in personen.db. Een atleet wordt in de hele app
 aangeduid met zijn master_id. Het pseudoniem (atleet_ref) in prestaties.db en
 testen.db is een opslagdetail van db/ en komt in de modellen niet voor.
 
-Privacy: naam en geboortedatum staan met repr=False, zodat ze niet in logs of
-foutmeldingen belanden als een Atleet geprint wordt.
+Privacy: naam, geboortedatum, atletiek.nu-id en AU-licentienummer staan met
+repr=False, zodat ze niet in logs of foutmeldingen belanden als een Atleet geprint wordt.
 """
 
 from __future__ import annotations
@@ -35,6 +35,7 @@ class Atleet:
     actief: bool = True
     notities: str | None = field(default=None, repr=False)
     tussenvoegsel: str | None = field(default=None, repr=False)   # bv. 'de', 'van der'
+    au_licentienummer: str | None = field(default=None, repr=False)   # licentienummer Atletiekunie, alleen cijfers
     master_id: str | None = None        # None zolang nog niet opgeslagen; db/ maakt hem aan
     aangemaakt_op: str | None = None    # gezet door de database
 
@@ -47,6 +48,10 @@ class Atleet:
             raise ValueError("master_id moet 32 hex-tekens zijn.")
         if self.geboortedatum is not None:
             _controleer_geboortedatum(self.geboortedatum)
+        if self.au_licentienummer is not None:
+            self.au_licentienummer = "".join(str(self.au_licentienummer).split()) or None
+            if self.au_licentienummer is not None and not self.au_licentienummer.isdigit():
+                raise ValueError("Het AU-licentienummer bestaat alleen uit cijfers.")
 
     @property
     def volledige_achternaam(self) -> str:

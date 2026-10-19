@@ -28,7 +28,7 @@ def nieuwe_atleet(db: Opslag, voornaam: str, achternaam: str, *,
     Bestaat er al iemand met dezelfde naam (en hetzelfde geboortejaar), dan
     volgt een DubbeleAtleet-fout, tenzij toch_aanmaken=True.
     Extra gegevens: tussenvoegsel, geslacht, geboortedatum, club, atletieknu_id,
-    specialisatie, notities.
+    au_licentienummer, specialisatie, notities.
     """
     voornaam, achternaam = voornaam.strip(), achternaam.strip()
     if not voornaam or not achternaam:
