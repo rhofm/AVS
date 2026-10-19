@@ -142,6 +142,23 @@
     </div>
   </form>
 
+  <section class="blok" aria-labelledby="kop-indienen">
+    <h2 class="kop" id="kop-indienen">Indienen</h2>
+    {% if pg.wedstrijd %}
+      <p>Opslaan zet de ploeg ook op de wedstrijdpagina van
+        <a href="{{ url_for('wedstrijd', wedstrijd_id=pg.wedstrijd.id) }}">{{ pg.wedstrijd.naam }}</a>
+        (inschrijvingen per onderdeel; reserves als &lsquo;gaat mee&rsquo;), zodat het tijdschema en de botsingen kloppen.</p>
+    {% else %}
+      <p class="zacht">Koppel een wedstrijd via <a href="{{ url_for('ploeg_gegevens', ploeg_id=p.id) }}">Gegevens wijzigen</a>;
+        dan komt de ploeg ook op de wedstrijdpagina.</p>
+    {% endif %}
+    <p>Download de opgeslagen opstelling als csv om in te lezen bij atletiek.nu: per atleet AU-nummer, naam,
+      geslacht, geboortedatum, vereniging, categorie en ploeg, en per onderdeel de prestatie (of &lsquo;x&rsquo;).</p>
+    {% if pg.fouten %}<p class="melding melding--fout">Let op: de opstelling voldoet nog niet aan de regels (zie boven).</p>{% endif %}
+    <p class="zacht">De csv bevat persoonsgegevens. Bewaar hem niet langer dan nodig en deel hem alleen met de wedstrijdorganisatie.</p>
+    <div><a class="knop" href="{{ url_for('ploeg_export', ploeg_id=p.id) }}" download>Csv voor atletiek.nu downloaden</a></div>
+  </section>
+
   <footer class="vel__voet">Atleet Volg Systeem<br>{{ p.naam }}</footer>
 </article>
 {% endblock %}

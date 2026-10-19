@@ -18,6 +18,7 @@ from typing import Mapping
 
 from db.queries import Opslag, OpslagFout
 from models import PRESTATIEBASIS, Atleet, Inzet, Ploeg, PloegLid, Wedstrijd
+from ploeg import inschrijven as _inschrijven
 from ploeg import opstelling as _opstelling
 from ploeg import regels as _regels
 from ploeg.regels import Overtreding, RegelFout, Regelset
@@ -168,19 +169,38 @@ def lees_formulier(db: Opslag, form: Mapping, bestaande: Ploeg | None = None) ->
                  prestatiebasis=basis, id=bestaande.id if bestaande else None)
 
 
+def _gewenst(db: Opslag, ploeg: Ploeg | None) -> _inschrijven.Gewenst:
+    """Inschrijvingen die bij de opgeslagen opstelling horen ({} zonder ploeg of leesbaar regelbestand)."""
+    if ploeg is None or ploeg.id is None:
+        return {}
+    try:
+        rs = _regels.laad(ploeg.regelset)
+    except RegelFout:
+        return {}
+    return _inschrijven.gewenst(db, rs, ploeg, db.ploeg_leden(ploeg.id), db.ploeg_inzet(ploeg.id))
+
+
 def ploeg_opslaan(db: Opslag, ploeg: Ploeg) -> Ploeg:
     """Gegevens opslaan. Bij een andere ploeg of wedstrijd (programma) vervallen onderdelen
-    die daar niet op staan; de leden blijven."""
-    if ploeg.id is not None:
-        oud = db.ploeg(ploeg.id)
-        if oud and (oud.regelset, oud.categorie, oud.programma) != (ploeg.regelset, ploeg.categorie, ploeg.programma):
-            sleutels = {r.sleutel for r in _regels.laad(ploeg.regelset).programma(ploeg.categorie, ploeg.programma)}
-            leden = db.ploeg_leden(ploeg.id)
-            inzet = [i for i in db.ploeg_inzet(ploeg.id) if i.onderdeel in sleutels]
-            db.ploeg_opslaan(ploeg)
-            db.ploeg_opstelling_opslaan(ploeg.id, leden, inzet)
-            return ploeg
-    return db.ploeg_opslaan(ploeg)
+    die daar niet op staan; de leden blijven. Een andere gekoppelde wedstrijd: de
+    inschrijvingen van de ploeg verhuizen mee."""
+    if ploeg.id is None:
+        return db.ploeg_opslaan(ploeg)
+    oud = db.ploeg(ploeg.id)
+    oud_gewenst = _gewenst(db, oud)
+    if oud and (oud.regelset, oud.categorie, oud.programma) != (ploeg.regelset, ploeg.categorie, ploeg.programma):
+        sleutels = {r.sleutel for r in _regels.laad(ploeg.regelset).programma(ploeg.categorie, ploeg.programma)}
+        leden = db.ploeg_leden(ploeg.id)
+        inzet = [i for i in db.ploeg_inzet(ploeg.id) if i.onderdeel in sleutels]
+        db.ploeg_opslaan(ploeg)
+        db.ploeg_opstelling_opslaan(ploeg.id, leden, inzet)
+    else:
+        db.ploeg_opslaan(ploeg)
+    if oud is not None and oud.wedstrijd_id != ploeg.wedstrijd_id:
+        _inschrijven.synchroniseer(db, oud, oud_gewenst, {})            # weg van de oude wedstrijd
+        oud_gewenst = {}
+    _inschrijven.synchroniseer(db, ploeg, oud_gewenst, _gewenst(db, ploeg))
+    return ploeg
 
 
 # ============================================================
@@ -249,16 +269,29 @@ def ploegpagina(db: Opslag, ploeg_id: int, leden: list[PloegLid] | None = None,
         {a.master_id: a.naam for a in atleten})
 
 
-def opstelling_opslaan(db: Opslag, ploeg_id: int, form: Mapping) -> Ploegpagina:
-    """Formulier van de ploegpagina opslaan en de nieuwe stand teruggeven.
-    Ook een opstelling met fouten wordt opgeslagen: de trainer ziet wat er nog moet."""
+def opstelling_opslaan(db: Opslag, ploeg_id: int, form: Mapping
+                       ) -> tuple[Ploegpagina, _inschrijven.Wijzigingen]:
+    """Formulier van de ploegpagina opslaan en de nieuwe stand teruggeven, met wat er op
+    de gekoppelde wedstrijd is veranderd. Ook een opstelling met fouten wordt opgeslagen:
+    de trainer ziet wat er nog moet."""
     p = db.ploeg(ploeg_id)
     if p is None:
         raise OpslagFout(f"Ploeg {ploeg_id} bestaat niet.")
     rs = _regels.laad(p.regelset)
     huidige = db.ploeg_leden(ploeg_id)
+    oud = _inschrijven.gewenst(db, rs, p, huidige, db.ploeg_inzet(ploeg_id))
     ids = [a.master_id for a in _opstelling.kandidaten(db, rs, p, huidige)]
     sleutels = [r.sleutel for r in rs.programma(p.categorie, p.programma)]
     leden, inzet = _opstelling.lees_formulier(form, ids, sleutels)
     db.ploeg_opstelling_opslaan(ploeg_id, leden, inzet)
-    return ploegpagina(db, ploeg_id)
+    wijzigingen = _inschrijven.synchroniseer(db, p, oud, _inschrijven.gewenst(db, rs, p, leden, inzet))
+    return ploegpagina(db, ploeg_id), wijzigingen
+
+
+def ploeg_verwijderen(db: Opslag, ploeg_id: int) -> None:
+    """Ploeg verwijderen; de inschrijvingen die de ploeg op de gekoppelde wedstrijd zette, gaan mee."""
+    p = db.ploeg(ploeg_id)
+    if p is None:
+        return
+    _inschrijven.synchroniseer(db, p, _gewenst(db, p), {})
+    db.ploeg_verwijderen(ploeg_id)

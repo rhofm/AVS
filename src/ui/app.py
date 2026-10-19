@@ -55,6 +55,7 @@ from ui import export as trainingsexport
 from ui import importeren as importeerpagina
 from ui import startpagina
 from ui.opmaak import registreer_filters
+from ploeg import export as ploegexport
 from ploeg import paginas as ploegpaginas
 from ploeg.regels import RegelFout
 from wedstrijden import detail as wedstrijddetail
@@ -1325,7 +1326,7 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
     def ploeg_opslaan(ploeg_id: int):
         haal_ploeg(ploeg_id)
         try:
-            pg = ploegpaginas.opstelling_opslaan(db(), ploeg_id, request.form)
+            pg, wijzigingen = ploegpaginas.opstelling_opslaan(db(), ploeg_id, request.form)
         except RegelFout:
             return _ploegpagina(ploeg_id)
         except OpslagFout as e:
@@ -1333,12 +1334,28 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
             return render_template("ploeg.html", pg=pg, fout=str(e), actief_menu="ploegen"), 400
         tekst = "Opgeslagen." + (" Nog niet alles klopt: zie de meldingen." if pg.fouten else
                                  " De opstelling voldoet aan de regels.")
+        if wijzigingen.iets and pg.wedstrijd:
+            tekst += (f" Wedstrijd {pg.wedstrijd.naam} bijgewerkt: {wijzigingen.ingeschreven} ingeschreven, "
+                      f"{wijzigingen.afgemeld} afgemeld.")
         return _ploegpagina(ploeg_id, pg, melding=tekst)
+
+    @app.get("/ploeg/<int:ploeg_id>/atletieknu.csv")
+    def ploeg_export(ploeg_id: int):
+        haal_ploeg(ploeg_id)
+        try:
+            e = ploegexport.atletieknu_csv(db(), ploeg_id)
+        except RegelFout:
+            return _ploegpagina(ploeg_id)
+        if e is None:
+            abort(404)
+        # Persoonsgegevens: alleen als download, niet opslaan en niet cachen.
+        return Response(e.inhoud, mimetype="text/csv; charset=utf-8", headers={
+            "Content-Disposition": f'attachment; filename="{e.bestandsnaam}"', "Cache-Control": "no-store"})
 
     @app.post("/ploeg/<int:ploeg_id>/verwijderen")
     def ploeg_verwijderen(ploeg_id: int):
         p = haal_ploeg(ploeg_id)
-        db().ploeg_verwijderen(ploeg_id)
+        ploegpaginas.ploeg_verwijderen(db(), ploeg_id)
         flash(f"Ploeg {p.naam} is verwijderd.")
         return redirect(url_for("ploegen"))
 

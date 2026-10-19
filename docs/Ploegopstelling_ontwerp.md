@@ -283,7 +283,14 @@ gezet, zodat de wedstrijdpagina en de botsingencontrole meteen werken.
    `tests/test_ploegen.py`. Nog niet: punten voor estafettes (stap 6),
    beschikbaarheid per dagdeel en groepen bij technische onderdelen in de UI,
    inschrijvingen in `prestaties.db` bij opslaan (stap 4).
-4. Csv-export.
+4. ✅ Csv-export (`ploeg/export.py`, `/ploeg/<id>/atletieknu.csv`, puntkomma + BOM,
+   alleen als download) en de ploeg op de wedstrijdpagina (`ploeg/inschrijven.py`):
+   met een gekoppelde wedstrijd schrijft opslaan de opstelling in (reserves als
+   'gaat mee'); uit de ploeg halen meldt af, eigen inschrijvingen van de trainer
+   blijven. Andere wedstrijd koppelen of de ploeg verwijderen neemt de
+   inschrijvingen mee. Tests: `tests/test_ploeg_export.py`. Open: het precieze
+   importformaat van atletiek.nu (koppen, categorie-notatie) controleren met een
+   echte teaminschrijving.
 5. Optimalisatie + de drie strategieën.
 6. Voorspeller en estafettes.
 7. Meer ploegen, botsingen uit de chronoloog, U18/U20 (werpmateriaal),

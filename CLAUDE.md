@@ -325,6 +325,13 @@ python src/db/init_db.py --herstel <sleutel>  # restore the key (e.g. new comput
   file; hand times count with correction); totals and checks are in
   `ploeg/opstelling.py`, page data in `ploeg/paginas.py`. Nothing in the
   matrix is stored.
+- Saving a lineup of a ploeg linked to a meet also writes `inschrijving` rows
+  (`ploeg/inschrijven.synchroniseer`, old -> new lineup, so the trainer's own
+  registrations stay); go through `ploeg.paginas.ploeg_opslaan` /
+  `opstelling_opslaan` / `ploeg_verwijderen`, not the bare `Opslag` methods,
+  from the UI. The atletiek.nu CSV (`ploeg/export.py`) holds personal data: build
+  it in memory and only return it as a download (`Cache-Control: no-store`);
+  never write it to disk or log it.
 - Strategies ("mentaliteiten") are pluggable modules in `ploeg/strategieen/`.
 - `ploeg.regelset` stores the rule file name and `ploeg.strategie` the strategy
   used, so a lineup can be explained afterwards.
