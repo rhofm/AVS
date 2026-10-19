@@ -1,0 +1,106 @@
+{#
+  Rooster importeren: een tabel uit Excel plakken of een CSV-bestand kiezen, eerst controleren, dan opslaan.
+  Context:
+    groep   – models.Groep
+    tekst   – de geplakte (of uit het bestand gelezen) tabel; gaat mee naar de volgende stap
+    res     – groepen.rooster.Importresultaat na 'Controleren' (anders None)
+    fout    – foutmelding (optioneel)
+    waarden – wat er in het formulier stond
+  Er wordt niets bewaard tot 'Importeren': de tabel gaat als tekst mee in het formulier.
+#}
+{% extends "basis.html" %}
+{% block titel %}Rooster importeren {{ groep.naam }}{% endblock %}
+
+{% block inhoud %}
+<article class="vel">
+  <header class="blok__kop">
+    <div>
+      <a class="terug" href="{{ url_for('groep_rooster', groep_id=groep.id) }}">&larr; Rooster {{ groep.naam }}</a>
+      <h1 class="kop kop--pagina">Rooster importeren</h1>
+      <p class="subkop">Plak een tabel uit Excel of kies een CSV-bestand. Je ziet eerst wat er wordt ingelezen.</p>
+    </div>
+    <a class="knop" href="{{ url_for('rooster_voorbeeld') }}">Voorbeeld-CSV downloaden</a>
+  </header>
+
+  {% if fout %}<p class="melding melding--fout" role="alert">{{ fout }}</p>{% endif %}
+
+  <form method="post" enctype="multipart/form-data" class="blok" style="gap: 1.5rem">
+    <details class="uitleg"{% if not res %} open{% endif %}>
+      <summary>Hoe moet de tabel eruitzien?</summary>
+      <p>De eerste regel bevat de kolomnamen. Nodig: <strong>week</strong> en <strong>dag</strong> (bijv. 1 en dinsdag of di), <em>of</em> een kolom <strong>datum</strong> (2026-10-06 of 6-10-2026). Daarnaast een of meer van: <strong>onderwerp</strong>, <strong>warming-up</strong>, <strong>kern a</strong>, <strong>kern b</strong>, <strong>cooling-down</strong>, <strong>notities</strong>. Een kolom <strong>tijd</strong> is alleen nodig als de groep op een dag meer dan één keer traint.</p>
+      <p>Met datums begint week 1 in de week van de vroegste datum (of bij &lsquo;Vanaf&rsquo;).</p>
+    </details>
+
+    <div class="velden">
+      <div class="veld veld--breed">
+        <label for="imp-naam">Naam van het rooster</label>
+        <input type="text" id="imp-naam" name="naam" value="{{ waarden.get('naam', '') }}" maxlength="80" required placeholder="bijv. Najaar {{ groep.naam }}">
+      </div>
+      <div class="veld">
+        <label for="imp-start">Vanaf <span class="zacht">(begin van week 1)</span></label>
+        <input type="date" id="imp-start" name="start" value="{{ waarden.get('start', '') }}">
+        <span class="veld__hint zacht">Bij een kolom datum mag dit leeg blijven.</span>
+      </div>
+      <div class="veld">
+        <label for="imp-eind">Tot en met <span class="zacht">(optioneel)</span></label>
+        <input type="date" id="imp-eind" name="eind" value="{{ waarden.get('eind', '') }}">
+      </div>
+    </div>
+    <label class="vinkje"><input type="checkbox" name="herhalen" value="1"{% if not waarden or waarden.get('herhalen') == '1' %} checked{% endif %}> Herhalen: na de laatste week weer week 1</label>
+
+    <div class="veld veld--breed">
+      <label for="imp-tabel">Tabel <span class="zacht">(plakken uit Excel, of de inhoud van een CSV)</span></label>
+      <textarea id="imp-tabel" name="tabel" rows="8" class="importtabel" spellcheck="false" placeholder="week&#9;dag&#9;onderwerp&#9;kern a&#10;1&#9;dinsdag&#9;Starts&#9;Startblok 6x 20m">{{ tekst }}</textarea>
+    </div>
+    <div class="veld">
+      <label for="imp-bestand">Of kies een bestand <span class="zacht">(.csv of .txt)</span></label>
+      <input type="file" id="imp-bestand" name="bestand" accept=".csv,.txt,text/csv,text/plain">
+    </div>
+
+    {% if res %}
+      <section class="blok" aria-labelledby="kop-controle">
+        <h2 class="kop" id="kop-controle">Controle</h2>
+        {% if res.fout %}
+          <p class="melding melding--fout" role="alert">{{ res.fout }}</p>
+        {% else %}
+          <p class="melding{{ ' melding--fout' if res.fouten else '' }}" role="status">
+            {{ res.goed | length }} {{ "regels" if res.goed | length != 1 else "regel" }} gelezen, {{ res.aantal_weken }} {{ "weken" if res.aantal_weken != 1 else "week" }}
+            {%- if res.met_datum and res.start %}, week 1 begint {{ res.start | datum_kort }} {{ res.start.year }}{% endif %}.
+            {% if res.fouten %}<strong>{{ res.fouten | length }} {{ "regels kloppen" if res.fouten | length != 1 else "regel klopt" }} niet</strong>: pas de tabel aan en controleer opnieuw.{% endif %}
+          </p>
+          <div class="tabelvak">
+            <table class="tabel">
+              <thead><tr><th scope="col">Regel</th><th scope="col">Week</th><th scope="col">Dag</th><th scope="col">Tijd</th><th scope="col">Onderwerp</th><th scope="col">Inhoud</th><th scope="col">Let op</th></tr></thead>
+              <tbody>
+                {% for i in res.regels %}
+                  <tr{% if i.fout %} class="status-afwezig"{% endif %}>
+                    <td>{{ i.rij }}</td>
+                    {% if i.regel %}
+                      <td>{{ i.regel.week }}</td><td>{{ i.regel.dag }}</td><td>{{ i.regel.starttijd | tijd if i.regel.starttijd else "–" }}</td>
+                      <td>{{ i.regel.onderwerp or "–" }}</td>
+                      <td class="zacht">{% if i.regel.aantal_delen %}{{ i.regel.aantal_delen }} {{ "onderdelen" if i.regel.aantal_delen != 1 else "onderdeel" }}{% else %}–{% endif %}</td>
+                    {% else %}
+                      <td colspan="5">–</td>
+                    {% endif %}
+                    <td>{% if i.fout %}<strong>{{ i.fout }}</strong>{% elif i.let_op %}{{ i.let_op }}{% endif %}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% endif %}
+      </section>
+    {% endif %}
+
+    <div class="opslaan opslaan--onder">
+      <a href="{{ url_for('groep_rooster', groep_id=groep.id) }}">Annuleren</a>
+      <button class="knop" type="submit" name="stap" value="controleren">{{ "Opnieuw controleren" if res else "Controleren" }}</button>
+      {% if res and res.bruikbaar %}
+        <button class="knop knop--vol" type="submit" name="stap" value="opslaan">Importeren en koppelen</button>
+      {% endif %}
+    </div>
+  </form>
+
+  <footer class="vel__voet">Atleet Volg Systeem<br>{{ groep.naam }}</footer>
+</article>
+{% endblock %}

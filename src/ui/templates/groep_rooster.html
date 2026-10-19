@@ -1,0 +1,170 @@
+{#
+  Rooster van een groep: welke roosters de groep volgt (koppelingen), het rooster als tabel
+  (weken × trainingen), koppelen, importeren.
+  Context:
+    p       – groepen.rooster.Roosterpagina
+    fout    – foutmelding bij koppelen (optioneel); waarden = wat er was ingevuld
+    melding – bevestiging (optioneel)
+  Een cel bewerken: /rooster/<id>/regel?week=&dag=&tijd=&groep= (tijd leeg = vaste tijd van de dag).
+#}
+{% extends "basis.html" %}
+{% set groep = p.groep %}
+{% block titel %}Rooster {{ groep.naam }}{% endblock %}
+
+{% block inhoud %}
+<article class="vel">
+  <header class="blok__kop">
+    <div>
+      <a class="terug" href="{{ url_for('groep', groep_id=groep.id) }}">&larr; {{ groep.naam }}</a>
+      <h1 class="kop kop--pagina">Rooster</h1>
+      <p class="subkop">Wat er per week op de trainingen staat. Optioneel: trainingen krijgen de inhoud vanzelf en blijven aan te passen.</p>
+    </div>
+    <span class="knoppen">
+      <a class="knop" href="{{ url_for('groep_rooster_importeren', groep_id=groep.id) }}">Importeren (Excel / CSV)</a>
+    </span>
+  </header>
+
+  {% if fout %}<p class="melding melding--fout" role="alert">{{ fout }}</p>{% endif %}
+  {% if melding %}<p class="melding" role="status">{{ melding }}</p>{% endif %}
+
+  {# ---------------- Koppelingen ---------------- #}
+  <section class="blok" aria-labelledby="kop-koppelingen">
+    <h2 class="kop" id="kop-koppelingen">Roosters van {{ groep.naam }}</h2>
+    {% if p.koppelingen %}
+      <div class="tabelvak">
+        <table class="tabel">
+          <thead><tr><th scope="col">Rooster</th><th scope="col">Vanaf</th><th scope="col">Tot en met</th><th scope="col"><span class="verborgen">Acties</span></th></tr></thead>
+          <tbody>
+            {% for k in p.koppelingen %}
+              <tr>
+                <td><a href="{{ url_for('groep_rooster', groep_id=groep.id, rooster=k.rooster.id) }}"><strong>{{ k.rooster.naam }}</strong></a>
+                  {%- if k.nu %} <span class="kenmerk kenmerk--pr">nu</span>{% endif %}<br><span class="zacht">{{ k.omschrijving }}</span></td>
+                <td class="nowrap">{{ k.koppeling.startdatum | datum_kort }} {{ k.koppeling.startdatum.year }}</td>
+                <td class="nowrap">{% if k.tot %}{{ k.tot | datum_kort }} {{ k.tot.year }}{% else %}<span class="zacht">doorlopend</span>{% endif %}</td>
+                <td class="rechts">
+                  <form method="post" action="{{ url_for('groep_rooster_ontkoppelen', groep_id=groep.id) }}"
+                        onsubmit="return confirm('Deze koppeling weghalen? Toekomstige trainingen die uit dit rooster kwamen worden weer leeg; met de hand aangepaste trainingen blijven staan.');">
+                    <input type="hidden" name="start" value="{{ k.koppeling.startdatum.isoformat() }}">
+                    <button class="knop knop--klein knop--gevaar" type="submit">Weghalen</button>
+                  </form>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="leeg">{{ groep.naam }} volgt nog geen rooster. Koppel er hieronder een, of importeer een tabel uit Excel.</p>
+    {% endif %}
+
+    <details class="roosterkoppelen"{% if fout or not p.koppelingen %} open{% endif %}>
+      <summary>Rooster koppelen</summary>
+      <form method="post" action="{{ url_for('groep_rooster_koppelen', groep_id=groep.id) }}" class="blok" style="gap: 1rem">
+        <div class="velden">
+          <div class="veld">
+            <label for="koppel-rooster">Rooster</label>
+            <select id="koppel-rooster" name="rooster" data-roosterkeuze>
+              {% for r in p.roosters %}<option value="{{ r.id }}"{% if waarden.get('rooster') == r.id | string or (not waarden and p.rooster and p.rooster.id == r.id) %} selected{% endif %}>{{ r.naam }} ({{ r.aantal_weken }} wk)</option>{% endfor %}
+              <option value="nieuw"{% if waarden.get('rooster') == 'nieuw' or not p.roosters %} selected{% endif %}>+ Nieuw rooster …</option>
+            </select>
+          </div>
+          <div class="veld" data-nieuw>
+            <label for="koppel-naam">Naam nieuw rooster</label>
+            <input type="text" id="koppel-naam" name="naam" value="{{ waarden.get('naam', '') }}" maxlength="80" placeholder="bijv. Najaar {{ groep.naam }}">
+          </div>
+          <div class="veld" data-nieuw>
+            <label for="koppel-weken">Aantal weken</label>
+            <input type="number" id="koppel-weken" name="weken" value="{{ waarden.get('weken', '4') }}" min="1" max="60">
+          </div>
+          <div class="veld">
+            <label for="koppel-start">Vanaf <span class="zacht">(begin van week 1)</span></label>
+            <input type="date" id="koppel-start" name="start" value="{{ waarden.get('start', p.standaard_start.isoformat()) }}" required>
+          </div>
+          <div class="veld">
+            <label for="koppel-eind">Tot en met <span class="zacht">(optioneel)</span></label>
+            <input type="date" id="koppel-eind" name="eind" value="{{ waarden.get('eind', '') }}">
+          </div>
+        </div>
+        <label class="vinkje"><input type="checkbox" name="herhalen" value="1"{% if not waarden or waarden.get('herhalen') == '1' %} checked{% endif %}> Herhalen: na de laatste week weer week 1</label>
+        <p class="zacht" style="font-size: var(--maat-s); margin: 0">Een koppeling geldt tot de volgende koppeling begint. Toekomstige trainingen die nog leeg zijn of uit het rooster komen, krijgen de inhoud; met de hand aangepaste trainingen blijven zoals ze zijn.</p>
+        <div class="opslaan opslaan--onder"><button class="knop knop--vol" type="submit">Koppelen</button></div>
+      </form>
+    </details>
+  </section>
+
+  {# ---------------- Het rooster ---------------- #}
+  {% if p.rooster %}
+    {% set r = p.rooster %}
+    <section class="blok" aria-labelledby="kop-rooster">
+      <div class="blok__kop">
+        <div>
+          <h2 class="kop" id="kop-rooster">{{ r.naam }}</h2>
+          <p class="subkop">{{ r.aantal_weken }} {{ "weken" if r.aantal_weken != 1 else "week" }}{% if p.week_nu %} · deze week: week {{ p.week_nu }}{% endif %}</p>
+        </div>
+      </div>
+      {% if p.andere_groepen %}
+        <p class="melding melding--let-op">Dit rooster wordt ook gebruikt door {{ p.andere_groepen | join(", ") }}. Een wijziging geldt voor alle groepen.</p>
+      {% endif %}
+      {% if p.momenten %}
+        <div class="tabelvak">
+          <table class="tabel roostertabel">
+            <thead>
+              <tr>
+                <th scope="col">Week</th>
+                {% for m in p.momenten %}
+                  <th scope="col"{% if not m.vast %} class="roostertabel__los" title="{{ groep.naam }} traint dan niet"{% endif %}>{{ m.dag | capitalize }}{% if m.tijd %} <span class="roostertabel__tijd">{{ m.tijd | tijd }}</span>{% endif %}{% if not m.vast %} <span class="verborgen">(geen training)</span>{% endif %}</th>
+                {% endfor %}
+              </tr>
+            </thead>
+            <tbody>
+              {% for rij in p.weken %}
+                <tr{% if rij[0].nu %} class="roostertabel__nu" aria-current="true"{% endif %}>
+                  <th scope="row">{{ loop.index }}{% if rij[0].nu %} <span class="verborgen">(deze week)</span>{% endif %}</th>
+                  {% for c in rij %}
+                    <td>
+                      <a class="roostercel{{ ' roostercel--leeg' if not c.regel }}" href="{{ url_for('rooster_regel', rooster_id=r.id, week=c.week, dag=c.moment.dag, tijd=c.tijd_veld, groep=groep.id) }}"
+                         title="Week {{ c.week }}, {{ c.moment.dag }}: {{ 'bewerken' if c.regel else 'invullen' }}">
+                        {%- if c.regel %}<strong>{{ c.regel.onderwerp or "Training" }}</strong>
+                          {%- if c.regel.aantal_delen %}<span class="roostercel__delen">{{ c.regel.aantal_delen }} {{ "onderdelen" if c.regel.aantal_delen != 1 else "onderdeel" }}</span>{% endif %}
+                        {%- else %}<span aria-hidden="true">+</span><span class="verborgen">invullen</span>{% endif -%}
+                      </a>
+                    </td>
+                  {% endfor %}
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <p class="leeg">{{ groep.naam }} heeft nog geen vaste trainingsdagen. Stel die eerst in op de pagina van de groep; dan verschijnen ze hier als kolommen.</p>
+      {% endif %}
+
+      <details class="roosterkoppelen">
+        <summary>Naam of aantal weken wijzigen</summary>
+        <form method="post" action="{{ url_for('rooster_wijzigen', rooster_id=r.id) }}" class="blok" style="gap: 1rem">
+          <input type="hidden" name="groep" value="{{ groep.id }}">
+          <div class="velden">
+            <div class="veld"><label for="rooster-naam">Naam</label><input type="text" id="rooster-naam" name="naam" value="{{ r.naam }}" maxlength="80" required></div>
+            <div class="veld"><label for="rooster-weken">Aantal weken</label><input type="number" id="rooster-weken" name="weken" value="{{ r.aantal_weken }}" min="1" max="60" required></div>
+          </div>
+          <div class="opslaan opslaan--onder"><button class="knop knop--vol" type="submit">Opslaan</button></div>
+        </form>
+      </details>
+    </section>
+  {% endif %}
+
+  <footer class="vel__voet">Atleet Volg Systeem<br>{{ groep.naam }}</footer>
+</article>
+<script>
+  // Naam en aantal weken alleen tonen bij 'Nieuw rooster'.
+  (function () {
+    var keuze = document.querySelector("[data-roosterkeuze]");
+    if (!keuze) return;
+    function bijwerken() {
+      document.querySelectorAll("[data-nieuw]").forEach(function (v) { v.hidden = keuze.value !== "nieuw"; });
+    }
+    keuze.addEventListener("change", bijwerken);
+    bijwerken();
+  })();
+</script>
+{% endblock %}

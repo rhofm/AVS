@@ -899,18 +899,18 @@ th[aria-sort="descending"] .sorteer__naam::after { content: " \2193"; opacity: 1
   --fase-v1: #c8e6bf;   /* algemene voorbereiding: groen */
   --fase-v2: #ffd3a1;   /* specifieke voorbereiding: oranje */
   --fase-wp: #ff9f9f;   /* wedstrijdperiode: rood */
-  --fase-rust: #e3e3e3; /* overgang / rust: grijs */
+  --fase-rust: #d2d2d2; /* overgang / rust: grijs */
   --week: #ffdfdf;
   --week-anders: #ffc9c9;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --fase-v1: #2a4a2c; --fase-v2: #5e3c14; --fase-wp: #6e2a2d; --fase-rust: #3a3a3a;
+    --fase-v1: #2a4a2c; --fase-v2: #5e3c14; --fase-wp: #6e2a2d; --fase-rust: #4a4a4a;
     --week: #34302f; --week-anders: #463c3b;
   }
 }
 :root[data-theme="dark"] {
-  --fase-v1: #2a4a2c; --fase-v2: #5e3c14; --fase-wp: #6e2a2d; --fase-rust: #3a3a3a;
+  --fase-v1: #2a4a2c; --fase-v2: #5e3c14; --fase-wp: #6e2a2d; --fase-rust: #4a4a4a;
   --week: #34302f; --week-anders: #463c3b;
 }
 .fase--v1 { background: var(--fase-v1); }
@@ -948,3 +948,33 @@ th[aria-sort="descending"] .sorteer__naam::after { content: " \2193"; opacity: 1
 .mesocyclus input[type="number"] { font: inherit; padding: .45rem .6rem; border: 1px solid var(--rand); background: var(--papier); color: var(--tekst); width: 6rem; }
 .mesocyclus__namen { display: grid; gap: .6rem 1rem; grid-template-columns: repeat(auto-fill, minmax(min(100%, 10rem), 1fr)); }
 .mesocyclus__namen .veld[hidden] { display: none; }
+
+/* ---------- rooster ---------- */
+.roosterkoppelen { border: 1px solid var(--rand); padding: .6rem .9rem; }
+.roosterkoppelen > summary { cursor: pointer; font-weight: 700; font-size: var(--maat-s); color: var(--rood); }
+.roosterkoppelen[open] > summary { margin-bottom: .8rem; }
+.roosterkoppelen select, .roosterkoppelen input[type="number"] {
+  font: inherit; padding: .45rem .6rem; border: 1px solid var(--rand); background: var(--papier); color: var(--tekst);
+}
+.roosterkoppelen .veld[hidden] { display: none; }
+.roostertabel th[scope="row"] { width: 3.5rem; text-align: center; }
+.roostertabel td { padding: 0; min-width: 8rem; }
+.roostertabel__tijd { font-weight: 400; }
+.roostertabel__los { opacity: .75; font-style: italic; }
+.roostertabel__nu th, .roostertabel__nu td { box-shadow: inset 0 2px 0 var(--rood), inset 0 -2px 0 var(--rood); }
+.roostercel {
+  display: flex; flex-direction: column; gap: .1rem; min-height: 3rem; padding: .45rem .6rem;
+  color: var(--tekst); text-decoration: none;
+}
+.roostercel:hover, .roostercel:focus-visible { background: var(--papier); outline-offset: -2px; }
+.roostercel--leeg { align-items: center; justify-content: center; color: var(--tekst-zacht); font-size: var(--maat-l); }
+.roostercel__delen { font-size: var(--maat-xs); color: var(--tekst-zacht); }
+.roosterstatus { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: .4rem .7rem; font-size: var(--maat-s); }
+.uitleg { font-size: var(--maat-s); }
+.uitleg > summary { cursor: pointer; font-weight: 700; color: var(--rood); }
+.uitleg p { margin: .5rem 0 0; }
+.importtabel {
+  width: 100%; font-family: ui-monospace, Consolas, monospace; font-size: var(--maat-s); padding: .5rem .6rem;
+  border: 1px solid var(--rand); background: var(--papier); color: var(--tekst); resize: vertical; tab-size: 12;
+}
+.importtabel:focus-visible { outline: 2px solid var(--rood); outline-offset: 1px; }

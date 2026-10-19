@@ -71,11 +71,11 @@ This project holds personal data about athletes, many of them minors.
 
 | Package       | Purpose |
 |---------------|---------|
-| `models/`     | Data classes: `atleet`, `prestatie`, `groep`, `leerlijn`, `periodisering` |
+| `models/`     | Data classes: `atleet`, `prestatie`, `groep`, `leerlijn`, `periodisering`, `rooster` |
 | `db/`         | `schema_<database>.sql`, `init_db.py` (keys, connect, create/migrate), `queries.py`, `migrations/<database>/` |
 | `importers/`  | Import results from links: atletiek.nu PRs, atletiek.nu competitions, Seltec competitions |
 | `ploeg/`      | Team selection: `vergelijk` (compare athletes), `regels` (rules), `opstelling` (lineup), `strategieen/` (selection "mentalities") |
-| `groepen/`    | Groups, `absentie`, `periodeplan` (periodisering pages: mega/meso cycle, year view, copy) |
+| `groepen/`    | Groups, `absentie`, `periodeplan` (periodisering pages: mega/meso cycle, year view, copy), `rooster` (planned training content, import, apply to trainings) |
 | `wedstrijden/` | `planning`: upcoming meets, who goes, which events (uses `wedstrijd` + `inschrijving` in `prestaties.db`) |
 | `atleten/`, `leerlijnen/` | Feature logic for athletes and learning pathways |
 | `ui/`         | Web UI |
@@ -97,7 +97,7 @@ when run from source, next to the `.exe` when frozen):
 
 | File             | Contents | Athlete identified by |
 |------------------|----------|-----------------------|
-| `personen.db`    | `atleet` (personal details), `groep` (id + name), `groep_trainingstijden` (one row per group: `groep_id` + `maandag` … `zondag`, start time 'HH:MM' or NULL = no training), `groep_extra_trainingstijd` (extra start times on a fixed day: `groep_id`, `dag`, `starttijd`), `groep_lid` (long: one row per athlete per group; an athlete can be in several groups), `training` (`warming_up`, `kern_a`, `kern_b`, `cooling_down`, `notities`; `hoofdtraining_id` for a deviating variant), `training_atleet` (long: who follows a variant), `groep_fase` (mega cycle: `groep_id`, `startdatum`, `fase`), `mesocyclus` + `mesocyclus_week` (meso cycles and week names), leerlijnen, `ploeg`, `ploeg_opstelling`; `periodeplan` is obsolete and always empty | `master_id` |
+| `personen.db`    | `atleet` (personal details), `groep` (id + name), `groep_trainingstijden` (one row per group: `groep_id` + `maandag` … `zondag`, start time 'HH:MM' or NULL = no training), `groep_extra_trainingstijd` (extra start times on a fixed day: `groep_id`, `dag`, `starttijd`), `groep_lid` (long: one row per athlete per group; an athlete can be in several groups), `training` (`warming_up`, `kern_a`, `kern_b`, `cooling_down`, `notities`; `hoofdtraining_id` for a deviating variant), `training_atleet` (long: who follows a variant), `groep_fase` (mega cycle: `groep_id`, `startdatum`, `fase`), `mesocyclus` + `mesocyclus_week` (meso cycles and week names), `rooster` + `rooster_regel` (training-content templates) + `groep_rooster` (which group follows which template from when), leerlijnen, `ploeg`, `ploeg_opstelling`; `periodeplan` is obsolete and always empty | `master_id` |
 | `prestaties.db`  | `onderdeel`, `wedstrijd`, `prestatie`, `inschrijving`, `wedstrijd_programma` (meet timetable / chronoloog: one row per item, no personal data), `doel` + `doel_regel` (goals for a group or athlete, usually at a meet), `pr` view | `atleet_ref` (pseudonym) |
 | `testen.db`      | `test`, `testresultaat` | `atleet_ref` (pseudonym) |
 | `trainingsschema.db` | `trainingsschema`: one row per athlete, columns `maandag` … `zondag` (0/1); `trainingskeuze`: which (`groep_id`, `starttijd`) the athlete picks on a day with several trainings | `atleet_ref` (pseudonym) |
@@ -176,8 +176,9 @@ python src/db/init_db.py --herstel <sleutel>  # restore the key (e.g. new comput
   `Opslag.training_voor_atleet()` to find what one athlete does.
 - Trainings on a group's fixed training days are created automatically
   (`groepen.trainingen.trainingen_aanvullen`, once a day and after changing
-  the days). Only empty future trainings (no texts, variants or attendance)
-  are ever removed automatically (`trainingen_opruimen`).
+  the days); if the group follows a rooster they get its content right away.
+  Only empty future trainings (no texts, variants or attendance) are ever
+  removed automatically (`trainingen_opruimen`).
 - Periodisering (`models/periodisering.py`, `groepen/periodeplan.py`): a mega
   cycle row (`groep_fase`) or meso cycle (`mesocyclus`) holds from its
   `startdatum` until the next row of the same kind; only start dates are
@@ -187,6 +188,19 @@ python src/db/init_db.py --herstel <sleutel>  # restore the key (e.g. new comput
   in `FASEN`. A meso cycle starts on `instellingen.weekbegin()`. Saving
   replaces all rows of a group (`groep_fasen_opslaan`, `mesocycli_opslaan`).
   Sharing between groups is a copy (`periodeplan.kopieren`), never a link.
+- Rooster (`models/rooster.py`, `groepen/rooster.py`): a `rooster` is a
+  template of N weeks; `rooster_regel` = content for (week, dag, starttijd),
+  starttijd NULL = the day's main time. A group follows a rooster from a
+  `groep_rooster.startdatum` (week start) until its next koppeling; `herhalen`
+  repeats the weeks, `einddatum` stops it. Rooster weeks are independent of
+  the meso cycle. Content is **copied** into trainings and
+  `training.rooster_regel_id` records where it came from: only trainings that
+  are empty or still linked are (re)filled (`rooster_toepassen`), never past
+  trainings or variants; editing a training with different content unlinks it
+  (`losmaken_als_aangepast`). Rooster-only content counts as empty for
+  `trainingen_opruimen`. Before deleting a rule, clear its linked future
+  trainings (`regel_opslaan` does): `ON DELETE SET NULL` would otherwise make
+  them look hand-written.
 - The old `periodeplan` table was replaced (migration personen/007):
   `init_db` copies its rows to `doel` in `prestaties.db` and empties it. The
   table and `training.periodeplan_id` stay because SQLite refuses inserts into

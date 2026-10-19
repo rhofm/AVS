@@ -30,6 +30,18 @@
   </header>
 
   {% if melding %}<p class="melding" role="status">{{ melding }}</p>{% endif %}
+  {% if tp.rooster %}
+    {% if tp.rooster.gekoppeld %}
+      <p class="roosterstatus"><span class="kenmerk">uit rooster</span> Deze training komt uit het <a href="{{ url_for('groep_rooster', groep_id=tp.groep.id) }}">rooster</a>. Pas je hem aan, dan blijft jouw versie staan.</p>
+    {% elif tp.rooster.afwijkend and tp.dagen_tot >= 0 %}
+      <form method="post" action="{{ url_for('training_rooster_terugzetten', training_id=t.id) }}" class="roosterstatus"
+            onsubmit="return confirm('De inhoud van deze training vervangen door wat het rooster plant?');">
+        <span class="kenmerk">afwijkend van rooster</span>
+        <span>Het rooster plant: <strong>{{ tp.rooster.regel.onderwerp or "een training" }}</strong>.</span>
+        <button class="knop knop--klein" type="submit">Terugzetten naar rooster</button>
+      </form>
+    {% endif %}
+  {% endif %}
 
   <section class="blok" aria-labelledby="kop-inhoud">
     <div class="blok__kop">

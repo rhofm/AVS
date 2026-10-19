@@ -106,6 +106,8 @@ class Training:
     # Begintijd van deze training ('HH:MM', migratie 006). None = de vaste begintijd van die dag;
     # nodig als een groep meerdere trainingen op één dag heeft. Zie effectieve_starttijd().
     starttijd: str | None = None
+    # Uit welke roosterregel de inhoud komt (migratie 008). None = niet (of niet meer) uit het rooster.
+    rooster_regel_id: int | None = None
 
     def __post_init__(self) -> None:
         # Lege tekst ('' of alleen spaties) opslaan als None; regeleinden gelijk trekken.

@@ -24,6 +24,8 @@ Heeft een dag meerdere begintijden (`Groep.tijden(dag)`, bijv. 09:00 en 10:30),
 dan komt er per tijd een training. Er komt nooit een tweede training op dezelfde
 datum en tijd, en bestaande trainingen worden niet aangepast (een training
 zonder eigen begintijd telt als de vaste tijd van die dag).
+Volgt de groep een rooster, dan krijgen nieuwe trainingen meteen de inhoud
+uit het rooster (groepen/rooster.py).
 `trainingen_opruimen()` haalt na het wijzigen van de dagen of tijden de
 toekomstige trainingen weg op dagen en tijden die niet meer gelden, maar alleen
 als ze nog leeg zijn (geen onderwerp, notities, onderdelen, afwijkende
@@ -44,6 +46,7 @@ from db.queries import Opslag, OpslagFout
 from models import ABSENTIE_STATUSSEN, DAGEN, TRAININGSONDERDELEN, Absentie, Atleet, Groep, Periode, Training
 
 from .absentie import absentielijst
+from .rooster import RoosterStatus, losmaken_als_aangepast, rooster_status, rooster_toepassen
 
 STATUS_VELD = "status-"
 REDEN_VELD = "reden-"
@@ -78,6 +81,8 @@ def trainingen_aanvullen(db: Opslag, groep: Groep, *, peildatum: date | None = N
             if (dag, tijd) not in momenten:
                 nieuw.append(db.training_opslaan(Training(groep.id, dag, starttijd=tijd)))
         dag += timedelta(days=1)
+    if nieuw:
+        rooster_toepassen(db, groep, trainingen=nieuw)     # inhoud uit het rooster, als de groep er een volgt
     return nieuw
 
 
@@ -98,8 +103,9 @@ def trainingen_opruimen(db: Opslag, groep: Groep, *, peildatum: date | None = No
 
 def _leeg(db: Opslag, t: Training) -> bool:
     """Niets ingevuld: geen onderwerp, notities of onderdelen (warming-up … cooling-down),
-    geen afwijkende varianten en geen aanwezigheid."""
-    return (not t.onderwerp and not t.notities and not t.onderdelen
+    geen afwijkende varianten en geen aanwezigheid. Inhoud die alleen uit het rooster komt
+    (rooster_regel_id) telt niet als ingevuld."""
+    return ((t.rooster_regel_id is not None or (not t.onderwerp and not t.notities and not t.onderdelen))
             and not db.varianten(t.id) and not db.absenties(t.id))
 
 
@@ -196,6 +202,7 @@ class TrainingPagina:
     vorige: Training | None
     volgende: Training | None
     varianten: list[tuple[Training, list[Atleet]]] = field(default_factory=list)   # afwijkend: (training, atleten)
+    rooster: RoosterStatus | None = None   # wat het rooster voor deze training plant; None = geen rooster
 
     @property
     def starttijd(self) -> str | None:
@@ -231,7 +238,8 @@ def trainingpagina(db: Opslag, training_id: int, *, peildatum: date | None = Non
     periode = db.periodisering(groep.id).op(t.datum) or None
     varianten = [(v, [a for a in (db.atleet(m) for m in v.atleten) if a is not None]) for v in db.varianten(t.id)]
     return TrainingPagina(t, groep, periode, (t.datum - vandaag).days, deelnemers, _stand(db, groep, t),
-                          alle[i - 1] if i > 0 else None, alle[i + 1] if i + 1 < len(alle) else None, varianten)
+                          alle[i - 1] if i > 0 else None, alle[i + 1] if i + 1 < len(alle) else None, varianten,
+                          rooster_status(db, groep, t))
 
 
 # ============================================================
@@ -345,6 +353,8 @@ def training_bewerken(db: Opslag, training_id: int, formulier: Mapping[str, str]
         setattr(t, veld, tekst)
     if t.is_afwijkend:
         t.atleten = [m for m in (gekozen or []) if m]
+    else:
+        losmaken_als_aangepast(db, t)       # met de hand aangepast: niet meer uit het rooster
     return db.training_opslaan(t)        # controleert varianten: groep, minstens één atleet, niet dubbel
 
 

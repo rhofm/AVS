@@ -15,6 +15,7 @@ from .leerlijn import Leerlijn, LeerlijnStap, LeerlijnVoortgang
 from .notitie import Notitie
 from .periodisering import FASE_CODES, FASEN, Fase, Mesocyclus, MesoWeek, Periode, Periodisering
 from .programma import ProgrammaOnderdeel, lees_categorie
+from .rooster import INHOUD, INHOUD_VELDEN, GroepRooster, Rooster, RoosterRegel
 from .prestatie import (
     BRONNEN,
     EENHEDEN,
@@ -38,6 +39,7 @@ __all__ = [
     "Bron", "BRONNEN", "Eenheid", "EENHEDEN", "MAX_WIND", "heeft_windmeting",
     "Groep", "normaliseer_tijd", "Training", "TRAININGSONDERDELEN", "Absentie", "AbsentieStatus", "ABSENTIE_STATUSSEN",
     "Fase", "FASEN", "FASE_CODES", "Mesocyclus", "MesoWeek", "Periode", "Periodisering",
+    "Rooster", "RoosterRegel", "GroepRooster", "INHOUD", "INHOUD_VELDEN",
     "Leerlijn", "LeerlijnStap", "LeerlijnVoortgang",
     "Leerdoel", "LeerdoelScore", "Categorie", "CATEGORIEEN", "LEERDOEL_BRONNEN",
     "Trainingsschema", "DAGEN",

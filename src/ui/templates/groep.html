@@ -197,7 +197,10 @@
           {% set open_tr = pagina.trainingen | selectattr("geweest") | list %}
           {% if open_tr %}<p class="subkop">{{ open_tr | length }} van de afgelopen week nog in te vullen</p>{% endif %}
         </div>
-        <a class="knop" href="{{ basis }}/trainingen">Alle trainingen &rarr;</a>
+        <span class="knoppen">
+          <a class="knop" href="{{ basis }}/rooster">Rooster</a>
+          <a class="knop" href="{{ basis }}/trainingen">Alle trainingen &rarr;</a>
+        </span>
       </div>
       {% if pagina.trainingen %}
         <div class="tabelvak">

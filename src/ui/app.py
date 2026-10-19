@@ -43,6 +43,7 @@ from groepen import groep_importeren
 from groepen.groepenoverzicht import GEEN_SEIZOEN, groepenoverzicht
 from groepen import landingspagina as groep_landingspagina
 from groepen import periodeplan as periodisering
+from groepen import rooster as roosterbeheer
 from groepen import overzichten as groep_overzichten
 from groepen import trainingen as trainingsbeheer
 from leerlijnen import overzicht as leerlijnoverzicht
@@ -429,6 +430,128 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
             fasen, cycli = bool(k.plan.fasen), bool(k.plan.cycli)
         return render_template("groep_periodisering_kopieren.html", k=k, gekozen=gekozen, fasen=fasen, cycli=cycli,
                                bevestigen=bevestigen, fout=fout, actief_menu="groepen"), (400 if fout else 200)
+
+    # ---------------- rooster (geplande trainingsinhoud) ----------------
+    def _bijgewerkt(n: int) -> str:
+        return f" {n} toekomstige {'trainingen' if n != 1 else 'training'} bijgewerkt." if n else ""
+
+    def _naar_rooster(groep_id: int, rooster_id: int | None = None):
+        return redirect(url_for("groep_rooster", groep_id=groep_id, **({"rooster": rooster_id} if rooster_id else {})))
+
+    def _roosterpagina(groep_id: int, fout: str | None = None, status: int = 200):
+        keuze = request.args.get("rooster", "")
+        p = roosterbeheer.roosterpagina(db(), groep_id, rooster_id=int(keuze) if keuze.isdigit() else None)
+        if p is None:
+            abort(404)
+        meldingen = get_flashed_messages()
+        return render_template("groep_rooster.html", p=p, fout=fout, waarden=request.form if fout else {},
+                               melding=meldingen[0] if meldingen else None, actief_menu="groepen"), status
+
+    @app.get("/groep/<int:groep_id>/rooster")
+    def groep_rooster(groep_id: int):
+        return _roosterpagina(groep_id)
+
+    @app.post("/groep/<int:groep_id>/rooster/koppelen")
+    def groep_rooster_koppelen(groep_id: int):
+        haal_groep(groep_id)
+        try:
+            k, n = roosterbeheer.koppelen(db(), groep_id, request.form)
+        except (OpslagFout, ValueError) as e:
+            return _roosterpagina(groep_id, fout=f"Niet gekoppeld: {e}", status=400)
+        flash(f"Rooster gekoppeld vanaf {k.startdatum.strftime('%d-%m-%Y')}." + _bijgewerkt(n))
+        return _naar_rooster(groep_id, k.rooster_id)
+
+    @app.post("/groep/<int:groep_id>/rooster/ontkoppelen")
+    def groep_rooster_ontkoppelen(groep_id: int):
+        haal_groep(groep_id)
+        try:
+            n = roosterbeheer.ontkoppelen(db(), groep_id, request.form.get("start", ""))
+        except OpslagFout as e:
+            return _roosterpagina(groep_id, fout=f"Niet gelukt: {e}", status=400)
+        flash("Koppeling weggehaald." + _bijgewerkt(n))
+        return _naar_rooster(groep_id)
+
+    @app.post("/rooster/<int:rooster_id>/wijzigen")
+    def rooster_wijzigen(rooster_id: int):
+        r = db().rooster(rooster_id)
+        groep_id = request.form.get("groep", "")
+        if r is None or not groep_id.isdigit():
+            abort(404)
+        try:
+            r, n = roosterbeheer.rooster_wijzigen(db(), rooster_id, request.form.get("naam", ""),
+                                                  request.form.get("weken", ""))
+        except OpslagFout as e:
+            flash(f"Niet opgeslagen: {e}")
+            return _naar_rooster(int(groep_id), rooster_id)
+        flash(f"Rooster '{r.naam}' opgeslagen ({r.aantal_weken} weken)." + _bijgewerkt(n))
+        return _naar_rooster(int(groep_id), rooster_id)
+
+    @app.route("/rooster/<int:rooster_id>/regel", methods=["GET", "POST"])
+    def rooster_regel(rooster_id: int):
+        a = request.values
+        groep_id = int(a["groep"]) if a.get("groep", "").isdigit() else None
+        try:
+            f = roosterbeheer.regelformulier(db(), rooster_id, a.get("week"), a.get("dag"), a.get("tijd"),
+                                             groep_id=groep_id)
+        except OpslagFout:
+            abort(404)
+        if f is None or f.groep is None:
+            abort(404)
+        fout = None
+        if request.method == "POST":
+            try:
+                regel, n = roosterbeheer.regel_opslaan(db(), rooster_id, f.week, f.dag, f.tijd, request.form)
+            except (OpslagFout, ValueError) as e:
+                fout = f"Niet opgeslagen: {e}"
+                f = roosterbeheer.regelformulier(db(), rooster_id, f.week, f.dag, f.tijd, groep_id=groep_id,
+                                                 ingevuld=request.form)
+            else:
+                flash(("Opgeslagen: " if regel else "Leeggemaakt: ") + f"week {f.week}, {f.dag}." + _bijgewerkt(n))
+                return _naar_rooster(groep_id, rooster_id)
+        return render_template("rooster_regel.html", f=f, fout=fout, actief_menu="groepen"), (400 if fout else 200)
+
+    @app.route("/groep/<int:groep_id>/rooster/importeren", methods=["GET", "POST"])
+    def groep_rooster_importeren(groep_id: int):
+        gr = haal_groep(groep_id)
+        tekst, res, fout = request.form.get("tabel", ""), None, None
+        bestand = request.files.get("bestand")
+        if bestand is not None and bestand.filename:
+            tekst = roosterbeheer.decodeer(bestand.read(roosterbeheer.MAX_TABEL + 1))
+        if request.method == "POST":
+            start = request.form.get("start", "").strip()
+            try:
+                startdatum = date.fromisoformat(start) if start else None
+            except ValueError:
+                startdatum, fout = None, "Vanaf: kies een geldige datum."
+            if request.form.get("stap") == "opslaan" and fout is None:
+                try:
+                    r, k, n = roosterbeheer.importeren(db(), groep_id, request.form, tekst)
+                except (OpslagFout, ValueError) as e:
+                    fout = f"Niet geïmporteerd: {e}"
+                else:
+                    flash(f"Rooster '{r.naam}' geïmporteerd ({len(r.regels)} regels, {r.aantal_weken} weken) "
+                          f"en gekoppeld vanaf {k.startdatum.strftime('%d-%m-%Y')}." + _bijgewerkt(n))
+                    return _naar_rooster(groep_id, r.id)
+            res = roosterbeheer.lees_tabel(tekst, groep=gr, start=startdatum)
+        return render_template("rooster_importeren.html", groep=gr, tekst=tekst, res=res, fout=fout,
+                               waarden=request.form, actief_menu="groepen"), (400 if fout else 200)
+
+    @app.get("/rooster/voorbeeld.csv")
+    def rooster_voorbeeld():
+        return Response("\ufeff" + roosterbeheer.VOORBEELD_CSV, mimetype="text/csv; charset=utf-8",
+                        headers={"Content-Disposition": 'attachment; filename="rooster-voorbeeld.csv"'})
+
+    @app.post("/training/<int:training_id>/rooster")
+    def training_rooster_terugzetten(training_id: int):
+        try:
+            t = roosterbeheer.terugzetten(db(), training_id)
+        except OpslagFout as e:
+            if db().training(training_id) is None:
+                abort(404)
+            flash(f"Niet gelukt: {e}")
+            return redirect(url_for("training", training_id=training_id))
+        flash("De training staat weer zoals in het rooster.")
+        return redirect(url_for("training", training_id=t.id))
 
     # ---------------- wedstrijden ----------------
     @app.get("/wedstrijden")

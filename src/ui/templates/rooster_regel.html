@@ -1,0 +1,57 @@
+{#
+  Eén regel van een rooster bewerken: wat er in week n op een dag (en tijd) op de training staat.
+  Context:
+    f    – groepen.rooster.Regelformulier
+    fout – foutmelding (optioneel); dan staat er nog wat er was ingevuld
+  Alles leeg en opslaan = de regel weghalen. Opslaan werkt de toekomstige trainingen bij die nog
+  uit het rooster komen (bij alle groepen die dit rooster volgen).
+#}
+{% extends "basis.html" %}
+{% set r = f.rooster %}
+{% block titel %}{{ r.naam }} week {{ f.week }} {{ f.dag }}{% endblock %}
+
+{% block inhoud %}
+<article class="vel">
+  <header class="blok__kop">
+    <div>
+      <a class="terug" href="{{ url_for('groep_rooster', groep_id=f.groep.id, rooster=r.id) }}">&larr; Rooster {{ f.groep.naam }}</a>
+      <h1 class="kop kop--pagina">Week {{ f.week }}, {{ f.dag }}{% if f.tijd %} {{ f.tijd | tijd }}{% endif %}</h1>
+      <p class="subkop">{{ r.naam }} · {{ r.aantal_weken }} weken</p>
+    </div>
+  </header>
+
+  {% if fout %}<p class="melding melding--fout" role="alert">{{ fout }}</p>{% endif %}
+  {% if f.andere_groepen %}<p class="melding melding--let-op">Dit rooster wordt ook gebruikt door {{ f.andere_groepen | join(", ") }}. De wijziging geldt ook daar.</p>{% endif %}
+
+  <form method="post" class="blok trainingform">
+    <input type="hidden" name="groep" value="{{ f.groep.id }}">
+    <input type="hidden" name="week" value="{{ f.week }}">
+    <input type="hidden" name="dag" value="{{ f.dag }}">
+    <input type="hidden" name="tijd" value="{{ f.tijd or '' }}">
+    {% for veld, titel, maximaal, waarde in f.velden %}
+      {% if veld == "onderwerp" %}
+        <label class="veld trainingform__onderwerp" for="veld-onderwerp"><span>Onderwerp <span class="zacht">(optioneel)</span></span>
+          <input type="text" id="veld-onderwerp" name="onderwerp" value="{{ waarde }}" maxlength="{{ maximaal }}" placeholder="bijv. Starts en versnellingen">
+        </label>
+        <div class="trainingform__delen">
+      {% elif veld == "notities" %}
+        </div>
+        <label class="veld trainingform__veld trainingform__veld--breed" for="veld-notities"><span>{{ titel }} <span class="zacht">(materiaal, aandachtspunten, …)</span></span>
+          <textarea id="veld-notities" name="notities" rows="4" maxlength="{{ maximaal }}">{{ waarde }}</textarea>
+        </label>
+      {% else %}
+        <label class="veld trainingform__veld" for="veld-{{ veld }}"><span>{{ titel }}</span>
+          <textarea id="veld-{{ veld }}" name="{{ veld }}" rows="7" maxlength="{{ maximaal }}">{{ waarde }}</textarea>
+        </label>
+      {% endif %}
+    {% endfor %}
+    <p class="zacht trainingform__hint">Opmaak mag: <code>**vet**</code>, <code>*schuin*</code>, een regel met <code>- </code> voor een lijstje, <code>1. </code> voor stappen en <code># </code> voor een kopje. Alles leegmaken en opslaan haalt deze regel uit het rooster.</p>
+    <div class="opslaan opslaan--onder">
+      <a href="{{ url_for('groep_rooster', groep_id=f.groep.id, rooster=r.id) }}">Annuleren</a>
+      <button class="knop knop--vol" type="submit">Opslaan</button>
+    </div>
+  </form>
+
+  <footer class="vel__voet">Atleet Volg Systeem<br>{{ r.naam }}</footer>
+</article>
+{% endblock %}

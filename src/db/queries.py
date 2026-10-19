@@ -56,8 +56,12 @@ from models import (
     Notitie,
     Onderdeel,
     Fase,
+    GroepRooster,
+    INHOUD_VELDEN,
     Mesocyclus,
     Periodisering,
+    Rooster,
+    RoosterRegel,
     Prestatie,
     ProgrammaOnderdeel,
     Test,
@@ -887,9 +891,160 @@ class Opslag:
         """Megacyclus en mesocycli van een groep samen (leeg als de groep ze niet gebruikt)."""
         return Periodisering(self.groep_fasen(groep_id), self.mesocycli(groep_id))
 
+    # ---------- rooster (sjablonen, regels, koppeling aan groepen) ----------
+    def _regel(self, r) -> RoosterRegel:
+        return RoosterRegel(r["week"], r["dag"], r["starttijd"], *(r[v] for v in INHOUD_VELDEN),
+                            rooster_id=r["rooster_id"], id=r["id"])
+
+    def roosters(self) -> list[Rooster]:
+        """Alle roosters (zonder regels), op naam."""
+        return [Rooster(r["naam"], r["aantal_weken"], id=r["id"])
+                for r in self.personen.execute("SELECT * FROM rooster ORDER BY naam COLLATE NOCASE, id")]
+
+    def rooster(self, rooster_id: int) -> Rooster | None:
+        """Een rooster met al zijn regels (week, dag, tijd)."""
+        r = self.personen.execute("SELECT * FROM rooster WHERE id = ?", (rooster_id,)).fetchone()
+        if r is None:
+            return None
+        regels = [self._regel(x) for x in self.personen.execute(
+            "SELECT * FROM rooster_regel WHERE rooster_id = ? ORDER BY week, id", (rooster_id,))]
+        return Rooster(r["naam"], r["aantal_weken"], regels, r["id"])
+
+    def rooster_opslaan(self, r: Rooster) -> Rooster:
+        """Naam en aantal weken opslaan (nieuw of bijwerken). De regels gaan apart (rooster_regel_opslaan).
+        Minder weken mag alleen als er in de weken die wegvallen geen regels staan."""
+        with self.personen:
+            if r.id is None:
+                r.id = self.personen.execute("INSERT INTO rooster (naam, aantal_weken) VALUES (?, ?)",
+                                             (r.naam, r.aantal_weken)).lastrowid
+            else:
+                hoogste = self.personen.execute("SELECT MAX(week) FROM rooster_regel WHERE rooster_id = ?",
+                                                (r.id,)).fetchone()[0]
+                if hoogste and hoogste > r.aantal_weken:
+                    raise OpslagFout(f"Er staat nog iets in week {hoogste}; haal dat eerst weg of kies meer weken.")
+                self.personen.execute("UPDATE rooster SET naam = ?, aantal_weken = ? WHERE id = ?",
+                                      (r.naam, r.aantal_weken, r.id))
+        return r
+
+    def rooster_verwijderen(self, rooster_id: int) -> None:
+        """Alleen een rooster dat geen groep (meer) gebruikt. Regels gaan mee (CASCADE)."""
+        if self.groepen_met_rooster(rooster_id):
+            raise OpslagFout("Dit rooster wordt nog door een groep gebruikt.")
+        with self.personen:
+            self.personen.execute("DELETE FROM rooster WHERE id = ?", (rooster_id,))
+
+    def rooster_regel(self, regel_id: int) -> RoosterRegel | None:
+        r = self.personen.execute("SELECT * FROM rooster_regel WHERE id = ?", (regel_id,)).fetchone()
+        return self._regel(r) if r else None
+
+    def rooster_regel_op(self, rooster_id: int, week: int, dag: str, starttijd: str | None) -> RoosterRegel | None:
+        """De regel op precies dit moment (starttijd None = de vaste tijd van de dag)."""
+        r = self.personen.execute(
+            "SELECT * FROM rooster_regel WHERE rooster_id = ? AND week = ? AND dag = ? AND starttijd IS ?",
+            (rooster_id, week, dag, starttijd)).fetchone()
+        return self._regel(r) if r else None
+
+    def rooster_regel_opslaan(self, regel: RoosterRegel) -> RoosterRegel | None:
+        """Regel opslaan op zijn moment (week, dag, tijd); vervangt wat daar stond. Een lege regel
+        haalt het moment leeg (geeft None)."""
+        r = self.rooster(regel.rooster_id) if regel.rooster_id is not None else None
+        if r is None:
+            raise OpslagFout("Deze regel hoort niet bij een bestaand rooster.")
+        if regel.week > r.aantal_weken:
+            raise OpslagFout(f"Het rooster heeft maar {r.aantal_weken} weken.")
+        bestaand = self.rooster_regel_op(r.id, regel.week, regel.dag, regel.starttijd)
+        with self.personen:
+            if regel.leeg:
+                if bestaand:
+                    self.personen.execute("DELETE FROM rooster_regel WHERE id = ?", (bestaand.id,))
+                return None
+            if bestaand:
+                regel.id = bestaand.id
+                self.personen.execute(
+                    f"UPDATE rooster_regel SET {', '.join(f'{v} = ?' for v in INHOUD_VELDEN)} WHERE id = ?",
+                    (*(getattr(regel, v) for v in INHOUD_VELDEN), regel.id))
+            else:
+                regel.id = self.personen.execute(
+                    f"INSERT INTO rooster_regel (rooster_id, week, dag, starttijd, {', '.join(INHOUD_VELDEN)}) "
+                    f"VALUES (?, ?, ?, ?, {_vraagtekens(len(INHOUD_VELDEN))})",
+                    (r.id, regel.week, regel.dag, regel.starttijd, *(getattr(regel, v) for v in INHOUD_VELDEN)),
+                ).lastrowid
+        return regel
+
+    def rooster_regels_vervangen(self, rooster_id: int, regels: Iterable[RoosterRegel]) -> list[RoosterRegel]:
+        """Alle regels van een rooster in één keer vervangen (bijv. na een import). Lege regels tellen niet.
+        Regels op hetzelfde moment: de laatste telt."""
+        r = self.rooster(rooster_id)
+        if r is None:
+            raise OpslagFout(f"Rooster {rooster_id} bestaat niet.")
+        per_moment = {x.moment: x for x in regels if not x.leeg}
+        if any(w > r.aantal_weken for w, _, _ in per_moment):
+            raise OpslagFout(f"Het rooster heeft maar {r.aantal_weken} weken.")
+        with self.personen:
+            # Bestaande regels op hetzelfde moment houden hun id, zodat trainingen gekoppeld blijven.
+            oud = {x.moment: x.id for x in r.regels}
+            weg = [i for m, i in oud.items() if m not in per_moment]
+            if weg:
+                self.personen.execute(f"DELETE FROM rooster_regel WHERE id IN ({_vraagtekens(len(weg))})", weg)
+            for m, x in per_moment.items():
+                x.rooster_id = rooster_id
+                if m in oud:
+                    x.id = oud[m]
+                    self.personen.execute(
+                        f"UPDATE rooster_regel SET {', '.join(f'{v} = ?' for v in INHOUD_VELDEN)} WHERE id = ?",
+                        (*(getattr(x, v) for v in INHOUD_VELDEN), x.id))
+                else:
+                    x.id = self.personen.execute(
+                        f"INSERT INTO rooster_regel (rooster_id, week, dag, starttijd, {', '.join(INHOUD_VELDEN)}) "
+                        f"VALUES (?, ?, ?, ?, {_vraagtekens(len(INHOUD_VELDEN))})",
+                        (rooster_id, x.week, x.dag, x.starttijd, *(getattr(x, v) for v in INHOUD_VELDEN)),
+                    ).lastrowid
+        return list(per_moment.values())
+
+    def trainingen_uit_regel(self, regel_id: int, van: date | None = None) -> list[Training]:
+        """De trainingen (vanaf `van`) waarvan de inhoud nog uit deze roosterregel komt."""
+        sql, args = "SELECT * FROM training WHERE rooster_regel_id = ?", [regel_id]
+        if van:
+            sql += " AND datum >= ?"
+            args.append(_naar_tekst(van))
+        return [self._training(r) for r in self.personen.execute(sql + " ORDER BY datum, id", args).fetchall()]
+
+    def groep_roosters(self, groep_id: int) -> list[GroepRooster]:
+        """Welke roosters een groep volgt, oudste koppeling eerst."""
+        return [GroepRooster(r["groep_id"], r["rooster_id"], _naar_datum(r["startdatum"]), bool(r["herhalen"]),
+                             _naar_datum(r["einddatum"]))
+                for r in self.personen.execute(
+                    "SELECT * FROM groep_rooster WHERE groep_id = ? ORDER BY startdatum", (groep_id,))]
+
+    def groep_rooster_opslaan(self, k: GroepRooster) -> GroepRooster:
+        """Koppeling opslaan; een koppeling van dezelfde groep op dezelfde startdatum wordt vervangen."""
+        if self.groep(k.groep_id) is None:
+            raise OpslagFout(f"Groep {k.groep_id} bestaat niet.")
+        if self.personen.execute("SELECT 1 FROM rooster WHERE id = ?", (k.rooster_id,)).fetchone() is None:
+            raise OpslagFout(f"Rooster {k.rooster_id} bestaat niet.")
+        with self.personen:
+            self.personen.execute(
+                """INSERT INTO groep_rooster (groep_id, rooster_id, startdatum, herhalen, einddatum)
+                   VALUES (?, ?, ?, ?, ?)
+                   ON CONFLICT (groep_id, startdatum) DO UPDATE SET rooster_id = excluded.rooster_id,
+                       herhalen = excluded.herhalen, einddatum = excluded.einddatum""",
+                (k.groep_id, k.rooster_id, _naar_tekst(k.startdatum), int(k.herhalen), _naar_tekst(k.einddatum)))
+        return k
+
+    def groep_rooster_verwijderen(self, groep_id: int, startdatum: date) -> None:
+        with self.personen:
+            self.personen.execute("DELETE FROM groep_rooster WHERE groep_id = ? AND startdatum = ?",
+                                  (groep_id, _naar_tekst(startdatum)))
+
+    def groepen_met_rooster(self, rooster_id: int) -> list[int]:
+        """De ids van de groepen die dit rooster (ooit) volgen."""
+        return [r[0] for r in self.personen.execute(
+            "SELECT DISTINCT groep_id FROM groep_rooster WHERE rooster_id = ? ORDER BY groep_id", (rooster_id,))]
+
     # training.periodeplan_id bestaat nog in de database maar wordt niet meer gebruikt (migratie 007).
     _TRAINING_VELDEN = ("groep_id", "datum", "onderwerp", "warming_up", "kern_a",
-                        "kern_b", "cooling_down", "notities", "hoofdtraining_id", "starttijd")   # vaste kolomnamen
+                        "kern_b", "cooling_down", "notities", "hoofdtraining_id", "starttijd",
+                        "rooster_regel_id")   # vaste kolomnamen
 
     def _training(self, r) -> Training:
         atleten = _ids_op_naam(self.personen.execute(
@@ -898,7 +1053,8 @@ class Opslag:
                WHERE ta.training_id = ?""", (r["id"],)))
         return Training(r["groep_id"], _naar_datum(r["datum"]), r["onderwerp"], r["notities"],
                         r["id"], r["warming_up"], r["kern_a"], r["kern_b"],
-                        r["cooling_down"], r["hoofdtraining_id"], atleten, r["starttijd"])
+                        r["cooling_down"], r["hoofdtraining_id"], atleten, r["starttijd"],
+                        r["rooster_regel_id"])
 
     def training_opslaan(self, t: Training) -> Training:
         """Training toevoegen of bijwerken (met id).

@@ -43,7 +43,10 @@
       <h1 class="kop kop--pagina">Trainingen</h1>
       <p class="subkop">{{ lijst.komend | length }} komend · {{ lijst.geweest | length }} geweest{% if lijst.nog_invullen %} · {{ lijst.nog_invullen }} nog in te vullen{% endif %}</p>
     </div>
-    <a class="knop" href="{{ url_for('groep_aanwezigheid', groep_id=groep.id) }}">Aanwezigheid &rarr;</a>
+    <span class="knoppen">
+      <a class="knop" href="{{ url_for('groep_rooster', groep_id=groep.id) }}">Rooster</a>
+      <a class="knop" href="{{ url_for('groep_aanwezigheid', groep_id=groep.id) }}">Aanwezigheid &rarr;</a>
+    </span>
   </header>
 
   <section class="blok" aria-labelledby="kop-komend">
