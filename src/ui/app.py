@@ -57,6 +57,7 @@ from ui import startpagina
 from ui.opmaak import registreer_filters
 from ploeg import export as ploegexport
 from ploeg import paginas as ploegpaginas
+from ploeg.optimaliseer import OptimalisatieFout
 from ploeg.regels import RegelFout
 from wedstrijden import detail as wedstrijddetail
 from wedstrijden import kalender, tijdschema_import, uitslag_import
@@ -1338,6 +1339,29 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
             tekst += (f" Wedstrijd {pg.wedstrijd.naam} bijgewerkt: {wijzigingen.ingeschreven} ingeschreven, "
                       f"{wijzigingen.afgemeld} afgemeld.")
         return _ploegpagina(ploeg_id, pg, melding=tekst)
+
+    @app.post("/ploeg/<int:ploeg_id>/optimaliseren")
+    def ploeg_optimaliseren(ploeg_id: int):
+        haal_ploeg(ploeg_id)
+        try:
+            o = ploegpaginas.optimaliseren(db(), ploeg_id, request.form.get("strategie", ""),
+                                           vastzetten=request.form.get("vastzetten") == "1",
+                                           alleen_aangevinkt=request.form.get("aangevinkt") == "1")
+        except KeyError:
+            return render_template("ploeg.html", pg=ploegpaginas.ploegpagina(db(), ploeg_id),
+                                   fout="Kies een manier om de opstelling te maken.", actief_menu="ploegen"), 400
+        except OptimalisatieFout as e:
+            return render_template("ploeg.html", pg=ploegpaginas.ploegpagina(db(), ploeg_id),
+                                   fout=str(e), actief_menu="ploegen"), 400
+        except RegelFout:
+            return _ploegpagina(ploeg_id)
+        tekst = f"Opstelling gemaakt met '{o.strategie}': {o.na} punten (was {o.voor})."
+        if o.pagina.fouten:
+            tekst += " Nog niet alles klopt: zie de meldingen."
+        if o.wijzigingen.iets and o.pagina.wedstrijd:
+            tekst += (f" Wedstrijd {o.pagina.wedstrijd.naam} bijgewerkt: {o.wijzigingen.ingeschreven} ingeschreven, "
+                      f"{o.wijzigingen.afgemeld} afgemeld.")
+        return _ploegpagina(ploeg_id, o.pagina, melding=tekst)
 
     @app.get("/ploeg/<int:ploeg_id>/atletieknu.csv")
     def ploeg_export(ploeg_id: int):

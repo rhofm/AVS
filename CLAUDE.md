@@ -332,7 +332,12 @@ python src/db/init_db.py --herstel <sleutel>  # restore the key (e.g. new comput
   from the UI. The atletiek.nu CSV (`ploeg/export.py`) holds personal data: build
   it in memory and only return it as a download (`Cache-Control: no-store`);
   never write it to disk or log it.
-- Strategies ("mentaliteiten") are pluggable modules in `ploeg/strategieen/`.
+- Strategies ("mentaliteiten") are pluggable modules in `ploeg/strategieen/`:
+  a class `Strategie` with `naam`, `titel`, `uitleg` and `bouw(model)` returning
+  objectives (maximised one after the other) for the MILP in
+  `ploeg/optimaliseer.py` (`scipy.optimize.milp`). Register a new one in
+  `STRATEGIEEN` (explicit imports, so PyInstaller bundles it). scipy is a
+  runtime dependency of the optimiser only; the rest of AVS works without it.
 - `ploeg.regelset` stores the rule file name and `ploeg.strategie` the strategy
   used, so a lineup can be explained afterwards.
 

@@ -1036,3 +1036,7 @@ th[aria-sort="descending"] .sorteer__naam::after { content: " \2193"; opacity: 1
 .ploegmatrix tfoot th, .ploegmatrix tfoot td { background: var(--zalm); color: var(--op-zalm); border: 2px solid var(--lijn); padding: .4rem .5rem; }
 .ploegmatrix tfoot .zacht { color: inherit; opacity: .85; }
 .ploegmatrix tbody tr td.ploegcel--nvt { background: var(--leeg-vlak); }
+.optimaliseren summary { cursor: pointer; }
+.keuzelijst { border: 0; margin: 0; padding: 0; display: grid; gap: .6rem; }
+.keuzelijst .vinkje { align-items: flex-start; font-weight: 400; }
+.keuzelijst input { accent-color: var(--rood); margin-top: .25rem; }

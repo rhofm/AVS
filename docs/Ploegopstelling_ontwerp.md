@@ -291,7 +291,18 @@ gezet, zodat de wedstrijdpagina en de botsingencontrole meteen werken.
    inschrijvingen mee. Tests: `tests/test_ploeg_export.py`. Open: het precieze
    importformaat van atletiek.nu (koppen, categorie-notatie) controleren met een
    echte teaminschrijving.
-5. Optimalisatie + de drie strategieën.
+5. ✅ Optimalisatie + de drie strategieën: `ploeg/optimaliseer.py` (Model met
+   `scipy.optimize.milp`, doelen lexicografisch na elkaar) en
+   `ploeg/strategieen/` (`max_punten`, `iedereen_meedoen`, `minimaal_twee`,
+   geregistreerd in `STRATEGIEEN`). Op de ploegpagina: 'Opstelling laten maken'
+   met keuze van strategie, 'alleen de aangevinkte deelnemers' (de aanwezigen;
+   zonder deelnemers: iedereen die mag en niet in een andere ploeg die dag zit)
+   en 'huidige vinkjes laten staan'. Reserves blijven reserve, estafettes
+   blijven staan en tellen mee voor de 3 onderdelen. Het resultaat wordt
+   opgeslagen (ook op de gekoppelde wedstrijd) en `ploeg.strategie` bewaart de
+   strategie. Tests: `tests/test_optimaliseer.py` (o.a. vergelijking met brute
+   kracht). Nog niet: estafettes optimaliseren (stap 6), botsingen en dagdelen
+   (stap 7), meer ploegen tegelijk.
 6. Voorspeller en estafettes.
 7. Meer ploegen, botsingen uit de chronoloog, U18/U20 (werpmateriaal),
    masters (age grading), senioren (gemengd), 1e divisie / NK Teams.

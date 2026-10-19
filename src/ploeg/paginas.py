@@ -20,6 +20,8 @@ from db.queries import Opslag, OpslagFout
 from models import PRESTATIEBASIS, Atleet, Inzet, Ploeg, PloegLid, Wedstrijd
 from ploeg import inschrijven as _inschrijven
 from ploeg import opstelling as _opstelling
+from ploeg import optimaliseer as _optimaliseer
+from ploeg import strategieen as _strategieen
 from ploeg import regels as _regels
 from ploeg.regels import Overtreding, RegelFout, Regelset
 from ploeg.vergelijk import Matrix, matrix
@@ -222,6 +224,15 @@ class Ploegpagina:
     namen: dict[str, str]                # master_id -> naam, voor de meldingen
 
     @property
+    def strategieen(self) -> list:
+        return list(_strategieen.STRATEGIEEN.values())
+
+    @property
+    def strategie_titel(self) -> str | None:
+        s = _strategieen.STRATEGIEEN.get(self.ploeg.strategie or "")
+        return s.titel if s else None
+
+    @property
     def basis_tekst(self) -> str:
         return PRESTATIEBASIS[self.ploeg.prestatiebasis].lower().replace("pr (", "PR (")
 
@@ -295,3 +306,47 @@ def ploeg_verwijderen(db: Opslag, ploeg_id: int) -> None:
         return
     _inschrijven.synchroniseer(db, p, _gewenst(db, p), {})
     db.ploeg_verwijderen(ploeg_id)
+
+
+# ============================================================
+# Optimaliseren
+# ============================================================
+@dataclass(slots=True)
+class Optimalisatie:
+    pagina: Ploegpagina
+    wijzigingen: _inschrijven.Wijzigingen
+    strategie: str                       # titel
+    voor: int                            # totaal voor het optimaliseren
+    na: int
+
+
+def optimaliseren(db: Opslag, ploeg_id: int, strategie: str, vastzetten: bool = False,
+                  alleen_aangevinkt: bool = True) -> Optimalisatie:
+    """Opstelling maken met een strategie en opslaan (ook op de gekoppelde wedstrijd).
+
+    alleen_aangevinkt: alleen de atleten die nu deelnemer zijn gebruiken (de 'aanwezigen');
+    staat er nog niemand in de ploeg, dan alle atleten die mogen.
+    OptimalisatieFout als er geen oplossing is; KeyError bij een onbekende strategie.
+    """
+    s = _strategieen.strategie(strategie)
+    pg = ploegpagina(db, ploeg_id)
+    if pg is None:
+        raise OpslagFout(f"Ploeg {ploeg_id} bestaat niet.")
+    p, rs = pg.ploeg, pg.regelset
+    leden, inzet = db.ploeg_leden(ploeg_id), db.ploeg_inzet(ploeg_id)
+    deelnemers = [lid.atleet_id for lid in leden if lid.rol == "deelnemer"]
+    andere = {lid.atleet_id for q in db.ploegen(p.datum) if q.id != p.id for lid in db.ploeg_leden(q.id)}
+    mag = {r.master_id for r in pg.matrix.rijen if r.toegestaan}
+    if alleen_aangevinkt and deelnemers:
+        atleten = [a for a in deelnemers if a in mag]
+    else:
+        atleten = [r.master_id for r in pg.matrix.rijen
+                   if r.toegestaan and r.atleet.actief and r.master_id not in andere]
+    oud = _inschrijven.gewenst(db, rs, p, leden, inzet)
+    r = _optimaliseer.optimaliseer(pg.matrix, rs, s, atleten, leden, inzet, vastzetten)
+    db.ploeg_opstelling_opslaan(ploeg_id, r.leden, r.inzet)
+    p.strategie = s.naam
+    db.ploeg_opslaan(p)
+    wijzigingen = _inschrijven.synchroniseer(db, p, oud, _inschrijven.gewenst(db, rs, p, r.leden, r.inzet))
+    nieuw = ploegpagina(db, ploeg_id)
+    return Optimalisatie(nieuw, wijzigingen, s.titel, pg.stand.totaal, nieuw.stand.totaal)

@@ -55,7 +55,30 @@
     {% endif %}
   </section>
 
+  {% if m.rijen %}
+  <details class="blok optimaliseren"{% if not pg.rol %} open{% endif %}>
+    <summary class="kop">Opstelling laten maken</summary>
+    <form method="post" action="{{ url_for('ploeg_optimaliseren', ploeg_id=p.id) }}" class="blok">
+      <fieldset class="keuzelijst">
+        <legend class="verborgen">Strategie</legend>
+        {% for s in pg.strategieen %}
+          <label class="vinkje"><input type="radio" name="strategie" value="{{ s.naam }}"
+            {%- if (p.strategie or "max_punten") == s.naam %} checked{% endif %}>
+            <span><strong>{{ s.titel }}</strong><br><span class="zacht">{{ s.uitleg }}</span></span></label>
+        {% endfor %}
+      </fieldset>
+      <label class="vinkje"><input type="checkbox" name="aangevinkt" value="1"{% if pg.deelnemers %} checked{% endif %}>
+        Alleen de atleten die nu &lsquo;deelnemer&rsquo; zijn (wie er is){% if not pg.deelnemers %} <span class="zacht">– nu nog niemand: dan iedereen die mag</span>{% endif %}</label>
+      <label class="vinkje"><input type="checkbox" name="vastzetten" value="1"> Huidige vinkjes laten staan en de rest aanvullen</label>
+      <p class="zacht">Gebruikt de opgeslagen opstelling: sla eerst op wat je hieronder hebt veranderd. Reserves blijven reserve
+        en estafettes blijven zoals ze zijn. Het resultaat wordt opgeslagen; daarna kun je alles nog met de hand aanpassen.</p>
+      <div><button class="knop knop--vol" type="submit">Maak opstelling</button></div>
+    </form>
+  </details>
+  {% endif %}
+
   <form method="post" class="blok">
+    {% if pg.strategie_titel %}<p class="zacht">Laatst gemaakt met: {{ pg.strategie_titel }}.</p>{% endif %}
     {% if m.rijen %}
       <div class="tabelvak">
         <table class="tabel ploegmatrix" id="ploegmatrix">
