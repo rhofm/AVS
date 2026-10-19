@@ -4,6 +4,7 @@
     pagina  – atleten.landingspagina.AtleetLandingspagina
     fases   – atleten.landingspagina.FASES
     melding – optioneel, bijv. na het opslaan van het trainingsschema
+    prs_melding – optioneel (tekst, is_fout) na 'Ophalen van atletiek.nu' bij de PR's
   Filters uit ui/opmaak.py (registreer_filters).
 #}
 {% extends "basis.html" %}
@@ -193,7 +194,22 @@
   {# ---------------- PR's, testen, leerlijnen ---------------- #}
   <div class="raster raster--drie">
     <section class="blok" aria-labelledby="kop-pr">
-      <h2 class="kop" id="kop-pr">PR's</h2>
+      <div class="blok__kop">
+        <h2 class="kop" id="kop-pr">PR's</h2>
+        {% if atleet.atletieknu_id %}
+          <form method="post" action="{{ basis }}/prs/importeren" class="prknop" data-bezig="Ophalen…">
+            <button class="knop" type="submit" title="Haal alle prestaties op van atletiek.nu (nummer {{ atleet.atletieknu_id }}); dit kan even duren">
+              <svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 2a6 6 0 0 1 5.2 3H11v1.5h4.5V2H14v1.7A7.5 7.5 0 0 0 .5 8H2a6 6 0 0 1 6-6Zm6 6a6 6 0 0 1-11.2 3H5V9.5H.5V14H2v-1.7A7.5 7.5 0 0 0 15.5 8Z"/></svg>
+              Ophalen van atletiek.nu
+            </button>
+          </form>
+        {% else %}
+          <a class="knop" href="{{ basis }}/aanpassen" title="Vul het atletiek.nu-nummer in om de PR's op te halen">+ atletiek.nu-nummer</a>
+        {% endif %}
+      </div>
+      {% if prs_melding %}
+        <p class="melding{{ ' melding--fout' if prs_melding[1] }}" role="{{ 'alert' if prs_melding[1] else 'status' }}">{{ prs_melding[0] }}</p>
+      {% endif %}
       {% if pagina.prs %}
         <div class="tabelvak">
           <table class="tabel">
@@ -206,7 +222,7 @@
           </table>
         </div>
       {% else %}
-        <p class="leeg">Nog geen prestaties. Importeer een uitslag of PR-lijst.</p>
+        <p class="leeg">Nog geen prestaties.{% if atleet.atletieknu_id %} Klik op &lsquo;Ophalen van atletiek.nu&rsquo;.{% else %} Vul het atletiek.nu-nummer in om de PR's op te halen, of importeer een uitslag.{% endif %}</p>
       {% endif %}
     </section>
 
@@ -252,4 +268,13 @@
 
   <footer class="vel__voet">Atleet Volg Systeem<br>{{ atleet.naam }}</footer>
 </article>
+<script>
+  /* 'Ophalen van atletiek.nu' duurt een paar seconden: laat zien dat er iets gebeurt en voorkom dubbel klikken. */
+  document.querySelectorAll("form[data-bezig]").forEach(function (f) {
+    f.addEventListener("submit", function () {
+      var b = f.querySelector("button");
+      if (b) { b.disabled = true; b.lastChild.textContent = " " + f.dataset.bezig; }
+    });
+  });
+</script>
 {% endblock %}

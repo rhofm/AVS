@@ -34,10 +34,12 @@ from atleten import nieuw as nieuwe_atleten
 from atleten import notities as notitiebeheer
 from atleten.overzicht import atletenoverzicht
 from atleten import trainingsschema as schemabeheer
+from atleten import prs_importeren as prs_import
 from atleten.aanwezigheid import aanwezigheid
 import instellingen
 from db.init_db import SleutelFout, init_db
 from db.queries import Opslag, OpslagFout
+from importers.base import ImportFout
 from groepen import groep as groepsbeheer
 from groepen import groep_importeren
 from groepen.groepenoverzicht import GEEN_SEIZOEN, groepenoverzicht
@@ -221,9 +223,21 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
         pagina = landingspagina.landingspagina(db(), master_id)
         if pagina is None:
             abort(404)
-        meldingen = get_flashed_messages()
+        meldingen = get_flashed_messages(with_categories=True)
+        algemeen = [m for soort, m in meldingen if not soort.startswith("prs")]
+        prs = next(((m, soort == "prs-fout") for soort, m in meldingen if soort.startswith("prs")), None)
         return render_template("atleet.html", pagina=pagina, fases=landingspagina.FASES,
-                               melding=meldingen[0] if meldingen else None, actief_menu="atleten")
+                               melding=algemeen[0] if algemeen else None, prs_melding=prs, actief_menu="atleten")
+
+    @app.post("/atleet/<master_id>/prs/importeren")
+    def atleet_prs_importeren(master_id: str):
+        """Knop 'PR's ophalen' op de atletenpagina: prestaties van atletiek.nu bijwerken."""
+        haal_atleet(master_id)
+        try:
+            flash(prs_import.prs_importeren(db(), master_id, _haal_profiel()).tekst, "prs")
+        except (OpslagFout, ImportFout) as e:
+            flash(f"PR's niet opgehaald: {str(e).splitlines()[0]}", "prs-fout")
+        return redirect(url_for("atleet", master_id=master_id) + "#kop-pr")
 
     @app.get("/atleet/<master_id>/wedstrijden")
     def atleet_wedstrijden(master_id: str):

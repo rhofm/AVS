@@ -1001,3 +1001,8 @@ th[aria-sort="descending"] .sorteer__naam::after { content: " \2193"; opacity: 1
 .doelform textarea { width: 100%; font: inherit; font-size: var(--maat-s); padding: .45rem .6rem; border: 1px solid var(--rand);
   background: var(--papier); color: var(--tekst); resize: vertical; }
 .doelform select { font: inherit; padding: .45rem .6rem; border: 1px solid var(--rand); background: var(--papier); color: var(--tekst); }
+
+/* atletenpagina: knop 'Ophalen van atletiek.nu' bij de PR's */
+.prknop { margin: 0; }
+.prknop .knop svg { width: .9em; height: .9em; }
+.prknop .knop:disabled { opacity: .6; cursor: progress; }
