@@ -15,7 +15,8 @@ from .leerdoel import CATEGORIEEN, LEERDOEL_BRONNEN, Categorie, Leerdoel, Leerdo
 from .leerlijn import Leerlijn, LeerlijnStap, LeerlijnVoortgang
 from .notitie import Notitie
 from .periodisering import FASE_CODES, FASEN, Fase, Mesocyclus, MesoWeek, Periode, Periodisering
-from .ploeg import BESCHIKBAAR, PRESTATIEBASIS, ROLLEN, Beschikbaar, Inzet, Ploeg, PloegLid, Prestatiebasis, Rol
+from .ploeg import (BESCHIKBAAR, NEUTRAAL, PRESTATIEBASIS, ROLLEN, VOORKEUREN, Beschikbaar, Inzet, Ploeg, PloegLid,
+                    Prestatiebasis, Rol, Voorkeur)
 from .programma import ProgrammaOnderdeel, lees_categorie
 from .rooster import INHOUD, INHOUD_VELDEN, GroepRooster, Rooster, RoosterRegel
 from .prestatie import (
@@ -49,4 +50,5 @@ __all__ = [
     "Notitie",
     "ProgrammaOnderdeel", "lees_categorie",
     "Ploeg", "PloegLid", "Inzet", "Rol", "ROLLEN", "Beschikbaar", "BESCHIKBAAR", "Prestatiebasis", "PRESTATIEBASIS",
+    "Voorkeur", "VOORKEUREN", "NEUTRAAL",
 ]

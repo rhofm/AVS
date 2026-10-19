@@ -1,0 +1,53 @@
+{#
+  Vaste voorkeuren van een atleet voor ploegopstellingen (alle competities).
+  Context:
+    av   – ploeg.paginas.AtleetVoorkeuren
+    fout – optioneel, foutmelding na opslaan
+  Formulier: per onderdeelnaam een veld `vk|<naam>` = '' (geen), voorkeur, wil_niet of moet.
+#}
+{% extends "basis.html" %}
+{% block titel %}Voorkeuren {{ av.atleet.naam }}{% endblock %}
+
+{% block inhoud %}
+<article class="vel">
+  <header class="blok">
+    <a class="terug" href="{{ url_for('atleet', master_id=av.atleet.master_id) }}">&larr; {{ av.atleet.naam }}</a>
+    <h1 class="kop kop--pagina">Voorkeuren voor ploegen</h1>
+    <p class="subkop">Wat {{ av.atleet.voornaam }} graag doet, niet wil of altijd moet doen. Geldt voor alle ploegen,
+      in elke competitie; per ploeg kun je het nog aanpassen.</p>
+  </header>
+
+  {% if fout %}<p class="melding melding--fout" role="alert">{{ fout }}</p>{% endif %}
+
+  <form method="post" class="blok">
+    <div class="voorkeurgroepen">
+      {% for groep, namen in av.groepen.items() %}
+        <fieldset class="voorkeurgroep">
+          <legend class="kop">{{ groep }}</legend>
+          {% for naam in namen %}
+            {% set id = "vk-" ~ loop.index ~ "-" ~ groep | lower | replace(" ", "-") %}
+            <div class="voorkeurregel{{ ' voorkeurregel--gezet' if av.gekozen.get(naam) }}">
+              <label for="{{ id }}">{{ naam }}</label>
+              <select id="{{ id }}" name="vk|{{ naam }}">
+                <option value="">–</option>
+                {% for code, tekst in av.keuzes.items() %}
+                  <option value="{{ code }}"{% if av.gekozen.get(naam) == code %} selected{% endif %}>{{ tekst }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          {% endfor %}
+        </fieldset>
+      {% endfor %}
+    </div>
+    <p class="zacht uitleg"><strong>Doet dit graag</strong>: bij &lsquo;Opstelling laten maken&rsquo; krijgt
+      {{ av.atleet.voornaam }} dit onderdeel waar het de ploeg geen punten kost.
+      <strong>Wil niet</strong>: wordt nooit vanzelf ingepland. <strong>Moet</strong>: wordt altijd ingepland als
+      {{ av.atleet.voornaam }} meedoet (en het onderdeel op het programma staat).
+      Een onderdeel geldt voor alle hordehoogtes en werpgewichten.</p>
+    <div class="opslaan opslaan--onder">
+      <a class="knop" href="{{ url_for('atleet', master_id=av.atleet.master_id) }}">Annuleren</a>
+      <button class="knop knop--vol" type="submit">Opslaan</button>
+    </div>
+  </form>
+</article>
+{% endblock %}

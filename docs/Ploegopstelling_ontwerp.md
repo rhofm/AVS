@@ -198,7 +198,9 @@ onderdelen als kolommen, punten in de cellen.
 - Nieuw `ploeg_lid`: `ploeg_id`, `atleet_id`, `rol` (`deelnemer`/`reserve`),
   `beschikbaar` (`hele_dag`/`ochtend`/`middag`).
 - Nieuw `ploeg_voorkeur`: `ploeg_id`, `atleet_id`, `programma_onderdeel`,
-  `voorkeur` (`wil_niet`/`voorkeur`/`moet`).
+  `voorkeur` (`wil_niet`/`voorkeur`/`moet`). Gebouwd in migratie
+  `personen/011_voorkeuren.sql`, samen met `atleet_voorkeur` (vaste voorkeur
+  per atleet, zie "Voorkeuren" hieronder).
 
 ### Het ILP-model (`optimaliseer.py`, scipy `milp`)
 
@@ -237,6 +239,28 @@ extra eisen aan het model toevoegt. Ontdekt zoals de importers in
 Na elkaar oplossen: A-ploeg eerst, dan de B-ploeg uit wie over is. Elke ploeg
 mag een eigen strategie hebben; niemand komt in twee ploegen (10.10). Samen
 oplossen kan later als dat uitmaakt.
+
+### Voorkeuren (`voorkeuren.py`)
+
+Twee niveaus. **Vast, per atleet** (`atleet_voorkeur`, pagina
+`/atleet/<id>/voorkeuren`, knop 'Voorkeuren ploeg' op de atletenpagina): op de
+onderdeelnaam zonder specificatie ('Kogelstoten', '80 meter horden'), zodat hij
+in elke competitie, categorie, hordehoogte en werpgewicht geldt. **Per ploeg**
+(`ploeg_voorkeur`, pagina `/ploeg/<id>/voorkeuren`): op de programmasleutel,
+gaat voor de vaste; 'Geen (vaste niet)' (`neutraal`) zet de vaste voorkeur voor
+die wedstrijd uit. `effectief()` geeft wat geldt.
+
+- `wil_niet`: `keuzes(a, e) = 0` (ook geen kwartet met die atleet);
+- `moet`: `keuzes(a, e) >= 1` als de atleet in de groep zit waaruit gekozen
+  wordt en het onderdeel voor haar kan (geslacht, dagdeel); te veel of
+  botsende 'moet' geeft een duidelijke fout;
+- `voorkeur`: een extra doel direct na het eerste doel van de strategie
+  (lexicografisch), dus bij 'Zoveel mogelijk punten' kost het nooit punten en
+  mag een atleet op haar voorkeursonderdeel ook als ze daar niet meetelt.
+
+Met de hand mag alles; de controle waarschuwt bij 'wil niet' op een onderdeel
+en bij een deelnemer met 'moet' die er niet op staat. In de matrix: ♥ (graag),
+✕ (wil niet), ! (moet).
 
 ### Export (`export.py`)
 

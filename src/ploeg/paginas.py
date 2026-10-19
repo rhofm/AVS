@@ -20,15 +20,16 @@ from datetime import date, timedelta
 from typing import Mapping
 
 from db.queries import Opslag, OpslagFout
-from models import PRESTATIEBASIS, Atleet, Inzet, Ploeg, PloegLid, Wedstrijd
+from models import PRESTATIEBASIS, VOORKEUREN, Atleet, Inzet, Ploeg, PloegLid, Wedstrijd
 from ploeg import inschrijven as _inschrijven
 from ploeg import opstelling as _opstelling
 from ploeg import optimaliseer as _optimaliseer
 from ploeg import strategieen as _strategieen
 from ploeg import regels as _regels
 from ploeg import tijdschema as _tijdschema
+from ploeg import voorkeuren as _voorkeuren
 from ploeg.regels import Overtreding, RegelFout, Regelset
-from ploeg.vergelijk import Matrix, matrix
+from ploeg.vergelijk import Matrix, matrix, normaliseer
 
 
 class InvoerFout(ValueError):
@@ -236,6 +237,7 @@ class Ploegpagina:
     beschikbaar: dict[str, str] = field(default_factory=dict)        # master_id -> dagdeel (leden)
     groep: dict[tuple[str, str], int] = field(default_factory=dict)  # (master_id, onderdeel) -> groep
     andere_ploegen: list[Ploeg] = field(default_factory=list)        # andere ploegen op dezelfde dag
+    voorkeuren: _voorkeuren.Voorkeuren = field(default_factory=dict)  # (master_id, onderdeel) -> wat geldt
 
     @property
     def strategieen(self) -> list:
@@ -298,7 +300,8 @@ def ploegpagina(db: Opslag, ploeg_id: int, leden: list[PloegLid] | None = None,
     atleten: list[Atleet] = _opstelling.kandidaten(db, rs, p, leden)
     m = matrix(db, rs, p.categorie, p.programma, p.datum, atleten, p.prestatiebasis)
     schema = _tijdschema.schema(db, rs, p, m) if wedstrijd is not None else None
-    alles = _opstelling.controleer(db, rs, p, leden, inzet, m, schema)
+    voorkeuren = _voorkeuren.effectief(db, rs, p, [a.master_id for a in atleten])
+    alles = _opstelling.controleer(db, rs, p, leden, inzet, m, schema, voorkeuren)
     return Ploegpagina(
         p, rs, rs.ploeg(p.categorie).naam, rs.programma_naam(p.programma), wedstrijd, m,
         {lid.atleet_id: lid.rol for lid in leden}, {(i.atleet_id, i.onderdeel) for i in inzet},
@@ -307,7 +310,7 @@ def ploegpagina(db: Opslag, ploeg_id: int, leden: list[PloegLid] | None = None,
         {a.master_id: a.naam for a in atleten}, schema,
         {lid.atleet_id: lid.beschikbaar for lid in leden},
         {(i.atleet_id, i.onderdeel): i.groep for i in inzet if i.groep is not None},
-        [q for q in db.ploegen(p.datum) if q.id != p.id])
+        [q for q in db.ploegen(p.datum) if q.id != p.id], voorkeuren)
 
 
 def opstelling_opslaan(db: Opslag, ploeg_id: int, form: Mapping
@@ -381,7 +384,8 @@ def optimaliseren(db: Opslag, ploeg_id: int, strategie: str, vastzetten: bool = 
         atleten = [r.master_id for r in pg.matrix.rijen
                    if r.toegestaan and r.atleet.actief and r.master_id not in andere]
     oud = _inschrijven.gewenst(db, rs, p, db.ploeg_leden(ploeg_id), db.ploeg_inzet(ploeg_id))
-    r = _optimaliseer.optimaliseer(pg.matrix, rs, s, atleten, leden, inzet, vastzetten, pg.schema)
+    r = _optimaliseer.optimaliseer(pg.matrix, rs, s, atleten, leden, inzet, vastzetten, pg.schema,
+                                   pg.voorkeuren)
     db.ploeg_opstelling_opslaan(ploeg_id, r.leden, r.inzet)
     p.strategie = s.naam
     db.ploeg_opslaan(p)
@@ -465,3 +469,96 @@ def dag_optimaliseren(db: Opslag, keuzes: list[tuple[int, str]], vastzetten: boo
     for o in uit:                                   # de pagina's zoals het nu is (na de latere ploegen)
         o.pagina = ploegpagina(db, o.pagina.ploeg.id)
     return uit
+
+
+# ============================================================
+# Voorkeuren
+# ============================================================
+@dataclass(slots=True)
+class VoorkeurCel:
+    sleutel: str
+    ploeg: str                           # ingesteld voor deze ploeg: voorkeur, 'neutraal' of '' (vaste geldt)
+    vast: str | None                     # vaste voorkeur van de atleet voor dit onderdeel
+    nvt: bool = False                    # atleet mag dit onderdeel niet doen
+
+
+@dataclass(slots=True)
+class VoorkeurRij:
+    atleet: Atleet
+    lid: bool
+    cellen: list[VoorkeurCel]
+
+
+@dataclass(slots=True)
+class Voorkeurpagina:
+    ploeg: Ploeg
+    ploegnaam: str
+    regels: list                          # Programmaregels (kolommen)
+    rijen: list[VoorkeurRij]
+    keuzes: dict[str, str] = field(default_factory=lambda: dict(VOORKEUREN))
+
+
+def voorkeurpagina(db: Opslag, ploeg_id: int) -> Voorkeurpagina | None:
+    """Per atleet die mag (en per lid) en per onderdeel: de voorkeur voor deze ploeg en de vaste."""
+    pg = ploegpagina(db, ploeg_id)
+    if pg is None:
+        return None
+    eigen = db.ploeg_voorkeuren(ploeg_id)
+    rs = pg.regelset
+    rijen = []
+    for rij in pg.matrix.rijen:
+        a = rij.atleet
+        vast = {normaliseer(n): v for n, v in db.atleet_voorkeuren(a.master_id).items()}
+        cellen = [VoorkeurCel(r.sleutel, eigen.get((a.master_id, r.sleutel), ""),
+                              vast.get(normaliseer(rs.onderdelen[r.sleutel].naam)), rij.cellen[r.sleutel].nvt)
+                  for r in pg.matrix.regels]
+        rijen.append(VoorkeurRij(a, a.master_id in pg.rol, cellen))
+    rijen.sort(key=lambda r: not r.lid)                  # leden eerst, verder op naam
+    return Voorkeurpagina(pg.ploeg, pg.ploegnaam, pg.matrix.regels, rijen)
+
+
+def voorkeuren_opslaan(db: Opslag, ploeg_id: int, form: Mapping) -> int:
+    """Voorkeuren van de ploegpagina opslaan; geeft het aantal ingestelde voorkeuren."""
+    vp = voorkeurpagina(db, ploeg_id)
+    if vp is None:
+        raise OpslagFout(f"Ploeg {ploeg_id} bestaat niet.")
+    gelezen = _voorkeuren.lees_ploegformulier(form, [r.atleet.master_id for r in vp.rijen],
+                                              [r.sleutel for r in vp.regels])
+    # voorkeuren van atleten die hier (nu) niet op de pagina staan, blijven bewaard
+    zichtbaar = {r.atleet.master_id for r in vp.rijen}
+    bewaard = {k: v for k, v in db.ploeg_voorkeuren(ploeg_id).items() if k[0] not in zichtbaar}
+    db.ploeg_voorkeuren_opslaan(ploeg_id, {**bewaard, **gelezen})
+    return len(gelezen)
+
+
+@dataclass(slots=True)
+class AtleetVoorkeuren:
+    atleet: Atleet
+    groepen: dict[str, list[str]]        # 'Lopen' -> ['60 meter', ...]
+    gekozen: dict[str, str]              # onderdeelnaam -> voorkeur
+    keuzes: dict[str, str] = field(default_factory=lambda: dict(VOORKEUREN))
+
+
+def atleet_voorkeuren(db: Opslag, master_id: str) -> AtleetVoorkeuren | None:
+    a = db.atleet(master_id)
+    if a is None:
+        return None
+    groepen = _voorkeuren.onderdeelnamen()
+    gekozen = db.atleet_voorkeuren(master_id)
+    bekend = {normaliseer(n) for namen in groepen.values() for n in namen}
+    los = [n for n in gekozen if normaliseer(n) not in bekend]        # niet meer in een regelbestand
+    if los:
+        groepen = {**groepen, "Overig": sorted({*groepen.get("Overig", []), *los})}
+    # gekozen op de getoonde naam (hoofdletters/spaties uit een ander bestand mogen verschillen)
+    per_norm = {normaliseer(n): v for n, v in gekozen.items()}
+    gekozen = {n: per_norm[normaliseer(n)] for namen in groepen.values() for n in namen if normaliseer(n) in per_norm}
+    return AtleetVoorkeuren(a, groepen, gekozen)
+
+
+def atleet_voorkeuren_opslaan(db: Opslag, master_id: str, form: Mapping) -> int:
+    av = atleet_voorkeuren(db, master_id)
+    if av is None:
+        raise OpslagFout("Deze atleet bestaat niet (meer).")
+    gelezen = _voorkeuren.lees_atleetformulier(form, [n for namen in av.groepen.values() for n in namen])
+    db.atleet_voorkeuren_opslaan(master_id, gelezen)
+    return len(gelezen)

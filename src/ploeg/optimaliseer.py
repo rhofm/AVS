@@ -13,6 +13,8 @@ Eisen uit het regelbestand:
                     <= max_onderdelen_per_atleet (4.1)
     tijdschema:     botsing e1/e2 voor atleet a: keuzes(a, e1) + keuzes(a, e2) <= 1;
                     onderdeel buiten het dagdeel van a: keuzes(a, e) = 0 (ploeg/tijdschema.py)
+    voorkeuren:     'wil_niet': keuzes(a, e) = 0; 'moet': keuzes(a, e) >= 1; 'voorkeur': een
+                    extra doel direct na het eerste doel van de strategie (ploeg/voorkeuren.py)
     alleen cellen waar de atleet het onderdeel mag doen (geslacht, 'alleen') en
     vastgezette vinkjes blijven staan (x = 1).
 
@@ -37,7 +39,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field
-from typing import Iterable
+from typing import Iterable, Mapping
 
 import numpy as np
 
@@ -66,6 +68,8 @@ class Model:
     verboden: frozenset[tuple[str, str]] = frozenset()   # (atleet, onderdeel) dat niet kan (dagdeel)
     botsingen: tuple[tuple[str, str, str], ...] = ()     # (atleet, e1, e2): niet allebei
     vaste_estafettes: frozenset[tuple[str, str]] = frozenset()   # (atleet, estafette) die blijft staan
+    moet: frozenset[tuple[str, str]] = frozenset()       # (atleet, onderdeel) dat erin moet ('moet')
+    graag: frozenset[tuple[str, str]] = frozenset()      # (atleet, onderdeel) met 'voorkeur'
     regels: list[Programmaregel] = field(init=False)
     x: dict[tuple[str, str], int] = field(init=False, default_factory=dict)
     s: dict[tuple[str, str], int] = field(init=False, default_factory=dict)
@@ -109,6 +113,10 @@ class Model:
             eigen = self.van_atleet(a)
             if eigen:
                 self.eis({v: 1 for v in eigen}, -math.inf, ruimte)
+        for a, e in self.moet:
+            keuzes = self.keuzes(a, e)
+            if keuzes and (a, e) not in self.vaste_estafettes:     # geen keuze (bijv. estafette zonder
+                self.eis({v: 1 for v in keuzes}, 1, math.inf)      # tijden): de controle meldt het
         for a, e1, e2 in self.botsingen:
             keuzes = self.keuzes(a, e1) + self.keuzes(a, e2)
             vast = sum(1 for e in (e1, e2) if (a, e) in self.vaste_estafettes)
@@ -134,6 +142,14 @@ class Model:
         if (a, e) in self.x:
             return [self.x[(a, e)]]
         return [v for k, v in self.w.items() if k[0] == e and a in self.kwartetten[k].lopers]
+
+    def voorkeurdoel(self) -> dict[int, float]:
+        """Zoveel mogelijk onderdelen met 'voorkeur' (een kwartet telt per loper met voorkeur)."""
+        doel: dict[int, float] = {}
+        for a, e in self.graag:
+            for v in self.keuzes(a, e):
+                doel[v] = doel.get(v, 0) + 1
+        return doel
 
     def puntendoel(self) -> dict[int, float]:
         doel = {self.s[k]: p for k, p in self.punten.items() if p}
@@ -171,7 +187,8 @@ class Model:
                        constraints=[LinearConstraint(A, lb, ub)] if len(eisen) else None,
                        options={"time_limit": tijdslimiet})
             if res.x is None:
-                raise OptimalisatieFout("Er is geen opstelling die aan de regels en de vaste keuzes voldoet.")
+                raise OptimalisatieFout("Er is geen opstelling die aan de regels, de vaste keuzes en de "
+                                        "'moet'-voorkeuren voldoet (te veel onderdelen, of tegelijk?).")
             uitkomst = np.round(res.x)
             beste = float(sum(w * uitkomst[i] for i, w in doel.items()))
             eisen.append((doel, beste - 1e-6, math.inf))   # dit doel vasthouden voor het volgende
@@ -187,7 +204,7 @@ class Resultaat:
 
 def optimaliseer(matrix: Matrix, regelset: Regelset, strategie, atleten: Iterable[str],
                  leden: Iterable[PloegLid], inzet: Iterable[Inzet], vastzetten: bool,
-                 schema: Schema | None = None) -> Resultaat:
+                 schema: Schema | None = None, voorkeuren: Mapping | None = None) -> Resultaat:
     """Nieuwe opstelling volgens een strategie.
 
     atleten:     wie mag worden ingezet (bijv. de aangevinkte deelnemers, of iedereen die mag)
@@ -195,6 +212,7 @@ def optimaliseer(matrix: Matrix, regelset: Regelset, strategie, atleten: Iterabl
                  alle huidige vinkjes staan. Een estafette blijft staan als een loper vast staat
                  of als er geen kwartet te schatten is; anders kiest de optimalisatie het kwartet.
     schema:      tijdschema van de gekoppelde wedstrijd (botsingen, dagdelen, groepen), of None.
+    voorkeuren:  (atleet, onderdeel) -> voorkeur (str of iets met `.voorkeur`), zie ploeg/voorkeuren.py.
     """
     leden, inzet = list(leden), list(inzet)
     rol = {lid.atleet_id: lid.rol for lid in leden}
@@ -223,9 +241,25 @@ def optimaliseer(matrix: Matrix, regelset: Regelset, strategie, atleten: Iterabl
             verboden |= {(a, e) for e in sleutels
                          if not schema.past_dagdeel(a, e, beschikbaar.get(a, "hele_dag"))}
             botsingen += [(a, e1, e2) for e1, e2 in schema.botsingen(a, sleutels)]
+    moet: set[tuple[str, str]] = set()
+    graag: set[tuple[str, str]] = set()
+    for (a, e), v in (voorkeuren or {}).items():
+        v = getattr(v, "voorkeur", v)
+        c = matrix.cel(a, e)
+        if a not in atleten or c is None or c.nvt:
+            continue
+        if v == "wil_niet" and (a, e) not in vast:
+            verboden.add((a, e))
+        elif v == "moet" and (a, e) not in verboden:
+            moet.add((a, e))
+        elif v == "voorkeur":
+            graag.add((a, e))
     model = Model(matrix, regelset, atleten, vast, estafettes, tuple(vrij), frozenset(verboden),
-                  tuple(botsingen), frozenset((i.atleet_id, i.onderdeel) for i in vaste_estafette))
+                  tuple(botsingen), frozenset((i.atleet_id, i.onderdeel) for i in vaste_estafette),
+                  frozenset(moet), frozenset(graag))
     doelen = strategie.bouw(model)
+    if graag:
+        doelen.insert(1, model.voorkeurdoel())
     waarden = model.oplossen(doelen)
 
     nieuw = [Inzet(a, e, vast=(a, e) in vast) for (a, e), v in model.x.items() if waarden[v] > 0.5]

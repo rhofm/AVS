@@ -25,7 +25,10 @@
         {{ p.datum | datum_kort }} {{ p.datum.year }}
         {%- if pg.wedstrijd %} · <a href="{{ url_for('wedstrijd', wedstrijd_id=pg.wedstrijd.id) }}">{{ pg.wedstrijd.naam }}</a>{% endif %}</p>
     </div>
-    <a class="knop" href="{{ url_for('ploeg_gegevens', ploeg_id=p.id) }}">Gegevens wijzigen</a>
+    <span class="knoppen">
+      <a class="knop" href="{{ url_for('ploeg_voorkeuren', ploeg_id=p.id) }}">Voorkeuren{% if pg.voorkeuren %} · {{ pg.voorkeuren | length }}{% endif %}</a>
+      <a class="knop" href="{{ url_for('ploeg_gegevens', ploeg_id=p.id) }}">Gegevens wijzigen</a>
+    </span>
   </header>
 
   {% if melding %}<p class="melding" role="status">{{ melding }}</p>{% endif %}
@@ -39,6 +42,7 @@
     </div>
     <p class="zacht">Punten uit: {{ pg.basis_tekst }}
       (windlegaal, tot de wedstrijddag). Per onderdeel tellen de beste atleten zoals het reglement zegt.
+      ♥ = doet dit graag, ✕ = wil niet, ! = moet (<a href="{{ url_for('ploeg_voorkeuren', ploeg_id=p.id) }}">voorkeuren</a>).
       Waarden met ≈ zijn voorspeld (geen eigen prestatie op dat onderdeel); de bron staat erbij als je de muis erop houdt.
       Een estafette telt met de geschatte tijd: de beentijden van de lopers samen, plus de wissels.
       {%- if pg.schema %} Tijden en groepen komen uit het tijdschema van {{ pg.wedstrijd.naam }}; botsingen en
@@ -161,6 +165,8 @@
                         <span class="zacht">–</span>
                       {% endif %}
                     </label>
+                    {% set vk = pg.voorkeuren.get((mid, r.sleutel)) %}
+                    {% if vk %}<span class="ploegcel__voorkeur ploegcel__voorkeur--{{ vk.voorkeur }}" title="{{ vk.tekst }}">{{ {"voorkeur": "♥", "wil_niet": "✕", "moet": "!"}[vk.voorkeur] }}<span class="verborgen"> {{ vk.tekst }}</span></span>{% endif %}
                     {% if pg.groep.get((mid, r.sleutel)) %}<span class="ploegcel__groep" title="Groep in het tijdschema (9.1)">gr. {{ pg.groep[(mid, r.sleutel)] }}</span>{% endif %}
                   </td>
                   {% endif %}

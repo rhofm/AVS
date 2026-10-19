@@ -1036,6 +1036,19 @@ th[aria-sort="descending"] .sorteer__naam::after { content: " \2193"; opacity: 1
 .ploegmatrix__dagdeel { display: block; margin-top: .25rem; font-size: .85em; }
 .ploegcel__groep { display: block; font-size: .75em; color: var(--tekst-zacht); text-align: right; }
 .ploegdag td select, .ploegdag td input { max-width: 14rem; }
+.ploegcel__voorkeur { display: inline-block; min-width: 1.1em; font-weight: 700; text-align: center; cursor: help; }
+.ploegcel__voorkeur--voorkeur { color: var(--rood); }
+.ploegcel__voorkeur--wil_niet { color: var(--tekst-zacht); }
+.ploegcel__voorkeur--moet { color: var(--tekst); }
+.voorkeurgroepen { display: grid; grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr)); gap: 1rem 2rem; }
+.voorkeurgroep { border: 0; padding: 0; margin: 0; }
+.voorkeurgroep .kop { margin-bottom: .4rem; }
+.voorkeurregel { display: flex; justify-content: space-between; align-items: center; gap: .75rem; padding: .2rem 0;
+  border-bottom: 1px solid var(--lijn); }
+.voorkeurregel--gezet label { font-weight: 700; }
+.voorkeurmatrix th[scope="row"] { white-space: nowrap; }
+.voorkeurmatrix td select { max-width: 9rem; font-size: .85em; }
+.voorkeurmatrix td.voorkeurcel--gezet select { font-weight: 700; }
 .ploegcel--voorspeld .ploegcel__waarde,
 .ploegcel--voorspeld .ploegcel__punten { font-style: italic; }
 .ploegcel--voorspeld .ploegcel__waarde { text-decoration: underline dotted; cursor: help; }

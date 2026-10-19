@@ -100,7 +100,7 @@ when run from source, next to the `.exe` when frozen):
 
 | File             | Contents | Athlete identified by |
 |------------------|----------|-----------------------|
-| `personen.db`    | `atleet` (personal details), `groep` (id + name), `groep_trainingstijden` (one row per group: `groep_id` + `maandag` … `zondag`, start time 'HH:MM' or NULL = no training), `groep_extra_trainingstijd` (extra start times on a fixed day: `groep_id`, `dag`, `starttijd`), `groep_lid` (long: one row per athlete per group; an athlete can be in several groups), `training` (`warming_up`, `kern_a`, `kern_b`, `cooling_down`, `notities`; `hoofdtraining_id` for a deviating variant), `training_atleet` (long: who follows a variant), `groep_fase` (mega cycle: `groep_id`, `startdatum`, `fase`), `mesocyclus` + `mesocyclus_week` (meso cycles and week names), `rooster` + `rooster_regel` (training-content templates) + `groep_rooster` (which group follows which template from when), leerlijnen, `ploeg` (+ `categorie`, `programma`, `datum`, `prestatiebasis`), `ploeg_lid` (who is on the form: `rol` deelnemer/reserve, `beschikbaar`), `ploeg_opstelling` (athlete + programme key from the rule file, `groep`, `vast`); `periodeplan` is obsolete and always empty | `master_id` |
+| `personen.db`    | `atleet` (personal details), `groep` (id + name), `groep_trainingstijden` (one row per group: `groep_id` + `maandag` … `zondag`, start time 'HH:MM' or NULL = no training), `groep_extra_trainingstijd` (extra start times on a fixed day: `groep_id`, `dag`, `starttijd`), `groep_lid` (long: one row per athlete per group; an athlete can be in several groups), `training` (`warming_up`, `kern_a`, `kern_b`, `cooling_down`, `notities`; `hoofdtraining_id` for a deviating variant), `training_atleet` (long: who follows a variant), `groep_fase` (mega cycle: `groep_id`, `startdatum`, `fase`), `mesocyclus` + `mesocyclus_week` (meso cycles and week names), `rooster` + `rooster_regel` (training-content templates) + `groep_rooster` (which group follows which template from when), leerlijnen, `ploeg` (+ `categorie`, `programma`, `datum`, `prestatiebasis`), `ploeg_lid` (who is on the form: `rol` deelnemer/reserve, `beschikbaar`), `ploeg_opstelling` (athlete + programme key from the rule file, `groep`, `vast`), `atleet_voorkeur` + `ploeg_voorkeur` (team-selection preferences); `periodeplan` is obsolete and always empty | `master_id` |
 | `prestaties.db`  | `onderdeel`, `wedstrijd`, `prestatie`, `inschrijving`, `wedstrijd_programma` (meet timetable / chronoloog: one row per item, no personal data), `doel` + `doel_regel` (goals for a group or athlete, usually at a meet), `pr` view | `atleet_ref` (pseudonym) |
 | `testen.db`      | `test`, `testresultaat` | `atleet_ref` (pseudonym) |
 | `trainingsschema.db` | `trainingsschema`: one row per athlete, columns `maandag` … `zondag` (0/1); `trainingskeuze`: which (`groep_id`, `starttijd`) the athlete picks on a day with several trainings | `atleet_ref` (pseudonym) |
@@ -357,6 +357,12 @@ python src/db/init_db.py --herstel <sleutel>  # restore the key (e.g. new comput
   `config/puntentelling/` (`punten.Leeftijdsfactoren`; performance x factor,
   then the senior formula). The shipped `masters_agegrading.yaml` is still
   empty: never invent factors; they must come from the AU tables.
+- Athlete preferences (`ploeg/voorkeuren.py`, migration personen/011): standing
+  per athlete in `atleet_voorkeur` (event name without specification, matched
+  with `normaliseer`) and per ploeg in `ploeg_voorkeur` (programme key; wins over
+  the standing one, `neutraal` switches it off). `wil_niet`/`moet` are hard in the
+  optimiser, `voorkeur` is an objective inserted right after the strategy's
+  first one; the check only warns.
 - `ploeg.regelset` stores the rule file name and `ploeg.strategie` the strategy
   used, so a lineup can be explained afterwards.
 

@@ -1,0 +1,68 @@
+{#
+  Voorkeuren van atleten voor één ploeg (gaan voor de vaste voorkeuren).
+  Context:
+    vp   – ploeg.paginas.Voorkeurpagina
+    fout – optioneel, foutmelding na opslaan
+  Formulier: per atleet en onderdeel `vk|<master_id>|<sleutel>` = '' (vaste voorkeur geldt),
+  voorkeur, wil_niet, moet of neutraal (vaste voorkeur hier niet).
+#}
+{% extends "basis.html" %}
+{% set p = vp.ploeg %}
+{% block titel %}Voorkeuren {{ p.naam }}{% endblock %}
+
+{% block inhoud %}
+<article class="vel">
+  <header class="blok">
+    <a class="terug" href="{{ url_for('ploeg', ploeg_id=p.id) }}">&larr; {{ p.naam }}</a>
+    <h1 class="kop kop--pagina">Voorkeuren voor deze ploeg</h1>
+    <p class="subkop">{{ vp.ploegnaam }} · {{ p.datum | datum_kort }} {{ p.datum.year }}. Alleen voor deze wedstrijd;
+      &lsquo;vast: …&rsquo; is de vaste voorkeur van de atleet (atletenpagina).</p>
+  </header>
+
+  {% if fout %}<p class="melding melding--fout" role="alert">{{ fout }}</p>{% endif %}
+
+  {% if vp.rijen %}
+  <form method="post" class="blok">
+    <div class="tabelvak">
+      <table class="tabel voorkeurmatrix">
+        <thead><tr>
+          <th scope="col">Naam</th>
+          {% for r in vp.regels %}<th scope="col" class="midden">{{ r.kop }}</th>{% endfor %}
+        </tr></thead>
+        <tbody>
+          {% for rij in vp.rijen %}
+            {% set mid = rij.atleet.master_id %}
+            <tr{% if rij.lid %} class="in-ploeg"{% endif %}>
+              <th scope="row">{{ rij.atleet.naam }}{% if rij.lid %} <span class="zacht">(in ploeg)</span>{% endif %}</th>
+              {% for c in rij.cellen %}
+                <td class="midden{{ ' voorkeurcel--gezet' if c.ploeg or c.vast }}">
+                  {% if c.nvt %}<span class="zacht" title="Niet voor deze atleet">·</span>{% else %}
+                  <label class="verborgen" for="vk-{{ mid }}-{{ c.sleutel }}">{{ rij.atleet.naam }}, {{ c.sleutel }}</label>
+                  <select id="vk-{{ mid }}-{{ c.sleutel }}" name="vk|{{ mid }}|{{ c.sleutel }}">
+                    <option value="">{% if c.vast %}vast: {{ vp.keuzes[c.vast] | lower }}{% else %}–{% endif %}</option>
+                    {% for code, tekst in vp.keuzes.items() %}
+                      <option value="{{ code }}"{% if c.ploeg == code %} selected{% endif %}>{{ tekst }}</option>
+                    {% endfor %}
+                    {% if c.vast or c.ploeg == "neutraal" %}<option value="neutraal"{% if c.ploeg == "neutraal" %} selected{% endif %}>Geen (vaste niet)</option>{% endif %}
+                  </select>
+                  {% endif %}
+                </td>
+              {% endfor %}
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <p class="zacht uitleg"><strong>Doet dit graag</strong>: krijgt het onderdeel waar het geen punten kost.
+      <strong>Wil niet</strong>: wordt nooit vanzelf ingepland. <strong>Moet</strong>: wordt altijd ingepland als de
+      atleet meedoet. Met de hand mag alles; de ploegpagina waarschuwt dan.</p>
+    <div class="opslaan opslaan--onder">
+      <a class="knop" href="{{ url_for('ploeg', ploeg_id=p.id) }}">Annuleren</a>
+      <button class="knop knop--vol" type="submit">Opslaan</button>
+    </div>
+  </form>
+  {% else %}
+    <p class="leeg">Er zijn (nog) geen atleten die in deze ploeg mogen.</p>
+  {% endif %}
+</article>
+{% endblock %}

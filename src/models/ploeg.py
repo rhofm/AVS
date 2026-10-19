@@ -19,6 +19,15 @@ ROLLEN: tuple[str, ...] = ("deelnemer", "reserve")
 Beschikbaar = Literal["hele_dag", "ochtend", "middag"]
 BESCHIKBAAR: tuple[str, ...] = ("hele_dag", "ochtend", "middag")
 
+Voorkeur = Literal["voorkeur", "wil_niet", "moet"]
+#: Voorkeur van een atleet voor een onderdeel: (code, wat de trainer ziet).
+VOORKEUREN: dict[str, str] = {
+    "voorkeur": "Doet dit graag",
+    "wil_niet": "Wil niet",
+    "moet": "Moet",
+}
+NEUTRAAL = "neutraal"               # alleen bij een ploeg: de vaste voorkeur geldt hier niet
+
 Prestatiebasis = Literal["seizoen", "pr", "12mnd"]
 #: Welke prestatie telt voor de punten: (code, uitleg voor de trainer).
 PRESTATIEBASIS: dict[str, str] = {

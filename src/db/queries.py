@@ -38,11 +38,13 @@ from __future__ import annotations
 
 from datetime import date
 from pathlib import Path
-from typing import Iterable
+from typing import Iterable, Mapping
 
 from models import (
     DAGEN,
+    NEUTRAAL,
     PR,
+    VOORKEUREN,
     Absentie,
     Atleet,
     Doel,
@@ -1644,6 +1646,44 @@ class Opslag:
             self.personen.executemany(
                 "INSERT INTO ploeg_opstelling (ploeg_id, atleet_id, onderdeel, groep, vast) VALUES (?, ?, ?, ?, ?)",
                 [(ploeg_id, i.atleet_id, i.onderdeel, i.groep, int(i.vast)) for i in inzet])
+
+    # ---------------- voorkeuren (ploegopstelling) ----------------
+    def atleet_voorkeuren(self, master_id: str) -> dict[str, str]:
+        """Vaste voorkeuren van een atleet: onderdeelnaam ('800 meter') -> 'voorkeur'/'wil_niet'/'moet'."""
+        return {r["onderdeel"]: r["voorkeur"] for r in self.personen.execute(
+            "SELECT onderdeel, voorkeur FROM atleet_voorkeur WHERE atleet_id = ? ORDER BY onderdeel", (master_id,))}
+
+    def atleet_voorkeuren_opslaan(self, master_id: str, voorkeuren: Mapping[str, str]) -> None:
+        """Alle vaste voorkeuren van een atleet vervangen."""
+        if self.atleet(master_id) is None:
+            raise OpslagFout("Deze atleet bestaat niet (meer).")
+        rijen = [(master_id, " ".join(o.split()), v) for o, v in voorkeuren.items() if o.strip()]
+        if any(v not in VOORKEUREN for _, _, v in rijen):
+            raise OpslagFout(f"Een voorkeur is een van {', '.join(VOORKEUREN)}.")
+        with self.personen:
+            self.personen.execute("DELETE FROM atleet_voorkeur WHERE atleet_id = ?", (master_id,))
+            self.personen.executemany(
+                "INSERT INTO atleet_voorkeur (atleet_id, onderdeel, voorkeur) VALUES (?, ?, ?)", rijen)
+
+    def ploeg_voorkeuren(self, ploeg_id: int) -> dict[tuple[str, str], str]:
+        """Voorkeuren voor één ploeg: (master_id, programmasleutel) -> voorkeur (of 'neutraal')."""
+        return {(r["atleet_id"], r["onderdeel"]): r["voorkeur"] for r in self.personen.execute(
+            "SELECT atleet_id, onderdeel, voorkeur FROM ploeg_voorkeur WHERE ploeg_id = ?", (ploeg_id,))}
+
+    def ploeg_voorkeuren_opslaan(self, ploeg_id: int, voorkeuren: Mapping[tuple[str, str], str]) -> None:
+        """Alle voorkeuren van een ploeg vervangen."""
+        if self.ploeg(ploeg_id) is None:
+            raise OpslagFout(f"Ploeg {ploeg_id} bestaat niet.")
+        if any(v not in VOORKEUREN and v != NEUTRAAL for v in voorkeuren.values()):
+            raise OpslagFout(f"Een voorkeur is een van {', '.join(VOORKEUREN)} of {NEUTRAAL}.")
+        for m in {m for m, _ in voorkeuren}:
+            if self.atleet(m) is None:
+                raise OpslagFout("Een atleet met een voorkeur bestaat niet (meer).")
+        with self.personen:
+            self.personen.execute("DELETE FROM ploeg_voorkeur WHERE ploeg_id = ?", (ploeg_id,))
+            self.personen.executemany(
+                "INSERT INTO ploeg_voorkeur (ploeg_id, atleet_id, onderdeel, voorkeur) VALUES (?, ?, ?, ?)",
+                [(ploeg_id, m, o, v) for (m, o), v in voorkeuren.items()])
 
     def ploeg_verwijderen(self, ploeg_id: int) -> None:
         with self.personen:        # leden en opstelling gaan mee (ON DELETE CASCADE)

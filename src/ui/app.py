@@ -242,6 +242,23 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
             flash(f"PR's niet opgehaald: {str(e).splitlines()[0]}", "prs-fout")
         return redirect(url_for("atleet", master_id=master_id) + "#kop-pr")
 
+    @app.get("/atleet/<master_id>/voorkeuren")
+    def atleet_voorkeuren(master_id: str):
+        haal_atleet(master_id)
+        return render_template("atleet_voorkeuren.html", av=ploegpaginas.atleet_voorkeuren(db(), master_id),
+                               actief_menu="atleten")
+
+    @app.post("/atleet/<master_id>/voorkeuren")
+    def atleet_voorkeuren_opslaan(master_id: str):
+        haal_atleet(master_id)
+        try:
+            n = ploegpaginas.atleet_voorkeuren_opslaan(db(), master_id, request.form)
+        except OpslagFout as e:
+            return render_template("atleet_voorkeuren.html", av=ploegpaginas.atleet_voorkeuren(db(), master_id),
+                                   fout=f"Niet opgeslagen: {e}", actief_menu="atleten"), 400
+        flash(f"Voorkeuren voor ploegen opgeslagen ({n} ingesteld).")
+        return redirect(url_for("atleet", master_id=master_id) + "#kop-wed")
+
     @app.get("/atleet/<master_id>/wedstrijden")
     def atleet_wedstrijden(master_id: str):
         a = haal_atleet(master_id)
@@ -1362,6 +1379,28 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
             tekst += (f" Wedstrijd {o.pagina.wedstrijd.naam} bijgewerkt: {o.wijzigingen.ingeschreven} ingeschreven, "
                       f"{o.wijzigingen.afgemeld} afgemeld.")
         return _ploegpagina(ploeg_id, o.pagina, melding=tekst)
+
+    @app.get("/ploeg/<int:ploeg_id>/voorkeuren")
+    def ploeg_voorkeuren(ploeg_id: int):
+        haal_ploeg(ploeg_id)
+        try:
+            vp = ploegpaginas.voorkeurpagina(db(), ploeg_id)
+        except RegelFout:
+            return _ploegpagina(ploeg_id)
+        return render_template("ploeg_voorkeuren.html", vp=vp, actief_menu="ploegen")
+
+    @app.post("/ploeg/<int:ploeg_id>/voorkeuren")
+    def ploeg_voorkeuren_opslaan(ploeg_id: int):
+        haal_ploeg(ploeg_id)
+        try:
+            n = ploegpaginas.voorkeuren_opslaan(db(), ploeg_id, request.form)
+        except OpslagFout as e:
+            return render_template("ploeg_voorkeuren.html", vp=ploegpaginas.voorkeurpagina(db(), ploeg_id),
+                                   fout=f"Niet opgeslagen: {e}", actief_menu="ploegen"), 400
+        except RegelFout:
+            return _ploegpagina(ploeg_id)
+        flash(f"Voorkeuren voor deze ploeg opgeslagen ({n} ingesteld).")
+        return redirect(url_for("ploeg", ploeg_id=ploeg_id))
 
     def _dag(datum: str):
         try:

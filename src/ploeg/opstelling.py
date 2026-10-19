@@ -110,7 +110,8 @@ def stand(matrix: Matrix, inzet: Iterable[Inzet]) -> Stand:
 # Controleren
 # ============================================================
 def controleer(db: Opslag, regelset: Regelset, ploeg: Ploeg, leden: Iterable[PloegLid], inzet: Iterable[Inzet],
-               matrix: Matrix, schema: Schema | None = None) -> list[Overtreding]:
+               matrix: Matrix, schema: Schema | None = None, voorkeuren: Mapping | None = None
+               ) -> list[Overtreding]:
     """Regels van de competitie + één ploeg per dag + waarschuwing 'geen prestatie'."""
     leden, inzet = list(leden), list(inzet)
     uit = regelset.controleer(ploeg.categorie, ploeg.programma, leden, inzet, matrix.categorieen)
@@ -138,6 +139,28 @@ def controleer(db: Opslag, regelset: Regelset, ploeg: Ploeg, leden: Iterable[Plo
                                                 f"({c.bron}).", "waarschuwing", i.atleet_id, i.onderdeel))
     if schema is not None:
         uit += _tijdschema_controle(schema, soorten, leden, inzet)
+    if voorkeuren:
+        uit += _voorkeur_controle(voorkeuren, soorten, leden, inzet, matrix)
+    return uit
+
+
+def _voorkeur_controle(voorkeuren: Mapping, soorten: Mapping[str, Programmaregel], leden: list[PloegLid],
+                       inzet: list[Inzet], matrix: Matrix) -> list[Overtreding]:
+    """'wil_niet' maar toch ingezet, en een deelnemer met 'moet' die er niet op staat (waarschuwingen)."""
+    uit = []
+    gekozen = {(i.atleet_id, i.onderdeel) for i in inzet}
+    deelnemers = {lid.atleet_id for lid in leden if lid.rol == "deelnemer"}
+    for (a, e), v in voorkeuren.items():
+        r = soorten.get(e)
+        if r is None:
+            continue
+        bron = " (vaste voorkeur)" if getattr(v, "bron", "") == "atleet" else ""
+        v = getattr(v, "voorkeur", v)
+        c = matrix.cel(a, e)
+        if v == "wil_niet" and (a, e) in gekozen:
+            uit.append(Overtreding("wil_niet", f"Wil {r.naam} niet{bron}.", "waarschuwing", a, e))
+        elif v == "moet" and a in deelnemers and (a, e) not in gekozen and c is not None and not c.nvt:
+            uit.append(Overtreding("moet", f"Moet {r.naam} doen{bron}, maar staat er niet op.", "waarschuwing", a, e))
     return uit
 
 
