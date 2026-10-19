@@ -55,6 +55,8 @@ from ui import export as trainingsexport
 from ui import importeren as importeerpagina
 from ui import startpagina
 from ui.opmaak import registreer_filters
+from ploeg import paginas as ploegpaginas
+from ploeg.regels import RegelFout
 from wedstrijden import detail as wedstrijddetail
 from wedstrijden import kalender, tijdschema_import, uitslag_import
 from wedstrijden.overzicht import wedstrijdenoverzicht
@@ -63,8 +65,7 @@ HOST = "127.0.0.1"
 VOORKEUR_POORT = 5050
 
 #: Menu-items en losse links die nog geen eigen pagina hebben: (pad, titel).
-BINNENKORT = {
-    "ploegen": "Ploegen",
+BINNENKORT: dict[str, str] = {
 }
 ATLEET_BINNENKORT: dict[str, str] = {
 }
@@ -1253,11 +1254,100 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
         flash("Instellingen opgeslagen.")
         return redirect(url_for("instellingen_pagina"))
 
+    # ---------------- ploegen ----------------
+    @app.get("/ploegen")
+    def ploegen():
+        meldingen = get_flashed_messages()
+        return render_template("ploegen.html", regels=ploegpaginas.overzicht(db(), date.today()),
+                               melding=meldingen[0] if meldingen else None, actief_menu="ploegen")
+
+    def _ploegformulier(ingevuld=None, *, ploeg=None, fouten=None, status: int = 200):
+        f = ploegpaginas.formulier(db(), date.today(), ingevuld, ploeg)
+        return render_template("ploeg_gegevens.html", f=f, p=ploeg, fouten=fouten or {},
+                               actief_menu="ploegen"), status
+
+    @app.get("/ploegen/nieuw")
+    def ploeg_nieuw():
+        return _ploegformulier()
+
+    @app.post("/ploegen/nieuw")
+    def ploeg_nieuw_opslaan():
+        try:
+            p = ploegpaginas.ploeg_opslaan(db(), ploegpaginas.lees_formulier(db(), request.form))
+        except ploegpaginas.InvoerFout as e:
+            return _ploegformulier(request.form, fouten=e.fouten, status=400)
+        except OpslagFout as e:
+            return _ploegformulier(request.form, fouten={"algemeen": str(e)}, status=400)
+        flash(f"Ploeg {p.naam} is aangemaakt. Kies de atleten en hun onderdelen.")
+        return redirect(url_for("ploeg", ploeg_id=p.id))
+
+    def haal_ploeg(ploeg_id: int):
+        p = db().ploeg(ploeg_id)
+        if p is None:
+            abort(404)
+        return p
+
+    @app.get("/ploeg/<int:ploeg_id>/gegevens")
+    def ploeg_gegevens(ploeg_id: int):
+        return _ploegformulier(ploeg=haal_ploeg(ploeg_id))
+
+    @app.post("/ploeg/<int:ploeg_id>/gegevens")
+    def ploeg_gegevens_opslaan(ploeg_id: int):
+        oud = haal_ploeg(ploeg_id)
+        try:
+            p = ploegpaginas.ploeg_opslaan(db(), ploegpaginas.lees_formulier(db(), request.form, oud))
+        except ploegpaginas.InvoerFout as e:
+            return _ploegformulier(request.form, ploeg=oud, fouten=e.fouten, status=400)
+        except OpslagFout as e:
+            return _ploegformulier(request.form, ploeg=oud, fouten={"algemeen": str(e)}, status=400)
+        flash("De gegevens van de ploeg zijn opgeslagen.")
+        return redirect(url_for("ploeg", ploeg_id=p.id))
+
+    def _ploegpagina(ploeg_id: int, pagina=None, *, melding=None, status: int = 200):
+        try:
+            pg = pagina or ploegpaginas.ploegpagina(db(), ploeg_id)
+        except RegelFout as e:
+            p = haal_ploeg(ploeg_id)
+            return render_template("fout.html", titel=p.naam,
+                                   tekst=f"Het regelbestand van deze ploeg is niet te lezen: {e}"), 500
+        if pg is None:
+            abort(404)
+        if melding is None:
+            meldingen = get_flashed_messages()
+            melding = meldingen[0] if meldingen else None
+        return render_template("ploeg.html", pg=pg, melding=melding, actief_menu="ploegen"), status
+
+    @app.get("/ploeg/<int:ploeg_id>")
+    def ploeg(ploeg_id: int):
+        return _ploegpagina(ploeg_id)
+
+    @app.post("/ploeg/<int:ploeg_id>")
+    def ploeg_opslaan(ploeg_id: int):
+        haal_ploeg(ploeg_id)
+        try:
+            pg = ploegpaginas.opstelling_opslaan(db(), ploeg_id, request.form)
+        except RegelFout:
+            return _ploegpagina(ploeg_id)
+        except OpslagFout as e:
+            pg = ploegpaginas.ploegpagina(db(), ploeg_id)
+            return render_template("ploeg.html", pg=pg, fout=str(e), actief_menu="ploegen"), 400
+        tekst = "Opgeslagen." + (" Nog niet alles klopt: zie de meldingen." if pg.fouten else
+                                 " De opstelling voldoet aan de regels.")
+        return _ploegpagina(ploeg_id, pg, melding=tekst)
+
+    @app.post("/ploeg/<int:ploeg_id>/verwijderen")
+    def ploeg_verwijderen(ploeg_id: int):
+        p = haal_ploeg(ploeg_id)
+        db().ploeg_verwijderen(ploeg_id)
+        flash(f"Ploeg {p.naam} is verwijderd.")
+        return redirect(url_for("ploegen"))
+
     # ---------------- nog te bouwen ----------------
-    @app.get("/<any(" + ", ".join(BINNENKORT) + "):onderdeel>")
-    def binnenkort(onderdeel: str):
-        return render_template("binnenkort.html", titel=BINNENKORT[onderdeel], terug_url=url_for("start"),
-                               terug_naam="Start", actief_menu=onderdeel)
+    if BINNENKORT:
+        @app.get("/<any(" + ", ".join(BINNENKORT) + "):onderdeel>")
+        def binnenkort(onderdeel: str):
+            return render_template("binnenkort.html", titel=BINNENKORT[onderdeel], terug_url=url_for("start"),
+                                   terug_naam="Start", actief_menu=onderdeel)
 
     @app.get("/atleet/<master_id>/<path:onderdeel>")
     def atleet_binnenkort(master_id: str, onderdeel: str):

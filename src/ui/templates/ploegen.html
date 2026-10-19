@@ -1,0 +1,54 @@
+{#
+  Overzicht van de competitieploegen (menu 'Ploegen').
+  Context:
+    regels  – lijst van ploeg.paginas.OverzichtRegel, nieuwste wedstrijddag eerst
+    melding – bevestiging na opslaan of verwijderen (optioneel)
+#}
+{% extends "basis.html" %}
+{% block titel %}Ploegen{% endblock %}
+
+{% block inhoud %}
+<article class="vel">
+  <header class="blok__kop">
+    <div>
+      <h1 class="kop kop--pagina">Ploegen</h1>
+      <p class="subkop">Competitieploegen: wie doet mee, op welk onderdeel, en hoeveel punten levert dat op.</p>
+    </div>
+    <a class="knop knop--vol" href="{{ url_for('ploeg_nieuw') }}">+ Nieuwe ploeg</a>
+  </header>
+
+  {% if melding %}<p class="melding" role="status">{{ melding }}</p>{% endif %}
+
+  <section class="blok" aria-label="Ploegen">
+    {% if regels %}
+      <div class="tabelvak">
+        <table class="tabel" id="tabel-ploegen">
+          <thead><tr>
+            <th scope="col">Datum</th>
+            <th scope="col">Ploeg</th>
+            <th scope="col">Competitie</th>
+            <th scope="col">Wedstrijd</th>
+            <th scope="col" class="rechts">Atleten</th>
+          </tr></thead>
+          <tbody>
+            {% for r in regels %}
+              <tr{% if r.geweest %} class="geweest"{% endif %}>
+                <td class="nowrap"><strong>{{ r.ploeg.datum | datum_kort }}</strong><br><span class="zacht">{{ r.ploeg.datum.year }}</span></td>
+                <td><a href="{{ url_for('ploeg', ploeg_id=r.ploeg.id) }}"><strong>{{ r.ploeg.naam }}</strong></a><br>
+                  <span class="zacht">{{ r.ploegnaam }}</span></td>
+                <td>{{ r.competitie }}<br><span class="zacht">{{ r.programma }}</span></td>
+                <td>{% if r.wedstrijd %}<a href="{{ url_for('wedstrijd', wedstrijd_id=r.wedstrijd.id) }}">{{ r.wedstrijd.naam }}</a>{% else %}<span class="zacht">–</span>{% endif %}</td>
+                <td class="rechts getallen">{{ r.deelnemers }}{% if r.reserves %} <span class="zacht">+ {{ r.reserves }} res.</span>{% endif %}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="leeg">Nog geen ploegen. Maak er een met <a href="{{ url_for('ploeg_nieuw') }}">+ Nieuwe ploeg</a>.</p>
+    {% endif %}
+  </section>
+
+  <footer class="vel__voet">Atleet Volg Systeem<br>Ploegen</footer>
+</article>
+{% endblock %}

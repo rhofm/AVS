@@ -48,7 +48,9 @@
 
 ## Ploeg
 
-* Functie voor vergelijken prs/prestaties van groep atleten
+* Ontwerp: docs/Ploegopstelling_ontwerp.md
+* Pagina 'Ploegen' (/ploegen): ploeg aanmaken (competitie + ploeg uit config/ploeg_regels/, welke wedstrijd van de competitie, gekoppelde wedstrijd of datum, welke prestaties tellen) en per ploeg een tabel atleten x onderdelen met beste prestatie en punten (AU-puntentelling uit config/puntentelling/). Vinkjes = opstelling; 'Opslaan en controleren' rekent de punten uit (beste twee bij lopen, beste één technisch bij U14/U16) en toont wat niet mag volgens het reglement
+* Functie voor vergelijken prs/prestaties van groep atleten: gedaan (ploeg/vergelijk.py)
 * Testfunctie voor chronoloog: gedaan als botsingencontrole (wedstrijden/chronoloog.py)
 * Makkelijk aan te passen
 * Verschillende 'mentaliteiten' van ploegenopstelling

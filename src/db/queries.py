@@ -62,6 +62,9 @@ from models import (
     INHOUD_VELDEN,
     Mesocyclus,
     Periodisering,
+    Inzet,
+    Ploeg,
+    PloegLid,
     Rooster,
     RoosterRegel,
     Prestatie,
@@ -505,6 +508,8 @@ class Opslag:
                 """UPDATE doel SET datum = (SELECT datum FROM wedstrijd WHERE id = ?)
                    WHERE wedstrijd_id = ? AND datum IS NULL""", (wedstrijd_id, wedstrijd_id))
             self.prestaties_db.execute("DELETE FROM wedstrijd WHERE id = ?", (wedstrijd_id,))
+        with self.personen:        # ploegen houden hun eigen datum; de koppeling vervalt
+            self.personen.execute("UPDATE ploeg SET wedstrijd_id = NULL WHERE wedstrijd_id = ?", (wedstrijd_id,))
 
     # ============================================================
     # Doelen (prestaties.db: doel, doel_regel)
@@ -1548,3 +1553,98 @@ class Opslag:
     def notitie_verwijderen(self, notitie_id: int) -> None:
         with self.notities_db:
             self.notities_db.execute("DELETE FROM notitie WHERE id = ?", (notitie_id,))
+
+    # ============================================================
+    # Ploegen (personen.db: ploeg, ploeg_lid, ploeg_opstelling)
+    # ============================================================
+    @staticmethod
+    def _ploeg(r) -> Ploeg:
+        return Ploeg(naam=r["naam"], regelset=r["regelset"], categorie=r["categorie"], programma=r["programma"],
+                     datum=_naar_datum(r["datum"]), wedstrijd_id=r["wedstrijd_id"], competitie=r["competitie"],
+                     strategie=r["strategie"], prestatiebasis=r["prestatiebasis"], id=r["id"],
+                     aangemaakt_op=r["aangemaakt_op"])
+
+    def ploeg_opslaan(self, p: Ploeg) -> Ploeg:
+        """Gegevens van een ploeg toevoegen of bijwerken (niet de leden; zie ploeg_opstelling_opslaan).
+
+        Een gekoppelde wedstrijd moet bestaan (prestaties.db, in Python gecontroleerd).
+        """
+        if p.wedstrijd_id is not None and self.wedstrijd(p.wedstrijd_id) is None:
+            raise OpslagFout(f"Wedstrijd {p.wedstrijd_id} bestaat niet.")
+        waarden = (p.naam, p.competitie, p.wedstrijd_id, p.regelset, p.strategie, p.categorie, p.programma,
+                   _naar_tekst(p.datum), p.prestatiebasis)
+        with self.personen:
+            if p.id is None:
+                p.id = self.personen.execute(
+                    """INSERT INTO ploeg (naam, competitie, wedstrijd_id, regelset, strategie, categorie, programma,
+                                          datum, prestatiebasis) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""", waarden
+                ).lastrowid
+            else:
+                n = self.personen.execute(
+                    """UPDATE ploeg SET naam = ?, competitie = ?, wedstrijd_id = ?, regelset = ?, strategie = ?,
+                              categorie = ?, programma = ?, datum = ?, prestatiebasis = ? WHERE id = ?""",
+                    (*waarden, p.id)).rowcount
+                if n == 0:
+                    raise OpslagFout(f"Ploeg {p.id} bestaat niet.")
+        return p
+
+    def ploeg(self, ploeg_id: int) -> Ploeg | None:
+        r = self.personen.execute("SELECT * FROM ploeg WHERE id = ?", (ploeg_id,)).fetchone()
+        return self._ploeg(r) if r and r["datum"] else None
+
+    def ploegen(self, datum: date | None = None) -> list[Ploeg]:
+        """Alle ploegen (nieuwste wedstrijddag eerst), of alleen die van één dag.
+        Ploegen van vóór migratie 010 zonder datum worden overgeslagen."""
+        if datum is None:
+            rijen = self.personen.execute(
+                "SELECT * FROM ploeg WHERE datum IS NOT NULL ORDER BY datum DESC, naam").fetchall()
+        else:
+            rijen = self.personen.execute(
+                "SELECT * FROM ploeg WHERE datum = ? ORDER BY naam", (_naar_tekst(datum),)).fetchall()
+        return [self._ploeg(r) for r in rijen]
+
+    def ploeg_leden(self, ploeg_id: int) -> list[PloegLid]:
+        """Leden van een ploeg, op naam gesorteerd (volgens Instellingen)."""
+        rijen = self.personen.execute(
+            """SELECT pl.atleet_id, a.voornaam, a.achternaam, a.tussenvoegsel, pl.rol, pl.beschikbaar
+               FROM ploeg_lid pl JOIN atleet a ON a.master_id = pl.atleet_id WHERE pl.ploeg_id = ?""",
+            (ploeg_id,)).fetchall()
+        per_id = {r["atleet_id"]: r for r in rijen}
+        return [PloegLid(m, per_id[m]["rol"], per_id[m]["beschikbaar"])
+                for m in _ids_op_naam([(r[0], r[1], r[2], r[3]) for r in rijen])]
+
+    def ploeg_inzet(self, ploeg_id: int) -> list[Inzet]:
+        return [Inzet(r["atleet_id"], r["onderdeel"], r["groep"], bool(r["vast"])) for r in self.personen.execute(
+            "SELECT * FROM ploeg_opstelling WHERE ploeg_id = ? ORDER BY onderdeel, atleet_id", (ploeg_id,))]
+
+    def ploeg_opstelling_opslaan(self, ploeg_id: int, leden: Iterable[PloegLid], inzet: Iterable[Inzet]) -> None:
+        """Leden en opstelling van een ploeg vervangen (één transactie).
+
+        Een inzet van iemand die geen lid is, geeft een OpslagFout: zet hem eerst in de ploeg.
+        Of de opstelling aan de competitieregels voldoet, controleert ploeg/opstelling.py.
+        """
+        leden, inzet = list(leden), list(inzet)
+        if self.ploeg(ploeg_id) is None:
+            raise OpslagFout(f"Ploeg {ploeg_id} bestaat niet.")
+        ids = {lid.atleet_id for lid in leden}
+        if len(ids) != len(leden):
+            raise OpslagFout("Een atleet staat twee keer in de ploeg.")
+        for m in ids:
+            if self.atleet(m) is None:
+                raise OpslagFout("Een atleet in de ploeg bestaat niet (meer).")
+        if any(i.atleet_id not in ids for i in inzet):
+            raise OpslagFout("Een atleet doet een onderdeel maar staat niet in de ploeg.")
+        if len({(i.atleet_id, i.onderdeel) for i in inzet}) != len(inzet):
+            raise OpslagFout("Een atleet staat twee keer op hetzelfde onderdeel.")
+        with self.personen:
+            self.personen.execute("DELETE FROM ploeg_lid WHERE ploeg_id = ?", (ploeg_id,))   # opstelling gaat mee
+            self.personen.executemany(
+                "INSERT INTO ploeg_lid (ploeg_id, atleet_id, rol, beschikbaar) VALUES (?, ?, ?, ?)",
+                [(ploeg_id, lid.atleet_id, lid.rol, lid.beschikbaar) for lid in leden])
+            self.personen.executemany(
+                "INSERT INTO ploeg_opstelling (ploeg_id, atleet_id, onderdeel, groep, vast) VALUES (?, ?, ?, ?, ?)",
+                [(ploeg_id, i.atleet_id, i.onderdeel, i.groep, int(i.vast)) for i in inzet])
+
+    def ploeg_verwijderen(self, ploeg_id: int) -> None:
+        with self.personen:        # leden en opstelling gaan mee (ON DELETE CASCADE)
+            self.personen.execute("DELETE FROM ploeg WHERE id = ?", (ploeg_id,))

@@ -1,4 +1,4 @@
-"""Dataclasses voor een ploegopstelling: wie in de ploeg zit (PloegLid) en wie wat doet (Inzet).
+"""Dataclasses voor een ploegopstelling: de ploeg zelf (Ploeg), wie erin zit (PloegLid) en wie wat doet (Inzet).
 
 Horen bij personen.db (de ploegtabellen; zie docs/Ploegopstelling_ontwerp.md).
 Een atleet heet hier, zoals overal in de modellen, met zijn master_id
@@ -10,6 +10,7 @@ met welke specificatie dat is, hangt af van de ploeg (zie ploeg/regels.py).
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import date
 from typing import Literal
 
 Rol = Literal["deelnemer", "reserve"]
@@ -17,6 +18,48 @@ ROLLEN: tuple[str, ...] = ("deelnemer", "reserve")
 
 Beschikbaar = Literal["hele_dag", "ochtend", "middag"]
 BESCHIKBAAR: tuple[str, ...] = ("hele_dag", "ochtend", "middag")
+
+Prestatiebasis = Literal["seizoen", "pr", "12mnd"]
+#: Welke prestatie telt voor de punten: (code, uitleg voor de trainer).
+PRESTATIEBASIS: dict[str, str] = {
+    "seizoen": "Beste van dit en vorig seizoen",
+    "pr": "PR (beste ooit)",
+    "12mnd": "Beste van de laatste 12 maanden",
+}
+
+
+@dataclass(slots=True)
+class Ploeg:
+    """Een ploeg voor één competitiewedstrijd (tabel `ploeg`).
+
+    `regelset` is de bestandsnaam in config/ploeg_regels/ (zonder .yaml),
+    `categorie` de ploeg daarin ('U16-V') en `programma` de wedstrijd
+    ('wedstrijd_2'). `datum` is de wedstrijddag; met een gekoppelde wedstrijd
+    (`wedstrijd_id`, prestaties.db) is dat de datum van die wedstrijd.
+    """
+
+    naam: str                       # bijv. 'U16 meisjes A'
+    regelset: str
+    categorie: str
+    programma: str
+    datum: date
+    wedstrijd_id: int | None = None
+    competitie: str | None = None   # naam uit het regelbestand, om te tonen
+    strategie: str | None = None    # welke 'mentaliteit' de opstelling maakte (None = met de hand)
+    prestatiebasis: Prestatiebasis = "seizoen"
+    id: int | None = None
+    aangemaakt_op: str | None = None
+
+    def __post_init__(self) -> None:
+        self.naam = " ".join((self.naam or "").split())
+        if not self.naam:
+            raise ValueError("Geef de ploeg een naam.")
+        if not self.regelset or not self.categorie or not self.programma:
+            raise ValueError("Een ploeg heeft een regelbestand, ploeg (categorie) en wedstrijd nodig.")
+        if not isinstance(self.datum, date):
+            raise ValueError("Een ploeg heeft een datum nodig.")
+        if self.prestatiebasis not in PRESTATIEBASIS:
+            raise ValueError(f"Onbekende prestatiebasis {self.prestatiebasis!r}; kies uit {tuple(PRESTATIEBASIS)}.")
 
 
 @dataclass(slots=True)

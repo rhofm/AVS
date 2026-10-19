@@ -1,0 +1,143 @@
+{#
+  Eén ploeg: de matrix atleten x onderdelen met de opstelling, punten en controle.
+  Context:
+    pg      – ploeg.paginas.Ploegpagina
+    melding – bevestiging na opslaan (optioneel)
+    fout    – foutmelding bij opslaan (optioneel)
+  Formulier: per atleet `rol-<master_id>` (''/deelnemer/reserve) en per vinkje
+  `inzet` = '<master_id>|<onderdeel>'. Een vinkje zonder rol maakt de atleet deelnemer.
+  Punten per cel volgen uit de beste prestatie (pg.p.prestatiebasis); vetgedrukt = telt mee.
+  Werkt zonder JavaScript: na 'Opslaan en controleren' rekent de server alles opnieuw uit.
+#}
+{% extends "basis.html" %}
+{% set p = pg.ploeg %}
+{% set m = pg.matrix %}
+{% block titel %}{{ p.naam }}{% endblock %}
+
+{% block inhoud %}
+<article class="vel">
+  <header class="blok__kop">
+    <div>
+      <a class="terug" href="{{ url_for('ploegen') }}">&larr; Ploegen</a>
+      <h1 class="kop kop--pagina">{{ p.naam }}</h1>
+      <p class="subkop">{{ pg.regelset.naam }} · {{ pg.ploegnaam }} · {{ pg.programma }} ·
+        {{ p.datum | datum_kort }} {{ p.datum.year }}
+        {%- if pg.wedstrijd %} · <a href="{{ url_for('wedstrijd', wedstrijd_id=pg.wedstrijd.id) }}">{{ pg.wedstrijd.naam }}</a>{% endif %}</p>
+    </div>
+    <a class="knop" href="{{ url_for('ploeg_gegevens', ploeg_id=p.id) }}">Gegevens wijzigen</a>
+  </header>
+
+  {% if melding %}<p class="melding" role="status">{{ melding }}</p>{% endif %}
+  {% if fout %}<p class="melding melding--fout" role="alert">{{ fout }}</p>{% endif %}
+
+  <section class="blok ploegstand" aria-label="Stand">
+    <div class="ploegstand__cijfers">
+      <div><span class="ploegstand__getal">{{ pg.stand.totaal }}</span><span class="zacht">punten</span></div>
+      <div><span class="ploegstand__getal">{{ pg.deelnemers }}</span><span class="zacht">deelnemer{{ "s" if pg.deelnemers != 1 }}</span></div>
+      <div><span class="ploegstand__getal">{{ pg.reserves }}</span><span class="zacht">reserve{{ "s" if pg.reserves != 1 }} (max. {{ pg.regelset.max_reserves }})</span></div>
+    </div>
+    <p class="zacht">Punten uit: {{ pg.basis_tekst }}
+      (windlegaal, tot de wedstrijddag). Per onderdeel tellen de beste atleten zoals het reglement zegt.
+      {%- if pg.stand.estafettes_zonder_punten %} Estafettes tellen nog niet mee in het totaal.{% endif %}</p>
+    {% if pg.fouten %}
+      <div class="melding melding--fout" role="alert">
+        <strong>Dit mag nog niet ({{ pg.fouten | length }}):</strong>
+        <ul>{% for o in pg.fouten %}<li>{{ pg.melding(o) }}</li>{% endfor %}</ul>
+      </div>
+    {% elif pg.rol %}
+      <p class="melding" role="status">De opstelling voldoet aan de regels van {{ pg.regelset.naam }}.</p>
+    {% endif %}
+    {% if pg.waarschuwingen %}
+      <details class="melding ploegstand__waarschuwingen"{% if pg.waarschuwingen | length <= 3 %} open{% endif %}>
+        <summary>Let op ({{ pg.waarschuwingen | length }})</summary>
+        <ul>{% for o in pg.waarschuwingen %}<li>{{ pg.melding(o) }}</li>{% endfor %}</ul>
+      </details>
+    {% endif %}
+  </section>
+
+  <form method="post" class="blok">
+    {% if m.rijen %}
+      <div class="tabelvak">
+        <table class="tabel ploegmatrix" id="ploegmatrix">
+          <thead>
+            <tr>
+              <th scope="col">In ploeg</th>
+              <th scope="col">Naam</th>
+              <th scope="col">Cat.</th>
+              {% for r in m.regels %}
+                <th scope="col" class="midden">{{ r.naam }}<br>
+                  <span class="ploegmatrix__regel">{% if r.soort == "estafette" %}{{ r.max_atleten }} ploeg{% else %}max {{ r.max_atleten }} · telt {{ r.tellend }}{% endif %}</span></th>
+              {% endfor %}
+              <th scope="col" class="rechts">Ond.</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for rij in m.rijen %}
+              {% set mid = rij.master_id %}
+              {% set rol = pg.rol.get(mid, "") %}
+              {% set eigen = pg.overtredingen_van(mid) %}
+              <tr class="{{ 'in-ploeg' if rol == 'deelnemer' else 'reserve' if rol == 'reserve' else '' }}{{ ' heeft-fout' if eigen | selectattr('ernst', 'equalto', 'fout') | list }}">
+                <td>
+                  <label class="verborgen" for="rol-{{ mid }}">Rol van {{ rij.atleet.naam }}</label>
+                  <select id="rol-{{ mid }}" name="rol-{{ mid }}">
+                    <option value=""{% if not rol %} selected{% endif %}>–</option>
+                    <option value="deelnemer"{% if rol == "deelnemer" %} selected{% endif %}>deelnemer</option>
+                    <option value="reserve"{% if rol == "reserve" %} selected{% endif %}>reserve</option>
+                  </select>
+                </td>
+                <th scope="row"><a href="{{ url_for('atleet', master_id=mid) }}">{{ rij.atleet.naam }}</a>
+                  {%- for o in eigen %} <span class="kenmerk{{ ' kenmerk--pr' if o.ernst == 'fout' }}" title="{{ o.tekst }}">!</span>{% endfor %}</th>
+                <td class="nowrap">{{ rij.categorie or "?" }}{% if not rij.toegestaan %} <span class="kenmerk kenmerk--pr" title="Mag niet in deze ploeg">niet toegestaan</span>{% endif %}</td>
+                {% for r in m.regels %}
+                  {% set c = rij.cellen[r.sleutel] %}
+                  {% set gekozen = (mid, r.sleutel) in pg.inzet %}
+                  {% set telt = mid in pg.stand.onderdelen[r.sleutel].tellend %}
+                  <td class="ploegcel{{ ' ploegcel--gekozen' if gekozen }}{{ ' ploegcel--telt' if telt }}{{ ' ploegcel--leeg' if c.waarde is none }}">
+                    <label title="{{ c.onderdeel_naam }}{% if c.datum %} · {{ c.datum | datum_lang }}{% endif %}">
+                      <input type="checkbox" name="inzet" value="{{ mid }}|{{ r.sleutel }}"{% if gekozen %} checked{% endif %}>
+                      {% if c.waarde is not none %}
+                        <span class="ploegcel__waarde">{{ c.tekst }}</span>
+                        <span class="ploegcel__punten">{{ c.punten }}</span>
+                      {% elif r.soort == "estafette" %}
+                        <span class="zacht">loper</span>
+                      {% elif c.hint %}
+                        <span class="zacht" title="Andere specificatie, geen punten">{{ c.hint }}</span>
+                      {% else %}
+                        <span class="zacht">–</span>
+                      {% endif %}
+                    </label>
+                  </td>
+                {% endfor %}
+                <td class="rechts getallen">{{ pg.stand.per_atleet.get(mid, 0) or "" }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+          <tfoot>
+            <tr>
+              <th scope="row" colspan="3">Punten</th>
+              {% for r in m.regels %}
+                {% set s = pg.stand.onderdelen[r.sleutel] %}
+                <td class="midden getallen"><strong>{{ s.punten if r.soort != "estafette" else "–" }}</strong><br>
+                  <span class="zacht">{{ s.ingezet | length }}/{{ r.max_atleten * (r.onderdeel.lopers or 1) }}</span></td>
+              {% endfor %}
+              <td class="rechts getallen"><strong>{{ pg.stand.totaal }}</strong></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+      <p class="zacht">Vinkje = atleet doet dat onderdeel. Het getal is de prestatie, daarnaast de punten;
+        een rood omrande cel telt mee voor het totaal. Een grijze tekst is een prestatie met een andere
+        specificatie (bijv. een lichtere kogel) en telt niet.</p>
+    {% else %}
+      <p class="leeg">Er zijn geen actieve atleten in de categorieën die in {{ pg.ploegnaam }} mogen
+        ({{ pg.regelset.ploeg(p.categorie).toegestaan | join(", ") }}) op {{ p.datum | datum_lang }}.</p>
+    {% endif %}
+    <div class="opslaan">
+      <a href="{{ url_for('ploegen') }}">Terug</a>
+      <button class="knop knop--vol" type="submit">Opslaan en controleren</button>
+    </div>
+  </form>
+
+  <footer class="vel__voet">Atleet Volg Systeem<br>{{ p.naam }}</footer>
+</article>
+{% endblock %}

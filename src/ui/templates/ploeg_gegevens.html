@@ -1,0 +1,104 @@
+{#
+  Nieuwe ploeg, of de gegevens van een ploeg wijzigen.
+  Context:
+    f      – ploeg.paginas.Formulier (keuzes en ingevulde waarden)
+    p      – models.Ploeg bij wijzigen, None bij een nieuwe ploeg
+    fouten – {veld: melding}; 'algemeen' voor een melding boven het formulier
+  Een gekoppelde wedstrijd bepaalt de datum; zonder wedstrijd vul je de datum in.
+#}
+{% extends "basis.html" %}
+{% block titel %}{{ "Gegevens · " ~ p.naam if p else "Nieuwe ploeg" }}{% endblock %}
+
+{% macro fout(veld) %}{% if fouten[veld] %}<span class="veld__fout">{{ fouten[veld] }}</span>{% endif %}{% endmacro %}
+
+{% block inhoud %}
+<article class="vel">
+  <header class="blok__kop">
+    <div>
+      {% if p %}
+        <a class="terug" href="{{ url_for('ploeg', ploeg_id=p.id) }}">&larr; {{ p.naam }}</a>
+        <h1 class="kop kop--pagina">Gegevens van de ploeg</h1>
+      {% else %}
+        <a class="terug" href="{{ url_for('ploegen') }}">&larr; Ploegen</a>
+        <h1 class="kop kop--pagina">Nieuwe ploeg</h1>
+        <p class="subkop">Kies de competitie en de wedstrijd; daarna kies je de atleten en hun onderdelen.</p>
+      {% endif %}
+    </div>
+  </header>
+
+  {% if fouten.algemeen %}<p class="melding melding--fout" role="alert">{{ fouten.algemeen }}</p>{% endif %}
+  {% for f_ in f.regelfouten %}<p class="melding melding--fout" role="alert">{{ f_ }}</p>{% endfor %}
+
+  {% if not f.ploegen %}
+    <p class="leeg">Er is nog geen regelbestand voor een competitie (config/ploeg_regels/).</p>
+  {% else %}
+  <form method="post" class="blok atleetform">
+    <div class="velden">
+      <div class="veld{% if fouten.naam %} veld--fout{% endif %}">
+        <label for="naam">Naam van de ploeg</label>
+        <input type="text" id="naam" name="naam" value="{{ f.naam }}" required maxlength="80" placeholder="bijv. U16 meisjes A"{% if not p %} autofocus{% endif %}>
+        {{ fout("naam") }}
+      </div>
+      <div class="veld{% if fouten.ploeg %} veld--fout{% endif %}">
+        <label for="ploeg">Competitie en ploeg</label>
+        <select id="ploeg" name="ploeg" required>
+          <option value="">Kies…</option>
+          {% for groep, keuzes in f.ploegen | groupby("groep") %}
+            <optgroup label="{{ groep }}">
+              {% for k in keuzes %}<option value="{{ k.waarde }}"{% if k.waarde == f.ploeg %} selected{% endif %}>{{ k.tekst }}</option>{% endfor %}
+            </optgroup>
+          {% endfor %}
+        </select>
+        {{ fout("ploeg") }}
+      </div>
+      <div class="veld{% if fouten.programma %} veld--fout{% endif %}">
+        <label for="programma">Welke wedstrijd van de competitie</label>
+        <select id="programma" name="programma" required>
+          <option value="">Kies…</option>
+          {% for k in f.programmas %}<option value="{{ k.waarde }}"{% if k.waarde == f.programma %} selected{% endif %}>{{ k.tekst }}</option>{% endfor %}
+        </select>
+        <span class="veld__hint zacht">Bepaalt het programma (welke onderdelen, hoeveel atleten).</span>
+        {{ fout("programma") }}
+      </div>
+    </div>
+    <div class="velden">
+      <div class="veld{% if fouten.wedstrijd %} veld--fout{% endif %}">
+        <label for="wedstrijd">Gekoppelde wedstrijd <span class="zacht">(optioneel)</span></label>
+        <select id="wedstrijd" name="wedstrijd">
+          <option value="">Geen</option>
+          {% for k in f.wedstrijden %}<option value="{{ k.waarde }}"{% if k.waarde == f.wedstrijd %} selected{% endif %}>{{ k.tekst }}</option>{% endfor %}
+        </select>
+        <span class="veld__hint zacht">Uit Wedstrijden; dan geldt de datum van de wedstrijd.</span>
+        {{ fout("wedstrijd") }}
+      </div>
+      <div class="veld{% if fouten.datum %} veld--fout{% endif %}">
+        <label for="datum">Datum <span class="zacht">(zonder gekoppelde wedstrijd)</span></label>
+        <input type="date" id="datum" name="datum" value="{{ f.datum }}">
+        {{ fout("datum") }}
+      </div>
+      <div class="veld{% if fouten.prestatiebasis %} veld--fout{% endif %}">
+        <label for="prestatiebasis">Welke prestaties tellen</label>
+        <select id="prestatiebasis" name="prestatiebasis">
+          {% for k in f.prestatiebases %}<option value="{{ k.waarde }}"{% if k.waarde == f.prestatiebasis %} selected{% endif %}>{{ k.tekst }}</option>{% endfor %}
+        </select>
+        {{ fout("prestatiebasis") }}
+      </div>
+    </div>
+    <div class="opslaan opslaan--onder">
+      <a href="{{ url_for('ploeg', ploeg_id=p.id) if p else url_for('ploegen') }}">Annuleren</a>
+      <button class="knop knop--vol" type="submit">{{ "Opslaan" if p else "Ploeg aanmaken" }}</button>
+    </div>
+  </form>
+  {% endif %}
+
+  {% if p %}
+  <form method="post" action="{{ url_for('ploeg_verwijderen', ploeg_id=p.id) }}" class="blok">
+    <h2 class="kop">Ploeg verwijderen</h2>
+    <p class="zacht">De ploeg en de opstelling verdwijnen; de atleten en hun prestaties blijven.</p>
+    <div><button class="knop knop--gevaar" type="submit">Verwijder {{ p.naam }}</button></div>
+  </form>
+  {% endif %}
+
+  <footer class="vel__voet">Atleet Volg Systeem<br>Ploegen</footer>
+</article>
+{% endblock %}

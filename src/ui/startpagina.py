@@ -38,6 +38,7 @@ def tegels(db: Opslag, vandaag: date | None = None) -> list[Tegel]:
     n_atleten = len(db.atleten(alleen_actief=True))
     n_groepen = len(db.groepen())
     komend = db.wedstrijden(van=vandaag)
+    n_ploegen = sum(1 for p in db.ploegen() if p.datum >= vandaag)
     volgende = (f"Eerstvolgende: {komend[0].naam} · {datum_kort(komend[0].datum)}"
                 if komend else None)
 
@@ -47,7 +48,7 @@ def tegels(db: Opslag, vandaag: date | None = None) -> list[Tegel]:
         Tegel("groepen", "Groepen", "Trainingsgroepen, trainingen en aanwezigheid.",
               str(n_groepen), _meervoud(n_groepen, "groep", "groepen")),
         Tegel("ploegen", "Ploegen", "Competitieploegen samenstellen en opstellingen maken.",
-              None, "binnenkort"),
+              str(n_ploegen), _meervoud(n_ploegen, "komende ploeg", "komende ploegen")),
         Tegel("wedstrijden", "Wedstrijden", "Komende wedstrijden plannen en inschrijven.",
               str(len(komend)), _meervoud(len(komend), "komende wedstrijd", "komende wedstrijden"), volgende),
     ]

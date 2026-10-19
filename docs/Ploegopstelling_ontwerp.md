@@ -246,7 +246,14 @@ gezet, zodat de wedstrijdpagina en de botsingencontrole meteen werken.
    veel lopers, samenstelling gemengde estafette, één atleet per groep (9.1).
    `controleer_dag()`: één ploeg per dag (10.10). Seizoensregels (10.5, 10.9)
    volgen als er opgeslagen ploegen zijn (stap 4).
-3. Matrix + handmatige opstelling + regelcontrole in de UI.
+3. ✅ Matrix + handmatige opstelling + regelcontrole in de UI, inclusief de
+   database (migratie `personen/010_ploeg_opstelling.sql`, `Opslag.ploeg*`).
+   Pagina's `/ploegen`, `/ploegen/nieuw`, `/ploeg/<id>` (+ `/gegevens`,
+   `/verwijderen`). Code: `ploeg/vergelijk.py` (matrix), `ploeg/opstelling.py`
+   (punten, controle, formulier), `ploeg/paginas.py` (pagina-gegevens). Tests:
+   `tests/test_ploegen.py`. Nog niet: punten voor estafettes (stap 6),
+   beschikbaarheid per dagdeel en groepen bij technische onderdelen in de UI,
+   inschrijvingen in `prestaties.db` bij opslaan (stap 4).
 4. Csv-export.
 5. Optimalisatie + de drie strategieën.
 6. Voorspeller en estafettes.

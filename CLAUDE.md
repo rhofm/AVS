@@ -100,7 +100,7 @@ when run from source, next to the `.exe` when frozen):
 
 | File             | Contents | Athlete identified by |
 |------------------|----------|-----------------------|
-| `personen.db`    | `atleet` (personal details), `groep` (id + name), `groep_trainingstijden` (one row per group: `groep_id` + `maandag` … `zondag`, start time 'HH:MM' or NULL = no training), `groep_extra_trainingstijd` (extra start times on a fixed day: `groep_id`, `dag`, `starttijd`), `groep_lid` (long: one row per athlete per group; an athlete can be in several groups), `training` (`warming_up`, `kern_a`, `kern_b`, `cooling_down`, `notities`; `hoofdtraining_id` for a deviating variant), `training_atleet` (long: who follows a variant), `groep_fase` (mega cycle: `groep_id`, `startdatum`, `fase`), `mesocyclus` + `mesocyclus_week` (meso cycles and week names), `rooster` + `rooster_regel` (training-content templates) + `groep_rooster` (which group follows which template from when), leerlijnen, `ploeg`, `ploeg_opstelling`; `periodeplan` is obsolete and always empty | `master_id` |
+| `personen.db`    | `atleet` (personal details), `groep` (id + name), `groep_trainingstijden` (one row per group: `groep_id` + `maandag` … `zondag`, start time 'HH:MM' or NULL = no training), `groep_extra_trainingstijd` (extra start times on a fixed day: `groep_id`, `dag`, `starttijd`), `groep_lid` (long: one row per athlete per group; an athlete can be in several groups), `training` (`warming_up`, `kern_a`, `kern_b`, `cooling_down`, `notities`; `hoofdtraining_id` for a deviating variant), `training_atleet` (long: who follows a variant), `groep_fase` (mega cycle: `groep_id`, `startdatum`, `fase`), `mesocyclus` + `mesocyclus_week` (meso cycles and week names), `rooster` + `rooster_regel` (training-content templates) + `groep_rooster` (which group follows which template from when), leerlijnen, `ploeg` (+ `categorie`, `programma`, `datum`, `prestatiebasis`), `ploeg_lid` (who is on the form: `rol` deelnemer/reserve, `beschikbaar`), `ploeg_opstelling` (athlete + programme key from the rule file, `groep`, `vast`); `periodeplan` is obsolete and always empty | `master_id` |
 | `prestaties.db`  | `onderdeel`, `wedstrijd`, `prestatie`, `inschrijving`, `wedstrijd_programma` (meet timetable / chronoloog: one row per item, no personal data), `doel` + `doel_regel` (goals for a group or athlete, usually at a meet), `pr` view | `atleet_ref` (pseudonym) |
 | `testen.db`      | `test`, `testresultaat` | `atleet_ref` (pseudonym) |
 | `trainingsschema.db` | `trainingsschema`: one row per athlete, columns `maandag` … `zondag` (0/1); `trainingskeuze`: which (`groep_id`, `starttijd`) the athlete picks on a day with several trainings | `atleet_ref` (pseudonym) |
@@ -135,8 +135,7 @@ python src/db/init_db.py --herstel <sleutel>  # restore the key (e.g. new comput
   The pseudonyms differ per database, so the files cannot be joined without the master key.
   To combine data, look up the `master_id` in `personen.db` and compute the
   pseudonym in Python; there is no stored mapping table.
-- Cross-file references (`ploeg.wedstrijd_id`, `ploeg_opstelling.onderdeel_id`
-  → `prestaties.db`; `absentie.training_id` → `personen.db`;
+- Cross-file references (`ploeg.wedstrijd_id` → `prestaties.db`; `absentie.training_id` → `personen.db`;
   `leerdoelscore.leerdoel_id` → `leerlijnen.db`) are not enforced
   by SQLite; check them in Python. Deleting a training must go through
   `Opslag.training_verwijderen()` so its absence rows go too.
@@ -312,6 +311,15 @@ python src/db/init_db.py --herstel <sleutel>  # restore the key (e.g. new comput
   (`categorie_code()`). A lineup is `models.ploeg`: `PloegLid` (who is on the
   form, `rol` deelnemer/reserve) and `Inzet` (athlete + event key). Violations
   name athletes only by master_id; the UI adds names.
+- A ploeg stores its own `datum`; with a linked meet the meet's date wins (the
+  page moves it along) and deleting the meet only unlinks it. `ploeg_opstelling`
+  rows exist only for members (FK to `ploeg_lid`); save both together with
+  `Opslag.ploeg_opstelling_opslaan()`. The athletes × events matrix is
+  `ploeg/vergelijk.matrix()` (best wind-legal performance per `prestatiebasis`
+  up to the meet day, matched by event name + specification from the rule
+  file; hand times count with correction); totals and checks are in
+  `ploeg/opstelling.py`, page data in `ploeg/paginas.py`. Nothing in the
+  matrix is stored.
 - Strategies ("mentaliteiten") are pluggable modules in `ploeg/strategieen/`.
 - `ploeg.regelset` stores the rule file name and `ploeg.strategie` the strategy
   used, so a lineup can be explained afterwards.

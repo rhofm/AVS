@@ -44,7 +44,7 @@ def test_tegels_volgorde_en_cijfers():
         atleten, groepen, ploegen, wedstrijden = t
         assert (atleten.cijfer, atleten.cijfer_label) == ("1", "actieve atleet")
         assert (groepen.cijfer, groepen.cijfer_label) == ("1", "groep")
-        assert ploegen.cijfer is None and ploegen.cijfer_label == "binnenkort"
+        assert (ploegen.cijfer, ploegen.cijfer_label) == ("0", "komende ploegen")
         # 'Vorig seizoen' ligt in het verleden en telt niet mee.
         assert (wedstrijden.cijfer, wedstrijden.cijfer_label) == ("2", "komende wedstrijden")
         assert wedstrijden.extra.startswith("Eerstvolgende: Clubkampioenschappen")
@@ -56,7 +56,7 @@ def test_tegels_volgorde_en_cijfers():
 def test_tegels_lege_database():
     with opslag(met_voorbeeld=False) as (db, _):
         t = startpagina.tegels(db, VANDAAG)
-        assert [x.cijfer for x in t] == ["0", "0", None, "0"]
+        assert [x.cijfer for x in t] == ["0", "0", "0", "0"]
         assert t[0].cijfer_label == "actieve atleten"
 
 
@@ -78,9 +78,9 @@ def test_startpagina_route():
         assert 'aria-label="Hoofdmenu"' not in html
         # Geen namen van atleten op de startpagina.
         assert "Anna" not in html and "Voorbeeld" not in html
-        # Andere pagina's houden het volledige menu; 'binnenkort' gaat terug naar Start.
+        # Andere pagina's houden het volledige menu.
         assert 'aria-label="Hoofdmenu"' in c.get("/atleten").get_data(as_text=True)
-        assert "&larr; Start" in c.get("/ploegen").get_data(as_text=True)
+        assert 'aria-label="Hoofdmenu"' in c.get("/ploegen").get_data(as_text=True)
 
 
 if __name__ == "__main__":

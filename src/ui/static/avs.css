@@ -1007,3 +1007,31 @@ th[aria-sort="descending"] .sorteer__naam::after { content: " \2193"; opacity: 1
 .prknop { margin: 0; }
 .prknop .knop svg { width: .9em; height: .9em; }
 .prknop .knop:disabled { opacity: .6; cursor: progress; }
+
+/* ---------- ploegen: matrix atleten x onderdelen ---------- */
+.ploegstand { gap: .75rem; }
+.ploegstand__cijfers { display: flex; flex-wrap: wrap; gap: 1rem 2.5rem; }
+.ploegstand__cijfers > div { display: grid; }
+.ploegstand__getal { font-size: var(--maat-xxl); font-weight: 700; color: var(--rood); line-height: 1.1; }
+.ploegstand ul { margin: .35rem 0 0; padding-left: 1.2rem; }
+.ploegstand__waarschuwingen summary { cursor: pointer; font-weight: 700; }
+.ploegmatrix { font-size: var(--maat-s); }
+.ploegmatrix thead th { vertical-align: bottom; }
+.ploegmatrix__regel { font-weight: 400; font-size: var(--maat-xs); white-space: nowrap; }
+.ploegmatrix select { font: inherit; padding: .15rem .25rem; border: 1px solid var(--rand); background: var(--papier); color: var(--tekst); }
+.ploegmatrix select:focus-visible { outline: 2px solid var(--rood); outline-offset: 1px; }
+.ploegmatrix tbody tr.in-ploeg td:first-child { box-shadow: inset 4px 0 0 var(--rood); }
+.ploegmatrix tbody tr.reserve td:first-child { box-shadow: inset 4px 0 0 var(--tekst-zacht); }
+.ploegmatrix tbody th { white-space: nowrap; }
+.ploegmatrix tbody th .kenmerk { margin-left: .2rem; }
+.ploegcel { min-width: 5.5rem; padding: .25rem .4rem; }
+.ploegcel label { display: flex; align-items: center; gap: .35rem; cursor: pointer; white-space: nowrap; }
+.ploegcel input { accent-color: var(--rood); width: 1rem; height: 1rem; margin: 0; flex: none; }
+.ploegcel__waarde { font-variant-numeric: tabular-nums; }
+.ploegcel__punten { margin-left: auto; font-variant-numeric: tabular-nums; color: var(--tekst-zacht); }
+.ploegmatrix tbody tr td.ploegcel--gekozen { box-shadow: inset 0 0 0 2px var(--tekst-zacht); }
+.ploegmatrix tbody tr td.ploegcel--telt { box-shadow: inset 0 0 0 2px var(--rood); }
+.ploegcel--telt .ploegcel__punten { color: var(--rood); font-weight: 700; }
+.ploegcel--leeg label > .zacht { white-space: nowrap; }
+.ploegmatrix tfoot th, .ploegmatrix tfoot td { background: var(--zalm); color: var(--op-zalm); border: 2px solid var(--lijn); padding: .4rem .5rem; }
+.ploegmatrix tfoot .zacht { color: inherit; opacity: .85; }

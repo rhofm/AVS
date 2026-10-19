@@ -79,7 +79,10 @@ def test_migratie_op_bestaande_database():
         echte_map = init_mod.MIGRATIONS_DIR
         oud = Path(tmp) / "migraties_tot_008"
         shutil.copytree(echte_map, oud)
-        (oud / "personen" / "009_au_licentienummer.sql").unlink()
+        for later in (oud / "personen").glob("*.sql"):          # 009 en alles wat daarna kwam
+            if int(later.name[:3]) >= 9:
+                later.unlink()
+        nieuwste = max(int(f.name[:3]) for f in (echte_map / "personen").glob("*.sql"))
         data = Path(tmp) / "data"
         data.mkdir()
         try:
@@ -100,7 +103,7 @@ def test_migratie_op_bestaande_database():
             init_db(data, hoofd=TESTSLEUTEL)
         assert "009_au_licentienummer.sql" in uitvoer.getvalue()
         with Opslag(map=data, hoofd=TESTSLEUTEL) as db:
-            assert db.personen.execute("SELECT MAX(versie) FROM schema_version").fetchone()[0] == 9
+            assert db.personen.execute("SELECT MAX(versie) FROM schema_version").fetchone()[0] == nieuwste
             anna = db.atleet("a" * 32)
             assert anna.naam == "Anna Proef" and anna.au_licentienummer is None
             anna.au_licentienummer = "1234567"
