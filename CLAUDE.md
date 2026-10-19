@@ -346,6 +346,17 @@ python src/db/init_db.py --herstel <sleutel>  # restore the key (e.g. new comput
   CSV gets 'x'). Relays (`ploeg/estafettes.py`): sum of the leg times
   (`benen`) + `correctie_s`; the optimiser chooses among precomputed quartets.
   All these numbers are configuration, not code.
+- With a linked meet that has a timetable, `ploeg/tijdschema.py` maps timetable
+  rows to programme keys per athlete: clashes and events outside the member's
+  `beschikbaar` (morning/afternoon, afternoon from 13:00) are warnings in the
+  check and hard constraints in the optimiser; technical-event groups (9.1) are
+  assigned automatically on save/optimise (`groepen_indelen`). All ploegen of
+  one day are made in order on `/ploegen/dag/<datum>` (`dag_optimaliseren`:
+  earlier ploeg picks first, 10.10).
+- Masters age grading: `leeftijdsfactoren:` in the rule file names a file in
+  `config/puntentelling/` (`punten.Leeftijdsfactoren`; performance x factor,
+  then the senior formula). The shipped `masters_agegrading.yaml` is still
+  empty: never invent factors; they must come from the AU tables.
 - `ploeg.regelset` stores the rule file name and `ploeg.strategie` the strategy
   used, so a lineup can be explained afterwards.
 

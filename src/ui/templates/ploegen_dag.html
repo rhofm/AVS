@@ -1,0 +1,89 @@
+{#
+  Alle ploegen van één dag samen laten maken (na elkaar: de eerste kiest eerst, 10.10).
+  Context:
+    dag       – ploeg.paginas.Dagpagina
+    uitkomst  – lijst van ploeg.paginas.Optimalisatie na het maken (optioneel)
+    fout      – foutmelding (optioneel)
+    fouten    – {veld: tekst} bij een fout in het formulier (optioneel)
+  Formulier: per ploeg `volgorde-<id>` (1 = eerst) en `strategie-<id>` (of 'overslaan'),
+  plus `vastzetten`.
+#}
+{% extends "basis.html" %}
+{% block titel %}Ploegen {{ dag.datum | datum_kort }}{% endblock %}
+
+{% block inhoud %}
+<article class="vel">
+  <header class="blok__kop">
+    <div>
+      <a class="terug" href="{{ url_for('ploegen') }}">&larr; Ploegen</a>
+      <h1 class="kop kop--pagina">Ploegen op {{ dag.datum | datum_kort }} {{ dag.datum.year }}</h1>
+      <p class="subkop">Alle opstellingen van deze dag in één keer. De ploeg die eerst komt, kiest eerst;
+        de volgende ploeg kiest uit wie er over is. Niemand komt in twee ploegen (10.10).</p>
+    </div>
+  </header>
+
+  {% if fout %}<p class="melding melding--fout" role="alert">{{ fout }}</p>{% endif %}
+  {% if uitkomst %}
+    <div class="melding" role="status">
+      <strong>Klaar.</strong>
+      <ul>
+        {% for o in uitkomst %}
+          <li><a href="{{ url_for('ploeg', ploeg_id=o.pagina.ploeg.id) }}">{{ o.pagina.ploeg.naam }}</a>:
+            {{ o.na }} punten (was {{ o.voor }}), {{ o.pagina.deelnemers }} deelnemer{{ "s" if o.pagina.deelnemers != 1 }},
+            met &lsquo;{{ o.strategie }}&rsquo;{% if o.pagina.fouten %} – <strong>nog niet alles klopt</strong>{% endif %}.</li>
+        {% endfor %}
+      </ul>
+    </div>
+  {% endif %}
+
+  {% if dag.regels %}
+  <form method="post" class="blok">
+    <div class="tabelvak">
+      <table class="tabel ploegdag">
+        <thead><tr>
+          <th scope="col">Volgorde</th>
+          <th scope="col">Ploeg</th>
+          <th scope="col">Manier</th>
+          <th scope="col" class="rechts">Nu</th>
+        </tr></thead>
+        <tbody>
+          {% for r in dag.regels %}
+            {% set pid = r.ploeg.id %}
+            <tr>
+              <td>
+                <label class="verborgen" for="volgorde-{{ pid }}">Volgorde van {{ r.ploeg.naam }}</label>
+                <input id="volgorde-{{ pid }}" name="volgorde-{{ pid }}" type="number" min="1" max="{{ dag.regels | length }}"
+                       value="{{ loop.index }}" inputmode="numeric" style="width: 4.5rem">
+                {% if fouten and fouten.get("volgorde-" ~ pid) %}<span class="veld__fout">{{ fouten["volgorde-" ~ pid] }}</span>{% endif %}
+              </td>
+              <td><a href="{{ url_for('ploeg', ploeg_id=pid) }}"><strong>{{ r.ploeg.naam }}</strong></a><br>
+                <span class="zacht">{{ r.ploegnaam }} · {{ r.programma }}</span>
+                {% if r.fout %}<br><span class="veld__fout">{{ r.fout }}</span>{% endif %}</td>
+              <td>
+                <label class="verborgen" for="strategie-{{ pid }}">Manier voor {{ r.ploeg.naam }}</label>
+                <select id="strategie-{{ pid }}" name="strategie-{{ pid }}"{% if r.fout %} disabled{% endif %}>
+                  {% for s in dag.strategieen %}
+                    <option value="{{ s.naam }}"{% if r.strategie == s.naam %} selected{% endif %}>{{ s.titel }}</option>
+                  {% endfor %}
+                  <option value="overslaan">Niet aanpassen</option>
+                </select>
+              </td>
+              <td class="rechts getallen">{{ r.deelnemers }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <label class="vinkje"><input type="checkbox" name="vastzetten" value="1"> Huidige vinkjes laten staan en de rest aanvullen</label>
+    <p class="zacht">Elke ploeg kiest uit alle atleten die mogen (ook wie nu in een latere ploeg staat).
+      Botsingen in het tijdschema en wie maar een dagdeel kan, tellen mee. Het resultaat wordt opgeslagen, ook op de
+      gekoppelde wedstrijden; daarna kun je elke ploeg nog met de hand aanpassen.</p>
+    <div><button class="knop knop--vol" type="submit">Maak alle opstellingen</button></div>
+  </form>
+  {% else %}
+    <p class="leeg">Er zijn geen ploegen op deze dag.</p>
+  {% endif %}
+
+  <footer class="vel__voet">Atleet Volg Systeem<br>Ploegen</footer>
+</article>
+{% endblock %}

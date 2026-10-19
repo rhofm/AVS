@@ -10,7 +10,9 @@ Nu: de opstelling die de trainer met de hand maakt.
   de geschatte tijd (ploeg/estafettes.py).
 - `controleer()`: de competitieregels (ploeg/regels.py), één ploeg per dag
   met de andere ploegen op dezelfde dag, en waarschuwingen voor wie op een
-  onderdeel staat zonder prestatie (0 punten).
+  onderdeel staat zonder prestatie (0 punten) of met een voorspelling, en met
+  een tijdschema (ploeg/tijdschema.py) voor botsingen en onderdelen buiten het
+  dagdeel van de atleet.
 - `lees_formulier()`: de opstelling uit het formulier van de ploegpagina.
 
 Opslaan gaat via `Opslag.ploeg_opstelling_opslaan()`. De optimalisatie
@@ -24,10 +26,12 @@ from typing import Iterable, Mapping
 
 from db.queries import Opslag
 from models import Atleet, Inzet, Ploeg, PloegLid
+from models.ploeg import BESCHIKBAAR
 from ploeg import estafettes as _estafettes
 from ploeg import regels as _regels
 from ploeg.estafettes import Schatting
 from ploeg.regels import Overtreding, Programmaregel, Regelset
+from ploeg.tijdschema import Schema, dagdeel_tekst
 from ploeg.vergelijk import Matrix, categorie_op
 
 
@@ -106,7 +110,7 @@ def stand(matrix: Matrix, inzet: Iterable[Inzet]) -> Stand:
 # Controleren
 # ============================================================
 def controleer(db: Opslag, regelset: Regelset, ploeg: Ploeg, leden: Iterable[PloegLid], inzet: Iterable[Inzet],
-               matrix: Matrix) -> list[Overtreding]:
+               matrix: Matrix, schema: Schema | None = None) -> list[Overtreding]:
     """Regels van de competitie + één ploeg per dag + waarschuwing 'geen prestatie'."""
     leden, inzet = list(leden), list(inzet)
     uit = regelset.controleer(ploeg.categorie, ploeg.programma, leden, inzet, matrix.categorieen)
@@ -132,6 +136,31 @@ def controleer(db: Opslag, regelset: Regelset, ploeg: Ploeg, leden: Iterable[Plo
         elif c is not None and c.voorspeld:
             uit.append(Overtreding("voorspeld", f"Geen prestatie op {r.naam}: de punten zijn een schatting "
                                                 f"({c.bron}).", "waarschuwing", i.atleet_id, i.onderdeel))
+    if schema is not None:
+        uit += _tijdschema_controle(schema, soorten, leden, inzet)
+    return uit
+
+
+def _tijdschema_controle(schema: Schema, soorten: Mapping[str, Programmaregel], leden: list[PloegLid],
+                         inzet: list[Inzet]) -> list[Overtreding]:
+    """Botsingen en onderdelen buiten het dagdeel (waarschuwingen: het tijdschema kan nog schuiven)."""
+    uit = []
+    beschikbaar = {lid.atleet_id: lid.beschikbaar for lid in leden}
+    per_atleet: dict[str, list[str]] = {}
+    for i in inzet:
+        if i.onderdeel in soorten:
+            per_atleet.setdefault(i.atleet_id, []).append(i.onderdeel)
+    for a, onderdelen in per_atleet.items():
+        for e1, e2 in schema.botsingen(a, onderdelen):
+            t1, t2 = schema.van(a, e1)[0], schema.van(a, e2)[0]
+            uit.append(Overtreding("botsing", f"{soorten[e1].naam} ({t1.starttijd}) en {soorten[e2].naam} "
+                                              f"({t2.starttijd}) zijn tegelijk.", "waarschuwing", a, e2))
+        b = beschikbaar.get(a, "hele_dag")
+        for e in onderdelen:
+            if not schema.past_dagdeel(a, e, b):
+                t = schema.van(a, e)[0]
+                uit.append(Overtreding("dagdeel", f"{soorten[e].naam} begint om {t.starttijd}, maar deze atleet "
+                                                  f"is er {dagdeel_tekst(b)}.", "waarschuwing", a, e))
     return uit
 
 
@@ -143,6 +172,7 @@ def lees_formulier(form: Mapping, kandidaat_ids: Iterable[str], onderdelen: Iter
     """Leden en inzet uit het formulier.
 
     Velden: `rol-<master_id>` = '' (niet in de ploeg), 'deelnemer' of 'reserve';
+    `beschikbaar-<master_id>` = 'hele_dag' (standaard), 'ochtend' of 'middag';
     `inzet` (meer keer) = '<master_id>|<onderdeel>'. Wie een onderdeel heeft maar
     geen rol, wordt deelnemer. Onbekende atleten of onderdelen worden genegeerd.
     """
@@ -163,5 +193,6 @@ def lees_formulier(form: Mapping, kandidaat_ids: Iterable[str], onderdelen: Iter
         if rol not in ("deelnemer", "reserve"):
             rol = "deelnemer" if mid in met_inzet else ""
         if rol:
-            leden.append(PloegLid(mid, rol))
+            beschikbaar = form.get(f"beschikbaar-{mid}", "") or "hele_dag"
+            leden.append(PloegLid(mid, rol, beschikbaar if beschikbaar in BESCHIKBAAR else "hele_dag"))
     return leden, inzet

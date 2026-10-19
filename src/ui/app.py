@@ -1363,6 +1363,32 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
                       f"{o.wijzigingen.afgemeld} afgemeld.")
         return _ploegpagina(ploeg_id, o.pagina, melding=tekst)
 
+    def _dag(datum: str):
+        try:
+            return date.fromisoformat(datum)
+        except ValueError:
+            abort(404)
+
+    @app.get("/ploegen/dag/<datum>")
+    def ploegen_dag(datum: str):
+        dag = ploegpaginas.dagpagina(db(), _dag(datum))
+        return render_template("ploegen_dag.html", dag=dag, actief_menu="ploegen")
+
+    @app.post("/ploegen/dag/<datum>")
+    def ploegen_dag_maken(datum: str):
+        dag = ploegpaginas.dagpagina(db(), _dag(datum))
+        try:
+            keuzes = ploegpaginas.lees_dagformulier(request.form, dag)
+            uitkomst = ploegpaginas.dag_optimaliseren(db(), keuzes, vastzetten=request.form.get("vastzetten") == "1")
+        except ploegpaginas.InvoerFout as e:
+            return render_template("ploegen_dag.html", dag=dag, fouten=e.fouten,
+                                   fout="Niet alles is goed ingevuld.", actief_menu="ploegen"), 400
+        except (OptimalisatieFout, RegelFout) as e:
+            return render_template("ploegen_dag.html", dag=ploegpaginas.dagpagina(db(), dag.datum), fout=str(e),
+                                   actief_menu="ploegen"), 400
+        return render_template("ploegen_dag.html", dag=ploegpaginas.dagpagina(db(), dag.datum), uitkomst=uitkomst,
+                               actief_menu="ploegen")
+
     @app.get("/ploeg/<int:ploeg_id>/atletieknu.csv")
     def ploeg_export(ploeg_id: int):
         haal_ploeg(ploeg_id)

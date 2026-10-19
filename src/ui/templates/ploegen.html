@@ -33,7 +33,8 @@
           <tbody>
             {% for r in regels %}
               <tr{% if r.geweest %} class="geweest"{% endif %}>
-                <td class="nowrap"><strong>{{ r.ploeg.datum | datum_kort }}</strong><br><span class="zacht">{{ r.ploeg.datum.year }}</span></td>
+                <td class="nowrap"><strong>{{ r.ploeg.datum | datum_kort }}</strong><br><span class="zacht">{{ r.ploeg.datum.year }}</span>
+                  {%- if r.zelfde_dag > 1 and not r.geweest %}<br><a href="{{ url_for('ploegen_dag', datum=r.ploeg.datum.isoformat()) }}">{{ r.zelfde_dag }} ploegen samen</a>{% endif %}</td>
                 <td><a href="{{ url_for('ploeg', ploeg_id=r.ploeg.id) }}"><strong>{{ r.ploeg.naam }}</strong></a><br>
                   <span class="zacht">{{ r.ploegnaam }}</span></td>
                 <td>{{ r.competitie }}<br><span class="zacht">{{ r.programma }}</span></td>

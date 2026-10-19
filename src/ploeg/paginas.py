@@ -5,7 +5,10 @@
   (naam, competitie + ploeg, welke wedstrijd, datum of gekoppelde wedstrijd,
   prestatiebasis).
 - `ploegpagina()`: de matrix atleten x onderdelen met de opstelling, de punten
-  en de controle; `opstelling_opslaan()` slaat het formulier van die pagina op.
+  en de controle (met het tijdschema van de gekoppelde wedstrijd: botsingen,
+  dagdelen, groepen); `opstelling_opslaan()` slaat het formulier van die pagina op.
+- `optimaliseren()`: één ploeg laten maken; `dagpagina()` / `dag_optimaliseren()`:
+  alle ploegen van één dag na elkaar (de eerste kiest eerst, 10.10).
 
 De templates krijgen alleen deze dataclasses; SQL en regels blijven in db/ en ploeg/.
 """
@@ -23,6 +26,7 @@ from ploeg import opstelling as _opstelling
 from ploeg import optimaliseer as _optimaliseer
 from ploeg import strategieen as _strategieen
 from ploeg import regels as _regels
+from ploeg import tijdschema as _tijdschema
 from ploeg.regels import Overtreding, RegelFout, Regelset
 from ploeg.vergelijk import Matrix, matrix
 
@@ -53,6 +57,7 @@ class OverzichtRegel:
     deelnemers: int
     reserves: int
     geweest: bool
+    zelfde_dag: int = 1             # aantal ploegen op deze dag (meer dan 1: samen te maken)
 
 
 def overzicht(db: Opslag, vandaag: date) -> list[OverzichtRegel]:
@@ -69,6 +74,11 @@ def overzicht(db: Opslag, vandaag: date) -> list[OverzichtRegel]:
             db.wedstrijd(p.wedstrijd_id) if p.wedstrijd_id else None,
             sum(1 for lid in leden if lid.rol == "deelnemer"), sum(1 for lid in leden if lid.rol == "reserve"),
             p.datum < vandaag))
+    per_dag: dict[date, int] = {}
+    for r in uit:
+        per_dag[r.ploeg.datum] = per_dag.get(r.ploeg.datum, 0) + 1
+    for r in uit:
+        r.zelfde_dag = per_dag[r.ploeg.datum]
     return uit
 
 
@@ -222,6 +232,10 @@ class Ploegpagina:
     fouten: list[Overtreding]
     waarschuwingen: list[Overtreding]
     namen: dict[str, str]                # master_id -> naam, voor de meldingen
+    schema: _tijdschema.Schema | None = None          # tijdschema van de gekoppelde wedstrijd
+    beschikbaar: dict[str, str] = field(default_factory=dict)        # master_id -> dagdeel (leden)
+    groep: dict[tuple[str, str], int] = field(default_factory=dict)  # (master_id, onderdeel) -> groep
+    andere_ploegen: list[Ploeg] = field(default_factory=list)        # andere ploegen op dezelfde dag
 
     @property
     def strategieen(self) -> list:
@@ -251,6 +265,18 @@ class Ploegpagina:
     def overtredingen_van(self, master_id: str) -> list[Overtreding]:
         return [o for o in (*self.fouten, *self.waarschuwingen) if o.atleet_id == master_id]
 
+    def tijden(self, onderdeel: str) -> str:
+        """Begintijd(en) uit het tijdschema voor de tabelkop, bijv. '10:30' of '10:30 / 13:15'."""
+        return " / ".join(self.schema.tijden(onderdeel)) if self.schema else ""
+
+    @property
+    def zonder_leeftijdsfactor(self) -> int:
+        """Masters: aantal cellen met een prestatie maar zonder leeftijdsfactor (punten zonder age grading)."""
+        if not self.regelset.leeftijdsfactoren:
+            return 0
+        return sum(1 for r in self.matrix.rijen for c in r.cellen.values()
+                   if c.waarde is not None and c.punten is not None and c.leeftijdsfactor is None)
+
 
 def ploegpagina(db: Opslag, ploeg_id: int, leden: list[PloegLid] | None = None,
                 inzet: list[Inzet] | None = None) -> Ploegpagina | None:
@@ -271,13 +297,17 @@ def ploegpagina(db: Opslag, ploeg_id: int, leden: list[PloegLid] | None = None,
     inzet = db.ploeg_inzet(ploeg_id) if inzet is None else inzet
     atleten: list[Atleet] = _opstelling.kandidaten(db, rs, p, leden)
     m = matrix(db, rs, p.categorie, p.programma, p.datum, atleten, p.prestatiebasis)
-    alles = _opstelling.controleer(db, rs, p, leden, inzet, m)
+    schema = _tijdschema.schema(db, rs, p, m) if wedstrijd is not None else None
+    alles = _opstelling.controleer(db, rs, p, leden, inzet, m, schema)
     return Ploegpagina(
         p, rs, rs.ploeg(p.categorie).naam, rs.programma_naam(p.programma), wedstrijd, m,
         {lid.atleet_id: lid.rol for lid in leden}, {(i.atleet_id, i.onderdeel) for i in inzet},
         _opstelling.stand(m, inzet),
         [o for o in alles if o.ernst == "fout"], [o for o in alles if o.ernst == "waarschuwing"],
-        {a.master_id: a.naam for a in atleten})
+        {a.master_id: a.naam for a in atleten}, schema,
+        {lid.atleet_id: lid.beschikbaar for lid in leden},
+        {(i.atleet_id, i.onderdeel): i.groep for i in inzet if i.groep is not None},
+        [q for q in db.ploegen(p.datum) if q.id != p.id])
 
 
 def opstelling_opslaan(db: Opslag, ploeg_id: int, form: Mapping
@@ -285,15 +315,16 @@ def opstelling_opslaan(db: Opslag, ploeg_id: int, form: Mapping
     """Formulier van de ploegpagina opslaan en de nieuwe stand teruggeven, met wat er op
     de gekoppelde wedstrijd is veranderd. Ook een opstelling met fouten wordt opgeslagen:
     de trainer ziet wat er nog moet."""
-    p = db.ploeg(ploeg_id)
-    if p is None:
+    huidig = ploegpagina(db, ploeg_id)
+    if huidig is None:
         raise OpslagFout(f"Ploeg {ploeg_id} bestaat niet.")
-    rs = _regels.laad(p.regelset)
+    p, rs = huidig.ploeg, huidig.regelset
     huidige = db.ploeg_leden(ploeg_id)
     oud = _inschrijven.gewenst(db, rs, p, huidige, db.ploeg_inzet(ploeg_id))
-    ids = [a.master_id for a in _opstelling.kandidaten(db, rs, p, huidige)]
+    ids = [r.master_id for r in huidig.matrix.rijen]
     sleutels = [r.sleutel for r in rs.programma(p.categorie, p.programma)]
     leden, inzet = _opstelling.lees_formulier(form, ids, sleutels)
+    inzet = _tijdschema.groepen_indelen(huidig.schema, rs, inzet, {lid.atleet_id: lid.beschikbaar for lid in leden})
     db.ploeg_opstelling_opslaan(ploeg_id, leden, inzet)
     wijzigingen = _inschrijven.synchroniseer(db, p, oud, _inschrijven.gewenst(db, rs, p, leden, inzet))
     return ploegpagina(db, ploeg_id), wijzigingen
@@ -321,11 +352,13 @@ class Optimalisatie:
 
 
 def optimaliseren(db: Opslag, ploeg_id: int, strategie: str, vastzetten: bool = False,
-                  alleen_aangevinkt: bool = True) -> Optimalisatie:
+                  alleen_aangevinkt: bool = True, uitsluiten: set[str] | None = None) -> Optimalisatie:
     """Opstelling maken met een strategie en opslaan (ook op de gekoppelde wedstrijd).
 
     alleen_aangevinkt: alleen de atleten die nu deelnemer zijn gebruiken (de 'aanwezigen');
     staat er nog niemand in de ploeg, dan alle atleten die mogen.
+    uitsluiten: deze atleten niet gebruiken en uit de ploeg halen (al in een eerdere ploeg van
+    de dag, zie dag_optimaliseren). Standaard: wie in een andere ploeg van die dag staat.
     OptimalisatieFout als er geen oplossing is; KeyError bij een onbekende strategie.
     """
     s = _strategieen.strategie(strategie)
@@ -334,19 +367,101 @@ def optimaliseren(db: Opslag, ploeg_id: int, strategie: str, vastzetten: bool = 
         raise OpslagFout(f"Ploeg {ploeg_id} bestaat niet.")
     p, rs = pg.ploeg, pg.regelset
     leden, inzet = db.ploeg_leden(ploeg_id), db.ploeg_inzet(ploeg_id)
+    if uitsluiten is not None:
+        andere = set(uitsluiten)
+        leden = [lid for lid in leden if lid.atleet_id not in andere]
+        inzet = [i for i in inzet if i.atleet_id not in andere]
+    else:
+        andere = {lid.atleet_id for q in db.ploegen(p.datum) if q.id != p.id for lid in db.ploeg_leden(q.id)}
     deelnemers = [lid.atleet_id for lid in leden if lid.rol == "deelnemer"]
-    andere = {lid.atleet_id for q in db.ploegen(p.datum) if q.id != p.id for lid in db.ploeg_leden(q.id)}
     mag = {r.master_id for r in pg.matrix.rijen if r.toegestaan}
     if alleen_aangevinkt and deelnemers:
         atleten = [a for a in deelnemers if a in mag]
     else:
         atleten = [r.master_id for r in pg.matrix.rijen
                    if r.toegestaan and r.atleet.actief and r.master_id not in andere]
-    oud = _inschrijven.gewenst(db, rs, p, leden, inzet)
-    r = _optimaliseer.optimaliseer(pg.matrix, rs, s, atleten, leden, inzet, vastzetten)
+    oud = _inschrijven.gewenst(db, rs, p, db.ploeg_leden(ploeg_id), db.ploeg_inzet(ploeg_id))
+    r = _optimaliseer.optimaliseer(pg.matrix, rs, s, atleten, leden, inzet, vastzetten, pg.schema)
     db.ploeg_opstelling_opslaan(ploeg_id, r.leden, r.inzet)
     p.strategie = s.naam
     db.ploeg_opslaan(p)
     wijzigingen = _inschrijven.synchroniseer(db, p, oud, _inschrijven.gewenst(db, rs, p, r.leden, r.inzet))
     nieuw = ploegpagina(db, ploeg_id)
     return Optimalisatie(nieuw, wijzigingen, s.titel, pg.stand.totaal, nieuw.stand.totaal)
+
+
+# ============================================================
+# Alle ploegen van één dag
+# ============================================================
+@dataclass(slots=True)
+class DagRegel:
+    ploeg: Ploeg
+    ploegnaam: str                       # 'U16 meisjes'
+    programma: str
+    strategie: str                       # code; standaard de laatst gebruikte of max_punten
+    deelnemers: int
+    fout: str | None = None              # regelbestand niet te lezen
+
+
+@dataclass(slots=True)
+class Dagpagina:
+    datum: date
+    regels: list[DagRegel]
+
+    @property
+    def strategieen(self) -> list:
+        return list(_strategieen.STRATEGIEEN.values())
+
+
+def dagpagina(db: Opslag, datum: date) -> Dagpagina:
+    """De ploegen van een dag in de standaardvolgorde (op naam: A voor B)."""
+    regels = []
+    for p in sorted(db.ploegen(datum), key=lambda q: q.naam.lower()):
+        deelnemers = sum(1 for lid in db.ploeg_leden(p.id) if lid.rol == "deelnemer")
+        strategie = p.strategie if p.strategie in _strategieen.STRATEGIEEN else "max_punten"
+        try:
+            rs = _regels.laad(p.regelset)
+            regels.append(DagRegel(p, rs.ploeg(p.categorie).naam, rs.programma_naam(p.programma), strategie,
+                                   deelnemers))
+        except RegelFout as e:
+            regels.append(DagRegel(p, p.categorie, programma_label(p.programma), strategie, deelnemers, str(e)))
+    return Dagpagina(datum, regels)
+
+
+def lees_dagformulier(form: Mapping, dag: Dagpagina) -> list[tuple[int, str]]:
+    """[(ploeg_id, strategie)] in de gekozen volgorde. Velden: `volgorde-<id>` (1, 2, ...) en
+    `strategie-<id>`. Een ploeg met 'overslaan' als strategie doet niet mee. InvoerFout bij onzin."""
+    fouten: dict[str, str] = {}
+    keuzes = []
+    for k, r in enumerate(dag.regels):
+        pid = r.ploeg.id
+        strategie = form.get(f"strategie-{pid}") or r.strategie
+        if strategie == "overslaan":
+            continue
+        if strategie not in _strategieen.STRATEGIEEN:
+            fouten[f"strategie-{pid}"] = f"Onbekende strategie voor {r.ploeg.naam}."
+        tekst = (form.get(f"volgorde-{pid}") or str(k + 1)).strip()
+        if not tekst.isdigit():
+            fouten[f"volgorde-{pid}"] = f"Volgorde van {r.ploeg.naam} is een getal (1 = eerst)."
+            continue
+        keuzes.append((int(tekst), k, pid, strategie))
+    if fouten:
+        raise InvoerFout(fouten)
+    return [(pid, strategie) for _, _, pid, strategie in sorted(keuzes)]
+
+
+def dag_optimaliseren(db: Opslag, keuzes: list[tuple[int, str]], vastzetten: bool = False
+                      ) -> list[Optimalisatie]:
+    """Ploegen na elkaar laten maken (design: A eerst, dan B uit wie over is). Een atleet komt
+    in hoogstens één ploeg (10.10): wie in een eerdere ploeg staat, gaat uit de latere.
+    Elke ploeg kiest uit alle atleten die mogen (niet alleen de aangevinkte)."""
+    gebruikt: set[str] = set()
+    uit = []
+    for pid, strategie in keuzes:
+        o = optimaliseren(db, pid, strategie, vastzetten=vastzetten, alleen_aangevinkt=False,
+                          uitsluiten=set(gebruikt))
+        uit.append(o)
+        gebruikt |= {lid.atleet_id for lid in db.ploeg_leden(pid)}
+    for o in uit:                                   # de pagina's zoals het nu is (na de latere ploegen)
+        o.pagina = ploegpagina(db, o.pagina.ploeg.id)
+    return uit

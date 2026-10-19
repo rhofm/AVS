@@ -54,7 +54,7 @@ _CATEGORIE = re.compile(r"^(?:(?:U\d{1,2}|SEN)-[MV]|[MV]\d{2})$")   # U14-V, SEN
 _VANAF = re.compile(r"^([MV])(\d{2})\+$")                         # masters vanaf een leeftijd: V35+, M50+
 _PLOEGSLEUTEL = re.compile(r"^[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*$")    # U16-V, U18U20-M, SEN, MAS-V
 _SLEUTELS = {"naam", "seizoen", "bron", "puntentelling", "puntentabel", "puntentoekenning",
-             "leeftijdsklassen", "programmanamen", "algemeen", "ploegen", "onderdelen"}
+             "leeftijdsfactoren", "leeftijdsklassen", "programmanamen", "algemeen", "ploegen", "onderdelen"}
 _ALGEMEEN = {"max_onderdelen_per_atleet", "max_reserves", "een_ploeg_per_dag",
              "een_atleet_per_groep", "tellend", "materiaal", "voorspelling_factor"}
 _PLOEG = {"naam", "geslacht", "toegestaan", "programma", "materiaal_als"}
@@ -226,6 +226,7 @@ class Regelset:
     ploegen: Mapping[str, Ploegsoort]
     onderdelen: Mapping[str, OnderdeelInfo]
     voorspelling_factor: float = VOORSPELLING_FACTOR   # 0 = niet voorspellen
+    leeftijdsfactoren: str = ""     # masters: bestand in config/puntentelling/ met age grading ('' = geen)
     _programmas: Mapping[tuple[str, str], tuple[Programmaregel, ...]] = field(repr=False, default_factory=dict)
 
     # ---------------- opvragen ----------------
@@ -423,6 +424,12 @@ class Regelset:
         toekenning = ruw.get("puntentoekenning", "prestatie")
         if toekenning not in PUNTENTOEKENNINGEN:
             raise RegelFout(f"{waar}: puntentoekenning moet {' of '.join(PUNTENTOEKENNINGEN)} zijn.")
+        factoren = ruw.get("leeftijdsfactoren") or ""
+        if factoren:
+            try:
+                _punten.leeftijdsfactoren(str(factoren), map=puntenmap)
+            except _punten.PuntenFout as e:
+                raise RegelFout(f"{waar}: {e}") from None
         klassen = ruw.get("leeftijdsklassen", "standaard")
         if klassen not in LEEFTIJDSKLASSEN:
             raise RegelFout(f"{waar}: leeftijdsklassen moet {' of '.join(LEEFTIJDSKLASSEN)} zijn.")
@@ -497,7 +504,8 @@ class Regelset:
             een_ploeg_per_dag=bool(alg.get("een_ploeg_per_dag", True)),
             een_atleet_per_groep=bool(alg.get("een_atleet_per_groep", True)),
             tellend=tellend, materiaal=materiaal, leeftijdsklassen=klassen, programmanamen=namen,
-            ploegen=ploegen, onderdelen=onderdelen, voorspelling_factor=float(factor), _programmas=programmas,
+            ploegen=ploegen, onderdelen=onderdelen, voorspelling_factor=float(factor), leeftijdsfactoren=str(factoren),
+            _programmas=programmas,
         )
 
 

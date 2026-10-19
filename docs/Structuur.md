@@ -53,6 +53,9 @@
 * Functie voor vergelijken prs/prestaties van groep atleten: gedaan (ploeg/vergelijk.py)
 * Voorspellen als een atleet een onderdeel nog niet deed (uit een buuronderdeel of ander werpgewicht/andere hordehoogte; met ≈ gemarkeerd) en estafettes met een geschatte tijd en punten: gedaan (ploeg/voorspeller.py, ploeg/estafettes.py; instellingen in het regelbestand)
 * Testfunctie voor chronoloog: gedaan als botsingencontrole (wedstrijden/chronoloog.py)
+* Ploeg en tijdschema: tijden in de tabel, botsingen en dagdelen (hele dag/ochtend/middag) meegenomen bij het maken van de opstelling, groepen bij technische onderdelen automatisch (ploeg/tijdschema.py)
+* Meer ploegen op één dag samen laten maken, A eerst (pagina Ploegen > 'n ploegen samen')
+* Masters: age grading voorbereid; de leeftijdsfactoren moeten nog in config/puntentelling/masters_agegrading.yaml
 * Makkelijk aan te passen
 * Verschillende 'mentaliteiten' van ploegenopstelling
 * Opstellingsregels makkelijk aan te passen voor de ploegleider

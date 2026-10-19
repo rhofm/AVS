@@ -18,6 +18,9 @@ hand of later met een strategie).
   (een U14 met de 2 kg-kogel), gemarkeerd met `voorspeld` en de `bron`. Kan
   dat niet, maar is er wel een prestatie met een andere specificatie, dan
   staat die als `hint` in de cel, zonder punten.
+- Masters met `leeftijdsfactoren` in het regelbestand (65.2, age grading): de
+  punten zijn die van prestatie x leeftijdsfactor (`Cel.leeftijdsfactor`);
+  zonder factor in de tabel de gewone punten.
 - Estafettes hebben geen prestatie per atleet. De matrix bewaart per atleet
   de tijd op elk estafettebeen (`beentijden`); ploeg/estafettes.py rekent
   daarmee een kwartet uit. In de cel staat die beentijd ter informatie.
@@ -67,6 +70,7 @@ class Cel:
     voorspeld: bool = False              # waarde/punten zijn een voorspelling (geen echte prestatie)
     bron: str | None = None              # waar de voorspelling vandaan komt
     beentijd: str | None = None          # estafette: tijd(en) van de atleet op de benen, als tekst
+    leeftijdsfactor: float | None = None # masters: de punten zijn met deze factor berekend
 
     @property
     def tekst(self) -> str:
@@ -147,6 +151,7 @@ def matrix(db: Opslag, regelset: Regelset, ploeg: str, programma: str, peildatum
     onderdelen: dict[int, Onderdeel] = {o.id: o for o in db.onderdelen()}
 
     benen = list(dict.fromkeys(b for r in regels if r.soort == "estafette" for b in r.onderdeel.benen))
+    factoren = _punten.leeftijdsfactoren(regelset.leeftijdsfactoren) if regelset.leeftijdsfactoren else None
 
     rijen = []
     beentijden: dict[str, dict[str, Beentijd]] = {}
@@ -201,6 +206,8 @@ def matrix(db: Opslag, regelset: Regelset, ploeg: str, programma: str, peildatum
             v = voorspel(regelset, ploeg, r.sleutel, cat, beste, specificaties)
             if v is not None:
                 cel.waarde, cel.punten, cel.voorspeld, cel.bron = v.waarde, v.punten, True, v.bron
+        if factoren is not None:
+            _leeftijdscorrectie(rij, regelset, ploeg, factoren, a.leeftijd_op(peildatum), pt)
         rijen.append(rij)
     return Matrix(regelset, ploeg, programma, peildatum, prestatiebasis, regels, rijen, beentijden)
 
@@ -267,3 +274,18 @@ def _beentekst(regelset: Regelset, benen: tuple[str, ...], tijden: dict[str, Bee
             tijd = f"{'≈' if t.voorspeld else ''}{toon_waarde(t.tijd, 'tijd')}"
             delen.append(tijd if len(soorten) == 1 else f"{regelset.onderdelen[b].naam}: {tijd}")
     return " · ".join(delen) or None
+
+
+def _leeftijdscorrectie(rij: Rij, regelset: Regelset, ploeg: str, factoren: _punten.Leeftijdsfactoren,
+                        leeftijd: int | None, pt: _punten.Puntentelling) -> None:
+    """Masters: punten opnieuw uitrekenen met prestatie x leeftijdsfactor (waar de tabel er een heeft)."""
+    for c in rij.cellen.values():
+        info = regelset.onderdelen[c.onderdeel]
+        if c.waarde is None or c.punten is None or info.is_estafette:
+            continue
+        f = factoren.factor(rij.atleet.geslacht, info.punten_sleutel, leeftijd)
+        if f is None:
+            continue
+        g = regelset.punten_geslacht(ploeg, c.onderdeel)
+        w = _punten.gecorrigeerd(c.waarde, f, info.punten_sleutel, c.handtijd)
+        c.punten, c.leeftijdsfactor = pt.punten(regelset.puntentabel, info.punten_sleutel, g, w), f

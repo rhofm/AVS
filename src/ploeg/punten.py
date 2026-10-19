@@ -353,3 +353,82 @@ def prestatie_voor(tabel: str, onderdeel: str, geslacht: str, punten: int,
                    afronden: bool = True, uitgave: str = STANDAARD_UITGAVE) -> float:
     """De zwakste prestatie die nog minstens zoveel punten oplevert."""
     return puntentelling(uitgave).prestatie_voor(tabel, onderdeel, geslacht, punten, afronden)
+
+
+# ============================================================
+# Leeftijdsfactoren (masters, 'age grading', bepaling 65.2)
+# ============================================================
+class Leeftijdsfactoren:
+    """Leeftijdsfactoren uit `config/puntentelling/<naam>.yaml`.
+
+    Gecorrigeerde prestatie = prestatie x factor (een handtijd eerst met de
+    handtijdcorrectie); daarna de gewone formule. Bij lopen is de factor dus
+    kleiner dan 1, bij springen en werpen groter dan 1. Per geslacht en
+    onderdeel (sleutel uit de puntentelling) een tabel leeftijd -> factor; een
+    leeftijd zonder eigen regel neemt de dichtstbijzijnde lagere (zo werkt een
+    tabel per jaar en een tabel per klasse van vijf jaar allebei).
+    """
+
+    def __init__(self, naam: str, bron: str, factoren: dict[str, dict[str, dict[int, float]]]):
+        self.naam, self.bron, self.factoren = naam, bron, factoren
+
+    @property
+    def leeg(self) -> bool:
+        return not any(self.factoren.get(g) for g in GESLACHTEN)
+
+    def factor(self, geslacht: str | None, onderdeel: str, leeftijd: int | None) -> float | None:
+        """De factor, of None (onbekend geslacht/leeftijd, of niet in de tabel)."""
+        if geslacht not in GESLACHTEN or leeftijd is None:
+            return None
+        tabel = self.factoren.get(geslacht, {}).get(onderdeel)
+        if not tabel:
+            return None
+        lager = [a for a in tabel if a <= leeftijd]
+        return tabel[max(lager)] if lager else None
+
+    @classmethod
+    def uit_dict(cls, ruw, bron: str = "leeftijdsfactoren") -> "Leeftijdsfactoren":
+        if not isinstance(ruw, dict):
+            raise PuntenFout(f"{bron}: leeg of geen geldig bestand.")
+        onbekend = set(ruw) - {"naam", "bron", "factoren"}
+        if onbekend:
+            raise PuntenFout(f"{bron}: onbekende instelling {', '.join(sorted(map(str, onbekend)))}.")
+        factoren: dict[str, dict[str, dict[int, float]]] = {}
+        for g, per in (ruw.get("factoren") or {}).items():
+            if g not in GESLACHTEN:
+                raise PuntenFout(f"{bron}: geslacht {g!r} moet M of V zijn.")
+            factoren[g] = {}
+            for onderdeel, tabel in (per or {}).items():
+                if not isinstance(tabel, dict):
+                    raise PuntenFout(f"{bron}: {g}.{onderdeel} moet zijn als {{35: 0.9999, 40: 0.9668}}.")
+                rij = {}
+                for leeftijd, f in tabel.items():
+                    if isinstance(leeftijd, bool) or not isinstance(leeftijd, int) or not 30 <= leeftijd <= 110:
+                        raise PuntenFout(f"{bron}: {g}.{onderdeel}: leeftijd {leeftijd!r} is geen leeftijd.")
+                    if isinstance(f, bool) or not isinstance(f, (int, float)) or not 0.2 <= f <= 5:
+                        raise PuntenFout(f"{bron}: {g}.{onderdeel}.{leeftijd}: factor {f!r} klopt niet.")
+                    rij[leeftijd] = float(f)
+                factoren[g][str(onderdeel)] = rij
+        return cls(str(ruw.get("naam", bron)), str(ruw.get("bron", "")), factoren)
+
+
+@lru_cache(maxsize=8)
+def _laad_factoren(naam: str, map: str) -> Leeftijdsfactoren:
+    pad = Path(map) / "puntentelling" / f"{naam}.yaml"
+    if not pad.is_file():
+        raise PuntenFout(f"Bestand met leeftijdsfactoren {naam}.yaml niet gevonden in {pad.parent}.")
+    try:
+        ruw = yaml.safe_load(pad.read_text(encoding="utf-8"))
+    except yaml.YAMLError as e:
+        raise PuntenFout(f"{pad.name} is geen geldige YAML: {e}") from None
+    return Leeftijdsfactoren.uit_dict(ruw, pad.name)
+
+
+def leeftijdsfactoren(naam: str, map: Path | None = None) -> Leeftijdsfactoren:
+    """Leeftijdsfactoren uit `config/puntentelling/<naam>.yaml` (eenmaal ingelezen)."""
+    return _laad_factoren(naam, str(map or config_map()))
+
+
+def gecorrigeerd(prestatie: float, factor: float, onderdeel: str, handtijd: bool = False) -> float:
+    """Prestatie na leeftijdscorrectie: (prestatie + handtijdcorrectie) x factor."""
+    return (prestatie + (handtijd_correctie(onderdeel) if handtijd else 0.0)) * factor

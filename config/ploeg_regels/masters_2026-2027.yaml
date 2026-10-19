@@ -9,16 +9,18 @@
 # wedstrijddag ('leeftijdsklassen: masters') en werpen met het materiaal van hun
 # eigen klasse (65.1): 'V50+: 3kg' = vanaf V50 (tot de volgende grens).
 #
-# LET OP: de punten worden in de competitie met 'age grading' berekend (65.2).
-# Die leeftijdsfactoren zitten nog niet in AVS: de punten zijn nu die van de
-# seniorentabel, zonder leeftijdscorrectie.
+# De punten worden met 'age grading' berekend (65.2): prestatie x leeftijdsfactor,
+# dan de seniorentabel. De factoren staan in config/puntentelling/masters_agegrading.yaml
+# en moeten nog worden ingevuld; zolang een factor ontbreekt, telt de gewone
+# seniorenpunt (de ploegpagina meldt dat). Estafettes: zonder leeftijdsfactor.
 # CONTROLEREN: werpgewichten per klasse volgens het wedstrijdreglement (WMA).
 
 naam: Mastercompetitie
 seizoen: 2026-2027
 bron: Wedstrijdbepalingen Competitie 2026-2027 (april 2026)
 puntentelling: au_2025
-puntentabel: au_senioren        # 18.4; age grading (65.2) volgt nog
+puntentabel: au_senioren        # 18.4
+leeftijdsfactoren: masters_agegrading   # 65.2: age grading, config/puntentelling/masters_agegrading.yaml
 puntentoekenning: prestatie
 leeftijdsklassen: masters
 

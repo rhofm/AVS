@@ -1,0 +1,32 @@
+# Leeftijdsfactoren ('age grading') voor de Mastercompetitie, bepaling 65.2:
+# "Bij de bepaling van de punten voor een onderdeel wordt gebruik gemaakt van
+# age-grading-tabellen. Deze worden gepubliceerd op de website van de
+# Atletiekunie."
+#
+# NOG LEEG: vul de factoren in uit de tabellen van de Atletiekunie (of de
+# Mastersploeg-spreadsheet). Zolang een factor ontbreekt, rekent AVS met de
+# gewone seniorenpunten en meldt de ploegpagina dat.
+#
+# Let op: de factoren in 'Formules & Constanten' (meerkampen masters) zijn NIET
+# voor de competitie bedoeld.
+#
+# Hoe AVS rekent: gecorrigeerde prestatie = prestatie x factor (een handtijd eerst
+# met de handtijdcorrectie), dan de seniorenformule. Lopen: factor < 1;
+# springen en werpen: factor > 1. Onderdeel = sleutel uit au_2025.yaml.
+# Leeftijd = leeftijd op de wedstrijddag; zonder eigen regel telt de
+# dichtstbijzijnde lagere leeftijd. Een tabel per jaar (35, 36, 37, ...) of per
+# klasse (35, 40, 45, ...) werkt allebei. Voorbeeld van de vorm (geen echte
+# getallen):
+#
+# factoren:
+#   M:
+#     100m:        {35: 0.99, 36: 0.98, 37: 0.98}
+#     verspringen: {35: 1.01, 36: 1.02}
+#   V:
+#     100m:        {35: 0.99}
+
+naam: Age grading Mastercompetitie
+bron: nog in te vullen (Atletiekunie, age-grading-tabellen competitie)
+factoren:
+  M: {}
+  V: {}

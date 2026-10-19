@@ -4,7 +4,8 @@
     pg      – ploeg.paginas.Ploegpagina
     melding – bevestiging na opslaan (optioneel)
     fout    – foutmelding bij opslaan (optioneel)
-  Formulier: per atleet `rol-<master_id>` (''/deelnemer/reserve) en per vinkje
+  Formulier: per atleet `rol-<master_id>` (''/deelnemer/reserve), `beschikbaar-<master_id>`
+  (hele_dag/ochtend/middag) en per vinkje
   `inzet` = '<master_id>|<onderdeel>'. Een vinkje zonder rol maakt de atleet deelnemer.
   Punten per cel volgen uit de beste prestatie (pg.p.prestatiebasis); vetgedrukt = telt mee.
   Werkt zonder JavaScript: na 'Opslaan en controleren' rekent de server alles opnieuw uit.
@@ -40,7 +41,21 @@
       (windlegaal, tot de wedstrijddag). Per onderdeel tellen de beste atleten zoals het reglement zegt.
       Waarden met ≈ zijn voorspeld (geen eigen prestatie op dat onderdeel); de bron staat erbij als je de muis erop houdt.
       Een estafette telt met de geschatte tijd: de beentijden van de lopers samen, plus de wissels.
+      {%- if pg.schema %} Tijden en groepen komen uit het tijdschema van {{ pg.wedstrijd.naam }}; botsingen en
+      onderdelen buiten het dagdeel van een atleet worden gemeld en niet ingepland.
+      {%- elif pg.wedstrijd %} {{ pg.wedstrijd.naam }} heeft nog geen tijdschema: botsingen en dagdelen worden niet gecontroleerd.{% endif %}
       {%- if pg.stand.estafettes_zonder_punten %} <strong>Een estafette telt nog niet mee</strong>: er staan niet precies genoeg lopers op, of niet iedereen heeft een tijd op zijn been.{% endif %}</p>
+    {% if pg.zonder_leeftijdsfactor %}
+      <p class="melding" role="status">Age grading (65.2): voor {{ pg.zonder_leeftijdsfactor }} prestatie{{ "s" if pg.zonder_leeftijdsfactor != 1 }}
+        ontbreekt een leeftijdsfactor; die tellen met de gewone seniorenpunten. De factoren staan in
+        config/puntentelling/{{ pg.regelset.leeftijdsfactoren }}.yaml.</p>
+    {% endif %}
+    {% if pg.andere_ploegen %}
+      <p class="zacht">Op deze dag {{ "is" if pg.andere_ploegen | length == 1 else "zijn" }} er nog
+        {{ pg.andere_ploegen | length }} ploeg{{ "en" if pg.andere_ploegen | length != 1 }}
+        ({% for q in pg.andere_ploegen %}<a href="{{ url_for('ploeg', ploeg_id=q.id) }}">{{ q.naam }}</a>{{ ", " if not loop.last }}{% endfor %}).
+        <a href="{{ url_for('ploegen_dag', datum=p.datum.isoformat()) }}">Alle opstellingen van deze dag maken</a></p>
+    {% endif %}
     {% if pg.fouten %}
       <div class="melding melding--fout" role="alert">
         <strong>Dit mag nog niet ({{ pg.fouten | length }}):</strong>
@@ -91,6 +106,7 @@
               <th scope="col">Cat.</th>
               {% for r in m.regels %}
                 <th scope="col" class="midden">{{ r.kop }}<br>
+                  {% if pg.tijden(r.sleutel) %}<span class="ploegmatrix__regel">{{ pg.tijden(r.sleutel) }}</span><br>{% endif %}
                   <span class="ploegmatrix__regel">{% if r.soort == "estafette" %}{{ r.max_atleten }} ploeg{% else %}max {{ r.max_atleten }} · telt {{ r.tellend }}{% endif %}</span></th>
               {% endfor %}
               <th scope="col" class="rechts">Ond.</th>
@@ -108,6 +124,13 @@
                     <option value=""{% if not rol %} selected{% endif %}>–</option>
                     <option value="deelnemer"{% if rol == "deelnemer" %} selected{% endif %}>deelnemer</option>
                     <option value="reserve"{% if rol == "reserve" %} selected{% endif %}>reserve</option>
+                  </select>
+                  {% set bd = pg.beschikbaar.get(mid, "hele_dag") %}
+                  <label class="verborgen" for="beschikbaar-{{ mid }}">Wanneer kan {{ rij.atleet.naam }}</label>
+                  <select id="beschikbaar-{{ mid }}" name="beschikbaar-{{ mid }}" class="ploegmatrix__dagdeel">
+                    <option value="hele_dag"{% if bd == "hele_dag" %} selected{% endif %}>hele dag</option>
+                    <option value="ochtend"{% if bd == "ochtend" %} selected{% endif %}>ochtend</option>
+                    <option value="middag"{% if bd == "middag" %} selected{% endif %}>middag</option>
                   </select>
                 </td>
                 <th scope="row"><a href="{{ url_for('atleet', master_id=mid) }}">{{ rij.atleet.naam }}</a>
@@ -138,6 +161,7 @@
                         <span class="zacht">–</span>
                       {% endif %}
                     </label>
+                    {% if pg.groep.get((mid, r.sleutel)) %}<span class="ploegcel__groep" title="Groep in het tijdschema (9.1)">gr. {{ pg.groep[(mid, r.sleutel)] }}</span>{% endif %}
                   </td>
                   {% endif %}
                 {% endfor %}

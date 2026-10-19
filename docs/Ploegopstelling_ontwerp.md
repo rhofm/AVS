@@ -326,12 +326,35 @@ gezet, zodat de wedstrijdpagina en de botsingencontrole meteen werken.
    (300 m als extra onderdeel voor de Zweedse). Tests: `tests/test_voorspeller.py`
    (o.a. brute kracht met estafette). Nog niet: voorspellingen in meer stappen
    (alleen uit echte prestaties), twee estafetteploegen op één estafette.
-7. Meer ploegen, botsingen uit de chronoloog, U18/U20 (werpmateriaal),
+7. ✅ Meer ploegen, botsingen uit de chronoloog, U18/U20 (werpmateriaal),
    masters (age grading), senioren (gemengd), 1e divisie / NK Teams.
+   Regelbestanden voor U18/U20, masters, senioren en NK Teams bestonden al.
+   Nieuw: `ploeg/tijdschema.py` koppelt het tijdschema van de gekoppelde
+   wedstrijd aan de programmaonderdelen (naam + specificatie, naam, of
+   puntensleutel; categorie van de ploeg bij 'materiaal: ploeg', 'Masters' bij
+   masters, anders die van de atleet). Daarmee: tijden in de tabelkop,
+   botsingen (waarschuwing; de optimalisatie plant ze niet in:
+   `x[a,e1] + x[a,e2] <= 1`, ook voor kwartetten), dagdeel per lid
+   (`beschikbaar` hele dag/ochtend/middag op de ploegpagina; de middag begint
+   om 13:00; buiten het dagdeel `x = 0`) en groepen bij technische onderdelen
+   (9.1: na opslaan of optimaliseren automatisch elk een andere groep, met zo
+   min mogelijk botsingen en in het dagdeel; 'gr. 1' in de cel). Meer ploegen:
+   pagina `/ploegen/dag/<datum>` maakt alle ploegen van een dag na elkaar in een
+   te kiezen volgorde, elk met een eigen strategie (of 'niet aanpassen'); wie in
+   een eerdere ploeg komt, gaat uit de latere (10.10). Masters: age grading via
+   `leeftijdsfactoren:` in het regelbestand en
+   `config/puntentelling/masters_agegrading.yaml` (prestatie x factor, dan de
+   seniorenformule; handtijd eerst gecorrigeerd; tabel per jaar of per klasse).
+   Dat bestand is nog **leeg**: zonder factor gelden de gewone seniorenpunten
+   en de ploegpagina meldt hoeveel prestaties geen factor hebben. Tests:
+   `tests/test_ploeg_dag.py`. Nog niet: samen oplossen van meer ploegen,
+   groepen met de hand kiezen, age grading voor estafettes, minimale pauze
+   tussen onderdelen.
 
 ## Open punten
 
-- Masters age-grading-factoren controleren tegen de spreadsheet.
+- Masters age-grading-factoren invullen in `config/puntentelling/masters_agegrading.yaml`
+  (uit de tabellen van de Atletiekunie of de Mastersploeg-spreadsheet).
 - Standaardwaarden voor de voorspeller (`voorspelling_factor`, `verhouding` per
   werpgewicht/hordehoogte, `correctie_s` per estafette) zijn ruwe schattingen;
   bepalen met echte data (eigen estafettetijden vs. som van de vlakke tijden).
