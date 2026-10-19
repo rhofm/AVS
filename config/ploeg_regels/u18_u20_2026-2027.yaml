@@ -1,0 +1,93 @@
+# Regels U18/U20-competitie - Wedstrijdbepalingen Competitie 2026-2027
+# (Atletiekunie, april 2026). Bepalingen 4, 9, 10, 18 en 50-54.
+#
+# Eén divisie; aparte ploegen voor mannen en vrouwen (bepaling 5). U18 en U20
+# samen in één ploeg; een U16 mag meedoen als U18 (bepaling 4, slot).
+# U18 loopt horden en gooit met het materiaal van de eigen categorie (50 **),
+# daarom 'materiaal: eigen' en een U16 telt als U18 ('materiaal_als').
+# De 2000 m steeplechase is alleen voor U18 (50 **).
+# Per onderdeel telt alleen de beste atleet van de ploeg (18.3).
+#
+# Onderdeelsleutels zijn dezelfde als in config/puntentelling/au_2025.yaml.
+# CONTROLEREN: specificaties (hordehoogte, gewicht) volgens het wedstrijdreglement.
+
+naam: U18/U20-competitie
+seizoen: 2026-2027
+bron: Wedstrijdbepalingen Competitie 2026-2027 (april 2026)
+puntentelling: au_2025
+puntentabel: au_senioren        # 18.4: puntentelling voor senioren, U18, U20 en masters
+puntentoekenning: prestatie
+
+programmanamen:
+  finale_2026: Finale 2026 (NK Teams U18/U20, programma Finale 1)
+  finale_2027: Finale 2027 (NK Teams U18/U20, programma Finale 2)
+
+algemeen:
+  max_onderdelen_per_atleet: 3   # 4.1, estafettes tellen mee
+  max_reserves: 4                # 9.3
+  een_ploeg_per_dag: true        # 10.10
+  een_atleet_per_groep: true     # 9.1
+  tellend:                       # 50 *): alleen de beste atleet per ploeg telt
+    loop: 1
+    technisch: 1
+  materiaal: eigen               # U18 met U18-materiaal, U20 met U20-materiaal
+
+ploegen:
+  U18U20-V:
+    naam: U18/U20 vrouwen
+    geslacht: V
+    toegestaan: [U16-V, U18-V, U20-V]
+    materiaal_als: {U16-V: U18-V}
+    programma:
+      wedstrijd_1: {100m: 2, 200m: 2, 800m: 2, 3000m: 2, 400mH: 2, 4x400m: 1, hoogspringen: 2,
+                    polsstokhoogspringen: 1, hinkstapspringen: 2, kogelstoten: 2, speerwerpen: 2}
+      wedstrijd_2: {100m: 2, 200m: 2, 400m: 2, 1500m: 2, 100mH: 2, 2000mSC: 2, zweedse: 1, hoogspringen: 2,
+                    verspringen: 2, kogelstoten: 2, discuswerpen: 2, speerwerpen: 2}
+      wedstrijd_3: {100m: 2, 400m: 2, 800m: 2, 1500m: 2, 100mH: 2, 4x100m: 1, hoogspringen: 2,
+                    verspringen: 2, kogelstoten: 2, discuswerpen: 2, kogelslingeren: 1}
+      finale_2026: {100m: 2, 400m: 2, 800m: 2, 1500m: 2, 100mH: 2, 2000mSC: 2, 4x100m: 1, hoogspringen: 2,
+                    polsstokhoogspringen: 1, verspringen: 2, kogelstoten: 2, speerwerpen: 2}
+      finale_2027: {100m: 2, 200m: 2, 800m: 2, 3000m: 2, 400mH: 2, 4x400m: 1, hoogspringen: 2,
+                    verspringen: 2, hinkstapspringen: 2, kogelstoten: 2, discuswerpen: 2, kogelslingeren: 1}
+
+  U18U20-M:
+    naam: U18/U20 mannen
+    geslacht: M
+    toegestaan: [U16-M, U18-M, U20-M]
+    materiaal_als: {U16-M: U18-M}
+    programma:
+      wedstrijd_1: {100m: 2, 200m: 2, 800m: 2, 3000m: 2, 400mH: 2, 4x400m: 1, hoogspringen: 2,
+                    verspringen: 2, kogelstoten: 2, discuswerpen: 2, speerwerpen: 2}
+      wedstrijd_2: {100m: 2, 200m: 2, 400m: 2, 1500m: 2, 110mH: 2, 2000mSC: 2, zweedse: 1, hoogspringen: 2,
+                    polsstokhoogspringen: 1, hinkstapspringen: 2, kogelstoten: 2, speerwerpen: 2}
+      wedstrijd_3: {100m: 2, 400m: 2, 800m: 2, 1500m: 2, 110mH: 2, 4x100m: 1, hoogspringen: 2,
+                    verspringen: 2, kogelstoten: 2, discuswerpen: 2, kogelslingeren: 1}
+      finale_2026: {100m: 2, 400m: 2, 800m: 2, 1500m: 2, 110mH: 2, 2000mSC: 2, 4x100m: 1, hoogspringen: 2,
+                    verspringen: 2, hinkstapspringen: 2, kogelstoten: 2, discuswerpen: 2, kogelslingeren: 1}
+      finale_2027: {100m: 2, 200m: 2, 800m: 2, 3000m: 2, 400mH: 2, 4x400m: 1, hoogspringen: 2,
+                    polsstokhoogspringen: 1, verspringen: 2, kogelstoten: 2, speerwerpen: 2}
+
+# Namen zoals atletiek.nu ze geeft en specificatie per categorie. Met
+# 'materiaal: eigen' telt de categorie van de atleet (een U16 als U18).
+onderdelen:
+  100m:    {naam: 100 meter}
+  200m:    {naam: 200 meter}
+  400m:    {naam: 400 meter}
+  800m:    {naam: 800 meter}
+  1500m:   {naam: 1500 meter}
+  3000m:   {naam: 3000 meter}
+  100mH:   {naam: 100 meter horden, specificatie: {U18-V: 76.2cm, U20-V: 84cm}}
+  110mH:   {naam: 110 meter horden, specificatie: {U18-M: 91.4cm, U20-M: 99.1cm}}
+  400mH:   {naam: 400 meter horden, specificatie: {U18-V: 76.2cm, U20-V: 76.2cm, U18-M: 84cm, U20-M: 91.4cm}}
+  2000mSC: {naam: 2000 meter steeple, specificatie: {U18-V: 76.2cm, U18-M: 91.4cm}, alleen: [U18-V, U18-M]}
+  4x100m:  {naam: 4 x 100 meter, lopers: 4}
+  4x400m:  {naam: 4 x 400 meter, lopers: 4}
+  zweedse: {naam: Zweedse estafette, lopers: 4}
+  hoogspringen:         {naam: Hoogspringen}
+  polsstokhoogspringen: {naam: Polsstokhoogspringen}
+  verspringen:          {naam: Verspringen}
+  hinkstapspringen:     {naam: Hink-stap-springen}
+  kogelstoten:    {naam: Kogelstoten,    specificatie: {U18-V: 3kg,  U20-V: 4kg,   U18-M: 5kg,   U20-M: 6kg}}
+  discuswerpen:   {naam: Discuswerpen,   specificatie: {U18-V: 1kg,  U20-V: 1kg,   U18-M: 1.5kg, U20-M: 1.75kg}}
+  speerwerpen:    {naam: Speerwerpen,    specificatie: {U18-V: 500g, U20-V: 600g,  U18-M: 700g,  U20-M: 800g}}
+  kogelslingeren: {naam: Kogelslingeren, specificatie: {U18-V: 3kg,  U20-V: 4kg,   U18-M: 5kg,   U20-M: 6kg}}

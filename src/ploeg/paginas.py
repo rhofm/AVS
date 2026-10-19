@@ -57,13 +57,12 @@ def overzicht(db: Opslag, vandaag: date) -> list[OverzichtRegel]:
     for p in db.ploegen():
         try:
             rs = _regels.laad(p.regelset)
-            ploegnaam = rs.ploeg(p.categorie).naam
-            competitie = rs.naam
+            ploegnaam, competitie, programma = rs.ploeg(p.categorie).naam, rs.naam, rs.programma_naam(p.programma)
         except RegelFout:
-            ploegnaam, competitie = p.categorie, p.competitie or p.regelset
+            ploegnaam, competitie, programma = p.categorie, p.competitie or p.regelset, programma_label(p.programma)
         leden = db.ploeg_leden(p.id)
         uit.append(OverzichtRegel(
-            p, competitie, ploegnaam, programma_label(p.programma),
+            p, competitie, ploegnaam, programma,
             db.wedstrijd(p.wedstrijd_id) if p.wedstrijd_id else None,
             sum(1 for lid in leden if lid.rol == "deelnemer"), sum(1 for lid in leden if lid.rol == "reserve"),
             p.datum < vandaag))
@@ -104,7 +103,7 @@ def formulier(db: Opslag, vandaag: date, ingevuld: Mapping | None = None, ploeg:
     if ingevuld is not None:
         for veld in ("naam", "ploeg", "programma", "wedstrijd", "datum", "prestatiebasis"):
             setattr(f, veld, (ingevuld.get(veld) or "").strip())
-    programmas: dict[str, None] = {}
+    gezien: set[tuple[str, str]] = set()
     for bestand in _regels.bestanden():
         try:
             rs = _regels.laad(bestand)
@@ -113,8 +112,10 @@ def formulier(db: Opslag, vandaag: date, ingevuld: Mapping | None = None, ploeg:
             continue
         for sleutel, p in rs.ploegen.items():
             f.ploegen.append(Keuze(f"{bestand}|{sleutel}", p.naam, rs.naam))
-            programmas.update(dict.fromkeys(p.programmas))
-    f.programmas = [Keuze(p, programma_label(p)) for p in programmas]
+            for prog in p.programmas:
+                if (rs.naam, prog) not in gezien:
+                    gezien.add((rs.naam, prog))
+                    f.programmas.append(Keuze(prog, rs.programma_naam(prog), rs.naam))
     gekozen = int(f.wedstrijd) if f.wedstrijd.isdigit() else None
     for w in db.wedstrijden(van=vandaag - timedelta(days=60)):
         f.wedstrijden.append(Keuze(str(w.id), f"{w.datum.isoformat()} · {w.naam}"))
@@ -144,7 +145,7 @@ def lees_formulier(db: Opslag, form: Mapping, bestaande: Ploeg | None = None) ->
     programma = form.get("programma") or ""
     if rs is not None and programma not in rs.ploeg(categorie).programmas:
         fouten["programma"] = (f"Kies een wedstrijd van {rs.ploeg(categorie).naam}: "
-                               + ", ".join(programma_label(p) for p in rs.programmas(categorie)) + ".")
+                               + ", ".join(rs.programma_naam(p) for p in rs.programmas(categorie)) + ".")
     wedstrijd = None
     w_tekst = (form.get("wedstrijd") or "").strip()
     if w_tekst:
@@ -241,7 +242,7 @@ def ploegpagina(db: Opslag, ploeg_id: int, leden: list[PloegLid] | None = None,
     m = matrix(db, rs, p.categorie, p.programma, p.datum, atleten, p.prestatiebasis)
     alles = _opstelling.controleer(db, rs, p, leden, inzet, m)
     return Ploegpagina(
-        p, rs, rs.ploeg(p.categorie).naam, programma_label(p.programma), wedstrijd, m,
+        p, rs, rs.ploeg(p.categorie).naam, rs.programma_naam(p.programma), wedstrijd, m,
         {lid.atleet_id: lid.rol for lid in leden}, {(i.atleet_id, i.onderdeel) for i in inzet},
         _opstelling.stand(m, inzet),
         [o for o in alles if o.ernst == "fout"], [o for o in alles if o.ernst == "waarschuwing"],

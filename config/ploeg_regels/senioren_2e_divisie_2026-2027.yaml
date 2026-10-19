@@ -1,0 +1,132 @@
+# Regels Seniorencompetitie 2e divisie - Wedstrijdbepalingen Competitie 2026-2027
+# (Atletiekunie, april 2026). Bepalingen 4, 9, 10, 18 en 40-44.
+#
+# De seniorencompetitie is gemengd (bepaling 5): mannen en vrouwen doen aparte
+# onderdelen met een aparte puntentelling, maar de punten worden opgeteld. Daarom
+# is er één ploeg 'SEN' en heeft elk onderdeel een geslacht (100m-V, 100m-M).
+# U16 mag niet meedoen (bepaling 4, slot); U18 en U20 wel, met seniorenmateriaal.
+#
+# Maximaal één ploeg per vereniging (10.2). 3000 m / 5000 m: in 2026 eenmalig 1 deelnemer (***).
+# Promotie/degradatie met de 1e divisie: de 1e divisie telt naar plaats (18.1); AVS rekent met prestatiepunten.
+# Onderdeelsleutels: zie de lijst 'onderdelen' onderaan; 'punten' verwijst naar
+# config/puntentelling/au_2025.yaml.
+# CONTROLEREN: specificaties (hordehoogte, gewicht) en namen zoals atletiek.nu ze geeft.
+
+naam: Seniorencompetitie 2e divisie
+seizoen: 2026-2027
+bron: Wedstrijdbepalingen Competitie 2026-2027 (april 2026)
+puntentelling: au_2025
+puntentabel: au_senioren
+puntentoekenning: prestatie
+
+algemeen:
+  max_onderdelen_per_atleet: 3   # 4.1, estafettes tellen mee
+  max_reserves: 4                # 9.3
+  een_ploeg_per_dag: true        # 10.10
+  een_atleet_per_groep: true     # 9.1
+  tellend:                       # 18.3: alleen de beste atleet per ploeg telt
+    loop: 1
+    technisch: 1
+  materiaal: ploeg               # seniorenmateriaal voor iedereen
+
+programmanamen:
+  pd_1e_divisie_2026: Promotie/degradatie met de 1e divisie 2026 (programma 3e wedstrijd 1e divisie, 42.4)
+  pd_1e_divisie_2027: Promotie/degradatie met de 1e divisie 2027 (programma 2e wedstrijd 1e divisie, 42.4)
+  pd_3e_divisie_2026: Promotie/degradatie met de 3e divisie 2026 (programma 3e wedstrijd 2e divisie, 42.5)
+  pd_3e_divisie_2027: Promotie/degradatie met de 3e divisie 2027 (programma 2e wedstrijd 2e divisie, 42.5)
+
+ploegen:
+  SEN:
+    naam: Senioren (mannen en vrouwen)
+    geslacht: gemengd
+    toegestaan: [SEN-V, SEN-M, U20-V, U20-M, U18-V, U18-M]
+    programma:
+      wedstrijd_1:
+        {100m-V: 2, 100m-M: 2, 200m-V: 2, 200m-M: 2, 400m-V: 2, 400m-M: 2, 800m-V: 2, 800m-M: 2,
+         3000m-V: 1, 5000m-M: 1, 100mH-V: 2, 110mH-M: 2, zweedse-V: 1, zweedse-M: 1,
+         hoogspringen-V: 2, hoogspringen-M: 2, polsstokhoogspringen-M: 1, verspringen-M: 2,
+         hinkstapspringen-V: 2, kogelstoten-V: 2, kogelstoten-M: 2, discuswerpen-V: 2,
+         discuswerpen-M: 2, speerwerpen-V: 1, speerwerpen-M: 1}
+      wedstrijd_2:
+        {100m-V: 2, 100m-M: 2, 200m-V: 2, 200m-M: 2, 400m-V: 2, 400m-M: 2, 800m-V: 2, 1500m-M: 2,
+         400mH-V: 1, 400mH-M: 1, 3000mSC-V: 1, 3000mSC-M: 1, 4x100m-V: 1, 4x100m-M: 1,
+         hoogspringen-V: 2, hoogspringen-M: 2, polsstokhoogspringen-V: 1, verspringen-V: 2,
+         verspringen-M: 2, kogelstoten-V: 2, kogelstoten-M: 2, discuswerpen-M: 1,
+         kogelslingeren-V: 2, kogelslingeren-M: 1, speerwerpen-V: 2}
+      wedstrijd_3:
+        {100m-V: 2, 100m-M: 2, 200m-V: 2, 200m-M: 2, 400m-V: 2, 400m-M: 2, 800m-M: 2, 1500m-V: 2,
+         3000m-V: 1, 5000m-M: 1, 100mH-V: 2, 110mH-M: 2, 4x400m-gemengd: 1, hoogspringen-V: 2,
+         hoogspringen-M: 2, polsstokhoogspringen-M: 1, verspringen-V: 2, hinkstapspringen-M: 2,
+         kogelstoten-V: 2, kogelstoten-M: 2, discuswerpen-V: 1, kogelslingeren-V: 1,
+         kogelslingeren-M: 2, speerwerpen-M: 2}
+      pd_1e_divisie_2026:
+        {100m-V: 2, 100m-M: 2, 200m-V: 2, 200m-M: 2, 400m-V: 2, 400m-M: 2, 800m-V: 2, 800m-M: 2,
+         3000m-V: 1, 5000m-M: 1, 100mH-V: 2, 110mH-M: 2, 400mH-V: 1, 400mH-M: 1, 3000mSC-M: 1,
+         zweedse-V: 1, zweedse-M: 1, hoogspringen-V: 2, hoogspringen-M: 2,
+         polsstokhoogspringen-V: 1, polsstokhoogspringen-M: 1, verspringen-M: 2,
+         hinkstapspringen-V: 2, kogelstoten-V: 2, kogelstoten-M: 2, discuswerpen-V: 1,
+         kogelslingeren-V: 1, kogelslingeren-M: 2, speerwerpen-M: 2}
+      pd_1e_divisie_2027:
+        {100m-V: 2, 100m-M: 2, 200m-V: 2, 200m-M: 2, 400m-V: 2, 400m-M: 2, 800m-V: 2, 800m-M: 2,
+         1500m-V: 2, 1500m-M: 2, 3000m-V: 1, 5000m-M: 1, 400mH-V: 1, 400mH-M: 1,
+         4x400m-gemengd: 1, hoogspringen-V: 2, hoogspringen-M: 2, polsstokhoogspringen-V: 1,
+         verspringen-V: 2, verspringen-M: 2, hinkstapspringen-M: 2, kogelstoten-V: 2,
+         kogelstoten-M: 2, discuswerpen-M: 1, kogelslingeren-V: 2, kogelslingeren-M: 1,
+         speerwerpen-V: 2}
+      pd_3e_divisie_2026:
+        {100m-V: 2, 100m-M: 2, 200m-V: 2, 200m-M: 2, 400m-V: 2, 400m-M: 2, 800m-M: 2, 1500m-V: 2,
+         3000m-V: 1, 5000m-M: 1, 100mH-V: 2, 110mH-M: 2, 4x400m-gemengd: 1, hoogspringen-V: 2,
+         hoogspringen-M: 2, polsstokhoogspringen-M: 1, verspringen-V: 2, hinkstapspringen-M: 2,
+         kogelstoten-V: 2, kogelstoten-M: 2, discuswerpen-V: 1, kogelslingeren-V: 1,
+         kogelslingeren-M: 2, speerwerpen-M: 2}
+      pd_3e_divisie_2027:
+        {100m-V: 2, 100m-M: 2, 200m-V: 2, 200m-M: 2, 400m-V: 2, 400m-M: 2, 800m-V: 2, 1500m-M: 2,
+         400mH-V: 1, 400mH-M: 1, 3000mSC-V: 1, 3000mSC-M: 1, 4x100m-V: 1, 4x100m-M: 1,
+         hoogspringen-V: 2, hoogspringen-M: 2, polsstokhoogspringen-V: 1, verspringen-V: 2,
+         verspringen-M: 2, kogelstoten-V: 2, kogelstoten-M: 2, discuswerpen-M: 1,
+         kogelslingeren-V: 2, kogelslingeren-M: 1, speerwerpen-V: 2}
+
+onderdelen:
+  # ---- lopen (V = vrouwen, M = mannen); 'punten' = naam in de puntentelling ----
+  100m-V:    {naam: 100 meter,  punten: 100m,  geslacht: V}
+  100m-M:    {naam: 100 meter,  punten: 100m,  geslacht: M}
+  200m-V:    {naam: 200 meter,  punten: 200m,  geslacht: V}
+  200m-M:    {naam: 200 meter,  punten: 200m,  geslacht: M}
+  400m-V:    {naam: 400 meter,  punten: 400m,  geslacht: V}
+  400m-M:    {naam: 400 meter,  punten: 400m,  geslacht: M}
+  800m-V:    {naam: 800 meter,  punten: 800m,  geslacht: V}
+  800m-M:    {naam: 800 meter,  punten: 800m,  geslacht: M}
+  1500m-V:   {naam: 1500 meter, punten: 1500m, geslacht: V}
+  1500m-M:   {naam: 1500 meter, punten: 1500m, geslacht: M}
+  3000m-V:   {naam: 3000 meter, punten: 3000m, geslacht: V}
+  5000m-M:   {naam: 5000 meter, punten: 5000m, geslacht: M}
+  100mH-V:   {naam: 100 meter horden, punten: 100mH, geslacht: V, specificatie: 84cm}
+  110mH-M:   {naam: 110 meter horden, punten: 110mH, geslacht: M, specificatie: 106.7cm}
+  400mH-V:   {naam: 400 meter horden, punten: 400mH, geslacht: V, specificatie: 76.2cm}
+  400mH-M:   {naam: 400 meter horden, punten: 400mH, geslacht: M, specificatie: 91.4cm}
+  3000mSC-V: {naam: 3000 meter steeple, punten: 3000mSC, geslacht: V, specificatie: 76.2cm}
+  3000mSC-M: {naam: 3000 meter steeple, punten: 3000mSC, geslacht: M, specificatie: 91.4cm}
+  # ---- estafettes ----
+  4x100m-V:  {naam: 4 x 100 meter, punten: 4x100m, geslacht: V, lopers: 4}
+  4x100m-M:  {naam: 4 x 100 meter, punten: 4x100m, geslacht: M, lopers: 4}
+  zweedse-V: {naam: Zweedse estafette, punten: zweedse, geslacht: V, lopers: 4}
+  zweedse-M: {naam: Zweedse estafette, punten: zweedse, geslacht: M, lopers: 4}
+  4x400m-gemengd: {naam: 4 x 400 meter gemengd, geslacht: gemengd, lopers: 4, samenstelling: {M: 2, V: 2}}
+  # ---- springen ----
+  hoogspringen-V:         {naam: Hoogspringen,         punten: hoogspringen,         geslacht: V}
+  hoogspringen-M:         {naam: Hoogspringen,         punten: hoogspringen,         geslacht: M}
+  polsstokhoogspringen-V: {naam: Polsstokhoogspringen, punten: polsstokhoogspringen, geslacht: V}
+  polsstokhoogspringen-M: {naam: Polsstokhoogspringen, punten: polsstokhoogspringen, geslacht: M}
+  verspringen-V:          {naam: Verspringen,          punten: verspringen,          geslacht: V}
+  verspringen-M:          {naam: Verspringen,          punten: verspringen,          geslacht: M}
+  hinkstapspringen-V:     {naam: Hink-stap-springen,   punten: hinkstapspringen,     geslacht: V}
+  hinkstapspringen-M:     {naam: Hink-stap-springen,   punten: hinkstapspringen,     geslacht: M}
+  # ---- werpen (seniorenmateriaal, ook voor U18/U20 in deze competitie) ----
+  kogelstoten-V:    {naam: Kogelstoten,    punten: kogelstoten,    geslacht: V, specificatie: 4kg}
+  kogelstoten-M:    {naam: Kogelstoten,    punten: kogelstoten,    geslacht: M, specificatie: 7.26kg}
+  discuswerpen-V:   {naam: Discuswerpen,   punten: discuswerpen,   geslacht: V, specificatie: 1kg}
+  discuswerpen-M:   {naam: Discuswerpen,   punten: discuswerpen,   geslacht: M, specificatie: 2kg}
+  kogelslingeren-V: {naam: Kogelslingeren, punten: kogelslingeren, geslacht: V, specificatie: 4kg}
+  kogelslingeren-M: {naam: Kogelslingeren, punten: kogelslingeren, geslacht: M, specificatie: 7.26kg}
+  speerwerpen-V:    {naam: Speerwerpen,    punten: speerwerpen,    geslacht: V, specificatie: 600g}
+  speerwerpen-M:    {naam: Speerwerpen,    punten: speerwerpen,    geslacht: M, specificatie: 800g}

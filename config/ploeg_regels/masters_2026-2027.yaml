@@ -1,0 +1,84 @@
+# Regels Mastercompetitie - Wedstrijdbepalingen Competitie 2026-2027
+# (Atletiekunie, april 2026). Bepalingen 4, 9, 10, 18 en 60-65.
+#
+# Eén divisie; aparte ploegen voor mannen en vrouwen (bepaling 5). Twee
+# voorrondewedstrijden en een finale (per vereniging één mannen- en één
+# vrouwenploeg in de finale, 62.3). Per onderdeel telt alleen de beste atleet (18.3).
+#
+# Masters doen mee in een leeftijdsklasse (M35, V40, ...) op hun leeftijd op de
+# wedstrijddag ('leeftijdsklassen: masters') en werpen met het materiaal van hun
+# eigen klasse (65.1): 'V50+: 3kg' = vanaf V50 (tot de volgende grens).
+#
+# LET OP: de punten worden in de competitie met 'age grading' berekend (65.2).
+# Die leeftijdsfactoren zitten nog niet in AVS: de punten zijn nu die van de
+# seniorentabel, zonder leeftijdscorrectie.
+# CONTROLEREN: werpgewichten per klasse volgens het wedstrijdreglement (WMA).
+
+naam: Mastercompetitie
+seizoen: 2026-2027
+bron: Wedstrijdbepalingen Competitie 2026-2027 (april 2026)
+puntentelling: au_2025
+puntentabel: au_senioren        # 18.4; age grading (65.2) volgt nog
+puntentoekenning: prestatie
+leeftijdsklassen: masters
+
+algemeen:
+  max_onderdelen_per_atleet: 3   # 4.1, estafettes tellen mee
+  max_reserves: 4                # 9.3
+  een_ploeg_per_dag: true        # 10.10
+  een_atleet_per_groep: true     # 9.1
+  tellend:                       # 60 *): alleen de beste atleet per ploeg telt
+    loop: 1
+    technisch: 1
+  materiaal: eigen               # 65.1: materiaal van de eigen leeftijdsklasse
+
+ploegen:
+  MAS-V:
+    naam: Masters vrouwen
+    geslacht: V
+    toegestaan: [V35+]
+    programma:
+      wedstrijd_1: {100m: 2, 200m: 2, 400m: 2, 1500m: 2, 4x100m: 1, hoogspringen: 2, verspringen: 2,
+                    kogelstoten: 2, discuswerpen: 2}
+      wedstrijd_2: {100m: 2, 200m: 2, 800m: 2, 3000m: 2, zweedse: 1, hoogspringen: 2, verspringen: 2,
+                    kogelstoten: 2, speerwerpen: 2, kogelslingeren: 2}
+      finale: {100m: 2, 400m: 2, 1500m: 2, 3000m: 2, 4x200m: 1, hoogspringen: 2, verspringen: 2,
+               kogelstoten: 2, discuswerpen: 1, speerwerpen: 1, kogelslingeren: 1}
+
+  MAS-M:
+    naam: Masters mannen
+    geslacht: M
+    toegestaan: [M35+]
+    programma:
+      wedstrijd_1: {100m: 2, 200m: 2, 400m: 2, 1500m: 2, 4x100m: 1, hoogspringen: 2, verspringen: 2,
+                    kogelstoten: 2, discuswerpen: 2, speerwerpen: 2}
+      wedstrijd_2: {100m: 2, 200m: 2, 800m: 2, 5000m: 2, zweedse: 1, hoogspringen: 2, verspringen: 2,
+                    kogelstoten: 2, kogelslingeren: 2}
+      finale: {100m: 2, 400m: 2, 1500m: 2, 5000m: 2, 4x200m: 1, hoogspringen: 2, verspringen: 2,
+               kogelstoten: 2, discuswerpen: 1, speerwerpen: 1, kogelslingeren: 1}
+
+onderdelen:
+  100m:    {naam: 100 meter}
+  200m:    {naam: 200 meter}
+  400m:    {naam: 400 meter}
+  800m:    {naam: 800 meter}
+  1500m:   {naam: 1500 meter}
+  3000m:   {naam: 3000 meter}
+  5000m:   {naam: 5000 meter}
+  4x100m:  {naam: 4 x 100 meter, lopers: 4}
+  4x200m:  {naam: 4 x 200 meter, lopers: 4}
+  zweedse: {naam: Zweedse estafette, lopers: 4}
+  hoogspringen: {naam: Hoogspringen}
+  verspringen:  {naam: Verspringen}
+  kogelstoten:
+    naam: Kogelstoten
+    specificatie: {V35+: 4kg, V50+: 3kg, V75+: 2kg, M35+: 7.26kg, M50+: 6kg, M60+: 5kg, M70+: 4kg, M80+: 3kg}
+  discuswerpen:
+    naam: Discuswerpen
+    specificatie: {V35+: 1kg, V75+: 0.75kg, M35+: 2kg, M50+: 1.5kg, M60+: 1kg}
+  speerwerpen:
+    naam: Speerwerpen
+    specificatie: {V35+: 600g, V50+: 500g, V75+: 400g, M35+: 800g, M50+: 700g, M60+: 600g, M70+: 500g, M80+: 400g}
+  kogelslingeren:
+    naam: Kogelslingeren
+    specificatie: {V35+: 4kg, V50+: 3kg, V75+: 2kg, M35+: 7.26kg, M50+: 6kg, M60+: 5kg, M70+: 4kg, M80+: 3kg}

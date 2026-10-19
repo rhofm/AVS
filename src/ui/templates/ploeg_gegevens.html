@@ -55,7 +55,11 @@
         <label for="programma">Welke wedstrijd van de competitie</label>
         <select id="programma" name="programma" required>
           <option value="">Kies…</option>
-          {% for k in f.programmas %}<option value="{{ k.waarde }}"{% if k.waarde == f.programma %} selected{% endif %}>{{ k.tekst }}</option>{% endfor %}
+          {% for groep, keuzes in f.programmas | groupby("groep") %}
+            <optgroup label="{{ groep }}">
+              {% for k in keuzes %}<option value="{{ k.waarde }}"{% if k.waarde == f.programma %} selected{% endif %}>{{ k.tekst }}</option>{% endfor %}
+            </optgroup>
+          {% endfor %}
         </select>
         <span class="veld__hint zacht">Bepaalt het programma (welke onderdelen, hoeveel atleten).</span>
         {{ fout("programma") }}

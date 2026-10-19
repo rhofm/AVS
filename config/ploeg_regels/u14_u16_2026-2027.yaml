@@ -28,7 +28,7 @@ ploegen:
   U14-V:
     naam: U14 meisjes
     geslacht: V
-    toegestaan: [U14-V]
+    toegestaan: [U14-V]          # U12 mag niet meedoen
     programma:
       wedstrijd_1: {60m: 3, 1000m: 3, 60mH: 3, 4x60m: 1, hoogspringen: 2, verspringen: 2, kogelstoten: 2, discuswerpen: 2, speerwerpen: 2}
       wedstrijd_2: {60m: 3, 600m: 3, 60mH: 3, 4x60m: 1, hoogspringen: 2, verspringen: 2, kogelstoten: 2, speerwerpen: 2}
@@ -39,7 +39,7 @@ ploegen:
   U14-M:
     naam: U14 jongens
     geslacht: M
-    toegestaan: [U14-M]
+    toegestaan: [U14-M]          # U12 mag niet meedoen
     programma:
       wedstrijd_1: {80m: 3, 1000m: 3, 80mH: 3, 4x80m: 1, hoogspringen: 2, verspringen: 2, kogelstoten: 2, speerwerpen: 2}
       wedstrijd_2: {80m: 3, 600m: 3, 80mH: 3, 4x80m: 1, hoogspringen: 2, verspringen: 2, kogelstoten: 2, discuswerpen: 2}
@@ -73,7 +73,6 @@ ploegen:
 # welke specificatie (hordehoogte, gewicht) bij welke categorie hoort.
 # Met 'materiaal: ploeg' telt de categorie van de ploeg: een U14-meisje in de
 # U16-ploeg gooit met de U16-kogel.
-# CONTROLEREN: gewichten en hoogtes volgens het wedstrijdreglement.
 onderdelen:
   60m:    {naam: 60 meter}
   80m:    {naam: 80 meter}
@@ -93,5 +92,5 @@ onderdelen:
   hoogspringen: {naam: Hoogspringen}
   verspringen:  {naam: Verspringen}
   kogelstoten:  {naam: Kogelstoten,  specificatie: {U14-V: 2kg, U14-M: 3kg, U16-V: 3kg, U16-M: 4kg}}
-  discuswerpen: {naam: Discuswerpen, specificatie: {U14-V: 0.75kg, U14-M: 0.75kg, U16-V: 1kg, U16-M: 1kg}}
+  discuswerpen: {naam: Discuswerpen, specificatie: {U14-V: 0.75kg, U14-M: 1kg, U16-V: 1kg, U16-M: 1kg}}
   speerwerpen:  {naam: Speerwerpen,  specificatie: {U14-V: 400g, U14-M: 400g, U16-V: 500g, U16-M: 600g}}

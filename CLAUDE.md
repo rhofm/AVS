@@ -307,8 +307,13 @@ python src/db/init_db.py --herstel <sleutel>  # restore the key (e.g. new comput
   also against the scoring table: every programme event needs a points
   formula) and checks a lineup with `controleer()` / `controleer_dag()`.
   Event keys in rule files are the keys of the scoring table (`80mH`,
-  `kogelstoten`, `4x80m`); categories are codes like `U14-V`, `U16-M`, `SEN-V`
-  (`categorie_code()`). A lineup is `models.ploeg`: `PloegLid` (who is on the
+  `kogelstoten`, `4x80m`), or carry `punten:` when they differ (senior events
+  `100m-V` / `100m-M` with `geslacht:` in the mixed ploeg `SEN`); categories are
+  codes like `U14-V`, `U16-M`, `SEN-V` (`categorie_code()`), or masters classes
+  `V45` in a file with `leeftijdsklassen: masters` (`masters_code()`, age on the
+  meet day; `V35+` in `toegestaan`/`specificatie` means "from V35"). Rule files
+  exist for U14/U16, U18/U20, masters, NK Teams and senioren 1e/2e/3e divisie
+  (see `docs/Ploegopstelling_ontwerp.md`). A lineup is `models.ploeg`: `PloegLid` (who is on the
   form, `rol` deelnemer/reserve) and `Inzet` (athlete + event key). Violations
   name athletes only by master_id; the UI adds names.
 - A ploeg stores its own `datum`; with a linked meet the meet's date wins (the

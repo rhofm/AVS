@@ -65,7 +65,7 @@
               <th scope="col">Naam</th>
               <th scope="col">Cat.</th>
               {% for r in m.regels %}
-                <th scope="col" class="midden">{{ r.naam }}<br>
+                <th scope="col" class="midden">{{ r.kop }}<br>
                   <span class="ploegmatrix__regel">{% if r.soort == "estafette" %}{{ r.max_atleten }} ploeg{% else %}max {{ r.max_atleten }} · telt {{ r.tellend }}{% endif %}</span></th>
               {% endfor %}
               <th scope="col" class="rechts">Ond.</th>
@@ -92,6 +92,9 @@
                   {% set c = rij.cellen[r.sleutel] %}
                   {% set gekozen = (mid, r.sleutel) in pg.inzet %}
                   {% set telt = mid in pg.stand.onderdelen[r.sleutel].tellend %}
+                  {% if c.nvt and not gekozen %}
+                  <td class="ploegcel ploegcel--nvt"><span class="verborgen">niet voor deze atleet</span></td>
+                  {% else %}
                   <td class="ploegcel{{ ' ploegcel--gekozen' if gekozen }}{{ ' ploegcel--telt' if telt }}{{ ' ploegcel--leeg' if c.waarde is none }}">
                     <label title="{{ c.onderdeel_naam }}{% if c.datum %} · {{ c.datum | datum_lang }}{% endif %}">
                       <input type="checkbox" name="inzet" value="{{ mid }}|{{ r.sleutel }}"{% if gekozen %} checked{% endif %}>
@@ -107,6 +110,7 @@
                       {% endif %}
                     </label>
                   </td>
+                  {% endif %}
                 {% endfor %}
                 <td class="rechts getallen">{{ pg.stand.per_atleet.get(mid, 0) or "" }}</td>
               </tr>

@@ -118,6 +118,35 @@ Per competitie:
 | Senioren 2e/3e divisie | **Gemengd**: mannen- en vrouwenonderdelen in één ploeg, punten opgeteld (5, 18.5). Elk programmaonderdeel krijgt `geslacht`. 4×400 m gemengd = 2 M + 2 V. Geen U16 (4.5 slot). |
 | 1e divisie / NK Teams | `puntentoekenning: plaats`; we optimaliseren met AU-seniorenpunten als benadering. NK Teams: 1 atleet per onderdeel. Eén ploeg per vereniging (10.2). |
 
+Bestanden (allemaal in `config/ploeg_regels/`, seizoen 2026-2027):
+
+| Bestand | Ploegen | Programma's |
+|---------|---------|-------------|
+| `u14_u16_2026-2027.yaml` | U14-V, U14-M, U16-V, U16-M | wedstrijd 1-3, finale 2026, finale 2027 |
+| `u18_u20_2026-2027.yaml` | U18U20-V, U18U20-M (`materiaal: eigen`, U16 als U18 via `materiaal_als`; steeple `alleen: [U18-V, U18-M]`) | wedstrijd 1-3, finale 2026, finale 2027 |
+| `masters_2026-2027.yaml` | MAS-V, MAS-M (`leeftijdsklassen: masters`, `toegestaan: [V35+]`, materiaal per klasse 'V50+: 3kg') | wedstrijd 1-2, finale |
+| `senioren_1e_divisie_2026-2027.yaml` | SEN (`geslacht: gemengd`) | wedstrijd 1-3, pd NK Teams, pd 2e divisie 2026/2027 |
+| `senioren_2e_divisie_2026-2027.yaml` | SEN | wedstrijd 1-3, pd 1e divisie 2026/2027, pd 3e divisie 2026/2027 |
+| `senioren_3e_divisie_2026-2027.yaml` | SEN | wedstrijd 1-3, pd 2e divisie 2026/2027 |
+| `nk_teams_2026-2027.yaml` | SEN | NK Teams, pd 1e divisie |
+
+Promotie/degradatie (42.3-42.5): met NK Teams = programma NK Teams; met de
+1e of 2e divisie = in 2026 het programma van de 3e wedstrijd, in 2027 dat van de
+2e wedstrijd van de hogere divisie. Namen staan onder `programmanamen`.
+
+Nieuwe velden in een regelbestand (naast die van U14/U16):
+
+- per onderdeel: `punten` (sleutel in de puntentelling, als de onderdeelsleutel
+  anders is, bijv. `100m-V` -> `100m`), `geslacht` (M, V of gemengd; verplicht
+  in een gemengde ploeg), `alleen` (alleen voor deze categorieën), en
+  `specificatie` als één waarde (`4kg`) of per categorie, ook 'vanaf'
+  (`V50+: 3kg`);
+- per ploeg: `geslacht: gemengd`, `materiaal_als` ({U16-V: U18-V});
+- bovenaan: `leeftijdsklassen: masters` en `programmanamen`.
+
+Masters: de punten zijn nog zonder age grading (65.2); dat volgt als de
+leeftijdsfactoren uit de Mastersploeg-spreadsheet erin zitten.
+
 `regels.py` laadt dit in een `Regelset`-dataclass en heeft
 `controleer(opstelling) -> list[Overtreding]`. Dezelfde controle draait bij
 handmatige opstellingen én op de uitkomst van de optimalisatie. Waarschuwingen

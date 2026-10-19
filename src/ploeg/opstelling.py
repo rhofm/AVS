@@ -38,7 +38,7 @@ def kandidaten(db: Opslag, regelset: Regelset, ploeg: Ploeg, leden: Iterable[Plo
     uit = []
     for a in db.atleten(alleen_actief=False):
         if a.master_id in lid_ids or (a.actief and regelset.mag_meedoen(ploeg.categorie,
-                                                                        categorie_op(a, ploeg.datum))):
+                                                                        categorie_op(a, ploeg.datum, regelset))):
             uit.append(a)
     return uit
 

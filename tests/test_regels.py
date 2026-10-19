@@ -91,6 +91,7 @@ def test_wie_mag_meedoen():
     assert not r.mag_meedoen("U14-V", "U16-V")              # ouder mag niet naar beneden
     assert not r.mag_meedoen("U16-V", "U16-M")              # jongens niet in de meisjesploeg
     assert not r.mag_meedoen("U16-V", None)
+    assert not r.mag_meedoen("U14-V", "U12-V") and not r.mag_meedoen("U14-M", "U12-M")   # U12 mag niet
 
 
 def test_onderdeelnaam_met_materiaal_van_de_ploeg():
@@ -98,6 +99,8 @@ def test_onderdeelnaam_met_materiaal_van_de_ploeg():
     assert r.onderdeel_naam("U16-V", "kogelstoten", "U14-V") == "Kogelstoten 3kg"   # U14 in U16-ploeg
     assert r.onderdeel_naam("U14-V", "kogelstoten", "U14-V") == "Kogelstoten 2kg"
     assert r.onderdeel_naam("U16-M", "100mH", "U16-M") == "100 meter horden 84cm"
+    assert r.onderdeel_naam("U14-M", "discuswerpen", "U14-M") == "Discuswerpen 1kg"
+    assert r.onderdeel_naam("U14-V", "discuswerpen", "U14-V") == "Discuswerpen 0,75kg"
     assert r.onderdeel_naam("U14-V", "60mH", "U14-V") == "60 meter horden 76,2cm"
     assert r.onderdeel_naam("U14-V", "verspringen", "U14-V") == "Verspringen"
 

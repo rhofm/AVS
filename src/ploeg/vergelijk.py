@@ -33,7 +33,7 @@ from atleten.prestaties import toon_waarde
 from db.queries import Opslag
 from models import PRESTATIEBASIS, Atleet, Onderdeel, Prestatie
 from ploeg import punten as _punten
-from ploeg.regels import Programmaregel, Regelset, categorie_code
+from ploeg.regels import Programmaregel, Regelset, categorie_code, masters_code
 
 _SPEC = re.compile(r"^[\d.]+(kg|g|cm)$")          # rest na de naam: '3kg', '76.2cm', '600g'
 
@@ -58,6 +58,7 @@ class Cel:
     handtijd: bool = False
     eenheid: str = "tijd"
     hint: str | None = None              # prestatie met een andere specificatie, zonder punten
+    nvt: bool = False                    # atleet mag dit onderdeel niet doen (ander geslacht, alleen U18, ...)
 
     @property
     def tekst(self) -> str:
@@ -105,8 +106,11 @@ class Matrix:
         return {r.master_id: r.categorie for r in self.rijen}
 
 
-def categorie_op(atleet: Atleet, peildatum: date) -> str | None:
-    """Categoriecode op de wedstrijddag, bijv. 'U16-V'. None zonder geboortedatum of geslacht."""
+def categorie_op(atleet: Atleet, peildatum: date, regelset: Regelset | None = None) -> str | None:
+    """Categoriecode op de wedstrijddag: 'U16-V', 'SEN-M', of bij een masterscompetitie
+    (leeftijdsklassen: masters) de klasse op leeftijd: 'V45'. None zonder geboortedatum of geslacht."""
+    if regelset is not None and regelset.leeftijdsklassen == "masters":
+        return masters_code(atleet.geslacht, atleet.leeftijd_op(peildatum))
     return categorie_code(leeftijdscategorie(atleet, peildatum), atleet.geslacht)
 
 
@@ -127,13 +131,13 @@ def matrix(db: Opslag, regelset: Regelset, ploeg: str, programma: str, peildatum
     if prestatiebasis not in PRESTATIEBASIS:
         raise ValueError(f"Onbekende prestatiebasis {prestatiebasis!r}.")
     regels = regelset.programma(ploeg, programma)
-    geslacht = regelset.ploeg(ploeg).geslacht
+    ploeg_geslacht = regelset.ploeg(ploeg).geslacht
     pt = _punten.puntentelling(regelset.puntentelling)
     onderdelen: dict[int, Onderdeel] = {o.id: o for o in db.onderdelen()}
 
     rijen = []
     for a in atleten:
-        cat = categorie_op(a, peildatum)
+        cat = categorie_op(a, peildatum, regelset)
         rij = Rij(a, cat, regelset.mag_meedoen(ploeg, cat))
         per_naam: dict[str, list[Prestatie]] = {}
         for p in db.prestaties(a.master_id):
@@ -148,17 +152,23 @@ def matrix(db: Opslag, regelset: Regelset, ploeg: str, programma: str, peildatum
             per_naam.setdefault(n, []).append(p)
 
         for r in regels:
+            info = r.onderdeel
             naam = regelset.onderdeel_naam(ploeg, r.sleutel, cat or ploeg)
             cel = Cel(r.sleutel, naam, eenheid="tijd" if r.soort != "technisch" else "afstand")
             rij.cellen[r.sleutel] = cel
+            if cat is not None and not info.past_bij(cat, regelset.materiaal_categorie(ploeg, cat)):
+                cel.nvt = True
+                continue
             if r.soort == "estafette":
                 continue
-            beste = _beste(per_naam, naam, r.sleutel, r.soort != "technisch")
+            beste = _beste(per_naam, naam, info.punten_sleutel, r.soort != "technisch")
             if beste is not None:
                 p, handtijd = beste
                 cel.waarde, cel.datum, cel.handtijd = p.waarde, p.datum, handtijd
                 cel.eenheid = onderdelen[p.onderdeel_id].eenheid
-                cel.punten = pt.punten(regelset.puntentabel, r.sleutel, geslacht, p.waarde, handtijd=handtijd)
+                g = info.geslacht if info.geslacht in ("M", "V") else (
+                    ploeg_geslacht if ploeg_geslacht in ("M", "V") else "M")
+                cel.punten = pt.punten(regelset.puntentabel, info.punten_sleutel, g, p.waarde, handtijd=handtijd)
             else:
                 cel.hint = _hint(per_naam, regelset.onderdelen[r.sleutel].naam, naam, onderdelen,
                                  r.soort != "technisch")

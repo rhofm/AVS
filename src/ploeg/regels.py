@@ -47,13 +47,18 @@ Ernst = Literal["fout", "waarschuwing"]
 PUNTENTOEKENNINGEN = ("prestatie", "plaats")   # 18.1: naar prestatie of naar plaats
 MATERIAAL = ("ploeg", "eigen")                 # werpmateriaal/hordehoogte van de ploeg of van de atleet
 
+LEEFTIJDSKLASSEN = ("standaard", "masters")    # standaard: U14, U16, ..., SEN; masters: M35, V40, ...
+GESLACHT_ONDERDEEL = ("M", "V", "gemengd")
+
 _CATEGORIE = re.compile(r"^(?:(?:U\d{1,2}|SEN)-[MV]|[MV]\d{2})$")   # U14-V, SEN-M, masters M35/V40
+_VANAF = re.compile(r"^([MV])(\d{2})\+$")                         # masters vanaf een leeftijd: V35+, M50+
+_PLOEGSLEUTEL = re.compile(r"^[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*$")    # U16-V, U18U20-M, SEN, MAS-V
 _SLEUTELS = {"naam", "seizoen", "bron", "puntentelling", "puntentabel", "puntentoekenning",
-             "algemeen", "ploegen", "onderdelen"}
+             "leeftijdsklassen", "programmanamen", "algemeen", "ploegen", "onderdelen"}
 _ALGEMEEN = {"max_onderdelen_per_atleet", "max_reserves", "een_ploeg_per_dag",
              "een_atleet_per_groep", "tellend", "materiaal"}
-_PLOEG = {"naam", "geslacht", "toegestaan", "programma"}
-_ONDERDEEL = {"naam", "specificatie", "lopers", "samenstelling"}
+_PLOEG = {"naam", "geslacht", "toegestaan", "programma", "materiaal_als"}
+_ONDERDEEL = {"naam", "specificatie", "lopers", "samenstelling", "punten", "geslacht", "alleen"}
 
 
 class RegelFout(ValueError):
@@ -69,8 +74,25 @@ def categorie_code(leeftijdscategorie: str | None, geslacht: str | None) -> str 
     return code if _CATEGORIE.match(code) else None
 
 
+def masters_code(geslacht: str | None, leeftijd: int | None) -> str | None:
+    """Masterscategorie op leeftijd: ('V', 47) -> 'V45'. Onder de 35 of onbekend: None."""
+    if geslacht not in ("M", "V") or leeftijd is None or leeftijd < 35:
+        return None
+    return f"{geslacht}{min(leeftijd // 5 * 5, 95)}"
+
+
 def _geslacht_van(categorie: str) -> str:
     return categorie[-1] if "-" in categorie else categorie[0]
+
+
+def _past_categorie(categorie: str | None, patroon: str) -> bool:
+    """Valt een categorie onder een patroon: precies ('U16-V') of masters vanaf ('V35+' -> V35, V40, ...)."""
+    if categorie is None:
+        return False
+    if categorie == patroon:
+        return True
+    m = _VANAF.match(patroon)
+    return bool(m and re.fullmatch(rf"{m.group(1)}\d{{2}}", categorie) and int(categorie[1:]) >= int(m.group(2)))
 
 
 # ============================================================
@@ -80,18 +102,48 @@ def _geslacht_van(categorie: str) -> str:
 class OnderdeelInfo:
     """Een onderdeel zoals het in een regelbestand staat."""
 
-    sleutel: str                                  # bijv. '80mH' (zelfde als in de puntentelling)
+    sleutel: str                                  # bijv. '80mH' of 'kogelstoten-V' (uniek in het bestand)
     naam: str                                     # zoals atletiek.nu het noemt: '80 meter horden'
-    specificaties: Mapping[str, str] = field(default_factory=dict)   # categorie -> '76.2cm', '3kg'
+    specificaties: Mapping[str, str] = field(default_factory=dict)   # categorie -> '76.2cm'; '*' = altijd
     lopers: int | None = None                     # estafette: aantal lopers per ploeg
     samenstelling: Mapping[str, int] = field(default_factory=dict)   # gemengde estafette: {'M': 2, 'V': 2}
+    punten: str = ""                              # sleutel in de puntentelling (standaard = sleutel)
+    geslacht: str | None = None                   # 'M', 'V' of 'gemengd' bij een gemengde ploeg (senioren)
+    alleen: tuple[str, ...] = ()                  # alleen voor deze (materiaal)categorieën, bijv. U18 (steeple)
 
     @property
     def is_estafette(self) -> bool:
         return self.lopers is not None
 
+    @property
+    def punten_sleutel(self) -> str:
+        return self.punten or self.sleutel
+
+    @property
+    def kop(self) -> str:
+        """Naam in een tabelkop: bij een gemengde ploeg met (V) / (M) erachter."""
+        return f"{self.naam} ({self.geslacht})" if self.geslacht in ("M", "V") else self.naam
+
     def specificatie(self, categorie: str) -> str | None:
-        return self.specificaties.get(categorie)
+        """Specificatie voor een categorie: precies ('U16-V'), anders de hoogste 'vanaf'
+        die past ('V50+' voor een V55), anders '*'."""
+        if categorie in self.specificaties:
+            return self.specificaties[categorie]
+        beste = None
+        for patroon, spec in self.specificaties.items():
+            m = _VANAF.match(patroon)
+            if m and _past_categorie(categorie, patroon) and (beste is None or int(m.group(2)) > beste[0]):
+                beste = (int(m.group(2)), spec)
+        return beste[1] if beste else self.specificaties.get("*")
+
+    def past_bij(self, categorie: str | None, materiaal: str | None = None) -> bool:
+        """Mag een atleet van deze categorie dit onderdeel doen? Geslacht (bij een gemengde
+        ploeg) en 'alleen' (op de materiaalcategorie, bijv. U18 voor de steeple)."""
+        if categorie is None:
+            return True                                   # onbekend: de controle meldt dat al
+        if self.geslacht in ("M", "V") and _geslacht_van(categorie) != self.geslacht:
+            return False
+        return not self.alleen or any(_past_categorie(materiaal or categorie, a) for a in self.alleen)
 
     def volledige_naam(self, categorie: str) -> str:
         """Naam zoals het onderdeel bij de prestaties heet: naam + specificatie
@@ -117,16 +169,21 @@ class Programmaregel:
     def naam(self) -> str:
         return self.onderdeel.naam
 
+    @property
+    def kop(self) -> str:
+        return self.onderdeel.kop
+
 
 @dataclass(frozen=True, slots=True)
 class Ploegsoort:
     """Een ploeg in een competitie, bijv. 'U16 meisjes'."""
 
-    sleutel: str                                   # categorie van de ploeg: 'U16-V'
+    sleutel: str                                   # bijv. 'U16-V', 'U18U20-M', 'SEN'
     naam: str
-    geslacht: str                                  # 'M' of 'V'
-    toegestaan: tuple[str, ...]                    # categorieën die in de ploeg mogen
+    geslacht: str                                  # 'M', 'V' of 'gemengd' (senioren: mannen en vrouwen samen)
+    toegestaan: tuple[str, ...]                    # categorieën die in de ploeg mogen ('V35+' = masters vanaf 35)
     programmas: Mapping[str, Mapping[str, int]]    # 'wedstrijd_1' -> {'80m': 3, ...}
+    materiaal_als: Mapping[str, str] = field(default_factory=dict)   # U16-V doet mee als U18-V
 
 
 @dataclass(frozen=True, slots=True)
@@ -158,6 +215,8 @@ class Regelset:
     een_atleet_per_groep: bool
     tellend: Mapping[str, int]      # 'loop' / 'technisch' -> aantal
     materiaal: str
+    leeftijdsklassen: str           # 'standaard' of 'masters'
+    programmanamen: Mapping[str, str]
     ploegen: Mapping[str, Ploegsoort]
     onderdelen: Mapping[str, OnderdeelInfo]
     _programmas: Mapping[tuple[str, str], tuple[Programmaregel, ...]] = field(repr=False, default_factory=dict)
@@ -174,6 +233,10 @@ class Regelset:
         """De wedstrijden met een programma voor deze ploeg: ['wedstrijd_1', ..., 'finale_2027']."""
         return list(self.ploeg(ploeg).programmas)
 
+    def programma_naam(self, programma: str) -> str:
+        """'wedstrijd_2' -> 'Wedstrijd 2', of de naam onder 'programmanamen' in het bestand."""
+        return self.programmanamen.get(programma) or programma.replace("_", " ").strip().capitalize()
+
     def programma(self, ploeg: str, programma: str) -> list[Programmaregel]:
         p = self.ploeg(ploeg)
         if programma not in p.programmas:
@@ -182,11 +245,15 @@ class Regelset:
         return list(self._programmas[(ploeg, programma)])
 
     def mag_meedoen(self, ploeg: str, categorie: str | None) -> bool:
-        return categorie is not None and categorie in self.ploeg(ploeg).toegestaan
+        return any(_past_categorie(categorie, t) for t in self.ploeg(ploeg).toegestaan)
 
     def materiaal_categorie(self, ploeg: str, categorie: str) -> str:
-        """Welke categorie bepaalt werpmateriaal en hordehoogte: die van de ploeg of van de atleet."""
-        return categorie if self.materiaal == "eigen" else self.ploeg(ploeg).sleutel
+        """Welke categorie bepaalt werpmateriaal en hordehoogte: die van de ploeg, of (materiaal:
+        eigen) die van de atleet, met `materiaal_als` (een U16 in de U18/U20-ploeg = U18)."""
+        p = self.ploeg(ploeg)
+        if self.materiaal == "eigen":
+            return p.materiaal_als.get(categorie, categorie)
+        return p.sleutel
 
     def onderdeel_naam(self, ploeg: str, sleutel: str, categorie: str) -> str:
         """Naam (+ specificatie) van het onderdeel dat deze atleet in deze ploeg doet."""
@@ -256,6 +323,13 @@ class Regelset:
                 uit.append(Overtreding("dubbel", f"Deze atleet staat twee keer op {regel.naam}.",
                                        atleet_id=i.atleet_id, onderdeel=i.onderdeel))
                 continue
+            cat = categorieen.get(i.atleet_id)
+            if cat is not None and not regel.onderdeel.past_bij(cat, self.materiaal_categorie(ploeg, cat)):
+                info = regel.onderdeel
+                wie = ("vrouwen" if info.geslacht == "V" else "mannen") if info.geslacht in ("M", "V") \
+                    else ", ".join(info.alleen)
+                uit.append(Overtreding("past_niet", f"{info.kop} is alleen voor {wie}.",
+                                       atleet_id=i.atleet_id, onderdeel=i.onderdeel))
             gezien.add((i.atleet_id, i.onderdeel))
             per_atleet[i.atleet_id].append(i.onderdeel)
             per_onderdeel[i.onderdeel].append(i)
@@ -333,6 +407,13 @@ class Regelset:
         toekenning = ruw.get("puntentoekenning", "prestatie")
         if toekenning not in PUNTENTOEKENNINGEN:
             raise RegelFout(f"{waar}: puntentoekenning moet {' of '.join(PUNTENTOEKENNINGEN)} zijn.")
+        klassen = ruw.get("leeftijdsklassen", "standaard")
+        if klassen not in LEEFTIJDSKLASSEN:
+            raise RegelFout(f"{waar}: leeftijdsklassen moet {' of '.join(LEEFTIJDSKLASSEN)} zijn.")
+        namen = ruw.get("programmanamen") or {}
+        if not isinstance(namen, dict) or not all(isinstance(v, str) for v in namen.values()):
+            raise RegelFout(f"{waar}: programmanamen moet zijn als {{pd_nk_teams: Promotie/degradatie met NK Teams}}.")
+        namen = {str(k): v.strip() for k, v in namen.items()}
 
         # algemeen
         alg = ruw.get("algemeen") or {}
@@ -370,14 +451,19 @@ class Regelset:
                 for ond, aantal in inhoud.items():
                     if ond not in onderdelen:
                         raise RegelFout(f"{pw}, {prog}: onderdeel {ond!r} staat niet onder 'onderdelen'.")
-                    if not pt.heeft(tabel, ond, p.geslacht):
-                        raise RegelFout(f"{pw}, {prog}: geen puntentelling voor {ond!r} "
-                                        f"in {ruw['puntentelling']}.yaml / {tabel}.")
                     info = onderdelen[ond]
+                    if p.geslacht == "gemengd" and info.geslacht is None:
+                        raise RegelFout(f"{pw}, {prog}: {ond!r} heeft 'geslacht: M', 'V' of 'gemengd' nodig "
+                                        f"(de ploeg is gemengd).")
+                    g = info.geslacht if info.geslacht in ("M", "V") else (
+                        p.geslacht if p.geslacht in ("M", "V") else "M")   # gemengd: tabel 'alle'
+                    if not pt.heeft(tabel, info.punten_sleutel, g):
+                        raise RegelFout(f"{pw}, {prog}: geen puntentelling voor {info.punten_sleutel!r} ({g}) "
+                                        f"in {ruw['puntentelling']}.yaml / {tabel}.")
                     if info.is_estafette:
                         soort, telt = "estafette", 1
                     else:
-                        soort = "loop" if pt.formule(tabel, ond, p.geslacht).lager_is_beter else "technisch"
+                        soort = "loop" if pt.formule(tabel, info.punten_sleutel, g).lager_is_beter else "technisch"
                         telt = min(tellend[soort], aantal)
                     rij.append(Programmaregel(info, aantal, soort, telt))
                 programmas[(sleutel, prog)] = tuple(rij)
@@ -388,8 +474,8 @@ class Regelset:
             puntentoekenning=toekenning, max_onderdelen_per_atleet=max_ond, max_reserves=max_res,
             een_ploeg_per_dag=bool(alg.get("een_ploeg_per_dag", True)),
             een_atleet_per_groep=bool(alg.get("een_atleet_per_groep", True)),
-            tellend=tellend, materiaal=materiaal, ploegen=ploegen, onderdelen=onderdelen,
-            _programmas=programmas,
+            tellend=tellend, materiaal=materiaal, leeftijdsklassen=klassen, programmanamen=namen,
+            ploegen=ploegen, onderdelen=onderdelen, _programmas=programmas,
         )
 
 
@@ -406,11 +492,11 @@ def _geheel(waar: str, v, minimaal: int) -> int:
     return v
 
 
-def _categorie(waar: str, c) -> str:
+def _categorie(waar: str, c, vanaf: bool = True, ster: bool = False) -> str:
     c = str(c)
-    if not _CATEGORIE.match(c):
-        raise RegelFout(f"{waar}: {c!r} is geen categorie; schrijf bijv. U14-V, U16-M of SEN-V.")
-    return c
+    if _CATEGORIE.match(c) or (vanaf and _VANAF.match(c)) or (ster and c == "*"):
+        return c
+    raise RegelFout(f"{waar}: {c!r} is geen categorie; schrijf bijv. U14-V, U16-M, SEN-V, M45 of V35+.")
 
 
 def _onderdeel(waar: str, sleutel: str, d) -> OnderdeelInfo:
@@ -418,9 +504,21 @@ def _onderdeel(waar: str, sleutel: str, d) -> OnderdeelInfo:
         raise RegelFout(f"{waar}: geef minstens een naam, bijv. {{naam: 80 meter horden}}.")
     _onbekend(waar, d, _ONDERDEEL)
     spec = d.get("specificatie") or {}
+    if isinstance(spec, (str, int, float)) and not isinstance(spec, bool):
+        spec = {"*": str(spec)}                          # één specificatie voor iedereen
     if not isinstance(spec, dict):
-        raise RegelFout(f"{waar}: specificatie moet per categorie zijn, bijv. {{U16-V: 3kg}}.")
-    specs = {_categorie(waar, k): str(v) for k, v in spec.items()}
+        raise RegelFout(f"{waar}: specificatie is één waarde (4kg) of per categorie, bijv. {{U16-V: 3kg}}.")
+    specs = {_categorie(waar, k, ster=True): str(v) for k, v in spec.items()}
+    geslacht = d.get("geslacht")
+    if geslacht is not None and geslacht not in GESLACHT_ONDERDEEL:
+        raise RegelFout(f"{waar}: geslacht moet M, V of gemengd zijn.")
+    alleen = d.get("alleen") or []
+    if not isinstance(alleen, list):
+        raise RegelFout(f"{waar}: alleen moet een lijst zijn, bijv. [U18-V, U18-M].")
+    alleen = tuple(_categorie(waar, c) for c in alleen)
+    punten_sleutel = d.get("punten") or ""
+    if not isinstance(punten_sleutel, str):
+        raise RegelFout(f"{waar}: punten is de naam in de puntentelling, bijv. 100m.")
     lopers = _geheel(f"{waar}: lopers", d["lopers"], 2) if "lopers" in d else None
     samenstelling = d.get("samenstelling") or {}
     if samenstelling:
@@ -430,17 +528,23 @@ def _onderdeel(waar: str, sleutel: str, d) -> OnderdeelInfo:
         if sum(samenstelling.values()) != lopers:
             raise RegelFout(f"{waar}: samenstelling telt op tot {sum(samenstelling.values())}, "
                             f"niet tot {lopers} lopers.")
-    return OnderdeelInfo(sleutel, d["naam"].strip(), specs, lopers, samenstelling)
+    return OnderdeelInfo(sleutel, d["naam"].strip(), specs, lopers, samenstelling, punten_sleutel.strip(),
+                         geslacht, alleen)
 
 
 def _ploeg(waar: str, sleutel: str, d) -> Ploegsoort:
-    _categorie(waar, sleutel)
+    if not _PLOEGSLEUTEL.match(sleutel):
+        raise RegelFout(f"{waar}: gebruik letters, cijfers en '-' in de naam van de ploeg, bijv. U16-V of SEN.")
     if not isinstance(d, dict):
         raise RegelFout(f"{waar}: verwacht naam, geslacht, toegestaan en programma.")
     _onbekend(waar, d, _PLOEG)
     geslacht = d.get("geslacht", _geslacht_van(sleutel))
-    if geslacht not in ("M", "V"):
-        raise RegelFout(f"{waar}: geslacht moet M of V zijn.")
+    if geslacht not in ("M", "V", "gemengd"):
+        raise RegelFout(f"{waar}: geslacht moet M, V of gemengd zijn.")
+    als = d.get("materiaal_als") or {}
+    if not isinstance(als, dict):
+        raise RegelFout(f"{waar}: materiaal_als moet zijn als {{U16-V: U18-V}}.")
+    als = {_categorie(waar, k, vanaf=False): _categorie(waar, v, vanaf=False) for k, v in als.items()}
     toegestaan = d.get("toegestaan", [sleutel])
     if not isinstance(toegestaan, list) or not toegestaan:
         raise RegelFout(f"{waar}: toegestaan moet een lijst zijn, bijv. [U14-V, U16-V].")
@@ -453,7 +557,7 @@ def _ploeg(waar: str, sleutel: str, d) -> Ploegsoort:
         if not isinstance(inhoud, dict) or not inhoud:
             raise RegelFout(f"{waar}, {prog}: geef de onderdelen als {{80m: 3, verspringen: 2}}.")
         programmas[str(prog)] = {str(o): _geheel(f"{waar}, {prog}, {o}", n, 1) for o, n in inhoud.items()}
-    return Ploegsoort(sleutel, str(d.get("naam", sleutel)), geslacht, toegestaan, programmas)
+    return Ploegsoort(sleutel, str(d.get("naam", sleutel)), geslacht, toegestaan, programmas, als)
 
 
 # ============================================================
