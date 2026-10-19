@@ -1,10 +1,12 @@
 {#
-  Instellingen van de app (instellingen/__init__.py): eerste dag van de week, thema en tijdnotatie.
+  Instellingen van de app (instellingen/__init__.py): eerste dag van de week, thema, tijdnotatie en naamvolgorde.
   Context:
     inst                – instellingen.Instellingen zoals opgeslagen (of zoals ingevuld na een fout)
     computer            – Instellingen met alles op 'systeem': laat zien wat de computer nu gebruikt
     eerste_dag_keuzes, thema_keuzes, tijd_keuzes – {waarde: tekst}
     tijdnotaties        – {waarde: Instellingen met die tijdnotatie}, voor de voorbeeldtijden
+    naam_keuzes         – {waarde: tekst} voor de naamvolgorde
+    naamvoorbeelden     – {waarde: [namen in die volgorde]} met verzonnen namen
     voorbeeld_tijden    – tijden om de notatie mee te laten zien
     meldingen / fout    – na opslaan / bij een fout
   Opslaan: POST naar dezelfde pagina; het thema wisselt al bij het kiezen (script onderaan).
@@ -17,7 +19,7 @@
   <header class="blok__kop">
     <div>
       <h1 class="kop kop--pagina">Instellingen</h1>
-      <p class="subkop">Hoe AVS weken, kleuren en tijden laat zien. Geldt voor deze computer.</p>
+      <p class="subkop">Hoe AVS weken, kleuren, tijden en namen laat zien. Geldt voor deze computer.</p>
     </div>
   </header>
 
@@ -90,6 +92,24 @@
               {%- for t in voorbeeld_tijden %}{{ notatie.tijd(t) }}{{ " · " if not loop.last }}{% endfor -%}
             </span>
             {% if waarde == "systeem" %}<span class="zacht">nu: {{ "24-uurs" if computer.tijd_24 else "12-uurs" }}</span>{% endif %}
+          </label>
+        {% endfor %}
+      </div>
+    </fieldset>
+
+    {# ---------- naamvolgorde ---------- #}
+    <fieldset class="instelling">
+      <legend class="instelling__kop">
+        <span class="subkop">Atleten sorteren op</span>
+        <span class="zacht">Voor de lijsten met atleten: overzicht, groepen, aanwezigheid en wedstrijden. Een tussenvoegsel telt niet mee.</span>
+      </legend>
+      <div class="instelling__keuzes instelling__keuzes--naam">
+        {% for waarde, tekst in naam_keuzes.items() %}
+          <input class="instelling__radio" type="radio" name="naamvolgorde" id="naam-{{ waarde }}" value="{{ waarde }}"
+                 {% if inst.naamvolgorde == waarde %} checked{% endif %}>
+          <label class="instelling__optie" for="naam-{{ waarde }}">
+            <strong>{{ tekst }}</strong>
+            <span class="naamvoorbeeld">{% for n in naamvoorbeelden[waarde] %}<span>{{ n }}</span>{% endfor %}</span>
           </label>
         {% endfor %}
       </div>

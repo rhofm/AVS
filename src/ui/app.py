@@ -957,10 +957,18 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
                                fasen=leerlijnoverzicht.FASEN, actief_menu="leerlijnen")
 
     # ---------------- instellingen ----------------
+    def _naamvoorbeelden() -> dict[str, list[str]]:
+        """Drie verzonnen namen, gesorteerd zoals elke keuze dat doet."""
+        from models import Atleet
+        namen = [Atleet("Jan", "Vries", tussenvoegsel="de"), Atleet("Sanne", "Akkerman"), Atleet("Eva", "Boer")]
+        return {w: [a.naam for a in sorted(namen, key=instellingen.Instellingen(naamvolgorde=w).naam_sleutel)]
+                for w in instellingen.NAAM_KEUZES}
+
     def _instellingenpagina(inst: instellingen.Instellingen, fout: str | None = None, status: int = 200):
         return render_template("instellingen.html", inst=inst, fout=fout, meldingen=get_flashed_messages(),
                                eerste_dag_keuzes=instellingen.EERSTE_DAG_KEUZES,
                                thema_keuzes=instellingen.THEMA_KEUZES, tijd_keuzes=instellingen.TIJD_KEUZES,
+                               naam_keuzes=instellingen.NAAM_KEUZES, naamvoorbeelden=_naamvoorbeelden(),
                                computer=instellingen.Instellingen(),        # alles 'systeem': wat de computer doet
                                tijdnotaties={w: instellingen.Instellingen(tijdnotatie=w)
                                              for w in instellingen.TIJD_KEUZES},

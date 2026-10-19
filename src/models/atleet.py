@@ -1,8 +1,9 @@
 """Dataclass Atleet: persoonsgegevens, specialisatie.
 
 De naam bestaat uit voornaam, tussenvoegsel (optioneel) en achternaam. `naam`
-geeft de volledige naam ('Jan de Vries'); sorteren gaat op achternaam zonder
-tussenvoegsel, zoals in Nederland gebruikelijk.
+geeft de volledige naam ('Jan de Vries'); sorteren gaat standaard op achternaam
+zonder tussenvoegsel, zoals in Nederland gebruikelijk, of op voornaam als dat in
+Instellingen is gekozen (`instellingen.naam_sleutel`).
 
 Hoort bij de tabel `atleet` in personen.db. Een atleet wordt in de hele app
 aangeduid met zijn master_id. Het pseudoniem (atleet_ref) in prestaties.db en

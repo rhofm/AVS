@@ -142,6 +142,59 @@ def test_tijden_op_groepspagina():
         assert "Zo 9:00AM" in overzicht and overzicht.index("Zo 9:00AM") < overzicht.index("Di 6:30PM")
 
 
+# ---------------- naamvolgorde ----------------
+def test_naam_sleutel():
+    from models import Atleet
+    jan, sanne, zoe = Atleet("Jan", "Vries", tussenvoegsel="de"), Atleet("Sanne", "Akkerman"), Atleet("Zoë", "Boer")
+    achter = Instellingen(naamvolgorde="achternaam")
+    voor = Instellingen(naamvolgorde="voornaam")
+    assert [a.voornaam for a in sorted([jan, sanne, zoe], key=achter.naam_sleutel)] == ["Sanne", "Zoë", "Jan"]
+    assert [a.voornaam for a in sorted([jan, sanne, zoe], key=voor.naam_sleutel)] == ["Jan", "Sanne", "Zoë"]
+    assert voor.naam_tekst(zoe) == "zoe boer" and achter.naam_tekst(jan) == "vries jan de"
+    assert Instellingen().naamvolgorde == "achternaam"                         # standaard: zoals altijd
+
+
+def test_naamvolgorde_in_de_app():
+    from test_app import client, tekst
+    from db.queries import Opslag
+    from test_landingspagina import TESTSLEUTEL
+    from atleten import beheer
+    with client() as (c, mid, map):
+        with Opslag(map=map, hoofd=TESTSLEUTEL) as db:
+            beheer.nieuwe_atleet(db, "Zara", "Aalders", geboortedatum="2012")
+            beheer.nieuwe_atleet(db, "Bas", "Zwart", geboortedatum="2012")
+
+        def volgorde(html):
+            return sorted(("Zara Aalders", "Anna Voorbeeld", "Bas Zwart"), key=html.index)
+
+        assert volgorde(tekst(c.get("/atleten"))) == ["Zara Aalders", "Anna Voorbeeld", "Bas Zwart"]
+        assert re.search(r'id="naam-achternaam" value="achternaam"\s+checked', tekst(c.get("/instellingen")))
+        r = c.post("/instellingen", data={"eerste_dag": "systeem", "thema": "systeem", "tijdnotatie": "systeem",
+                                          "naamvolgorde": "voornaam"})
+        assert r.status_code == 302 and instellingen.laad(map).naamvolgorde == "voornaam"
+        html = tekst(c.get("/atleten"))
+        assert volgorde(html) == ["Anna Voorbeeld", "Bas Zwart", "Zara Aalders"]
+        assert 'data-sort="anna voorbeeld"' in html                            # klikbaar sorteren volgt mee
+        # oude instellingenbestanden zonder naamvolgorde blijven werken
+        (map / instellingen.BESTAND).write_text('{"thema": "donker"}', encoding="utf-8")
+        assert instellingen.laad(map).naamvolgorde == "achternaam"
+    assert instellingen.actief() == instellingen.NEDERLANDS
+
+
+def test_groepsleden_op_voornaam():
+    from test_groep_landingspagina import opslag, voorbeeldgroep
+    with opslag() as (db, _):
+        ids = voorbeeldgroep(db)
+        groep = db.groep(ids["groep"])
+        namen = lambda g: [db.atleet(m).voornaam for m in g.leden]      # noqa: E731
+        assert namen(groep) == ["Cas", "Bram", "Anna"]                       # Proef, Test, Voorbeeld
+        instellingen.activeer(Instellingen(naamvolgorde="voornaam"))
+        try:
+            assert namen(db.groep(groep.id)) == ["Anna", "Bram", "Cas"]
+        finally:
+            instellingen.activeer(instellingen.NEDERLANDS)
+
+
 if __name__ == "__main__":
     for naam, f in list(globals().items()):
         if naam.startswith("test_") and callable(f) and f.__code__.co_argcount == 0:

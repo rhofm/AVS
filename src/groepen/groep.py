@@ -36,7 +36,7 @@ from typing import Iterable, Mapping
 
 from atleten.landingspagina import DAG_KORT, categorie_code, leeftijdscategorie
 from db.queries import Opslag, OpslagFout
-from instellingen import dagvolgorde, tijd as toon_tijd
+from instellingen import dagvolgorde, naam_sleutel, tijd as toon_tijd
 from models import DAGEN, Atleet, Groep, Trainingsschema
 
 from .landingspagina import trainingsdagen as afgeleide_trainingsdagen
@@ -387,7 +387,7 @@ def leden_opslaan(db: Opslag, groep_id: int, gekozen: Iterable[str],
         if schema_aanvullen(db, m, huidige_dagen if m not in oud else erbij):
             aangevuld.append(atleten[m])
 
-    sorteer = lambda a: (a.achternaam.lower(), a.voornaam.lower())   # noqa: E731
+    sorteer = naam_sleutel                                             # achternaam of voornaam (Instellingen)
     return Wijziging(sorted(toegevoegd, key=sorteer), sorted(verwijderd, key=sorteer),
                      dagen if dagen_gewijzigd else None, extra if dagen_gewijzigd else {},
                      sorted(aangevuld, key=sorteer), erbij_tr, weg_tr)

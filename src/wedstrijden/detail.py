@@ -28,7 +28,7 @@ from typing import Iterable
 
 from atleten.landingspagina import categorie_code, leeftijdscategorie
 from db.queries import Opslag, OpslagFout
-from instellingen import tijd as toon_tijd, tijdvak
+from instellingen import naam_sleutel, tijd as toon_tijd, tijdvak
 from models import Atleet, Onderdeel, ProgrammaOnderdeel, Wedstrijd
 
 from . import chronoloog, planning
@@ -150,8 +150,9 @@ class WedstrijdDetail:
         return [d for d in self.deelnemers if d.volgt_nog or d.niet_in_tijdschema]
 
 
-def _sorteer(a: Atleet) -> tuple[str, str]:
-    return a.achternaam.lower(), a.voornaam.lower()
+def _sorteer(a: Atleet) -> tuple[str, str, str]:
+    """Op achternaam of voornaam, zoals in Instellingen gekozen."""
+    return naam_sleutel(a)
 
 
 def _code(a: Atleet, op: date) -> str | None:

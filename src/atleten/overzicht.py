@@ -17,6 +17,7 @@ from dataclasses import dataclass, field
 from datetime import date
 
 from db.queries import Opslag
+from instellingen import naam_sleutel, naam_tekst
 from models import Atleet, Groep
 
 from .landingspagina import categorie_code, leeftijdscategorie
@@ -48,8 +49,8 @@ class AtleetRij:
     # ---- sorteersleutels (data-sort) ----
     @property
     def sort_naam(self) -> str:
-        """Op achternaam zonder tussenvoegsel, zoals in Nederland gebruikelijk."""
-        return plat(f"{self.atleet.achternaam} {self.atleet.voornaam} {self.atleet.tussenvoegsel or ''}")
+        """Op achternaam zonder tussenvoegsel (zoals in Nederland gebruikelijk) of op voornaam: zie Instellingen."""
+        return naam_tekst(self.atleet)
 
     @property
     def sort_categorie(self) -> str:
@@ -70,7 +71,7 @@ class AtleetRij:
 
 @dataclass
 class Overzicht:
-    rijen: list[AtleetRij]             # na zoeken en filteren, op achternaam
+    rijen: list[AtleetRij]             # na zoeken en filteren, op naam (Instellingen)
     totaal: int                        # zonder zoeken/filteren (wel met het actief-vinkje)
     zoek: str
     categorie: str                     # gekozen filter, '' = alle
@@ -101,7 +102,7 @@ def atletenoverzicht(db: Opslag, *, zoek: str = "", categorie: str = "", groep_i
     for a in db.atleten(alleen_actief=not ook_inactief):
         cat = leeftijdscategorie(a, vandaag)
         alle.append(AtleetRij(a, cat, categorie_code(cat, a.geslacht), db.groepen_van_atleet(a.master_id)))
-    alle.sort(key=lambda r: r.sort_naam)
+    alle.sort(key=lambda r: naam_sleutel(r.atleet))
     aanwezig = {r.categorie for r in alle if r.categorie}
     categorie = categorie if categorie in CATEGORIE_VOLGORDE else ""
     groepen = sorted(db.groepen(), key=lambda g: plat(g.naam))

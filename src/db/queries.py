@@ -66,6 +66,8 @@ from models import (
     Wedstrijd,
 )
 
+from instellingen import naam_sleutel, op_naam
+
 from .init_db import hoofdsleutel, nieuw_master_id, pseudoniem, verbind
 
 
@@ -76,6 +78,13 @@ class OpslagFout(ValueError):
 # ============================================================
 # Omzetten tussen Python en SQLite
 # ============================================================
+def _ids_op_naam(rijen) -> list[str]:
+    """master_ids uit rijen (atleet_id, voornaam, achternaam, tussenvoegsel), op naam gesorteerd
+    volgens Instellingen (achternaam of voornaam). In Python, zodat het accentongevoelig is."""
+    rijen = [(r[0], Atleet(r[1], r[2], tussenvoegsel=r[3])) for r in rijen]
+    return [mid for mid, a in sorted(rijen, key=lambda x: naam_sleutel(x[1]))]
+
+
 def _naar_tekst(d: date | None) -> str | None:
     return d.isoformat() if d is not None else None
 
@@ -186,8 +195,7 @@ class Opslag:
         sql = "SELECT * FROM atleet"
         if alleen_actief:
             sql += " WHERE actief = 1"
-        sql += " ORDER BY achternaam, voornaam"
-        return [self._atleet(r) for r in self.personen.execute(sql)]
+        return op_naam(self._atleet(r) for r in self.personen.execute(sql))
 
     def atleten_zoeken(self, tekst: str, alleen_actief: bool = False) -> list[Atleet]:
         """Zoek op (een deel van) de volledige naam, hoofdletterongevoelig."""
@@ -196,8 +204,7 @@ class Opslag:
                "WHERE (voornaam || ' ' || COALESCE(tussenvoegsel || ' ', '') || achternaam) LIKE ?")
         if alleen_actief:
             sql += " AND actief = 1"
-        sql += " ORDER BY achternaam, voornaam"
-        return [self._atleet(r) for r in self.personen.execute(sql, (patroon,))]
+        return op_naam(self._atleet(r) for r in self.personen.execute(sql, (patroon,)))
 
     def atleet_verwijderen(self, master_id: str) -> None:
         """Verwijdert een atleet en AL zijn gegevens uit alle databases.
@@ -725,9 +732,10 @@ class Opslag:
         return g
 
     def _groep(self, r) -> Groep:
-        leden = [x[0] for x in self.personen.execute(
-            """SELECT gl.atleet_id FROM groep_lid gl JOIN atleet a ON a.master_id = gl.atleet_id
-               WHERE gl.groep_id = ? ORDER BY a.achternaam, a.voornaam""", (r["id"],))]
+        leden = _ids_op_naam(self.personen.execute(
+            """SELECT gl.atleet_id, a.voornaam, a.achternaam, a.tussenvoegsel
+               FROM groep_lid gl JOIN atleet a ON a.master_id = gl.atleet_id
+               WHERE gl.groep_id = ?""", (r["id"],)))
         t = self.personen.execute("SELECT * FROM groep_trainingstijden WHERE groep_id = ?", (r["id"],)).fetchone()
         tijden = {d: t[d] for d in DAGEN if t[d]} if t else {}
         extra: dict[str, list[str]] = {}
@@ -844,9 +852,10 @@ class Opslag:
                         "kern_b", "cooling_down", "notities", "hoofdtraining_id", "starttijd")   # vaste kolomnamen
 
     def _training(self, r) -> Training:
-        atleten = [x[0] for x in self.personen.execute(
-            """SELECT ta.atleet_id FROM training_atleet ta JOIN atleet a ON a.master_id = ta.atleet_id
-               WHERE ta.training_id = ? ORDER BY a.achternaam, a.voornaam""", (r["id"],))]
+        atleten = _ids_op_naam(self.personen.execute(
+            """SELECT ta.atleet_id, a.voornaam, a.achternaam, a.tussenvoegsel
+               FROM training_atleet ta JOIN atleet a ON a.master_id = ta.atleet_id
+               WHERE ta.training_id = ?""", (r["id"],)))
         return Training(r["groep_id"], _naar_datum(r["datum"]), r["onderwerp"], r["notities"],
                         r["periodeplan_id"], r["id"], r["warming_up"], r["kern_a"], r["kern_b"],
                         r["cooling_down"], r["hoofdtraining_id"], atleten, r["starttijd"])

@@ -26,7 +26,7 @@ from itertools import combinations
 
 from atleten.landingspagina import leeftijdscategorie
 from db.queries import Opslag, OpslagFout
-from instellingen import tijd as toon_tijd
+from instellingen import naam_sleutel, tijd as toon_tijd
 from models import Atleet, ProgrammaOnderdeel, Wedstrijd, lees_categorie
 
 
@@ -144,7 +144,7 @@ def overzicht(db: Opslag, wedstrijd_id: int) -> list[OverzichtRegel]:
     for i in db.deelnemers(wedstrijd_id):
         if i.onderdeel_id is not None:
             per_atleet.setdefault(i.atleet_id, set()).add(i.onderdeel_id)
-    sorteer = lambda a: (a.achternaam.lower(), a.voornaam.lower())   # noqa: E731
+    sorteer = naam_sleutel                                             # achternaam of voornaam (Instellingen)
     for mid, onderdelen in per_atleet.items():
         a = db.atleet(mid)
         if a is None:
@@ -207,7 +207,7 @@ def botsingen(db: Opslag, wedstrijd_id: int, min_pauze: int = 0) -> list[Botsing
                 pauze = int((tweede.begin - eerste.einde).total_seconds() // 60)
                 if pauze < min_pauze:
                     uit.append(Botsing(a, eerste, tweede, pauze))
-    return sorted(uit, key=lambda b: (b.eerste.begin, b.atleet.achternaam.lower(), b.atleet.voornaam.lower()))
+    return sorted(uit, key=lambda b: (b.eerste.begin, *naam_sleutel(b.atleet)))
 
 
 def dagen(regels: list[ProgrammaOnderdeel]) -> list[date]:

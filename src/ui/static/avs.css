@@ -864,6 +864,8 @@ th[aria-sort="descending"] .sorteer__naam::after { content: " \2193"; opacity: 1
 .instelling__radio:checked + .instelling__optie .zacht { color: inherit; opacity: .85; }
 .instelling__radio:focus-visible + .instelling__optie { outline: 2px solid var(--rood); outline-offset: 2px; }
 .tijdvoorbeeld { font-size: var(--maat-m); font-variant-numeric: tabular-nums; }
+.instelling__keuzes--naam { grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr)); gap: .6rem; }
+.naamvoorbeeld { display: grid; gap: .1rem; font-size: var(--maat-s); font-weight: 400; }
 
 /* de week in de gekozen volgorde */
 .weekvoorbeeld { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; max-width: 28rem; font-size: var(--maat-xs); }

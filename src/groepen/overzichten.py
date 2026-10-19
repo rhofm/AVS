@@ -17,6 +17,7 @@ from atleten.landingspagina import categorie_code, leeftijdscategorie
 from atleten.prestaties import toon_waarde
 from atleten.testen import laatste_per_test
 from db.queries import Opslag
+from instellingen import naam_tekst
 from leerlijnen.voortgang import leerdoelenpagina
 from models import Atleet, Groep, Training
 
@@ -41,8 +42,8 @@ class Rij:
 
     @property
     def naam_sortering(self) -> str:
-        """Sorteren op achternaam zonder tussenvoegsel, dan voornaam: 'boer eva'."""
-        return f"{self.atleet.achternaam} {self.atleet.voornaam}".lower()
+        """Sorteren op naam volgens Instellingen: 'boer eva' (achternaam) of 'eva boer' (voornaam)."""
+        return naam_tekst(self.atleet)
 
     @property
     def categorie_sortering(self) -> int:

@@ -1,4 +1,4 @@
-"""Instellingen van de app: eerste dag van de week, licht/donker thema en tijdnotatie.
+"""Instellingen van de app: eerste dag van de week, thema, tijdnotatie en naamvolgorde.
 
 De keuzes staan in `instellingen.json` in de datamap (naast de databases, dus
 ook git-genegeerd). Er staat geen persoonlijke informatie in, daarom is dit
@@ -14,6 +14,7 @@ Gebruik in de rest van de code:
     from instellingen import dagvolgorde, tijd, tijdvak
     for dag in dagvolgorde(): ...            # ('zondag', 'maandag', …) als de week op zondag begint
     tijd("18:30")                            # '18:30u' of '6:30PM'
+    sorted(atleten, key=naam_sleutel)        # op achternaam of op voornaam
 
 De UI zet de actieve instellingen per request (`activeer(laad(map))`). Zonder
 activeren (bijv. in losse tests) geldt de vaste Nederlandse standaard: week op
@@ -25,6 +26,7 @@ from __future__ import annotations
 import json
 import os
 import tempfile
+import unicodedata
 from dataclasses import asdict, dataclass, replace
 from datetime import date, timedelta
 from pathlib import Path
@@ -40,6 +42,7 @@ SYSTEEM = "systeem"
 EERSTE_DAG_KEUZES: dict[str, str] = {SYSTEEM: "Zoals de computer", **{d: d.capitalize() for d in DAGEN}}
 THEMA_KEUZES: dict[str, str] = {SYSTEEM: "Zoals de computer", "licht": "Licht", "donker": "Donker"}
 TIJD_KEUZES: dict[str, str] = {SYSTEEM: "Zoals de computer", "24": "24-uursklok", "12": "12-uursklok"}
+NAAM_KEUZES: dict[str, str] = {"achternaam": "Achternaam", "voornaam": "Voornaam"}
 
 #: Waarde voor het data-theme-attribuut van <html> (avs.css); None = de browser volgt de computer.
 _THEMA_ATTRIBUUT = {"licht": "light", "donker": "dark", SYSTEEM: None}
@@ -50,10 +53,11 @@ class Instellingen:
     eerste_dag: str = SYSTEEM          # 'systeem' of 'maandag' … 'zondag'
     thema: str = SYSTEEM               # 'systeem', 'licht' of 'donker'
     tijdnotatie: str = SYSTEEM         # 'systeem', '24' of '12'
+    naamvolgorde: str = "achternaam"   # atleten sorteren op 'achternaam' (zonder tussenvoegsel) of 'voornaam'
 
     def __post_init__(self) -> None:
         for veld, keuzes in (("eerste_dag", EERSTE_DAG_KEUZES), ("thema", THEMA_KEUZES),
-                             ("tijdnotatie", TIJD_KEUZES)):
+                             ("tijdnotatie", TIJD_KEUZES), ("naamvolgorde", NAAM_KEUZES)):
             if getattr(self, veld) not in keuzes:
                 raise ValueError(f"Onbekende keuze {getattr(self, veld)!r} voor {veld}.")
 
@@ -95,6 +99,15 @@ class Instellingen:
             return f"{u:02d}:{m:02d}u"
         return f"{_uur_12(u)}:{m:02d}{_ampm(u)}"
 
+    def naam_sleutel(self, atleet) -> tuple[str, str, str]:
+        """Sorteersleutel voor een Atleet: (achternaam, voornaam, tussenvoegsel) of (voornaam, achternaam, …).
+        Hoofdletter- en accentongevoelig; het tussenvoegsel telt pas als laatste mee ('de Vries' bij de V)."""
+        return _naam_sleutel(atleet, self.naamvolgorde)
+
+    def naam_tekst(self, atleet) -> str:
+        """Dezelfde sleutel als één tekst, voor data-sort in tabellen (sorteer.js)."""
+        return " ".join(x for x in self.naam_sleutel(atleet) if x)
+
     def tijdvak(self, begin: str | None, eind: str | None) -> str:
         """Begin- en eindtijd samen: '18:00–18:45u', '6:00–6:45PM' of '11:30AM–12:15PM'."""
         b, e = _uren_minuten(begin), _uren_minuten(eind)
@@ -105,6 +118,17 @@ class Instellingen:
         if _ampm(b[0]) == _ampm(e[0]):
             return f"{_uur_12(b[0])}:{b[1]:02d}–{self.tijd(eind)}"
         return f"{self.tijd(begin)}–{self.tijd(eind)}"
+
+
+def _plat(tekst: str | None) -> str:
+    """Kleine letters, zonder accenten en dubbele spaties: 'Zoë  ' -> 'zoe'."""
+    tekst = unicodedata.normalize("NFKD", tekst or "")
+    return " ".join("".join(c for c in tekst if not unicodedata.combining(c)).lower().split())
+
+
+def _naam_sleutel(atleet, volgorde: str) -> tuple[str, str, str]:
+    voor, achter, tussen = _plat(atleet.voornaam), _plat(atleet.achternaam), _plat(atleet.tussenvoegsel)
+    return (voor, achter, tussen) if volgorde == "voornaam" else (achter, voor, tussen)
 
 
 def _uren_minuten(hhmm: str | None) -> tuple[int, int] | None:
@@ -166,7 +190,8 @@ def opslaan(inst: Instellingen, map: Path | None = None) -> None:
 def uit_formulier(form) -> Instellingen:
     """Instellingen uit het formulier van de pagina Instellingen. ValueError bij een onbekende keuze."""
     return Instellingen(eerste_dag=form.get("eerste_dag", SYSTEEM), thema=form.get("thema", SYSTEEM),
-                        tijdnotatie=form.get("tijdnotatie", SYSTEEM))
+                        tijdnotatie=form.get("tijdnotatie", SYSTEEM),
+                        naamvolgorde=form.get("naamvolgorde", "achternaam"))
 
 
 # ============================================================
@@ -204,3 +229,16 @@ def tijd(hhmm: str | None) -> str:
 
 def tijdvak(begin: str | None, eind: str | None) -> str:
     return _actief.tijdvak(begin, eind)
+
+
+def naam_sleutel(atleet) -> tuple[str, str, str]:
+    return _actief.naam_sleutel(atleet)
+
+
+def naam_tekst(atleet) -> str:
+    return _actief.naam_tekst(atleet)
+
+
+def op_naam(atleten):
+    """De atleten (of iets met .atleet) gesorteerd volgens Instellingen."""
+    return sorted(atleten, key=lambda x: naam_sleutel(getattr(x, "atleet", x)))
