@@ -147,7 +147,7 @@ onderdelen als kolommen, punten in de cellen.
 
 ## 4. Opstelling en optimalisatie
 
-### Database (migratie `personen/009_ploeg_opstelling.sql`)
+### Database (migratie `personen/010_ploeg_opstelling.sql`; 009 is al `au_licentienummer`)
 
 - `ploeg` krijgt erbij: `categorie` (bijv. `U16-V`), `programma`
   (bijv. `wedstrijd_2`), `prestatiebasis` (`seizoen`/`pr`/`12mnd`,
@@ -226,7 +226,13 @@ gezet, zodat de wedstrijdpagina en de botsingencontrole meteen werken.
 
 ## Volgorde van bouwen
 
-1. `punten.py` + `au_2025.yaml` + tests tegen de voorbeelden uit het document.
+1. ✅ `punten.py` + `au_2025.yaml` + tests tegen de voorbeelden uit het document
+   (`tests/test_punten.py`). Tabellen: `au_senioren`, `au_u14_u16`,
+   `au_u12_klassiek`, `wa_meerkamp`. Onderdeelsleutels staan bovenin
+   `au_2025.yaml` (bijv. `100m`, `80mH`, `60mH-84`, `4x400m-gemengd`,
+   `zweedse`, `verspringen`); de regelbestanden gebruiken dezelfde sleutels.
+   `ploeg/config.py` vindt `config/` vanuit de broncode en naast de .exe
+   (anders de meegebouwde kopie): `build.py` moet `config/` meenemen.
 2. `u14_u16_2026.yaml` + `regels.py` (U14/U16 heeft de interessantste
    telregel, goede test voor het ontwerp).
 3. Matrix + handmatige opstelling + regelcontrole in de UI.

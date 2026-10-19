@@ -190,7 +190,9 @@ def test_migratie_op_bestaande_database():
     with tempfile.TemporaryDirectory() as tmp:
         with contextlib.redirect_stdout(io.StringIO()):
             init_db(Path(tmp), hoofd=TESTSLEUTEL)
-        with verbind("prestaties", Path(tmp), TESTSLEUTEL) as c:
+        # closing(): `with verbind(...)` sluit de verbinding niet; op Windows kan de
+        # tijdelijke map dan niet weg (WinError 32).
+        with contextlib.closing(verbind("prestaties", Path(tmp), TESTSLEUTEL)) as c:
             c.execute("DROP TABLE wedstrijd_programma")
             c.execute("DROP TABLE doel_regel")                  # 004 (doelen) kwam later
             c.execute("DROP TABLE doel")

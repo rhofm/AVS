@@ -1,0 +1,221 @@
+# Puntentelling - constanten uit "Formules & Constanten", december 2025
+# (14e uitgave, Werkgroep Wedstrijdreglement, Atletiekunie).
+#
+# Nieuwe uitgave van het document? Maak een nieuw bestand (bijv. au_2027.yaml)
+# en laat dit bestand staan: oude ploegopstellingen blijven zo uit te leggen.
+#
+# Opbouw:
+#   tabellen:
+#     <tabel>:                 # welke puntentelling (zie 'omschrijving')
+#       <geslacht>:            # M, V, of 'alle' (zelfde constanten voor iedereen)
+#         <onderdeel>: {formule: ..., A: ..., B: ..., C: ...}
+#
+# Een onderdeel met een knik (bijv. hoogspringen tot en met 1,35 m een andere
+# formule) is een lijst: elk stuk behalve het laatste heeft 'tot' (tot en met).
+#
+# Formules (prestatie in seconden of meters; INT = afkappen, niet afronden):
+#   au_loop    INT(A / tijd - B)
+#   au_techn   INT(A * sqrt(afstand) - B)
+#   lineair    INT((afstand - B) * A + C)
+#   wa_loop    INT(A * (B - tijd) ^ C)
+#   wa_spring  INT(A * (100 * (afstand - B)) ^ C)
+#   wa_werp    INT(A * (afstand - B) ^ C)
+#
+# Onderdeelnamen (sleutels):
+#   lopen      30m ... 5000m, 2000mSC, 3000mSC (steeplechase)
+#   horden     50mH, 60mH, 80mH, 100mH, 110mH, 300mH, 400mH
+#              U14/U16: 50mH, 60mH, 80mH, 300mH = 76,2 cm; 50mH-84, 60mH-84, 100mH = 84 cm
+#   estafettes 4x40m, 4x60m, 4x80m, 4x100m, 4x200m, 4x400m, 4x400m-gemengd, zweedse
+#   technisch  hoogspringen, polsstokhoogspringen, verspringen, hinkstapspringen,
+#              kogelstoten, discuswerpen, speerwerpen, kogelslingeren,
+#              gewichtwerpen, balwerpen
+
+naam: Formules & Constanten, december 2025
+uitgave: 2025-12
+
+tabellen:
+
+  # ------------------------------------------------------------------------
+  au_senioren:
+    omschrijving: >-
+      Atletiekunie puntentelling voor senioren, U20/U18 en masters
+      (competities en meerkampen buiten WA TR 39.11 / WMA TR 28.5).
+    M:
+      35m:      {formule: au_loop, A: 12020.6,   B: 1813.60}
+      40m:      {formule: au_loop, A: 13826.6,   B: 1860.50}
+      50m:      {formule: au_loop, A: 16844.4,   B: 1927.10}
+      60m:      {formule: au_loop, A: 19942.4,   B: 1983.80}
+      100m:     {formule: au_loop, A: 29550.0,   B: 1881.50}
+      150m:     {formule: au_loop, A: 38003.1,   B: 1486.00}
+      200m:     {formule: au_loop, A: 52611.4,   B: 1547.10}
+      300m:     {formule: au_loop, A: 81710.5,   B: 1473.60}
+      400m:     {formule: au_loop, A: 111960.0,  B: 1433.50}
+      600m:     {formule: au_loop, A: 181894.7,  B: 1341.00}
+      800m:     {formule: au_loop, A: 248544.0,  B: 1323.20}
+      1000m:    {formule: au_loop, A: 317523.3,  B: 1285.00}
+      1500m:    {formule: au_loop, A: 489971.4,  B: 1224.70}
+      3000m:    {formule: au_loop, A: 1077300.0, B: 1234.90}
+      5000m:    {formule: au_loop, A: 1786833.9, B: 1145.00}
+      3000mSC:  {formule: au_loop, A: 1048695.7, B: 1008.90}
+      2000mSC:  {formule: au_loop, A: 673418.4,  B: 1001.10}   # U18 mannen
+      50mH:     {formule: au_loop, A: 16606.5,   B: 1504.50}
+      60mH:     {formule: au_loop, A: 22564.2,   B: 1795.00}
+      110mH:    {formule: au_loop, A: 23955.3,   B: 747.90}
+      400mH:    {formule: au_loop, A: 96830.9,   B: 912.80}
+      4x100m:   {formule: au_loop, A: 118175.1,  B: 1880.65}
+      4x200m:   {formule: au_loop, A: 210287.2,  B: 1545.10}
+      4x400m:   {formule: au_loop, A: 446880.0,  B: 1429.25}
+      zweedse:  {formule: au_loop, A: 247800.0,  B: 1126.00}
+      hoogspringen:         {formule: au_techn, A: 2440.0, B: 2593.5}
+      polsstokhoogspringen: {formule: au_techn, A: 1040.0, B: 1272.5}
+      verspringen:          {formule: au_techn, A: 1094.4, B: 2075.3}
+      hinkstapspringen:     {formule: au_techn, A: 762.9,  B: 2074.5}
+      kogelstoten:          {formule: au_techn, A: 462.5,  B: 1001.8}
+      discuswerpen:         {formule: au_techn, A: 249.8,  B: 893.5}
+      kogelslingeren:       {formule: au_techn, A: 197.3,  B: 591.8}
+      speerwerpen:          {formule: au_techn, A: 190.2,  B: 711.3}
+      gewichtwerpen:        {formule: au_techn, A: 333.5,  B: 539.0}   # alleen masters
+    V:
+      35m:      {formule: au_loop, A: 11844.40,   B: 1684.00}
+      40m:      {formule: au_loop, A: 13289.00,   B: 1592.50}
+      50m:      {formule: au_loop, A: 16234.10,   B: 1623.70}
+      60m:      {formule: au_loop, A: 19268.70,   B: 1631.80}
+      100m:     {formule: au_loop, A: 30672.00,   B: 1682.50}
+      150m:     {formule: au_loop, A: 40288.40,   B: 1330.00}
+      200m:     {formule: au_loop, A: 54720.00,   B: 1342.00}
+      300m:     {formule: au_loop, A: 90616.40,   B: 1307.00}
+      400m:     {formule: au_loop, A: 111720.00,  B: 1084.50}
+      600m:     {formule: au_loop, A: 175609.80,  B: 964.10}
+      800m:     {formule: au_loop, A: 247200.00,  B: 975.50}
+      1000m:    {formule: au_loop, A: 335842.30,  B: 1034.40}
+      1500m:    {formule: au_loop, A: 557448.00,  B: 1181.50}
+      3000m:    {formule: au_loop, A: 1197450.00, B: 1176.00}
+      3000mSC:  {formule: au_loop, A: 1161602.60, B: 926.20}
+      2000mSC:  {formule: au_loop, A: 822635.4,   B: 1118.60}   # U18 vrouwen
+      50mH:     {formule: au_loop, A: 15999.80,   B: 1211.00}
+      60mH:     {formule: au_loop, A: 18477.90,   B: 1161.00}
+      100mH:    {formule: au_loop, A: 24672.00,   B: 895.50}
+      400mH:    {formule: au_loop, A: 112752.00,  B: 925.70}
+      4x100m:   {formule: au_loop, A: 122328.00,  B: 1677.75}
+      4x200m:   {formule: au_loop, A: 218613.30,  B: 1340.60}
+      4x400m:   {formule: au_loop, A: 446803.85,  B: 1084.35}
+      zweedse:  {formule: au_loop, A: 261981.50,  B: 865.00}
+      hoogspringen:
+        - {tot: 1.40, formule: au_techn, A: 3039.8, B: 2981.5}
+        - {formule: au_techn, A: 2635.6, B: 2501.5}
+      polsstokhoogspringen: {formule: au_techn, A: 1225.8, B: 1500.2}
+      verspringen:          {formule: au_techn, A: 1076.3, B: 1729.4}
+      hinkstapspringen:     {formule: au_techn, A: 750.3,  B: 1730.6}
+      kogelstoten:          {formule: au_techn, A: 429.5,  B: 768.3}
+      discuswerpen:         {formule: au_techn, A: 224.8,  B: 686.5}
+      kogelslingeren:       {formule: au_techn, A: 183.5,  B: 415.7}
+      speerwerpen:          {formule: au_techn, A: 197.5,  B: 482.5}
+      gewichtwerpen:        {formule: au_techn, A: 309.4,  B: 440.0}   # alleen masters
+    alle:
+      4x400m-gemengd: {formule: au_loop, A: 446841.93, B: 1256.80}
+
+  # ------------------------------------------------------------------------
+  au_u14_u16:
+    omschrijving: >-
+      Atletiekunie puntentelling voor U14 en U16 atleten (meerkampen en
+      competities). Dezelfde constanten voor jongens en meisjes.
+    alle:
+      30m:      {formule: au_loop, A: 8532.0,   B: 1035.00}
+      35m:      {formule: au_loop, A: 9710.0,   B: 1073.00}
+      40m:      {formule: au_loop, A: 10834.0,  B: 1096.00}
+      50m:      {formule: au_loop, A: 13090.0,  B: 1141.50}
+      60m:      {formule: au_loop, A: 15365.0,  B: 1158.00}
+      80m:      {formule: au_loop, A: 19933.0,  B: 1193.00}
+      100m:     {formule: au_loop, A: 24450.0,  B: 1212.00}
+      150m:     {formule: au_loop, A: 36380.0,  B: 1200.00}
+      300m:     {formule: au_loop, A: 78286.0,  B: 1204.00}
+      600m:     {formule: au_loop, A: 160470.5, B: 911.35}
+      800m:     {formule: au_loop, A: 216604.8, B: 884.50}
+      1000m:    {formule: au_loop, A: 276912.0, B: 838.50}
+      1500m:    {formule: au_loop, A: 425682.0, B: 788.50}
+      50mH:     {formule: au_loop, A: 11985.0,  B: 790.50}    # 76,2 cm, 4 horden
+      60mH:     {formule: au_loop, A: 14050.0,  B: 795.50}    # 76,2 cm, outdoor 6 / indoor 5 horden
+      80mH:     {formule: au_loop, A: 18100.0,  B: 804.50}    # 76,2 cm, 8 horden
+      300mH:    {formule: au_loop, A: 70800.0,  B: 872.50}    # 76,2 cm, 7 horden
+      50mH-84:  {formule: au_loop, A: 11780.0,  B: 712.50}    # 84 cm, 4 horden
+      60mH-84:  {formule: au_loop, A: 13820.0,  B: 714.50}    # 84 cm, 5 horden
+      100mH:    {formule: au_loop, A: 21800.0,  B: 727.00}    # 84 cm, 10 horden
+      4x40m:    {formule: au_loop, A: 41050.0,  B: 1053.00}
+      4x60m:    {formule: au_loop, A: 59225.0,  B: 1130.00}
+      4x80m:    {formule: au_loop, A: 77325.0,  B: 1168.00}
+      4x100m:   {formule: au_loop, A: 95150.0,  B: 1189.50}
+      hoogspringen:
+        - {tot: 1.35, formule: lineair, A: 733.33333, B: 0.67, C: 0.7}
+        - {formule: au_techn, A: 1977.53, B: 1798.5}
+      polsstokhoogspringen: {formule: au_techn, A: 795.66, B: 686.5}
+      verspringen:
+        - {tot: 4.41, formule: lineair, A: 200, B: 1.91, C: 0.5}
+        - {formule: au_techn, A: 887.99, B: 1364.5}
+      kogelstoten:          {formule: au_techn, A: 303.73, B: 437.5}
+      discuswerpen:         {formule: au_techn, A: 166.79, B: 438.5}
+      speerwerpen:          {formule: au_techn, A: 170.39, B: 437.5}
+
+  # ------------------------------------------------------------------------
+  au_u12_klassiek:
+    omschrijving: >-
+      Atletiekunie puntentelling voor U8, U9, U10 en U12 'klassiek'
+      (meerkampen en competities, niet Athletics Champs).
+    alle:
+      30m:      {formule: au_loop, A: 8532.0,   B: 935.00}
+      35m:      {formule: au_loop, A: 9710.0,   B: 973.00}
+      40m:      {formule: au_loop, A: 10834.0,  B: 996.00}
+      50m:      {formule: au_loop, A: 13090.0,  B: 1041.50}
+      60m:      {formule: au_loop, A: 15365.0,  B: 1058.00}
+      600m:     {formule: au_loop, A: 160470.5, B: 811.35}
+      1000m:    {formule: au_loop, A: 276912.0, B: 738.50}
+      4x40m:    {formule: au_loop, A: 41050.0,  B: 953.00}
+      4x60m:    {formule: au_loop, A: 59225.0,  B: 1030.00}
+      hoogspringen:
+        - {tot: 1.35, formule: lineair, A: 733.33333, B: 0.67, C: 100.7}
+        - {formule: au_techn, A: 1977.53, B: 1698.5}
+      verspringen:
+        - {tot: 4.41, formule: lineair, A: 200, B: 1.91, C: 100.5}
+        - {formule: au_techn, A: 887.99, B: 1264.5}
+      kogelstoten:          {formule: au_techn, A: 303.73, B: 337.5}
+      balwerpen:            {formule: au_techn, A: 126.00, B: 245.5}
+
+  # ------------------------------------------------------------------------
+  wa_meerkamp:
+    omschrijving: >-
+      IAAF/WA Scoring Tables for Combined Events (meerkampen senioren,
+      U20/U18 en masters, WA TR 39.11 / WMA TR 28.5). Niet voor de competitie.
+    M:
+      60m:    {formule: wa_loop, A: 58.01500, B: 11.5,  C: 1.810}
+      100m:   {formule: wa_loop, A: 25.43470, B: 18.0,  C: 1.810}
+      200m:   {formule: wa_loop, A: 5.84250,  B: 38.0,  C: 1.810}
+      400m:   {formule: wa_loop, A: 1.53775,  B: 82.0,  C: 1.810}
+      1000m:  {formule: wa_loop, A: 0.08713,  B: 305.5, C: 1.850}
+      1500m:  {formule: wa_loop, A: 0.03768,  B: 480.0, C: 1.850}
+      60mH:   {formule: wa_loop, A: 20.51730, B: 15.5,  C: 1.920}
+      110mH:  {formule: wa_loop, A: 5.74352,  B: 28.5,  C: 1.920}
+      hoogspringen:         {formule: wa_spring, A: 0.846500, B: 0.75, C: 1.42}
+      polsstokhoogspringen: {formule: wa_spring, A: 0.279700, B: 1.00, C: 1.35}
+      verspringen:          {formule: wa_spring, A: 0.143540, B: 2.20, C: 1.40}
+      kogelstoten:          {formule: wa_werp, A: 51.3900, B: 1.5, C: 1.05}
+      discuswerpen:         {formule: wa_werp, A: 12.9100, B: 4.0, C: 1.10}
+      kogelslingeren:       {formule: wa_werp, A: 13.0941, B: 5.5, C: 1.05}   # alleen masters werpvijfkamp
+      speerwerpen:          {formule: wa_werp, A: 10.1400, B: 7.0, C: 1.08}
+      gewichtwerpen:        {formule: wa_werp, A: 47.8338, B: 1.5, C: 1.05}   # alleen masters werpvijfkamp
+    V:
+      60m:    {formule: wa_loop, A: 46.08490, B: 13.0,  C: 1.810}
+      100m:   {formule: wa_loop, A: 17.85700, B: 21.0,  C: 1.810}
+      200m:   {formule: wa_loop, A: 4.99087,  B: 42.5,  C: 1.810}
+      400m:   {formule: wa_loop, A: 1.34285,  B: 91.7,  C: 1.810}
+      800m:   {formule: wa_loop, A: 0.11193,  B: 254.0, C: 1.880}
+      1000m:  {formule: wa_loop, A: 0.07068,  B: 337.0, C: 1.880}
+      1500m:  {formule: wa_loop, A: 0.02883,  B: 535.0, C: 1.880}
+      60mH:   {formule: wa_loop, A: 20.04790, B: 17.0,  C: 1.835}
+      100mH:  {formule: wa_loop, A: 9.23076,  B: 26.7,  C: 1.835}
+      hoogspringen:         {formule: wa_spring, A: 1.845230, B: 0.75, C: 1.348}
+      polsstokhoogspringen: {formule: wa_spring, A: 0.441250, B: 1.00, C: 1.350}
+      verspringen:          {formule: wa_spring, A: 0.188807, B: 2.10, C: 1.410}
+      kogelstoten:          {formule: wa_werp, A: 56.0211, B: 1.5, C: 1.05}
+      discuswerpen:         {formule: wa_werp, A: 12.3311, B: 3.0, C: 1.10}
+      kogelslingeren:       {formule: wa_werp, A: 13.3174, B: 5.0, C: 1.05}   # alleen masters werpvijfkamp
+      speerwerpen:          {formule: wa_werp, A: 15.9803, B: 3.8, C: 1.04}
+      gewichtwerpen:        {formule: wa_werp, A: 44.2593, B: 1.5, C: 1.05}   # alleen masters werpvijfkamp

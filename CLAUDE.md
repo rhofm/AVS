@@ -81,7 +81,10 @@ This project holds personal data about athletes, many of them minors.
 | `ui/`         | Web UI |
 
 Other folders: `config/ploeg_regels/*.yaml` (team rule sets, per competition),
-`tests/`, `docs/`.
+`config/puntentelling/<uitgave>.yaml` (AU scoring constants, one file per
+edition of "Formules & Constanten"), `tests/`, `docs/`. Find `config/` with
+`ploeg.config.config_map()` (works from source and frozen; never use the
+working directory). Design of the team feature: `docs/Ploegopstelling_ontwerp.md`.
 
 Many files are still placeholders (a docstring or `#This is an empty temporary
 file`): `pyproject.toml`, `build.py`, `src/__main__.py`, the YAML rule sets and
@@ -297,6 +300,10 @@ python src/db/init_db.py --herstel <sleutel>  # restore the key (e.g. new comput
 
 - Rules live in YAML (`config/ploeg_regels/`), so team leaders can change them
   without touching code. Do not hard-code competition rules in Python.
+- Points come from `ploeg/punten.py` (`punten()`, `prestatie_voor()`); the
+  constants live in `config/puntentelling/`, never in Python. Points are
+  truncated (`INT`), never negative; hand times are corrected with
+  `handtijd_correctie()`. A new AU edition is a new YAML file, not an edit.
 - Strategies ("mentaliteiten") are pluggable modules in `ploeg/strategieen/`.
 - `ploeg.regelset` stores the rule file name and `ploeg.strategie` the strategy
   used, so a lineup can be explained afterwards.
