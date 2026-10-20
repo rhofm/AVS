@@ -98,7 +98,7 @@ def test_onderdeelnaam_met_materiaal_van_de_ploeg():
     r = rs()
     assert r.onderdeel_naam("U16-V", "kogelstoten", "U14-V") == "Kogelstoten 3kg"   # U14 in U16-ploeg
     assert r.onderdeel_naam("U14-V", "kogelstoten", "U14-V") == "Kogelstoten 2kg"
-    assert r.onderdeel_naam("U16-M", "100mH", "U16-M") == "100 meter horden 84cm"
+    assert r.onderdeel_naam("U16-M", "100mH", "U16-M") == "100 meter horden 83,8cm"
     assert r.onderdeel_naam("U14-M", "discuswerpen", "U14-M") == "Discuswerpen 1kg"
     assert r.onderdeel_naam("U14-V", "discuswerpen", "U14-V") == "Discuswerpen 0,75kg"
     assert r.onderdeel_naam("U14-V", "60mH", "U14-V") == "60 meter horden 76,2cm"
