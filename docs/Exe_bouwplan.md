@@ -8,8 +8,8 @@ Do steps 1–4 on their own feature branch(es) and merge them into `dev` before 
 
 | Step | What | Why |
 |------|------|-----|
-| 1 | Restore the key from Instellingen | Users without a terminal must be able to restore the recovery key |
-| 2 | Package the database schemas | Without them the .exe crashes on first start |
+| 1 ✅ | Restore the key from Instellingen | Users without a terminal must be able to restore the recovery key |
+| 2 ✅ | Package the database schemas | Without them the .exe crashes on first start |
 | 3 | External config has priority, per file | Updates bring new YAML files without losing local edits |
 | 4 | Move `standaard_map()` to `%LOCALAPPDATA%` | Data must be writable, wherever the .exe is |
 | 5 | Pin dependencies in `pyproject.toml` | Reproducible environment for building |
@@ -20,7 +20,7 @@ Do steps 1–4 on their own feature branch(es) and merge them into `dev` before 
 
 ---
 
-## Step 1 — "Sleutel herstellen" on the Instellingen page
+## Step 1 — "Sleutel herstellen" on the Instellingen page ✅ done
 
 **Goal:** a button **Sleutel herstellen** on `/instellingen`. Clicking it shows a box where
 the user pastes the recovery key. After a successful restore the app works again without a restart.
@@ -116,16 +116,25 @@ Never use the real keyring: monkeypatch `init_db._lees_hoofdsleutel` and
 
 ---
 
-## Step 2 — Package the database schemas
+## Step 2 — Package the database schemas ✅ done
 
-`init_db.py` reads `DB_DIR / "schema_<database>.sql"` and `DB_DIR / "migrations"`, where
-`DB_DIR = Path(__file__).parent`. In the .exe, `__file__` of `db.init_db` points to
-`sys._MEIPASS/db/`. So the SQL files must land there.
+The SQL files are read from `SQL_DIR` (`init_db._sql_map()`): `src/db/` from source,
+`sys._MEIPASS/db` in the .exe. The `--add-data` lines in step 7 put them there:
+`src/db/schema_*.sql → db` and `src/db/migrations → db/migrations`. Use `schema_*.sql`, not
+`*.sql`: the old `src/db/schema.sql` is not used.
 
-- No code change needed, just the `--add-data` lines in step 7:
-  `src/db/*.sql → db` and `src/db/migrations → db/migrations`.
-- Do add a check to the self-test (step 6): all `schema_*.sql` files for `DATABASES` exist,
-  and `_migraties()` finds at least the known migrations.
+Two safety checks, both before any database is touched:
+- `controleer_sql_bestanden()` (first thing in `init_db()`): every `schema_<database>.sql`
+  exists and is not empty, `migrations/` exists, no empty or duplicate migrations.
+  Otherwise `InstallatieFout` ("AVS is niet volledig geïnstalleerd …").
+- `_controleer_versies()`: a database whose version is higher than the newest migration this
+  AVS knows (an older .exe, or a build without migrations) → `InstallatieFout`, before
+  anything is migrated.
+
+`app.start()` shows an `InstallatieFout` on the error page without the "Sleutel herstellen"
+button. Checked with a real PyInstaller build: with the two `--add-data` lines all databases
+and migrations are created; without `migrations/` the build stops with the error.
+The self-test in step 6 calls `controleer_sql_bestanden()`.
 
 ---
 
@@ -287,7 +296,7 @@ src/__main__.py --name AVS --onefile --console --noconfirm --clean
 --paths src
 --add-data src/ui/templates{sep}ui/templates
 --add-data src/ui/static{sep}ui/static
---add-data src/db/*.sql{sep}db
+--add-data src/db/schema_*.sql{sep}db
 --add-data src/db/migrations{sep}db/migrations
 --add-data config{sep}config
 --hidden-import keyring.backends.Windows

@@ -56,6 +56,14 @@ Gebruik:
 
 In de app (ook de .exe) kan de herstelsleutel worden teruggezet via
 Instellingen > Sleutel herstellen; die pagina gebruikt herstel().
+
+Schema's en migraties
+---------------------
+De SQL-bestanden (schema_<database>.sql en migrations/) horen bij de code. In
+de PyInstaller-.exe staan ze in sys._MEIPASS/db (build.py: --add-data). Voordat
+er iets met de databases gebeurt controleert init_db() dat ze er allemaal zijn
+(controleer_sql_bestanden()); een onvolledige build of installatie geeft dan een
+InstallatieFout met uitleg, in plaats van een crash of overgeslagen migraties.
 """
 
 from __future__ import annotations
@@ -72,7 +80,17 @@ from pathlib import Path
 import sqlcipher3
 
 DB_DIR = Path(__file__).resolve().parent
-MIGRATIONS_DIR = DB_DIR / "migrations"
+
+
+def _sql_map() -> Path:
+    """Map met schema_*.sql en migrations/: naast deze module, of in de .exe (sys._MEIPASS/db)."""
+    if getattr(sys, "frozen", False):
+        return Path(getattr(sys, "_MEIPASS", Path(sys.executable).resolve().parent)) / "db"
+    return DB_DIR
+
+
+SQL_DIR = _sql_map()
+MIGRATIONS_DIR = SQL_DIR / "migrations"
 _MIGRATIE_NAAM = re.compile(r"^(\d+)_.*\.sql$")
 
 DATABASES = ("personen", "prestaties", "testen", "trainingsschema", "absentie", "leerlijnen", "leerdoelscores",
@@ -93,6 +111,11 @@ HERSTEL_UITLEG = "Zet de herstelsleutel terug via Instellingen > Sleutel herstel
 # ============================================================
 class SleutelFout(RuntimeError):
     """De hoofdsleutel ontbreekt, is ongeldig of past niet bij de databases."""
+
+
+class InstallatieFout(RuntimeError):
+    """Bestanden van AVS zelf ontbreken of passen niet bij de databases (onvolledige build,
+    of een oudere AVS dan de databases). Heeft niets met de sleutel te maken."""
 
 
 def _naar_bytes(sleutel: str | bytes) -> bytes:
@@ -245,6 +268,52 @@ def _migraties(database: str) -> list[tuple[int, Path]]:
     return gevonden
 
 
+def controleer_sql_bestanden() -> None:
+    """InstallatieFout als schema's of migraties ontbreken of niet kloppen.
+
+    Raakt de databases en de sleutel niet aan; ook bruikbaar als zelftest van een build.
+    """
+    problemen = []
+    for database in DATABASES:
+        schema = SQL_DIR / f"schema_{database}.sql"
+        if not schema.is_file() or not schema.read_text(encoding="utf-8").strip():
+            problemen.append(f"schema_{database}.sql ontbreekt of is leeg")
+    if not MIGRATIONS_DIR.is_dir():
+        problemen.append("de map migrations/ ontbreekt")
+    else:
+        for database in DATABASES:
+            try:
+                for _, bestand in _migraties(database):
+                    if not bestand.read_text(encoding="utf-8").strip():
+                        problemen.append(f"migrations/{database}/{bestand.name} is leeg")
+            except RuntimeError as e:                    # twee migraties met hetzelfde nummer
+                problemen.append(str(e))
+    if problemen:
+        raise InstallatieFout(
+            "AVS is niet volledig geïnstalleerd: " + "; ".join(problemen) + f" (gezocht in {SQL_DIR}). "
+            "Installeer AVS opnieuw. Je gegevens zijn niet aangeraakt."
+        )
+
+
+def _controleer_versies(map: Path, hoofd: bytes) -> None:
+    """InstallatieFout als een bestaande database nieuwer is dan deze AVS kent.
+
+    Gebeurt vóór er iets wordt bijgewerkt, zodat een oudere AVS (of een build zonder
+    migraties) nooit half doorstart op databases die hij niet kent.
+    """
+    for database in DATABASES:
+        if not db_pad(database, map).exists():
+            continue
+        bekend = max([1] + [nummer for nummer, _ in _migraties(database)])
+        with closing(verbind(database, map, hoofd)) as conn:
+            versie = huidige_versie(conn)
+        if versie > bekend:
+            raise InstallatieFout(
+                f"{database}.db is versie {versie}, maar deze AVS kent alleen versies tot en met "
+                f"{bekend}. Gebruik de nieuwste versie van AVS. Je gegevens zijn niet aangeraakt."
+            )
+
+
 def _init_een(database: str, map: Path | None, hoofd: bytes) -> int:
     # closing(): `with conn` alleen commit, maar sluit de verbinding niet. Op Windows
     # blijft het bestand dan open (en vergrendeld) tot de garbage collector langskomt.
@@ -252,7 +321,7 @@ def _init_een(database: str, map: Path | None, hoofd: bytes) -> int:
         versie = huidige_versie(conn)
 
         if versie == 0:
-            schema = DB_DIR / f"schema_{database}.sql"
+            schema = SQL_DIR / f"schema_{database}.sql"
             conn.executescript(schema.read_text(encoding="utf-8"))
             versie = huidige_versie(conn)
             print(f"Nieuwe database aangemaakt: {database}.db (versie {versie})")
@@ -388,6 +457,7 @@ def init_db(map: Path | None = None, hoofd: str | bytes | None = None) -> Path:
     hoofd: alleen voor tests; normaal komt de sleutel uit de sleutelkluis en
     wordt hij bij de allereerste start aangemaakt.
     """
+    controleer_sql_bestanden()                  # eerst: zonder SQL-bestanden niets aanraken
     map = Path(map) if map else standaard_map()
 
     if hoofd is not None:
@@ -403,6 +473,7 @@ def init_db(map: Path | None = None, hoofd: str | bytes | None = None) -> Path:
             )
         hoofd = hoofdsleutel(aanmaken=True)
 
+    _controleer_versies(map, hoofd)
     for database in DATABASES:
         versie = _init_een(database, map, hoofd)
         print(f"{database}.db up-to-date: versie {versie}")
@@ -476,7 +547,7 @@ def _main(argv: list[str] | None = None) -> int:
             herstel(args.herstel, args.map)
             print("Herstelsleutel teruggezet.")
         init_db(args.map)
-    except (SleutelFout, RuntimeError) as fout:
+    except (SleutelFout, InstallatieFout, RuntimeError) as fout:
         print(f"Fout: {fout}", file=sys.stderr)
         return 1
     return 0

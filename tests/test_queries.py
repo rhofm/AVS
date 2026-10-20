@@ -191,6 +191,7 @@ def test_migratie_op_bestaande_database():
         echte_map = init_mod.MIGRATIONS_DIR
         try:
             init_mod.MIGRATIONS_DIR = Path(tmp) / "geen_migraties"
+            init_mod.MIGRATIONS_DIR.mkdir()           # lege map: wel geïnstalleerd, geen migraties
             with contextlib.redirect_stdout(io.StringIO()):
                 init_db(Path(tmp), hoofd=TESTSLEUTEL)
         finally:

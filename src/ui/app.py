@@ -38,7 +38,7 @@ from atleten import trainingsschema as schemabeheer
 from atleten import prs_importeren as prs_import
 from atleten.aanwezigheid import aanwezigheid
 import instellingen
-from db.init_db import HERSTEL_UITLEG, SleutelFout, herstel, init_db
+from db.init_db import HERSTEL_UITLEG, InstallatieFout, SleutelFout, herstel, init_db
 from db.queries import Opslag, OpslagFout
 from importers.base import ImportFout
 from groepen import groep as groepsbeheer
@@ -85,13 +85,16 @@ def _ui_map() -> Path:
     return Path(__file__).resolve().parent
 
 
-def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfout: str | None = None) -> Flask:
+def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfout: str | None = None,
+             sleutelfout: bool = True) -> Flask:
     """Maak de Flask-app.
 
     map / hoofd: databasemap en sleutel; None = de normale (data/ en de sleutelkluis).
     startfout:   melding als de databases niet geopend konden worden; dan toont
                  elke pagina die melding in plaats van te crashen, behalve
                  Instellingen (ZONDER_DATABASE), waar de sleutel kan worden hersteld.
+    sleutelfout: True als startfout over de sleutel gaat (dan een knop 'Sleutel herstellen');
+                 False bij bijv. een onvolledige installatie (InstallatieFout).
     """
     ui = _ui_map()
     app = Flask(__name__, template_folder=str(ui / "templates"), static_folder=str(ui / "static"))
@@ -99,6 +102,7 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
     app.config["AVS_MAP"] = map
     app.config["AVS_HOOFD"] = hoofd
     app.config["AVS_STARTFOUT"] = startfout     # wordt None na 'Sleutel herstellen'
+    app.config["AVS_STARTFOUT_SLEUTEL"] = sleutelfout
     registreer_filters(app.jinja_env)
 
     # ---------------- databases per request ----------------
@@ -118,7 +122,7 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
         fout = app.config["AVS_STARTFOUT"]
         if fout and request.endpoint not in ZONDER_DATABASE:
             return render_template("fout.html", titel="AVS kan niet starten", tekst=fout,
-                                   sleutel_herstellen=True), 500
+                                   sleutel_herstellen=app.config["AVS_STARTFOUT_SLEUTEL"]), 500
 
     @app.before_request
     def instellingen_laden():
@@ -1257,7 +1261,7 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
         startfout = app.config["AVS_STARTFOUT"]
         return render_template("instellingen.html", inst=inst, fout=fout, meldingen=get_flashed_messages(),
                                startfout=startfout, sleutel_fout=sleutel_fout,
-                               sleutel_open=bool(startfout or sleutel_fout),
+                               sleutel_open=bool((startfout and app.config["AVS_STARTFOUT_SLEUTEL"]) or sleutel_fout),
                                eerste_dag_keuzes=instellingen.EERSTE_DAG_KEUZES,
                                thema_keuzes=instellingen.THEMA_KEUZES, tijd_keuzes=instellingen.TIJD_KEUZES,
                                naam_keuzes=instellingen.NAAM_KEUZES, naamvoorbeelden=_naamvoorbeelden(),
@@ -1306,7 +1310,7 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
         try:
             herstel(request.form.get("herstelsleutel", ""), app.config["AVS_MAP"])
             init_db(app.config["AVS_MAP"], app.config["AVS_HOOFD"])     # databases bijwerken met de sleutel
-        except SleutelFout as e:
+        except (SleutelFout, InstallatieFout) as e:
             pagina, status = _instellingenpagina(instellingen.actief(), sleutel_fout=f"Niet hersteld: {e}",
                                                  status=400)
             return pagina, status, {"Cache-Control": "no-store"}
@@ -1534,11 +1538,14 @@ def _vrije_poort(voorkeur: int = VOORKEUR_POORT) -> int:
 def start(map: Path | None = None, browser: bool = True) -> None:
     """Databases klaarzetten, de server starten en de browser openen."""
     startfout = None
+    sleutelfout = True
     try:
         init_db(map)
     except SleutelFout as e:
         startfout = str(e) if HERSTEL_UITLEG in str(e) else f"{e}\n\n{HERSTEL_UITLEG}"
-    app = maak_app(map=map, startfout=startfout)
+    except InstallatieFout as e:
+        startfout, sleutelfout = str(e), False
+    app = maak_app(map=map, startfout=startfout, sleutelfout=sleutelfout)
     poort = _vrije_poort()
     adres = f"http://{HOST}:{poort}/"
     print(f"AVS draait op {adres}  (sluit dit venster om te stoppen)")

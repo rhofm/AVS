@@ -126,6 +126,13 @@ every other page shows the start error. `herstel()` only stores a key after it
 has opened the existing databases, and the submitted key is never echoed,
 logged or cached.
 
+The SQL files are read from `init_db.SQL_DIR` (`src/db/` from source,
+`sys._MEIPASS/db` in the `.exe`), never via the working directory. `init_db()`
+first runs `controleer_sql_bestanden()` and refuses databases newer than the
+newest known migration (`_controleer_versies()`); both raise `InstallatieFout`
+before anything is touched. A new database needs its `schema_<naam>.sql` in
+`src/db/`; the build includes `schema_*.sql` and `migrations/`.
+
 ### Keys and IDs
 
 - One random 32-byte **master key** is stored in the OS keyring (service `AVS`,

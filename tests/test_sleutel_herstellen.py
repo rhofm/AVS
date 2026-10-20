@@ -153,12 +153,12 @@ def test_start_melding(kluis, data, monkeypatch):
     """start() wijst naar Instellingen, niet naar de terminal."""
     gezien = {}
 
-    def nep_maak_app(map=None, hoofd=None, startfout=None):
-        gezien["startfout"] = startfout
+    def nep_maak_app(map=None, hoofd=None, startfout=None, sleutelfout=True):
+        gezien.update(startfout=startfout, sleutelfout=sleutelfout)
         raise SystemExit                                # niet echt een server starten
 
     monkeypatch.setattr("ui.app.maak_app", nep_maak_app)
     with pytest.raises(SystemExit), contextlib.redirect_stdout(io.StringIO()):
         start(map=data, browser=False)
-    assert "Instellingen > Sleutel herstellen" in gezien["startfout"]
+    assert "Instellingen > Sleutel herstellen" in gezien["startfout"] and gezien["sleutelfout"] is True
     assert gezien["startfout"].count("Sleutel herstellen") == 1 and "python" not in gezien["startfout"]
