@@ -82,9 +82,13 @@ This project holds personal data about athletes, many of them minors.
 
 Other folders: `config/ploeg_regels/*.yaml` (team rule sets, per competition),
 `config/puntentelling/<uitgave>.yaml` (AU scoring constants, one file per
-edition of "Formules & Constanten"), `tests/`, `docs/`. Find `config/` with
-`ploeg.config.config_map()` (works from source and frozen; never use the
-working directory). Design of the team feature: `docs/Ploegopstelling_ontwerp.md`.
+edition of "Formules & Constanten"), `tests/`, `docs/`. Find config files with
+`ploeg.config.config_bestand(submap, naam)` / `config_bestanden(submap)` (works
+from source and frozen; never use the working directory). Frozen, each file is
+looked up separately: `config/` next to the `.exe` first (the team leader's own
+edits and additions), then the copy built into the `.exe`; an empty file
+(only whitespace/#-comments) never hides a filled one. Loaded files are cached
+by path + modification time, so an edited YAML file counts without a restart. Design of the team feature: `docs/Ploegopstelling_ontwerp.md`.
 
 Many files are still placeholders (a docstring or `#This is an empty temporary
 file`): `pyproject.toml`, `build.py`, `src/__main__.py`, the YAML rule sets and

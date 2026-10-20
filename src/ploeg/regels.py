@@ -39,7 +39,7 @@ import yaml
 
 from models.ploeg import Inzet, PloegLid
 from ploeg import punten as _punten
-from ploeg.config import config_map
+from ploeg.config import config_bestand, config_bestanden, gezocht_in
 
 Soort = Literal["loop", "technisch", "estafette"]
 Ernst = Literal["fout", "waarschuwing"]
@@ -642,14 +642,17 @@ def controleer_dag(ploegen: Mapping[str, Iterable[PloegLid]]) -> list[Overtredin
 # ============================================================
 # Bestanden
 # ============================================================
-def _map(map: Path | None) -> Path:
-    return Path(map) if map else config_map() / "ploeg_regels"
+def _paden(map: Path | None) -> list[Path]:
+    """De geldende regelbestanden: uit `map`, of per bestand naast de .exe / meegebouwd (ploeg.config)."""
+    if map:
+        return sorted(Path(map).glob("*.yaml"))
+    return config_bestanden("ploeg_regels")
 
 
 def bestanden(map: Path | None = None) -> list[str]:
     """Namen (zonder .yaml) van de regelbestanden die iets bevatten; lege voorbeeldbestanden tellen niet."""
     uit = []
-    for pad in sorted(_map(map).glob("*.yaml")):
+    for pad in _paden(map):
         try:
             inhoud = yaml.safe_load(pad.read_text(encoding="utf-8"))
         except yaml.YAMLError:
@@ -674,7 +677,8 @@ def laad(bestand: str, map: Path | None = None, puntenmap: Path | None = None) -
     naam = bestand[:-5] if bestand.endswith(".yaml") else bestand
     if not naam or "/" in naam or "\\" in naam or naam.startswith("."):
         raise RegelFout(f"Ongeldige naam voor een regelbestand: {bestand!r}.")
-    pad = _map(map) / f"{naam}.yaml"
-    if not pad.is_file():
-        raise RegelFout(f"Regelbestand {naam}.yaml niet gevonden in {pad.parent}.")
+    pad = Path(map) / f"{naam}.yaml" if map else config_bestand("ploeg_regels", f"{naam}.yaml")
+    if pad is None or not pad.is_file():
+        waar = pad.parent if pad is not None else gezocht_in("ploeg_regels")
+        raise RegelFout(f"Regelbestand {naam}.yaml niet gevonden in {waar}.")
     return _laad(str(pad), pad.stat().st_mtime_ns, str(puntenmap) if puntenmap else None)

@@ -10,7 +10,7 @@ Do steps 1–4 on their own feature branch(es) and merge them into `dev` before 
 |------|------|-----|
 | 1 ✅ | Restore the key from Instellingen | Users without a terminal must be able to restore the recovery key |
 | 2 ✅ | Package the database schemas | Without them the .exe crashes on first start |
-| 3 | External config has priority, per file | Updates bring new YAML files without losing local edits |
+| 3 ✅ | External config has priority, per file | Updates bring new YAML files without losing local edits |
 | 4 | Move `standaard_map()` to `%LOCALAPPDATA%` | Data must be writable, wherever the .exe is |
 | 5 | Pin dependencies in `pyproject.toml` | Reproducible environment for building |
 | 6 | Add `__main__.py` options and a self-test | Lets `build.py` check the built .exe |
@@ -138,7 +138,7 @@ The self-test in step 6 calls `controleer_sql_bestanden()`.
 
 ---
 
-## Step 3 — External config has priority, per file
+## Step 3 — External config has priority, per file ✅ done
 
 **Now:** `config_map()` takes the whole `config/` folder next to the .exe if it exists, otherwise
 the built-in copy. After an update, new YAML files inside the .exe are never seen.
@@ -177,6 +177,11 @@ def config_bestanden(submap: str, patroon: str = "*.yaml") -> list[Path]:
   `regels._laad` already does), so an edited points file is picked up without a restart.
 - The `puntentelling:` reference in a rule file is resolved the same way, so an external
   rule file can use a points table that only exists in the built-in copy.
+
+**Built** as described above (`tests/test_config_voorrang.py`), and checked with a real
+PyInstaller build: an edited `masters_2026-2027.yaml` and a new rule file in `config/` next to
+the program are used; the other rule files and the points table come from the built-in copy.
+Points files are now also cached by modification time (like rule files).
 
 ### Tests
 - An external file overrides the built-in one with the same name.

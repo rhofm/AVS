@@ -35,7 +35,7 @@ from pathlib import Path
 
 import yaml
 
-from ploeg.config import config_map
+from ploeg.config import config_bestand, gezocht_in
 
 STANDAARD_UITGAVE = "au_2025"
 
@@ -333,14 +333,40 @@ def _formule(waar: str, onderdeel: str, d) -> Formule:
 # ============================================================
 # Gemak: de standaarduitgave
 # ============================================================
+def _veilige_naam(naam: str) -> str:
+    if not naam or "/" in naam or "\\" in naam or naam.startswith("."):
+        raise PuntenFout(f"Ongeldige naam voor een puntentellingsbestand: {naam!r}.")
+    return naam
+
+
+def _pad(naam: str, map: Path | None) -> Path | None:
+    """`<map>/puntentelling/<naam>.yaml`, of zonder map het geldende bestand (ploeg.config)."""
+    bestand = f"{_veilige_naam(naam)}.yaml"
+    if map:
+        return Path(map) / "puntentelling" / bestand
+    return config_bestand("puntentelling", bestand)
+
+
+def _gewijzigd(pad: Path) -> int:
+    try:
+        return pad.stat().st_mtime_ns
+    except OSError:
+        return 0
+
+
 @lru_cache(maxsize=8)
-def _laad(uitgave: str, map: str) -> Puntentelling:
-    return Puntentelling.uit_bestand(Path(map) / "puntentelling" / f"{uitgave}.yaml")
+def _laad(pad: str, gewijzigd: int) -> Puntentelling:
+    return Puntentelling.uit_bestand(Path(pad))
 
 
 def puntentelling(uitgave: str = STANDAARD_UITGAVE, map: Path | None = None) -> Puntentelling:
-    """De puntentelling uit `config/puntentelling/<uitgave>.yaml` (eenmaal ingelezen)."""
-    return _laad(uitgave, str(map or config_map()))
+    """De puntentelling uit `config/puntentelling/<uitgave>.yaml` (eenmaal ingelezen; een
+    aangepast bestand wordt opnieuw gelezen). Zonder `map`: per bestand eerst de map naast
+    de .exe, dan de meegebouwde (zie ploeg.config)."""
+    pad = _pad(uitgave, map)
+    if pad is None:
+        raise PuntenFout(f"Puntentelling {uitgave}.yaml niet gevonden in {gezocht_in('puntentelling')}.")
+    return _laad(str(pad), _gewijzigd(pad))
 
 
 def punten(tabel: str, onderdeel: str, geslacht: str, prestatie: float,
@@ -413,10 +439,8 @@ class Leeftijdsfactoren:
 
 
 @lru_cache(maxsize=8)
-def _laad_factoren(naam: str, map: str) -> Leeftijdsfactoren:
-    pad = Path(map) / "puntentelling" / f"{naam}.yaml"
-    if not pad.is_file():
-        raise PuntenFout(f"Bestand met leeftijdsfactoren {naam}.yaml niet gevonden in {pad.parent}.")
+def _laad_factoren(pad_tekst: str, gewijzigd: int) -> Leeftijdsfactoren:
+    pad = Path(pad_tekst)
     try:
         ruw = yaml.safe_load(pad.read_text(encoding="utf-8"))
     except yaml.YAMLError as e:
@@ -425,8 +449,13 @@ def _laad_factoren(naam: str, map: str) -> Leeftijdsfactoren:
 
 
 def leeftijdsfactoren(naam: str, map: Path | None = None) -> Leeftijdsfactoren:
-    """Leeftijdsfactoren uit `config/puntentelling/<naam>.yaml` (eenmaal ingelezen)."""
-    return _laad_factoren(naam, str(map or config_map()))
+    """Leeftijdsfactoren uit `config/puntentelling/<naam>.yaml` (eenmaal ingelezen; zoeken
+    zoals puntentelling())."""
+    pad = _pad(naam, map)
+    if pad is None or not pad.is_file():
+        waar = pad.parent if pad is not None else gezocht_in("puntentelling")
+        raise PuntenFout(f"Bestand met leeftijdsfactoren {naam}.yaml niet gevonden in {waar}.")
+    return _laad_factoren(str(pad), _gewijzigd(pad))
 
 
 def gecorrigeerd(prestatie: float, factor: float, onderdeel: str, handtijd: bool = False) -> float:
