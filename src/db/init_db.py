@@ -132,6 +132,12 @@ class InstallatieFout(RuntimeError):
     of een oudere AVS dan de databases). Heeft niets met de sleutel te maken."""
 
 
+class SleutelkluisFout(InstallatieFout):
+    """De sleutelkluis van de computer (Windows: Referentiebeheer) is niet te gebruiken.
+
+    Geen SleutelFout: de sleutel terugzetten helpt dan niet, want ook dat gaat via de kluis."""
+
+
 def _naar_bytes(sleutel: str | bytes) -> bytes:
     if isinstance(sleutel, bytes):
         ruw = sleutel
@@ -149,17 +155,36 @@ def _keyring():
     try:
         import keyring
     except ImportError:
-        raise SleutelFout("Het pakket 'keyring' ontbreekt: pip install keyring") from None
+        raise SleutelkluisFout("Het pakket 'keyring' ontbreekt: pip install keyring") from None
     return keyring
 
 
+def _kluisfout(e: Exception) -> SleutelkluisFout:
+    # Alleen het soort fout noemen: de melding van de kluis zelf kan details bevatten.
+    return SleutelkluisFout(
+        "AVS kan de sleutelkluis van deze computer (Windows: Referentiebeheer) niet gebruiken "
+        f"({type(e).__name__}). Je gegevens zijn niet aangeraakt. Start de computer opnieuw op; "
+        "helpt dat niet, vraag dan iemand met beheerrechten om naar Referentiebeheer te kijken."
+    )
+
+
 def _lees_hoofdsleutel() -> bytes | None:
-    opgeslagen = _keyring().get_password(KEYRING_DIENST, KEYRING_NAAM)
+    kluis = _keyring()
+    from keyring.errors import KeyringError
+    try:
+        opgeslagen = kluis.get_password(KEYRING_DIENST, KEYRING_NAAM)
+    except KeyringError as e:
+        raise _kluisfout(e) from None
     return _naar_bytes(opgeslagen) if opgeslagen else None
 
 
 def _bewaar_hoofdsleutel(sleutel: bytes) -> None:
-    _keyring().set_password(KEYRING_DIENST, KEYRING_NAAM, sleutel.hex())
+    kluis = _keyring()
+    from keyring.errors import KeyringError
+    try:
+        kluis.set_password(KEYRING_DIENST, KEYRING_NAAM, sleutel.hex())
+    except KeyringError as e:
+        raise _kluisfout(e) from None
 
 
 def hoofdsleutel(aanmaken: bool = False) -> bytes:

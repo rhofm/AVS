@@ -26,6 +26,7 @@ In de conda-omgeving met Python 3.13, vanuit de root van de repo:
 pip install -e .[dev]     # afhankelijkheden + pytest en PyInstaller
 python -m pytest          # tests
 python src                # AVS starten (opent de browser)
+python src --zelftest     # controleren of alles werkt (ook: AVS.exe --zelftest)
 ```
 
 Het plan voor de .exe staat in [Exe_bouwplan](docs/Exe_bouwplan.md).

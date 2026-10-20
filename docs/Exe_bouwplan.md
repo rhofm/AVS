@@ -13,7 +13,7 @@ Do steps 1–4 on their own feature branch(es) and merge them into `dev` before 
 | 3 ✅ | External config has priority, per file | Updates bring new YAML files without losing local edits |
 | 4 ✅ | Move `standaard_map()` to `%LOCALAPPDATA%` | Data must be writable, wherever the .exe is |
 | 5 ✅ | Pin dependencies in `pyproject.toml` | Reproducible environment for building |
-| 6 | Add `__main__.py` options and a self-test | Lets `build.py` check the built .exe |
+| 6 ✅ | Add `__main__.py` options and a self-test | Lets `build.py` check the built .exe |
 | 7 | Write `build.py` | One command → `dist/AVS.exe` |
 | 8 | Test the frozen build by hand | Check the things a self-test can't cover |
 | 9 | Release (optional) | Automatic build on `main` |
@@ -287,7 +287,7 @@ with (`pip freeze`) next to the .exe, so a later build can use the same set.
 
 ---
 
-## Step 6 — `src/__main__.py`: options and self-test
+## Step 6 — `src/__main__.py`: options and self-test ✅ done
 
 ```
 AVS.exe                 start the server and open the browser (as now)
@@ -302,6 +302,18 @@ AVS.exe --zelftest      check the build and stop (exit code 0/1)
 - every `schema_*.sql` and the migrations exist (step 2)
 - `config_bestanden("ploeg_regels")` and `config_bestand("puntentelling", "au_2025.yaml")` are found (step 3)
 - an SQLCipher database with a test key can be created, written and read in a temp folder
+
+**Built** in `src/zelftest.py` (11 checks, each reported as `ok`/`FOUT`, all run even after a
+failure; `--details` shows tracebacks). It also checks that every rule file loads, the strategies
+are registered, `milp` solves a tiny problem, a PDF can be made and curl_cffi can impersonate
+Chrome. Tests: `tests/test_zelftest.py`.
+
+Tried on a real PyInstaller build of the whole app (≈ 95 MB, Linux):
+- The self-test caught a module PyInstaller left out (`importers.detect`: nothing imports it).
+  `--collect-submodules` did **not** fix this (our packages are only found via `--paths src`),
+  so step 7 passes **every module in the list as `--hidden-import`** instead. Then: all ok, exit 0.
+- Without a working keyring the .exe crashed with a traceback. Fixed: keyring errors become
+  `SleutelkluisFout` (shown on the error page at start and during use).
 
 ---
 
@@ -321,7 +333,9 @@ src/__main__.py --name AVS --onefile --console --noconfirm --clean
 --add-data src/db/schema_*.sql{sep}db
 --add-data src/db/migrations{sep}db/migrations
 --add-data config{sep}config
+--add-data <build>/zelftest_modules.txt{sep}.     # zelftest.schrijf_modulelijst()
 --hidden-import keyring.backends.Windows
+--hidden-import <module>       # for every module in zelftest_modules.txt (see step 6)
 --collect-all curl_cffi
 --collect-binaries sqlcipher3
 --icon assets/avs.ico            (optional)

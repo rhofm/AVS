@@ -1514,6 +1514,11 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
                                terug_url=url_for("atleet", master_id=master_id), terug_naam=a.naam,
                                actief_menu="atleten")
 
+    @app.errorhandler(InstallatieFout)
+    def installatiefout(e):
+        """Bijv. de sleutelkluis van Windows die halverwege niet meer bereikbaar is."""
+        return render_template("fout.html", titel="AVS kan je gegevens niet openen", tekst=str(e)), 500
+
     @app.errorhandler(404)
     def niet_gevonden(_e):
         return render_template("fout.html", titel="Niet gevonden",

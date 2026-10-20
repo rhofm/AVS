@@ -91,7 +91,7 @@ edits and additions), then the copy built into the `.exe`; an empty file
 by path + modification time, so an edited YAML file counts without a restart. Design of the team feature: `docs/Ploegopstelling_ontwerp.md`.
 
 Many files are still placeholders (a docstring or `#This is an empty temporary
-file`): `build.py`, `src/__main__.py` and some YAML rule sets. The docstring in
+file`): `build.py` and some YAML rule sets. The docstring in
 each placeholder describes its intended role — follow it when implementing.
 
 **Dependencies** are in `pyproject.toml` (Python 3.13), installed into the
@@ -102,6 +102,23 @@ site-packages. Every lower bound must have a ready-made Windows wheel for
 Python 3.13 (checked with `pip download --only-binary :all: --python-version 3.13
 --platform win_amd64`); a new dependency goes in `dependencies` with a comment
 saying what uses it.
+
+**Starting and self-test** (`src/__main__.py`): `python src` / `AVS.exe` starts
+the app; `--geen-browser` doesn't open the browser; `--zelftest` (`src/zelftest.py`)
+checks everything a build can miss — all own modules import, the outside packages,
+SQL files, a throw-away encrypted database (random key, temp folder), the
+keyring backend, every rule file loads, strategies, `milp`, a PDF, curl_cffi,
+all templates and static files — and exits 0/1. It never touches the real data
+folder or keyring. In the `.exe` the module list comes from `zelftest_modules.txt`
+(`zelftest.schrijf_modulelijst()`, written by `build.py`), because PyInstaller
+only bundles what it finds through imports: a module nothing imports (e.g.
+`importers.detect`) would otherwise be missing silently. A new outside package
+also goes in `zelftest.EXTERNE_MODULES`.
+
+The keyring can fail on its own (no backend, Credential Manager blocked):
+`_lees_hoofdsleutel`/`_bewaar_hoofdsleutel` turn any `KeyringError` into
+`SleutelkluisFout` (an `InstallatieFout`, not a `SleutelFout`: restoring the key
+can't help), shown on the error page at start and during use; never a traceback.
 
 ## Database
 
