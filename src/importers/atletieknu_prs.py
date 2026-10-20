@@ -213,10 +213,17 @@ def parse_result_table(table: Tag, base: dict, meets: dict) -> list[Resultaat]:
 
 
 def parse_results(html: str) -> list[Resultaat]:
+    """
+    Alle prestaties van het profiel. Heeft atletiek.nu te weinig uitslagen voor grafieken
+    ('Te weinig uitslagen'), dan ontbreekt div#graphTabs en komen de prestaties uit de
+    PR-tabel (zie resultaten_uit_prs). ValueError als het geen profielpagina is.
+    """
     soup = BeautifulSoup(html, "html.parser")
     graph = soup.find(id="graphTabs")
     if not graph:
-        raise ValueError("Geen grafieken/prestaties gevonden (div#graphTabs ontbreekt).")
+        if find_table(soup, ["Onderdeel", "Record"]) or soup.find(id="records"):
+            return resultaten_uit_prs(soup)
+        raise ValueError("Geen profielpagina: geen grafieken en geen PR-tabel gevonden.")
     meets = meet_lookup(soup)
     nav_names = {a["data-tabtarget"]: clean(a.get_text())
                  for a in soup.select("#graphTabButtons a[data-tabtarget]")}
@@ -238,6 +245,42 @@ def parse_results(html: str) -> list[Resultaat]:
         else:
             for table in pane.find_all("table"):
                 results += parse_result_table(table, {**base, "specificatie": ""}, meets)
+    return results
+
+
+# In de PR-tabel staat onder het onderdeel een gewicht of hoogte ('3kg', '500gr', '76.2cm'),
+# maar ook een opmerking als 'Handtijd' of 'Ontbrekende windmeting'. Alleen het eerste is een
+# specificatie zoals in de grafiektabellen; een handtijd zie je al aan de 'h' in '10,1h'.
+SPECIFICATIE_RE = re.compile(r"\d+(?:[.,]\d+)?\s*(?:kg|gr|g|cm|m)", re.IGNORECASE)
+
+
+def resultaten_uit_prs(soup: BeautifulSoup) -> list[Resultaat]:
+    """
+    Prestaties uit de PR-tabel, voor profielen zonder grafieken. Bij zo weinig uitslagen zijn de
+    PR's alle prestaties die de pagina toont. Het onderdeel-id staat niet in de PR-tabel (leeg).
+    Dezelfde prestatie staat soms twee keer in de tabel (met en zonder 'Ontbrekende
+    windmeting'); die wordt één resultaat.
+    """
+    table = find_table(soup, ["Onderdeel", "Record"])
+    if not table or not table.find("tbody"):
+        return []
+    meets = meet_lookup(soup)
+    results: list[Resultaat] = []
+    gezien: set[tuple[str, str, str, str]] = set()
+    for tr in table.find("tbody").find_all("tr", recursive=False):
+        pr = parse_pr_row(tr, meets)
+        if pr is None:
+            continue
+        spec = pr.specificatie if SPECIFICATIE_RE.fullmatch(pr.specificatie) else ""
+        sleutel = (pr.onderdeel, spec, pr.prestatie, pr.datum)
+        if sleutel in gezien:
+            continue
+        gezien.add(sleutel)
+        key = parse_sortdata(tr.find_all("td", recursive=False)[2])[3]
+        results.append(Resultaat(
+            onderdeel=pr.onderdeel, onderdeel_id="", specificatie=spec, prestatie=pr.prestatie,
+            waarde=pr.waarde, wind=pr.wind, datum=pr.datum, plaats=pr.plaats, land=pr.land,
+            wedstrijd=pr.wedstrijd, wedstrijd_url=meets.get(key, ("", ""))[1]))
     return results
 
 
@@ -342,4 +385,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    main()

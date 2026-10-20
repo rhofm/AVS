@@ -135,6 +135,58 @@ class TestSeltec(unittest.TestCase):
         self.assertEqual(seltec.overzicht_url("19133"), SELTEC_URL)
 
 
+class TestAtletiekNuProfiel(unittest.TestCase):
+    """
+    fixtures/atletieknu_profiel.html: profiel mét grafieken (nep-id 999999).
+    fixtures/atletieknu_profiel_weinig.html: profiel met 'Te weinig uitslagen' (nep-id 999998):
+    geen div#graphTabs, de prestaties komen dan uit de PR-tabel.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.met_grafieken = (FIXTURES / "atletieknu_profiel.html").read_text(encoding="utf-8")
+        cls.weinig = (FIXTURES / "atletieknu_profiel_weinig.html").read_text(encoding="utf-8")
+
+    def test_met_grafieken_ongewijzigd(self):
+        r = atletieknu_prs.parse_results(self.met_grafieken)
+        self.assertEqual([(x.onderdeel, x.onderdeel_id, x.prestatie) for x in r],
+                         [("100 meter", "1", "12,34"), ("100 meter", "1", "DNF"), ("Verspringen", "2", "5,12")])
+
+    def test_te_weinig_uitslagen_uit_prs(self):
+        r = atletieknu_prs.parse_results(self.weinig)
+        self.assertEqual([(x.onderdeel, x.specificatie, x.prestatie, x.waarde) for x in r], [
+            ("60 meter", "", "9,8h", 9.8),                  # 'Handtijd' is geen specificatie
+            ("80 meter", "", "13,30", 13.3),
+            ("80 meter horden", "76.2cm", "18,52", 18.52),
+            ("Kogelstoten", "3kg", "4,71", 4.71),
+            ("Hoogspringen", "", "1,25", 1.25),             # dubbel (ontbrekende windmeting) = één keer
+        ])
+        horden = r[2]
+        self.assertEqual((horden.wind, horden.datum, horden.plaats, horden.land),
+                         ("-1,2 m/s", "2026-06-06", "Proefstad", "NLD"))
+        self.assertEqual((horden.wedstrijd, horden.wedstrijd_url),
+                         ("Testcompetitie U14/U16 R3 [2026]", "https://www.atletiek.nu/atleet/main/55555/"))
+        self.assertTrue(all(x.onderdeel_id == "" for x in r))
+
+    def test_prs_van_profiel_zonder_grafieken(self):
+        prs = atletieknu_prs.parse_prs(self.weinig)
+        self.assertEqual(len(prs), 6)
+        self.assertEqual(prs[0].specificatie, "Handtijd")   # de PR-export laat de opmerking staan
+
+    def test_importer_op_opgeslagen_pagina(self):
+        atleet_id, prs, resultaten = atletieknu_prs.AtletiekNuPRImporter().parse(
+            str(FIXTURES / "atletieknu_profiel_weinig.html"))
+        self.assertEqual((atleet_id, len(prs), len(resultaten)), ("999998", 6, 5))
+
+    def test_profiel_zonder_prestaties_is_leeg(self):
+        html = "<html><body><div id='records' class='tab-pane'><h2>Persoonlijke records</h2></div></body></html>"
+        self.assertEqual(atletieknu_prs.parse_results(html), [])
+
+    def test_geen_profielpagina_blijft_fout(self):
+        with self.assertRaises(ValueError):
+            atletieknu_prs.parse_results("<html><body>geen profiel</body></html>")
+
+
 class NepAntwoord:
     """Minimale vervanger van requests.Response voor de ophaal-tests."""
 

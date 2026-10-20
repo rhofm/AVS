@@ -21,6 +21,8 @@ from importers.base import ImportFout  # noqa: E402
 
 PROFIEL = (Path(__file__).parent / "fixtures" / "atletieknu_profiel.html").read_text(encoding="utf-8")
 NUMMER = "999999"
+WEINIG = (Path(__file__).parent / "fixtures" / "atletieknu_profiel_weinig.html").read_text(encoding="utf-8")
+WEINIG_NUMMER = "999998"
 
 
 def _verwacht(fout, fn):
@@ -56,6 +58,21 @@ def test_importeren_en_opnieuw():
         r = prs_importeren(db, mid, haal)
         assert (r.nieuw, r.bekend, r.nieuwe_prs) == (0, 2, [])
         assert r.tekst == "PR's opgehaald van atletiek.nu: geen nieuwe prestaties."
+
+
+def test_profiel_met_te_weinig_uitslagen():
+    """Zonder grafieken ('Te weinig uitslagen') komen de prestaties uit de PR-tabel."""
+    with opslag() as db:
+        mid = voorbeeld(db)
+        _met_nummer(db, mid, WEINIG_NUMMER)
+        r = prs_importeren(db, mid, lambda nummer: WEINIG)
+        assert (r.nieuw, r.bekend, r.overgeslagen) == (5, 0, 0)
+        namen = {p.onderdeel for p in db.prestaties(mid) if p.bron == "atletieknu"}
+        assert {"60 meter", "80 meter horden 76,2cm", "Kogelstoten 3kg", "Hoogspringen"} <= namen
+        assert not any("Handtijd" in n or "windmeting" in n for n in namen)
+
+        r = prs_importeren(db, mid, lambda nummer: WEINIG)               # opnieuw: niets dubbel
+        assert (r.nieuw, r.bekend) == (0, 5)
 
 
 def test_meldingen():
