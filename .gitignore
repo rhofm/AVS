@@ -27,6 +27,7 @@ data/
 build/
 dist/
 *.spec
+*.egg-info/
 
 # Virtuele omgevingen en editors
 .venv/

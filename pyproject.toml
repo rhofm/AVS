@@ -1,1 +1,51 @@
-#This is an empty temporary file
+# Atleet Volg Systeem (AVS)
+#
+# Installeren in de conda-omgeving (Python 3.13), vanuit de root van de repo:
+#
+#     pip install -e .[dev]        # alles om te ontwikkelen, testen en de .exe te bouwen
+#     pip install -e .             # alleen wat AVS zelf nodig heeft
+#
+# Dit installeert alleen de afhankelijkheden: de code zelf blijft in src/ staan en
+# wordt gestart met `python src` (of als .exe, zie build.py). De mappen in src/
+# (db, ui, models, ...) worden bewust NIET als pakketten geïnstalleerd: zulke
+# algemene namen zouden kunnen botsen met andere pakketten in de omgeving.
+#
+# Ondergrenzen: de oudste versie met wat AVS gebruikt (zie het commentaar per regel).
+# Vaste versies voor een reproduceerbare .exe: zie build.py (stap 7 van docs/Exe_bouwplan.md).
+
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "avs"
+version = "0.1.0"
+description = "Atleet Volg Systeem: atleten, groepen, trainingen, wedstrijden en competitieploegen voor een atletiekvereniging"
+readme = "README.md"
+requires-python = ">=3.13,<3.14"
+dependencies = [
+    "flask>=3.0",                 # de lokale webinterface (ui/app.py)
+    "markupsafe>=3.0",            # veilig HTML maken (ui/markdown.py); 3.0 = eerste met Python 3.13 op Windows
+    "sqlcipher3-wheels>=0.5.4",   # versleutelde SQLite-databases (import sqlcipher3); 0.5.4 = eerste met Python 3.13 op Windows
+    "keyring>=24",                # hoofdsleutel in Windows Referentiebeheer
+    "requests>=2.31",             # importeren van Seltec
+    "curl_cffi>=0.7",             # importeren van atletiek.nu (doet zich voor als Chrome)
+    "beautifulsoup4>=4.12",       # HTML van de uitslagensites lezen (import bs4)
+    "pyyaml>=6.0.2",              # config/: puntentelling en ploegregels (import yaml); 6.0.2 = eerste met Python 3.13
+    "numpy>=2.1",                 # optimaliseren van opstellingen; 2.1 = eerste met Python 3.13
+    "scipy>=1.14.1",              # scipy.optimize.milp; 1.14.1 = eerste met Python 3.13
+    "fpdf2>=2.8.1",               # training als PDF (import fpdf; TextStyle)
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8",
+    "pyinstaller>=6.11",          # de .exe bouwen (build.py); 6.11+ ondersteunt Python 3.13
+]
+
+[tool.setuptools]
+packages = []                     # zie boven: alleen afhankelijkheden installeren
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

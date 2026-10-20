@@ -19,6 +19,17 @@
 ### Structuur
 Dit staat in het [Structuur](docs/Structuur.md) bestand.
 
+### Installeren (ontwikkelen)
+In de conda-omgeving met Python 3.13, vanuit de root van de repo:
+
+```
+pip install -e .[dev]     # afhankelijkheden + pytest en PyInstaller
+python -m pytest          # tests
+python src                # AVS starten (opent de browser)
+```
+
+Het plan voor de .exe staat in [Exe_bouwplan](docs/Exe_bouwplan.md).
+
 
 
 

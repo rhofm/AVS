@@ -12,7 +12,7 @@ Do steps 1–4 on their own feature branch(es) and merge them into `dev` before 
 | 2 ✅ | Package the database schemas | Without them the .exe crashes on first start |
 | 3 ✅ | External config has priority, per file | Updates bring new YAML files without losing local edits |
 | 4 ✅ | Move `standaard_map()` to `%LOCALAPPDATA%` | Data must be writable, wherever the .exe is |
-| 5 | Pin dependencies in `pyproject.toml` | Reproducible environment for building |
+| 5 ✅ | Pin dependencies in `pyproject.toml` | Reproducible environment for building |
 | 6 | Add `__main__.py` options and a self-test | Lets `build.py` check the built .exe |
 | 7 | Write `build.py` | One command → `dist/AVS.exe` |
 | 8 | Test the frozen build by hand | Check the things a self-test can't cover |
@@ -241,7 +241,7 @@ folder: the first start copies the 8 databases, the second start copies nothing.
 
 ---
 
-## Step 5 — `pyproject.toml`
+## Step 5 — `pyproject.toml` ✅ done
 
 Replace the placeholder. Plain `pyproject.toml` dependencies, installed into the
 `atletiek` conda environment with `pip install -e .[dev]`.
@@ -271,8 +271,19 @@ dev = ["pytest", "pyinstaller>=6"]
 testpaths = ["tests"]
 ```
 
-Pin exact versions (`==`) once the first build works, so a later build gives the same .exe.
-This list is based on part of the modules. PyInstaller's `warn-AVS.txt` (step 7) shows what's missing.
+**Built.** The real file differs from the sketch above in a few places:
+- `[tool.setuptools] packages = []`: `pip install -e .` installs only the dependencies, so the
+  generic folder names in `src/` (`db`, `ui`, `models`, …) never end up in site-packages.
+- `pythonpath = ["src"]` for pytest, so tests also run without the `sys.path` lines.
+- Every lower bound has a reason in a comment, and was checked: each one has a ready-made
+  Windows wheel for Python 3.13 (`pip download --only-binary :all: --platform win_amd64`), and
+  the full test suite passes with **all lowest versions** installed (`uv pip install
+  --resolution lowest-direct`) as well as with the newest. Raised because of that check:
+  `pyyaml>=6.0.2`, `sqlcipher3-wheels>=0.5.4`, `markupsafe>=3.0`, `fpdf2>=2.8.1`.
+- The dependency list now covers all of `src/` (every import was checked).
+
+Exact versions for a reproducible .exe come in step 7: `build.py` writes the versions it built
+with (`pip freeze`) next to the .exe, so a later build can use the same set.
 
 ---
 

@@ -91,9 +91,17 @@ edits and additions), then the copy built into the `.exe`; an empty file
 by path + modification time, so an edited YAML file counts without a restart. Design of the team feature: `docs/Ploegopstelling_ontwerp.md`.
 
 Many files are still placeholders (a docstring or `#This is an empty temporary
-file`): `pyproject.toml`, `build.py`, `src/__main__.py`, the YAML rule sets and
-most modules. The docstring in each placeholder describes its intended role —
-follow it when implementing.
+file`): `build.py`, `src/__main__.py` and some YAML rule sets. The docstring in
+each placeholder describes its intended role — follow it when implementing.
+
+**Dependencies** are in `pyproject.toml` (Python 3.13), installed into the
+conda environment with `pip install -e .[dev]` (`[dev]` = pytest + PyInstaller).
+It installs only the dependencies: `[tool.setuptools] packages = []`, so the
+generic folder names in `src/` (`db`, `ui`, `models`, …) never land in
+site-packages. Every lower bound must have a ready-made Windows wheel for
+Python 3.13 (checked with `pip download --only-binary :all: --python-version 3.13
+--platform win_amd64`); a new dependency goes in `dependencies` with a comment
+saying what uses it.
 
 ## Database
 
@@ -405,6 +413,7 @@ feature/<naam>  →  dev  →  staging  →  main
 
 - Keep the UI simple for non-technical users; put the complexity in the back end.
 - Write tests for new logic (`tests/`); importers and team selection especially.
-- When a design decision is still open (UI framework, test runner, dependency
-  management in `pyproject.toml`), propose an option and ask rather than
-  silently picking one.
+- When a design decision is still open (e.g. the UI framework), propose an
+  option and ask rather than silently picking one. Decided: pytest as test
+  runner, plain `pyproject.toml` dependencies installed with pip into the conda
+  environment.
