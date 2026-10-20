@@ -1,4 +1,5 @@
-{# Foutpagina (404, of databases die niet geopend konden worden). Context: titel, tekst. #}
+{# Foutpagina (404, of databases die niet geopend konden worden).
+   Context: titel, tekst; sleutel_herstellen = True als AVS niet kon starten (link naar Instellingen). #}
 {% extends "basis.html" %}
 {% block titel %}{{ titel }}{% endblock %}
 
@@ -7,7 +8,11 @@
   <div class="blok">
     <h1 class="kop kop--pagina">{{ titel }}</h1>
     <p class="melding melding--fout" style="white-space: pre-line">{{ tekst }}</p>
+    {% if sleutel_herstellen %}
+    <p><a class="knop knop--vol" href="{{ url_for('instellingen_pagina') }}#sleutel">Sleutel herstellen &rarr;</a></p>
+    {% else %}
     <a class="terug" href="/atleten">&larr; Naar atleten</a>
+    {% endif %}
   </div>
   <footer class="vel__voet">Atleet Volg Systeem</footer>
 </article>

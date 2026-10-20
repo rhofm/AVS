@@ -850,6 +850,12 @@ th[aria-sort="descending"] .sorteer__naam::after { content: " \2193"; opacity: 1
 .instelling__kop { padding: 0; display: grid; gap: .15rem; margin-bottom: .75rem; }
 .instelling__kop .zacht { font-size: var(--maat-s); }
 .instelling__keuzes { display: grid; gap: 4px; }
+.sleutel { margin-top: 2.5rem; padding-top: 1.5rem; border-top: 1px solid var(--rand); }
+.sleutel__herstellen summary { list-style: none; width: fit-content; }
+.sleutel__herstellen summary::-webkit-details-marker { display: none; }
+.sleutel__herstellen[open] summary { margin-bottom: 1rem; }
+.sleutel__formulier { display: grid; gap: .9rem; max-width: 38rem; }
+.sleutel__formulier .veld input { width: 100%; font-family: ui-monospace, Consolas, monospace; }
 .instelling__keuzes--dagen { grid-template-columns: minmax(9rem, 1.6fr) repeat(7, minmax(2.6rem, 1fr)); }
 .instelling__keuzes--thema, .instelling__keuzes--tijd { grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr)); gap: .6rem; }
 .instelling__radio { position: absolute; opacity: 0; pointer-events: none; }

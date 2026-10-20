@@ -119,6 +119,13 @@ python src/db/init_db.py --herstelsleutel     # show the recovery key
 python src/db/init_db.py --herstel <sleutel>  # restore the key (e.g. new computer)
 ```
 
+Users without a terminal (the `.exe`) restore the key on **Instellingen > Sleutel
+herstellen** (`POST /instellingen/sleutel`). That page and the settings form work
+even when the databases can't be opened (`ZONDER_DATABASE` in `ui/app.py`);
+every other page shows the start error. `herstel()` only stores a key after it
+has opened the existing databases, and the submitted key is never echoed,
+logged or cached.
+
 ### Keys and IDs
 
 - One random 32-byte **master key** is stored in the OS keyring (service `AVS`,

@@ -21,6 +21,7 @@ import threading
 import webbrowser
 from datetime import date
 from pathlib import Path
+from urllib.parse import urlparse
 
 if __package__ in (None, ""):          # los gestart: src/ op het pad zetten
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -37,7 +38,7 @@ from atleten import trainingsschema as schemabeheer
 from atleten import prs_importeren as prs_import
 from atleten.aanwezigheid import aanwezigheid
 import instellingen
-from db.init_db import SleutelFout, init_db
+from db.init_db import HERSTEL_UITLEG, SleutelFout, herstel, init_db
 from db.queries import Opslag, OpslagFout
 from importers.base import ImportFout
 from groepen import groep as groepsbeheer
@@ -72,6 +73,10 @@ BINNENKORT: dict[str, str] = {
 ATLEET_BINNENKORT: dict[str, str] = {
 }
 
+#: Pagina's die ook werken als de databases niet open kunnen (bijv. sleutel kwijt):
+#: daar zet de gebruiker de herstelsleutel terug. Ze gebruiken geen database.
+ZONDER_DATABASE = frozenset({"static", "instellingen_pagina", "instellingen_opslaan", "sleutel_herstellen"})
+
 
 def _ui_map() -> Path:
     """Map met templates/ en static/, ook in de PyInstaller-.exe (sys._MEIPASS)."""
@@ -85,13 +90,15 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
 
     map / hoofd: databasemap en sleutel; None = de normale (data/ en de sleutelkluis).
     startfout:   melding als de databases niet geopend konden worden; dan toont
-                 elke pagina die melding in plaats van te crashen.
+                 elke pagina die melding in plaats van te crashen, behalve
+                 Instellingen (ZONDER_DATABASE), waar de sleutel kan worden hersteld.
     """
     ui = _ui_map()
     app = Flask(__name__, template_folder=str(ui / "templates"), static_folder=str(ui / "static"))
     app.secret_key = os.urandom(32)         # alleen voor meldingen na opslaan; hoeft niet te blijven bestaan
     app.config["AVS_MAP"] = map
     app.config["AVS_HOOFD"] = hoofd
+    app.config["AVS_STARTFOUT"] = startfout     # wordt None na 'Sleutel herstellen'
     registreer_filters(app.jinja_env)
 
     # ---------------- databases per request ----------------
@@ -108,8 +115,10 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
 
     @app.before_request
     def controleer_start():
-        if startfout and request.endpoint != "static":
-            return render_template("fout.html", titel="AVS kan niet starten", tekst=startfout), 500
+        fout = app.config["AVS_STARTFOUT"]
+        if fout and request.endpoint not in ZONDER_DATABASE:
+            return render_template("fout.html", titel="AVS kan niet starten", tekst=fout,
+                                   sleutel_herstellen=True), 500
 
     @app.before_request
     def instellingen_laden():
@@ -133,7 +142,8 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
     def trainingen_klaarzetten():
         """Eén keer per dag (bij de eerste pagina): trainingen aanmaken voor de vaste trainingsdagen
         van alle groepen, tot een paar weken vooruit. Zie groepen.trainingen.trainingen_aanvullen()."""
-        if request.endpoint == "static" or app.config.get("AVS_AANGEVULD_OP") == date.today():
+        if (request.endpoint in ZONDER_DATABASE or app.config["AVS_STARTFOUT"]
+                or app.config.get("AVS_AANGEVULD_OP") == date.today()):
             return None
         trainingsbeheer.alle_trainingen_aanvullen(db())
         app.config["AVS_AANGEVULD_OP"] = date.today()
@@ -1242,8 +1252,12 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
         return {w: [a.naam for a in sorted(namen, key=instellingen.Instellingen(naamvolgorde=w).naam_sleutel)]
                 for w in instellingen.NAAM_KEUZES}
 
-    def _instellingenpagina(inst: instellingen.Instellingen, fout: str | None = None, status: int = 200):
+    def _instellingenpagina(inst: instellingen.Instellingen, fout: str | None = None, status: int = 200,
+                            sleutel_fout: str | None = None):
+        startfout = app.config["AVS_STARTFOUT"]
         return render_template("instellingen.html", inst=inst, fout=fout, meldingen=get_flashed_messages(),
+                               startfout=startfout, sleutel_fout=sleutel_fout,
+                               sleutel_open=bool(startfout or sleutel_fout),
                                eerste_dag_keuzes=instellingen.EERSTE_DAG_KEUZES,
                                thema_keuzes=instellingen.THEMA_KEUZES, tijd_keuzes=instellingen.TIJD_KEUZES,
                                naam_keuzes=instellingen.NAAM_KEUZES, naamvoorbeelden=_naamvoorbeelden(),
@@ -1272,6 +1286,36 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
         instellingen.activeer(nieuw)
         flash("Instellingen opgeslagen.")
         return redirect(url_for("instellingen_pagina"))
+
+    def _van_deze_app() -> bool:
+        """Komt het formulier van AVS zelf? Een andere website in dezelfde browser kan ook naar
+        127.0.0.1 posten; browsers sturen dan een Origin (of Referer) van die site mee."""
+        herkomst = request.headers.get("Origin") or request.headers.get("Referer")
+        if not herkomst:
+            return True                     # geen herkomst meegestuurd (oude browser, tests)
+        return urlparse(herkomst).netloc == request.host
+
+    @app.post("/instellingen/sleutel")
+    def sleutel_herstellen():
+        """Herstelsleutel terugzetten (nieuwe computer, Windows opnieuw geïnstalleerd).
+
+        De sleutel wordt nooit teruggezet in de pagina, gelogd of bewaard buiten de sleutelkluis.
+        """
+        if not _van_deze_app():
+            abort(403)
+        try:
+            herstel(request.form.get("herstelsleutel", ""), app.config["AVS_MAP"])
+            init_db(app.config["AVS_MAP"], app.config["AVS_HOOFD"])     # databases bijwerken met de sleutel
+        except SleutelFout as e:
+            pagina, status = _instellingenpagina(instellingen.actief(), sleutel_fout=f"Niet hersteld: {e}",
+                                                 status=400)
+            return pagina, status, {"Cache-Control": "no-store"}
+        app.config["AVS_STARTFOUT"] = None
+        app.config["AVS_AANGEVULD_OP"] = None       # trainingen klaarzetten bij de volgende pagina
+        flash("Herstelsleutel teruggezet. AVS kan je gegevens weer openen.")
+        r = redirect(url_for("instellingen_pagina"))
+        r.headers["Cache-Control"] = "no-store"
+        return r
 
     # ---------------- ploegen ----------------
     @app.get("/ploegen")
@@ -1493,7 +1537,7 @@ def start(map: Path | None = None, browser: bool = True) -> None:
     try:
         init_db(map)
     except SleutelFout as e:
-        startfout = (f"{e}\n\nZet de herstelsleutel terug met: python src/db/init_db.py --herstel <sleutel>")
+        startfout = str(e) if HERSTEL_UITLEG in str(e) else f"{e}\n\n{HERSTEL_UITLEG}"
     app = maak_app(map=map, startfout=startfout)
     poort = _vrije_poort()
     adres = f"http://{HOST}:{poort}/"

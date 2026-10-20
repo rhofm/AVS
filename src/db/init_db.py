@@ -53,6 +53,9 @@ Gebruik:
     python src/db/init_db.py --herstelsleutel     # toon de herstelsleutel
     python src/db/init_db.py --herstel <sleutel>  # zet een herstelsleutel terug
                                                   # (bijv. op een nieuwe computer)
+
+In de app (ook de .exe) kan de herstelsleutel worden teruggezet via
+Instellingen > Sleutel herstellen; die pagina gebruikt herstel().
 """
 
 from __future__ import annotations
@@ -80,6 +83,9 @@ GEPSEUDONIMISEERD = ("prestaties", "testen", "trainingsschema", "absentie", "lee
 KEYRING_DIENST = "AVS"
 KEYRING_NAAM = "hoofdsleutel"
 _SLEUTEL_LENGTE = 32  # bytes
+
+#: Waar een gebruiker zonder terminal de herstelsleutel terugzet (zie ui/app.py).
+HERSTEL_UITLEG = "Zet de herstelsleutel terug via Instellingen > Sleutel herstellen."
 
 
 # ============================================================
@@ -125,8 +131,7 @@ def hoofdsleutel(aanmaken: bool = False) -> bytes:
     if sleutel is None:
         if not aanmaken:
             raise SleutelFout(
-                "Geen hoofdsleutel gevonden op deze computer. "
-                "Zet de herstelsleutel terug met: python src/db/init_db.py --herstel <sleutel>"
+                f"Geen hoofdsleutel gevonden op deze computer. {HERSTEL_UITLEG}"
             )
         sleutel = secrets.token_bytes(_SLEUTEL_LENGTE)
         _bewaar_hoofdsleutel(sleutel)
@@ -394,7 +399,7 @@ def init_db(map: Path | None = None, hoofd: str | bytes | None = None) -> Path:
             # dan onbereikbaar worden.
             raise SleutelFout(
                 f"Er staan al databases in {map} ({', '.join(bestaande)}), maar er is geen "
-                "hoofdsleutel op deze computer. Zet de herstelsleutel terug met --herstel."
+                f"hoofdsleutel op deze computer. {HERSTEL_UITLEG}"
             )
         hoofd = hoofdsleutel(aanmaken=True)
 
@@ -415,15 +420,42 @@ def herstelsleutel() -> str:
     return hoofdsleutel().hex()
 
 
-def herstel(sleutel: str) -> None:
-    """Zet een opgeschreven herstelsleutel terug in de sleutelkluis van deze computer."""
-    nieuw = _naar_bytes(sleutel)
+def _opschonen(sleutel: str) -> str:
+    """Spaties, tabs en regeleinden weg: een overgetypte of geplakte sleutel staat vaak in groepjes."""
+    return "".join(sleutel.split())
+
+
+def _past_bij_databases(sleutel: bytes, map: Path | None) -> None:
+    """SleutelFout als een bestaande database in `map` niet met deze sleutel opent."""
+    map = Path(map) if map else standaard_map()
+    for database in DATABASES:
+        if db_pad(database, map).exists():
+            try:
+                verbind(database, map, sleutel).close()
+            except SleutelFout:
+                raise SleutelFout(
+                    "Deze herstelsleutel past niet bij de databases op deze computer. "
+                    "Controleer of je hem goed hebt overgenomen."
+                ) from None
+
+
+def herstel(sleutel: str, map: Path | None = None) -> None:
+    """Zet een opgeschreven herstelsleutel terug in de sleutelkluis van deze computer.
+
+    Eerst wordt gecontroleerd dat de sleutel de bestaande databases in `map`
+    (standaard data/) opent; een sleutel die niet past komt nooit in de kluis.
+    Een andere sleutel die er al staat wordt nooit overschreven.
+    """
+    nieuw = _naar_bytes(_opschonen(sleutel))
     huidig = _lees_hoofdsleutel()
-    if huidig is not None and not hmac.compare_digest(huidig, nieuw):
+    if huidig is not None:
+        if hmac.compare_digest(huidig, nieuw):
+            return                                  # staat er al: niets te doen
         raise SleutelFout(
             "Er staat al een andere hoofdsleutel op deze computer. Die wordt niet "
             "overschreven, anders zijn de huidige databases niet meer te openen."
         )
+    _past_bij_databases(nieuw, map)
     _bewaar_hoofdsleutel(nieuw)
 
 
@@ -441,7 +473,7 @@ def _main(argv: list[str] | None = None) -> int:
             print(herstelsleutel())
             return 0
         if args.herstel:
-            herstel(args.herstel)
+            herstel(args.herstel, args.map)
             print("Herstelsleutel teruggezet.")
         init_db(args.map)
     except (SleutelFout, RuntimeError) as fout:
