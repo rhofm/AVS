@@ -162,3 +162,64 @@ def test_start_melding(kluis, data, monkeypatch):
         start(map=data, browser=False)
     assert "Instellingen > Sleutel herstellen" in gezien["startfout"] and gezien["sleutelfout"] is True
     assert gezien["startfout"].count("Sleutel herstellen") == 1 and "python" not in gezien["startfout"]
+
+
+# ---------------- herstelsleutel tonen ----------------
+def _app_met_sleutel(map: Path, hoofd=None):
+    app = maak_app(map=map, hoofd=hoofd)
+    app.config["TESTING"] = True
+    return app.test_client()
+
+
+def test_herstelsleutel_als_hij_past(kluis, data):
+    from db.init_db import herstelsleutel_als_hij_past, in_groepjes
+    assert herstelsleutel_als_hij_past(data, SLEUTEL) == SLEUTEL
+    with pytest.raises(SleutelFout, match="past niet"):
+        herstelsleutel_als_hij_past(data, ANDERE)
+    with pytest.raises(SleutelFout, match="Geen hoofdsleutel"):
+        herstelsleutel_als_hij_past(data)                      # lege kluis
+    kluis["sleutel"] = bytes.fromhex(SLEUTEL)
+    assert herstelsleutel_als_hij_past(data) == SLEUTEL
+    assert in_groepjes(SLEUTEL) == ["5a5a5a5a"] * 8
+
+
+def test_herstelsleutel_tonen(kluis, data):
+    kluis["sleutel"] = bytes.fromhex(SLEUTEL)
+    c = _app_met_sleutel(data)
+
+    html = _tekst(c.get("/instellingen"))
+    assert "Herstelsleutel tonen" in html and "5a5a5a5a" not in html  # alleen de knop, nooit de sleutel
+
+    r = c.post("/instellingen/sleutel/tonen")
+    html = _tekst(r)
+    assert r.status_code == 200 and html.count("<span>5a5a5a5a</span>") == 8
+    assert "Deel deze sleutel met niemand." in html and "Herstelsleutel tonen</button>" not in html
+    assert r.headers["Cache-Control"] == "no-store" and r.headers["Referrer-Policy"] == "no-referrer"
+    assert "5a5a5a5a" not in _tekst(c.get("/instellingen"))      # daarna weer weg
+    assert c.get("/instellingen/sleutel/tonen").status_code == 405    # geen GET: niet in de geschiedenis
+
+    # de getoonde sleutel (met spaties) werkt bij herstellen
+    kluis.clear()
+    herstel(" ".join(["5a5a5a5a"] * 8), data)
+    assert kluis["sleutel"] == bytes.fromhex(SLEUTEL)
+
+
+def test_herstelsleutel_tonen_testsleutel(kluis, data):
+    """Met een vaste sleutel (hoofd=) wordt die getoond, niet wat er in de kluis staat."""
+    c = _app_met_sleutel(data, hoofd=SLEUTEL)
+    assert _tekst(c.post("/instellingen/sleutel/tonen")).count("<span>5a5a5a5a</span>") == 8
+
+
+def test_herstelsleutel_tonen_niet_bij_startfout(kluis, data):
+    c = _app_zonder_sleutel(data)
+    html = _tekst(c.get("/instellingen"))
+    assert "Herstelsleutel tonen" not in html and "Sleutel herstellen" in html
+    r = c.post("/instellingen/sleutel/tonen")
+    assert r.status_code == 500 and "5a5a" not in _tekst(r)
+
+
+def test_herstelsleutel_tonen_andere_website(kluis, data):
+    kluis["sleutel"] = bytes.fromhex(SLEUTEL)
+    c = _app_met_sleutel(data)
+    r = c.post("/instellingen/sleutel/tonen", headers={"Origin": "https://kwaadaardig.example"})
+    assert r.status_code == 403 and "5a5a" not in _tekst(r)

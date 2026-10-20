@@ -26,6 +26,8 @@ from urllib.parse import urlparse
 if __package__ in (None, ""):          # los gestart: src/ op het pad zetten
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from werkzeug.serving import WSGIRequestHandler, make_server
+
 from flask import (Flask, Response, abort, flash, g, get_flashed_messages, redirect, render_template, request,
                    url_for)
 
@@ -38,8 +40,8 @@ from atleten import trainingsschema as schemabeheer
 from atleten import prs_importeren as prs_import
 from atleten.aanwezigheid import aanwezigheid
 import instellingen
-from db.init_db import (HERSTEL_UITLEG, InstallatieFout, OvernameFout, SleutelFout, herstel, init_db,
-                        oude_data_overnemen, standaard_map)
+from db.init_db import (HERSTEL_UITLEG, InstallatieFout, OvernameFout, SleutelFout, herstel,
+                        herstelsleutel_als_hij_past, in_groepjes, init_db, oude_data_overnemen, standaard_map)
 from db.queries import Opslag, OpslagFout
 from importers.base import ImportFout
 from groepen import groep as groepsbeheer
@@ -56,6 +58,7 @@ from leerlijnen import voortgang
 from ui import export as trainingsexport
 from ui import importeren as importeerpagina
 from ui import startpagina
+from ui.levensduur import HARTSLAG, Bewaker
 from ui.opmaak import registreer_filters
 from ploeg import export as ploegexport
 from ploeg import paginas as ploegpaginas
@@ -76,7 +79,10 @@ ATLEET_BINNENKORT: dict[str, str] = {
 
 #: Pagina's die ook werken als de databases niet open kunnen (bijv. sleutel kwijt):
 #: daar zet de gebruiker de herstelsleutel terug. Ze gebruiken geen database.
-ZONDER_DATABASE = frozenset({"static", "instellingen_pagina", "instellingen_opslaan", "sleutel_herstellen"})
+ZONDER_DATABASE = frozenset({"static", "instellingen_pagina", "instellingen_opslaan", "sleutel_herstellen",
+                             "levend", "weg", "afsluiten"})
+#: Tekens van leven van de pagina's zelf (ui/levensduur.py); tellen niet als 'gewoon' verzoek.
+LEVENSTEKENS = frozenset({"levend", "weg"})
 
 
 def _ui_map() -> Path:
@@ -87,7 +93,7 @@ def _ui_map() -> Path:
 
 
 def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfout: str | None = None,
-             sleutelfout: bool = True) -> Flask:
+             sleutelfout: bool = True, bewaker: Bewaker | None = None) -> Flask:
     """Maak de Flask-app.
 
     map / hoofd: databasemap en sleutel; None = de normale (data/ en de sleutelkluis).
@@ -96,6 +102,8 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
                  Instellingen (ZONDER_DATABASE), waar de sleutel kan worden hersteld.
     sleutelfout: True als startfout over de sleutel gaat (dan een knop 'Sleutel herstellen');
                  False bij bijv. een onvolledige installatie (InstallatieFout).
+    bewaker:     stopt AVS als er geen pagina meer open is (ui/levensduur.py); None = nooit
+                 vanzelf stoppen (tests). Kan ook later in app.config["AVS_BEWAKER"] worden gezet.
     """
     ui = _ui_map()
     app = Flask(__name__, template_folder=str(ui / "templates"), static_folder=str(ui / "static"))
@@ -104,6 +112,7 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
     app.config["AVS_HOOFD"] = hoofd
     app.config["AVS_STARTFOUT"] = startfout     # wordt None na 'Sleutel herstellen'
     app.config["AVS_STARTFOUT_SLEUTEL"] = sleutelfout
+    app.config["AVS_BEWAKER"] = bewaker
     registreer_filters(app.jinja_env)
 
     # ---------------- databases per request ----------------
@@ -117,6 +126,13 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
         opslag = g.pop("db", None)
         if opslag is not None:
             opslag.sluit()
+
+    @app.before_request
+    def teken_van_leven():
+        """Elk gewoon verzoek (pagina laden, opslaan) telt als teken dat AVS nog gebruikt wordt."""
+        bewaker = app.config["AVS_BEWAKER"]
+        if bewaker is not None and request.endpoint not in LEVENSTEKENS:
+            bewaker.verzoek()
 
     @app.before_request
     def controleer_start():
@@ -141,7 +157,9 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
         inst = instellingen.actief()
         dagen = inst.dagen()
         return {"thema": inst.thema_attribuut,
-                "weekkoppen": [d[:2].capitalize() for d in dagen]}     # ['Ma', 'Di', …] of ['Zo', 'Ma', …]
+                "weekkoppen": [d[:2].capitalize() for d in dagen],      # ['Ma', 'Di', …] of ['Zo', 'Ma', …]
+                "levensteken": app.config["AVS_BEWAKER"] is not None,   # script + knop 'AVS afsluiten'
+                "hartslag_ms": HARTSLAG * 1000}
 
     @app.before_request
     def trainingen_klaarzetten():
@@ -1258,10 +1276,12 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
                 for w in instellingen.NAAM_KEUZES}
 
     def _instellingenpagina(inst: instellingen.Instellingen, fout: str | None = None, status: int = 200,
-                            sleutel_fout: str | None = None):
+                            sleutel_fout: str | None = None, getoonde_sleutel: list[str] | None = None,
+                            tonen_fout: str | None = None):
         startfout = app.config["AVS_STARTFOUT"]
         return render_template("instellingen.html", inst=inst, fout=fout, meldingen=get_flashed_messages(),
                                startfout=startfout, sleutel_fout=sleutel_fout,
+                               getoonde_sleutel=getoonde_sleutel, tonen_fout=tonen_fout,
                                datamap=Path(app.config["AVS_MAP"] or standaard_map()),
                                sleutel_open=bool((startfout and app.config["AVS_STARTFOUT_SLEUTEL"]) or sleutel_fout),
                                eerste_dag_keuzes=instellingen.EERSTE_DAG_KEUZES,
@@ -1301,6 +1321,34 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
             return True                     # geen herkomst meegestuurd (oude browser, tests)
         return urlparse(herkomst).netloc == request.host
 
+    # ---------------- levensduur (ui/levensduur.py) ----------------
+    def _pagina_id() -> str:
+        return request.get_data(as_text=True, cache=False)[:64].strip()
+
+    @app.post("/levend")
+    def levend():
+        bewaker = app.config["AVS_BEWAKER"]
+        if bewaker is not None:
+            bewaker.levend(_pagina_id())
+        return "", 204
+
+    @app.post("/weg")
+    def weg():
+        bewaker = app.config["AVS_BEWAKER"]
+        if bewaker is not None and _van_deze_app():
+            bewaker.weg(_pagina_id())
+        return "", 204
+
+    @app.post("/afsluiten")
+    def afsluiten():
+        """Knop 'AVS afsluiten': eerst deze pagina, daarna stopt de server (na dit verzoek)."""
+        if not _van_deze_app():
+            abort(403)
+        bewaker = app.config["AVS_BEWAKER"]
+        if bewaker is not None:
+            bewaker.stop_nu()
+        return render_template("afgesloten.html", afgesloten=True, levensteken=False)
+
     @app.post("/instellingen/sleutel")
     def sleutel_herstellen():
         """Herstelsleutel terugzetten (nieuwe computer, Windows opnieuw geïnstalleerd).
@@ -1322,6 +1370,26 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
         r = redirect(url_for("instellingen_pagina"))
         r.headers["Cache-Control"] = "no-store"
         return r
+
+    @app.post("/instellingen/sleutel/tonen")
+    def herstelsleutel_tonen():
+        """Herstelsleutel laten zien, om op te schrijven. Alleen als de versleuteling open is:
+        niet bij een startfout (dan houdt controleer_start() dit verzoek al tegen, want dit
+        endpoint staat niet in ZONDER_DATABASE) en alleen een sleutel die de databases echt opent.
+
+        Alleen via POST vanaf AVS zelf, zodat de sleutel niet in de browsergeschiedenis of een
+        bladwijzer belandt en een andere website hem niet kan opvragen; nooit gelogd of gecachet.
+        """
+        if not _van_deze_app() or app.config["AVS_STARTFOUT"]:
+            abort(403)
+        try:
+            sleutel = in_groepjes(herstelsleutel_als_hij_past(app.config["AVS_MAP"], app.config["AVS_HOOFD"]))
+        except (SleutelFout, InstallatieFout) as e:
+            pagina, status = _instellingenpagina(instellingen.actief(), tonen_fout=f"Kan de sleutel niet tonen: {e}",
+                                                 status=500)
+            return pagina, status, {"Cache-Control": "no-store"}
+        pagina, status = _instellingenpagina(instellingen.actief(), getoonde_sleutel=sleutel)
+        return pagina, status, {"Cache-Control": "no-store", "Referrer-Policy": "no-referrer"}
 
     # ---------------- ploegen ----------------
     @app.get("/ploegen")
@@ -1530,6 +1598,13 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
 # ============================================================
 # Starten
 # ============================================================
+class _StilleHandler(WSGIRequestHandler):
+    """Geen regel per verzoek in de console/log: de adressen bevatten id's van atleten."""
+
+    def log_request(self, *args, **kwargs) -> None:
+        pass
+
+
 def _vrije_poort(voorkeur: int = VOORKEUR_POORT) -> int:
     """De voorkeurspoort als die vrij is, anders een willekeurige vrije poort."""
     for poort in (voorkeur, 0):
@@ -1559,11 +1634,21 @@ def start(map: Path | None = None, browser: bool = True) -> None:
     app = maak_app(map=map, startfout=startfout, sleutelfout=sleutelfout)
     poort = _vrije_poort()
     adres = f"http://{HOST}:{poort}/"
-    print(f"AVS draait op {adres}  (sluit dit venster om te stoppen)")
+    # Eén gebruiker op één computer: één thread is genoeg en houdt SQLCipher eenvoudig.
+    server = make_server(HOST, poort, app, threaded=False, request_handler=_StilleHandler)
+    # Stoppen vanuit een eigen thread: shutdown() wacht tot het lopende verzoek klaar is,
+    # dus nooit midden in het opslaan (en niet vastlopen als een verzoek zelf stopt).
+    bewaker = Bewaker(stop=lambda: threading.Thread(target=server.shutdown, daemon=True).start())
+    app.config["AVS_BEWAKER"] = bewaker
+    bewaker.start_thread()
+    print(f"AVS draait op {adres}  (stopt vanzelf als je het laatste AVS-tabblad sluit)")
     if browser:
         threading.Timer(1.0, webbrowser.open, args=(adres,)).start()
-    # Eén gebruiker op één computer: één thread is genoeg en houdt SQLCipher eenvoudig.
-    app.run(host=HOST, port=poort, debug=False, threaded=False, use_reloader=False)
+    try:
+        server.serve_forever()
+    finally:
+        server.server_close()
+    print(f"AVS is gestopt ({bewaker.reden}).")
 
 
 if __name__ == "__main__":

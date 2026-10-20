@@ -13,9 +13,13 @@
     sleutel_fout        – na een mislukte poging om de herstelsleutel terug te zetten
     sleutel_open        – het blok 'Sleutel herstellen' meteen open tonen
     datamap             – de map met de databases (om een back-up van te maken)
+    getoonde_sleutel    – de herstelsleutel in groepjes, alleen direct na 'Herstelsleutel tonen' (POST)
+    tonen_fout          – waarom de sleutel niet getoond kan worden
   Opslaan: POST naar dezelfde pagina; het thema wisselt al bij het kiezen (script onderaan).
   Sleutel herstellen: eigen formulier, POST naar /instellingen/sleutel. De ingevulde sleutel
   komt nooit terug in de pagina.
+  Herstelsleutel tonen: alleen als de databases open zijn (geen startfout), POST naar
+  /instellingen/sleutel/tonen. Een gewone GET van deze pagina bevat de sleutel nooit.
 #}
 {% extends "basis.html" %}
 {% block titel %}Instellingen{% endblock %}
@@ -145,10 +149,36 @@
   <section id="sleutel" class="instelling sleutel">
     <div class="instelling__kop">
       <span class="subkop">Sleutel</span>
-      <span class="zacht">Nieuwe computer, of Windows opnieuw geïnstalleerd? Zet hier je herstelsleutel terug,
-        dan kan AVS je gegevens weer openen.</span>
+      <span class="zacht">Met de herstelsleutel open je je gegevens op een andere computer, of na het opnieuw
+        installeren van Windows. Schrijf hem op en bewaar hem veilig, buiten deze computer.</span>
     </div>
+
+    {% if not startfout %}
+      {% if getoonde_sleutel %}
+        <div class="sleutel__getoond" role="region" aria-label="Herstelsleutel">
+          <p class="melding melding--let-op"><strong>Deel deze sleutel met niemand.</strong>
+            Wie hem heeft én een kopie van je gegevens, kan alles lezen. Bewaar hem op papier of in een wachtwoordkluis,
+            niet in een bestand naast de back-up.</p>
+          <p class="sleutel__tekst getallen" id="herstelsleutel-tekst">
+            {%- for g in getoonde_sleutel %}<span>{{ g }}</span>{{ " " if not loop.last }}{% endfor -%}
+          </p>
+          <div class="knoppen">
+            <button class="knop" type="button" id="sleutel-kopieren" hidden>Kopiëren</button>
+            <a class="knop knop--vol" href="{{ url_for('instellingen_pagina') }}#sleutel">Verbergen</a>
+          </div>
+          <p class="zacht sleutel__uitleg">64 tekens in groepjes van 8. De spaties hoeven niet mee bij herstellen.</p>
+        </div>
+      {% else %}
+        {% if tonen_fout %}<p class="melding melding--fout" role="alert">{{ tonen_fout }}</p>{% endif %}
+        <form method="post" action="{{ url_for('herstelsleutel_tonen') }}#sleutel" class="sleutel__tonen">
+          <button class="knop" type="submit">Herstelsleutel tonen</button>
+          <span class="zacht">Laat de sleutel van de gegevens op deze computer zien, om op te schrijven.</span>
+        </form>
+      {% endif %}
+    {% endif %}
+
     <details class="sleutel__herstellen"{% if sleutel_open %} open{% endif %}>
+      {# zet een sleutel terug op een nieuwe computer; bij een startfout het enige wat hier staat #}
       <summary class="knop">Sleutel herstellen</summary>
       <form method="post" action="{{ url_for('sleutel_herstellen') }}" class="sleutel__formulier" autocomplete="off">
         {% if sleutel_fout %}<p class="melding melding--fout" role="alert">{{ sleutel_fout }}</p>{% endif %}
@@ -178,6 +208,18 @@
         if (a) root.setAttribute("data-theme", a); else root.removeAttribute("data-theme");
       });
     });
+    /* Herstelsleutel kopiëren (alleen als de browser het klembord toestaat). */
+    var kopieer = document.getElementById("sleutel-kopieren");
+    if (kopieer && navigator.clipboard) {
+      kopieer.hidden = false;
+      kopieer.addEventListener("click", function () {
+        var tekst = document.getElementById("herstelsleutel-tekst").textContent.trim();
+        navigator.clipboard.writeText(tekst).then(function () {
+          kopieer.textContent = "Gekopieerd";
+          setTimeout(function () { kopieer.textContent = "Kopiëren"; }, 2000);
+        });
+      });
+    }
     var namen = ["Ma", "Di", "Wo", "Do", "Vr", "Za", "Zo"];
     var voorbeeld = document.querySelector(".weekvoorbeeld");
     document.querySelectorAll("input[name=eerste_dag]").forEach(function (r) {

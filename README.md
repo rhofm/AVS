@@ -25,7 +25,7 @@ In de conda-omgeving met Python 3.13, vanuit de root van de repo:
 ```
 pip install -e .[dev]     # afhankelijkheden + pytest en PyInstaller
 python -m pytest          # tests
-python src                # AVS starten (opent de browser)
+python src                # AVS starten (opent de browser; stopt vanzelf als het laatste tabblad dicht is)
 python src --zelftest     # controleren of alles werkt (ook: AVS.exe --zelftest)
 python build.py           # de .exe bouwen: tests, bouwen, controle, zelftest -> dist/AVS.exe
 ```

@@ -34,7 +34,8 @@ This project holds personal data about athletes, many of them minors.
   and do not add files that contain real names, birth dates or results.
 - **Never commit, print or log keys.** The master key lives only in the OS
   keyring; the recovery key is shown only on explicit request
-  (`--herstelsleutel`). Do not write keys to files, config or test fixtures.
+  (`--herstelsleutel`, or the button on Instellingen). Do not write keys to
+  files, config or test fixtures.
 - **Keep the split intact.** Names, birth dates, `master_id`, `atletieknu_id` and
   `au_licentienummer` (Atletiekunie licence number) live only in `personen.db`. Never copy them into `prestaties.db`,
   `testen.db`, `trainingsschema.db`, `absentie.db`, `leerlijnen.db`,
@@ -68,7 +69,7 @@ This project holds personal data about athletes, many of them minors.
   contents for anything that looks like data (`.db`, `.csv`, `.xlsx`,
   `instellingen.json`, `data/`, `tests/` → refused), runs `AVS.exe --zelftest`
   and writes the exact package versions to `dist/AVS-pakketten.txt`.
-  `--zonder-tests` is for trial builds only. What goes in is listed in
+  `--zonder-tests` is for trial builds only. The `.exe` is `--windowed`. What goes in is listed in
   `build.bronnen()`; every own module is passed as `--hidden-import` (from
   `zelftest_modules.txt`), plus `keyring.backends.Windows`, `--collect-all
   curl_cffi`, `--collect-binaries sqlcipher3`; optional packages AVS doesn't use
@@ -111,8 +112,25 @@ Python 3.13 (checked with `pip download --only-binary :all: --python-version 3.1
 --platform win_amd64`); a new dependency goes in `dependencies` with a comment
 saying what uses it.
 
-**Starting and self-test** (`src/__main__.py`): `python src` / `AVS.exe` starts
-the app; `--geen-browser` doesn't open the browser; `--zelftest` (`src/zelftest.py`)
+**Starting and stopping** (`src/__main__.py`, `src/ui/levensduur.py`): `python src`
+/ `AVS.exe` starts the app; `--geen-browser` doesn't open the browser. The `.exe`
+has no console window (`--windowed`): AVS stops by itself when the last AVS tab is
+closed, or with the **AVS afsluiten** button in the app bar (`POST /afsluiten`,
+page `afgesloten.html`). Every page loads `static/levend.js` (only when a
+`Bewaker` is set, i.e. a real start): `POST /levend` with a per-page id on load
+and every `HARTSLAG` s, `navigator.sendBeacon('/weg')` on `pagehide`. The
+`Bewaker` stops the server when no page is open and nothing happened for
+`WEG_WACHTTIJD` s, when a page was silent for `TIJDLIMIET` s (generous: browsers
+throttle background tabs to once a minute), or when no page came within
+`EERSTE_PAGINA` s; a jump in its own clock means the computer slept, which
+never stops AVS. It stops via `server.shutdown()` in another thread, so never in
+the middle of a request. `/weg` and `/afsluiten` only accept requests from AVS
+itself (`_van_deze_app`). Request logging is off (`_StilleHandler`: URLs contain
+athlete ids). Without a console, `--zelftest` writes to the console it was
+started from (`AttachConsole`), and an unexpected start error is shown as a
+Windows message box.
+
+**Self-test**: `--zelftest` (`src/zelftest.py`)
 checks everything a build can miss — all own modules import, the outside packages,
 SQL files, a throw-away encrypted database (random key, temp folder), the
 keyring backend, every rule file loads, strategies, `milp`, a PDF, curl_cffi,
@@ -168,6 +186,14 @@ even when the databases can't be opened (`ZONDER_DATABASE` in `ui/app.py`);
 every other page shows the start error. `herstel()` only stores a key after it
 has opened the existing databases, and the submitted key is never echoed,
 logged or cached.
+
+Writing the key down works the other way round: **Instellingen > Herstelsleutel
+tonen** (`POST /instellingen/sleutel/tonen`) shows it in groups of 8, only when
+the databases are open (not in `ZONDER_DATABASE`, and refused while there is a
+start error) and only a key that actually opens them
+(`init_db.herstelsleutel_als_hij_past()`). POST only and only from AVS itself
+(`_van_deze_app`), the response is `Cache-Control: no-store`, and a normal GET of
+the page never contains the key.
 
 The SQL files are read from `init_db.SQL_DIR` (`src/db/` from source,
 `sys._MEIPASS/db` in the `.exe`), never via the working directory. `init_db()`

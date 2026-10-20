@@ -128,6 +128,14 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--rood); outline-
 }
 .appbalk__instellingen svg { width: 1.05em; height: 1.05em; }
 .appbalk__instellingen:hover, .appbalk__instellingen[aria-current="page"] { border-color: var(--rood); color: var(--rood); }
+.appbalk__afsluiten { margin: 0 0 0 -1rem; }            /* direct naast Instellingen */
+.appbalk__afsluiten button {
+  display: inline-flex; align-items: center; gap: .35rem; cursor: pointer;
+  font: inherit; font-size: var(--maat-s); color: var(--tekst); background: transparent;
+  padding: .3rem .6rem; border: 1px solid var(--rand);
+}
+.appbalk__afsluiten svg { width: 1.05em; height: 1.05em; }
+.appbalk__afsluiten button:hover, .appbalk__afsluiten button:focus-visible { border-color: var(--rood); color: var(--rood); }
 
 /* ---------- het "vel" ---------- */
 .pagina {
@@ -859,6 +867,17 @@ th[aria-sort="descending"] .sorteer__naam::after { content: " \2193"; opacity: 1
 .datamap { margin: 0; }
 .datamap code { display: inline-block; max-width: 100%; overflow-wrap: anywhere; padding: .35rem .6rem;
   font-size: var(--maat-s); background: var(--papier); border: 1px solid var(--rand); }
+.sleutel__tonen { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem 1rem; margin-bottom: 1rem; }
+.sleutel__tonen .zacht { font-size: var(--maat-s); }
+.sleutel__getoond { display: grid; gap: .8rem; max-width: 38rem; margin-bottom: 1.25rem; }
+.sleutel__tekst {
+  margin: 0; padding: .9rem 1rem; display: grid; grid-template-columns: repeat(4, max-content); gap: .4rem 1.1rem;
+  font-family: ui-monospace, Consolas, monospace; font-size: var(--maat-l); letter-spacing: .04em;
+  background: var(--papier); border: 2px dashed var(--zalm); user-select: all;
+}
+.sleutel__uitleg { margin: 0; font-size: var(--maat-xs); }
+@media (max-width: 30rem) { .sleutel__tekst { grid-template-columns: repeat(2, max-content); font-size: var(--maat-m); } }
+@media print { .sleutel__getoond .knoppen { display: none; } }
 .sleutel__formulier .veld input { width: 100%; font-family: ui-monospace, Consolas, monospace; }
 .instelling__keuzes--dagen { grid-template-columns: minmax(9rem, 1.6fr) repeat(7, minmax(2.6rem, 1fr)); }
 .instelling__keuzes--thema, .instelling__keuzes--tijd { grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr)); gap: .6rem; }

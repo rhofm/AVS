@@ -602,6 +602,24 @@ def herstelsleutel() -> str:
     return hoofdsleutel().hex()
 
 
+def herstelsleutel_als_hij_past(map: Path | None = None, hoofd: str | bytes | None = None) -> str:
+    """De herstelsleutel, maar alleen als die de bestaande databases in `map` echt opent.
+
+    Voor de knop 'Herstelsleutel tonen' (Instellingen): zo laat AVS nooit een sleutel
+    zien die niet bij de gegevens hoort. hoofd: een vaste sleutel (tests); None = de
+    sleutelkluis. SleutelFout als er geen sleutel is of hij niet past; SleutelkluisFout
+    als de kluis niet bereikbaar is.
+    """
+    sleutel = _naar_bytes(hoofd) if hoofd is not None else hoofdsleutel()
+    _past_bij_databases(sleutel, map)
+    return sleutel.hex()
+
+
+def in_groepjes(sleutel: str, grootte: int = 8) -> list[str]:
+    """'5a5a…' -> ['5a5a5a5a', …]: makkelijker over te schrijven. herstel() negeert de spaties weer."""
+    return [sleutel[i:i + grootte] for i in range(0, len(sleutel), grootte)]
+
+
 def _opschonen(sleutel: str) -> str:
     """Spaties, tabs en regeleinden weg: een overgetypte of geplakte sleutel staat vaak in groepjes."""
     return "".join(sleutel.split())

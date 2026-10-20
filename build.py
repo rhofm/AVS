@@ -99,7 +99,7 @@ def pyinstaller_argumenten(werkmap: Path, modulelijst: Path, onedir: bool = Fals
         str(SRC / "__main__.py"),
         "--name", NAAM,
         "--onedir" if onedir else "--onefile",
-        "--console",                                   # het venster is (nog) de manier om AVS te stoppen
+        "--windowed",                                  # geen consolevenster: AVS stopt vanzelf of via de knop
         "--noconfirm", "--clean",
         "--log-level", "WARN",
         "--distpath", str(DIST),

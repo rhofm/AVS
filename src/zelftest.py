@@ -189,7 +189,7 @@ def _webinterface(tmp: Path) -> str:
     for naam in namen:
         app.jinja_env.get_template(naam)              # elk template is te lezen en klopt
     c = app.test_client()
-    for pad in ("/static/avs.css", "/static/filter.js", "/static/sorteer.js", "/instellingen"):
+    for pad in ("/static/avs.css", "/static/filter.js", "/static/sorteer.js", "/static/levend.js", "/instellingen"):
         r = c.get(pad)
         if r.status_code != 200:
             raise RuntimeError(f"{pad} gaf {r.status_code}")

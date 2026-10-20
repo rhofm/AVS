@@ -38,7 +38,7 @@ def _paren(args: list[str], optie: str) -> list[str]:
 def test_argumenten(build, modulelijst, tmp_path):
     args = build.pyinstaller_argumenten(tmp_path / "werk", modulelijst)
     assert args[0] == str(ROOT / "src" / "__main__.py")
-    assert "--onefile" in args and "--console" in args and "--onedir" not in args
+    assert "--onefile" in args and "--windowed" in args and "--console" not in args and "--onedir" not in args
     assert _paren(args, "--name") == ["AVS"] and _paren(args, "--paths") == [str(ROOT / "src")]
 
     data = _paren(args, "--add-data")

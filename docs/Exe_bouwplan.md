@@ -347,7 +347,7 @@ src/__main__.py --name AVS --onefile --console --noconfirm --clean
 **Never** add `data/`, `tests/` or `.git` (athlete privacy). `build/`, `dist/` and `*.spec`
 are already in `.gitignore`.
 
-Choices for now:
+Choices for now (`--console` was later replaced, see "Afterwards" at the end):
 - `--console`: the console window is the way to stop AVS ("sluit dit venster om te stoppen").
   Switch to `--windowed` only after adding another way to stop (tray icon, a "Stoppen" button,
   or stopping automatically when the browser tab closes).
@@ -396,3 +396,21 @@ to a GitHub Release.
 
 Updating for users: replace `AVS.exe`. Their data stays in `%LOCALAPPDATA%\AVS\data`, migrations
 run on the next start, and their own `config\` edits keep priority (step 3).
+
+---
+
+## Afterwards — no console window, AVS stops by itself ✅ done
+
+The .exe is now built with `--windowed`: no terminal window.
+- AVS stops by itself when the last AVS tab is closed (about 8 s after closing; clicking to
+  another page doesn't count), or when a page was silent for 2½ minutes (crashed browser).
+  Sleep mode never stops it. Details: `src/ui/levensduur.py`.
+- **AVS afsluiten** button next to Instellingen (asks for confirmation) → page "AVS is
+  afgesloten", then the server stops after that response.
+- Without a console: `AVS.exe --zelftest` from a command prompt still prints there
+  (`build.py` relies on that); an unexpected start error appears as a Windows message box.
+- Tested in a real browser (Chromium): navigating keeps AVS running, closing the tab stopped it
+  after 9 s, the button stopped it at once. Tests: `tests/test_levensduur.py`.
+
+Still to check on Windows by hand (step 8): double-click start without a terminal window,
+closing the tab, the button, and `AVS.exe --zelftest` from `cmd`.
