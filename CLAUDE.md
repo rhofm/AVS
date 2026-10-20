@@ -53,7 +53,7 @@ This project holds personal data about athletes, many of them minors.
   with `templates/` and `static/`. The framework choice is still open.
 - **Settings** (page Instellingen): `src/instellingen/` keeps first weekday, theme,
   time notation and name order (sort athletes by last or first name) in
-  `data/instellingen.json` (no personal data, so plain JSON).
+  `instellingen.json` in the data folder (no personal data, so plain JSON).
   'systeem' = follow the computer (`instellingen/systeem.py` reads the Windows
   registry; the theme follows the browser's `prefers-color-scheme`). Never loop
   over `DAGEN` for *display*: use `instellingen.dagvolgorde()` (and `weekbegin()`,
@@ -99,8 +99,14 @@ follow it when implementing.
 
 ### Encrypted databases
 
-The data is split over eight SQLCipher-encrypted files in `data/` (repo root
-when run from source, next to the `.exe` when frozen):
+The data is split over eight SQLCipher-encrypted files in the data folder,
+`init_db.standaard_map()`: `data/` in the repo root when run from source,
+`%LOCALAPPDATA%\AVS\data` when frozen (always writable, wherever the `.exe`
+is), or `$AVS_DATA` when that environment variable is set. On the first frozen
+start with an empty data folder, `oude_data_overnemen()` copies a `data/`
+folder next to the `.exe` (copy only, never overwrite, all-or-nothing; on
+failure `OvernameFout` and no `init_db()`, so no empty databases appear). The
+Instellingen page shows the data folder. Never hard-code `data/` elsewhere. The files:
 
 | File             | Contents | Athlete identified by |
 |------------------|----------|-----------------------|

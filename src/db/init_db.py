@@ -1,7 +1,15 @@
 """Initialiseert de versleutelde AVS-databases.
 
 De databases staan NIET in git (privacy). De gegevens zijn verdeeld over acht
-bestanden, elk met SQLCipher versleuteld met een eigen sleutel:
+bestanden, elk met SQLCipher versleuteld met een eigen sleutel. Ze staan in de
+datamap (standaard_map()):
+
+    vanuit de broncode   data/ in de root van de repo
+    de .exe              %LOCALAPPDATA%\\AVS\\data (altijd schrijfbaar, waar de .exe ook staat)
+    AVS_DATA=<map>       die map (omgevingsvariabele; voor testen of bijzondere gevallen)
+
+De eerste keer dat de .exe start met een lege datamap neemt hij een data/-map
+naast de .exe over (oude_data_overnemen(): kopiëren, nooit overschrijven).
 
     data/personen.db         persoonsgegevens, groepen, trainingen, leerlijnen, ploegen
     data/prestaties.db       onderdelen, wedstrijden, prestaties, PR's
@@ -71,8 +79,10 @@ from __future__ import annotations
 import argparse
 import hashlib
 import hmac
+import os
 import re
 import secrets
+import shutil
 import sys
 from contextlib import closing
 from pathlib import Path
@@ -111,6 +121,10 @@ HERSTEL_UITLEG = "Zet de herstelsleutel terug via Instellingen > Sleutel herstel
 # ============================================================
 class SleutelFout(RuntimeError):
     """De hoofdsleutel ontbreekt, is ongeldig of past niet bij de databases."""
+
+
+class OvernameFout(RuntimeError):
+    """De gegevens naast de .exe konden niet naar de nieuwe datamap worden gekopieerd."""
 
 
 class InstallatieFout(RuntimeError):
@@ -187,13 +201,85 @@ def pseudoniem(master_id: str, database: str, hoofd: str | bytes | None = None) 
 # ============================================================
 # Verbinden
 # ============================================================
+#: Omgevingsvariabele voor een eigen datamap (gaat voor alles).
+DATAMAP_OMGEVING = "AVS_DATA"
+
+
+def _lokale_appdata() -> Path:
+    eigen = os.environ.get("LOCALAPPDATA")
+    return Path(eigen) if eigen else Path.home() / "AppData" / "Local"
+
+
 def standaard_map() -> Path:
-    """data/ naast de .exe (gebouwd) of in de root van de repo (ontwikkeling)."""
+    """De datamap: $AVS_DATA, anders %LOCALAPPDATA%\\AVS\\data (de .exe) of data/ in de repo (broncode)."""
+    eigen = os.environ.get(DATAMAP_OMGEVING, "").strip()
+    if eigen:
+        return Path(eigen).expanduser()
     if getattr(sys, "frozen", False):  # draait als PyInstaller-.exe
-        basis = Path(sys.executable).resolve().parent
-    else:
-        basis = DB_DIR.parents[1]  # src/db -> repo-root
-    return basis / "data"
+        return _lokale_appdata() / "AVS" / "data"
+    return DB_DIR.parents[1] / "data"  # src/db -> repo-root
+
+
+def _oude_datamap() -> Path | None:
+    """Waar de .exe vroeger zijn gegevens bewaarde: data/ naast de .exe. Vanuit de broncode: None."""
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).resolve().parent / "data"
+    return None
+
+
+#: Wat er bij het overnemen mee moet: de databases (met een eventueel achtergebleven
+#: journal van een onderbroken schrijfactie) en de instellingen.
+_OVER_TE_NEMEN = tuple(f"{d}.db{x}" for d in DATABASES for x in ("", "-journal")) + ("instellingen.json",)
+
+
+def oude_data_overnemen(doel: Path | None = None, bron: Path | None = None) -> list[str]:
+    """Eenmalig: de gegevens uit data/ naast de .exe kopiëren naar de (nieuwe) datamap.
+
+    Alleen als de datamap nog geen enkele database heeft en de bron er wel heeft. Kopiëren,
+    nooit verplaatsen of overschrijven: de oude map blijft staan. Eerst alles naar een
+    tijdelijke map, dan pas op de plek zetten, zodat er nooit een halve set staat (dan zou
+    init_db de ontbrekende databases leeg aanmaken). Geeft de namen van de gekopieerde bestanden.
+    """
+    doel = Path(doel) if doel else standaard_map()
+    bron = Path(bron) if bron else _oude_datamap()
+    if bron is None or not bron.is_dir():
+        return []
+    try:
+        if bron.resolve() == doel.resolve():
+            return []
+    except OSError:
+        return []
+    if any(db_pad(d, doel).exists() for d in DATABASES):
+        return []                                    # er staan al gegevens: nooit overschrijven
+    bestanden = [bron / naam for naam in _OVER_TE_NEMEN if (bron / naam).is_file()]
+    if not any(f.suffix == ".db" for f in bestanden):
+        return []
+
+    tijdelijk = doel / ".overnemen"
+    geplaatst: list[Path] = []
+    try:
+        doel.mkdir(parents=True, exist_ok=True)
+        shutil.rmtree(tijdelijk, ignore_errors=True)
+        tijdelijk.mkdir()
+        for f in bestanden:
+            shutil.copy2(f, tijdelijk / f.name)
+        for f in bestanden:
+            if not (doel / f.name).exists():         # bijv. een eigen instellingen.json blijft staan
+                (tijdelijk / f.name).replace(doel / f.name)
+                geplaatst.append(doel / f.name)
+    except OSError as e:
+        for f in geplaatst:                          # geen halve set achterlaten
+            f.unlink(missing_ok=True)
+        raise OvernameFout(
+            f"Je gegevens konden niet worden overgenomen van {bron} naar {doel} ({e.strerror or e}). "
+            "Er is niets gewist: de gegevens staan nog in de oude map. Start AVS opnieuw, of zet de "
+            "bestanden zelf over."
+        ) from None
+    finally:
+        shutil.rmtree(tijdelijk, ignore_errors=True)
+    namen = [f.name for f in geplaatst]
+    print(f"Gegevens overgenomen van {bron} naar {doel}: {', '.join(namen)}")
+    return namen
 
 
 def db_pad(database: str, map: Path | None = None) -> Path:

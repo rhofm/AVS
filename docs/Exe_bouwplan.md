@@ -11,7 +11,7 @@ Do steps 1–4 on their own feature branch(es) and merge them into `dev` before 
 | 1 ✅ | Restore the key from Instellingen | Users without a terminal must be able to restore the recovery key |
 | 2 ✅ | Package the database schemas | Without them the .exe crashes on first start |
 | 3 ✅ | External config has priority, per file | Updates bring new YAML files without losing local edits |
-| 4 | Move `standaard_map()` to `%LOCALAPPDATA%` | Data must be writable, wherever the .exe is |
+| 4 ✅ | Move `standaard_map()` to `%LOCALAPPDATA%` | Data must be writable, wherever the .exe is |
 | 5 | Pin dependencies in `pyproject.toml` | Reproducible environment for building |
 | 6 | Add `__main__.py` options and a self-test | Lets `build.py` check the built .exe |
 | 7 | Write `build.py` | One command → `dist/AVS.exe` |
@@ -193,7 +193,7 @@ and `sys.executable` pointing into `tmp_path`.)
 
 ---
 
-## Step 4 — Move `standaard_map()`
+## Step 4 — Move `standaard_map()` ✅ done
 
 **New location for the .exe:** `%LOCALAPPDATA%\AVS\data`
 (e.g. `C:\Users\<naam>\AppData\Local\AVS\data`). It's always writable, belongs to the
@@ -227,6 +227,12 @@ keyring key, which looks like all data is gone.
   same keyring).
 - Show the data folder on the Instellingen page (read-only text: "Je gegevens staan in …"),
   so a user knows what to back up.
+
+**Built** as described (`tests/test_datamap.py`). The copy is all-or-nothing: files go to a
+temporary folder first and are only then put in place; if anything fails, `OvernameFout`
+is shown on the error page and `init_db()` does not run (so no empty databases appear).
+The old folder is never changed. Checked with a real PyInstaller build in a "Program Files"
+folder: the first start copies the 8 databases, the second start copies nothing.
 
 ### Tests
 - Frozen + `LOCALAPPDATA` in `tmp_path` → `standaard_map()` is `…/AVS/data`.

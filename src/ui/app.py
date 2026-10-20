@@ -38,7 +38,8 @@ from atleten import trainingsschema as schemabeheer
 from atleten import prs_importeren as prs_import
 from atleten.aanwezigheid import aanwezigheid
 import instellingen
-from db.init_db import HERSTEL_UITLEG, InstallatieFout, SleutelFout, herstel, init_db
+from db.init_db import (HERSTEL_UITLEG, InstallatieFout, OvernameFout, SleutelFout, herstel, init_db,
+                        oude_data_overnemen, standaard_map)
 from db.queries import Opslag, OpslagFout
 from importers.base import ImportFout
 from groepen import groep as groepsbeheer
@@ -1261,6 +1262,7 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
         startfout = app.config["AVS_STARTFOUT"]
         return render_template("instellingen.html", inst=inst, fout=fout, meldingen=get_flashed_messages(),
                                startfout=startfout, sleutel_fout=sleutel_fout,
+                               datamap=Path(app.config["AVS_MAP"] or standaard_map()),
                                sleutel_open=bool((startfout and app.config["AVS_STARTFOUT_SLEUTEL"]) or sleutel_fout),
                                eerste_dag_keuzes=instellingen.EERSTE_DAG_KEUZES,
                                thema_keuzes=instellingen.THEMA_KEUZES, tijd_keuzes=instellingen.TIJD_KEUZES,
@@ -1540,7 +1542,11 @@ def start(map: Path | None = None, browser: bool = True) -> None:
     startfout = None
     sleutelfout = True
     try:
+        if map is None:
+            oude_data_overnemen()           # eenmalig: data/ naast de .exe -> %LOCALAPPDATA%\AVS\data
         init_db(map)
+    except OvernameFout as e:               # dan géén init_db: die zou lege databases aanmaken
+        startfout, sleutelfout = str(e), False
     except SleutelFout as e:
         startfout = str(e) if HERSTEL_UITLEG in str(e) else f"{e}\n\n{HERSTEL_UITLEG}"
     except InstallatieFout as e:

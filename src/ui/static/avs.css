@@ -855,6 +855,10 @@ th[aria-sort="descending"] .sorteer__naam::after { content: " \2193"; opacity: 1
 .sleutel__herstellen summary::-webkit-details-marker { display: none; }
 .sleutel__herstellen[open] summary { margin-bottom: 1rem; }
 .sleutel__formulier { display: grid; gap: .9rem; max-width: 38rem; }
+.sleutel + .sleutel { margin-top: 1.5rem; }
+.datamap { margin: 0; }
+.datamap code { display: inline-block; max-width: 100%; overflow-wrap: anywhere; padding: .35rem .6rem;
+  font-size: var(--maat-s); background: var(--papier); border: 1px solid var(--rand); }
 .sleutel__formulier .veld input { width: 100%; font-family: ui-monospace, Consolas, monospace; }
 .instelling__keuzes--dagen { grid-template-columns: minmax(9rem, 1.6fr) repeat(7, minmax(2.6rem, 1fr)); }
 .instelling__keuzes--thema, .instelling__keuzes--tijd { grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr)); gap: .6rem; }

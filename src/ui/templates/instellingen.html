@@ -12,6 +12,7 @@
     startfout           – waarom AVS de databases niet kon openen (of None)
     sleutel_fout        – na een mislukte poging om de herstelsleutel terug te zetten
     sleutel_open        – het blok 'Sleutel herstellen' meteen open tonen
+    datamap             – de map met de databases (om een back-up van te maken)
   Opslaan: POST naar dezelfde pagina; het thema wisselt al bij het kiezen (script onderaan).
   Sleutel herstellen: eigen formulier, POST naar /instellingen/sleutel. De ingevulde sleutel
   komt nooit terug in de pagina.
@@ -129,6 +130,16 @@
       <button class="knop knop--vol" type="submit">Opslaan</button>
     </div>
   </form>
+
+  {# ---------- waar de gegevens staan ---------- #}
+  <section id="gegevens" class="instelling sleutel">
+    <div class="instelling__kop">
+      <span class="subkop">Gegevens</span>
+      <span class="zacht">Al je gegevens staan versleuteld in deze map. Maak er regelmatig een back-up van,
+        en bewaar je herstelsleutel apart: zonder die sleutel is een back-up niet te openen.</span>
+    </div>
+    <p class="datamap"><code>{{ datamap }}</code></p>
+  </section>
 
   {# ---------- sleutel herstellen (eigen formulier, los van de instellingen hierboven) ---------- #}
   <section id="sleutel" class="instelling sleutel">
