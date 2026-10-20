@@ -88,13 +88,13 @@ onderdelen:
   1500m-M:   {naam: 1500 meter, punten: 1500m, geslacht: M, buren: [800m-M, 5000m-M]}
   3000m-V:   {naam: 3000 meter, punten: 3000m, geslacht: V, buren: [1500m-V]}
   5000m-M:   {naam: 5000 meter, punten: 5000m, geslacht: M, buren: [1500m-M]}
-  100mH-V:   {naam: 100 meter horden, punten: 100mH, geslacht: V, specificatie: 84cm,
-              verhouding: {76.2cm: 0.97, 84cm: 1.0}}
+  100mH-V:   {naam: 100 meter horden, punten: 100mH, geslacht: V, specificatie: 83.8cm,
+              verhouding: {76.2cm: 0.97, 83.8cm: 1.0}}
   110mH-M:   {naam: 110 meter horden, punten: 110mH, geslacht: M, specificatie: 106.7cm,
               verhouding: {91.4cm: 0.94, 99.1cm: 0.97, 106.7cm: 1.0}}
   400mH-V:   {naam: 400 meter horden, punten: 400mH, geslacht: V, specificatie: 76.2cm, buren: [400m-V]}
   400mH-M:   {naam: 400 meter horden, punten: 400mH, geslacht: M, specificatie: 91.4cm, buren: [400m-M],
-              verhouding: {84cm: 0.98, 91.4cm: 1.0}}
+              verhouding: {83.8cm: 0.98, 91.4cm: 1.0}}
   3000mSC-V: {naam: 3000 meter steeple, punten: 3000mSC, geslacht: V, specificatie: 76.2cm}
   3000mSC-M: {naam: 3000 meter steeple, punten: 3000mSC, geslacht: M, specificatie: 91.4cm}
   # ---- estafettes ----

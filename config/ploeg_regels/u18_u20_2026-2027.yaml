@@ -83,12 +83,12 @@ onderdelen:
   800m:    {naam: 800 meter,  buren: [400m, 1500m]}
   1500m:   {naam: 1500 meter, buren: [800m, 3000m]}
   3000m:   {naam: 3000 meter, buren: [1500m]}
-  100mH:   {naam: 100 meter horden, specificatie: {U18-V: 76.2cm, U20-V: 84cm},
-            verhouding: {76.2cm: 0.97, 84cm: 1.0}}
+  100mH:   {naam: 100 meter horden, specificatie: {U18-V: 76.2cm, U20-V: 83.8cm},
+            verhouding: {76.2cm: 0.97, 83.8cm: 1.0}}
   110mH:   {naam: 110 meter horden, specificatie: {U18-M: 91.4cm, U20-M: 99.1cm},
             verhouding: {91.4cm: 0.97, 99.1cm: 1.0, 106.7cm: 1.03}}
-  400mH:   {naam: 400 meter horden, specificatie: {U18-V: 76.2cm, U20-V: 76.2cm, U18-M: 84cm, U20-M: 91.4cm},
-            buren: [400m], verhouding: {76.2cm: 0.98, 84cm: 1.0, 91.4cm: 1.02}}
+  400mH:   {naam: 400 meter horden, specificatie: {U18-V: 76.2cm, U20-V: 76.2cm, U18-M: 83.8cm, U20-M: 91.4cm},
+            buren: [400m], verhouding: {76.2cm: 0.98, 83.8cm: 1.0, 91.4cm: 1.02}}
   2000mSC: {naam: 2000 meter steeple, specificatie: {U18-V: 76.2cm, U18-M: 91.4cm}, alleen: [U18-V, U18-M]}
   4x100m:  {naam: 4 x 100 meter, lopers: 4, benen: [100m, 100m, 100m, 100m], correctie_s: -1.5}
   4x400m:  {naam: 4 x 400 meter, lopers: 4, benen: [400m, 400m, 400m, 400m], correctie_s: -2.0}
