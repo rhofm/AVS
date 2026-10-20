@@ -14,7 +14,7 @@ Do steps 1–4 on their own feature branch(es) and merge them into `dev` before 
 | 4 ✅ | Move `standaard_map()` to `%LOCALAPPDATA%` | Data must be writable, wherever the .exe is |
 | 5 ✅ | Pin dependencies in `pyproject.toml` | Reproducible environment for building |
 | 6 ✅ | Add `__main__.py` options and a self-test | Lets `build.py` check the built .exe |
-| 7 | Write `build.py` | One command → `dist/AVS.exe` |
+| 7 ✅ | Write `build.py` | One command → `dist/AVS.exe` |
 | 8 | Test the frozen build by hand | Check the things a self-test can't cover |
 | 9 | Release (optional) | Automatic build on `main` |
 
@@ -317,7 +317,7 @@ Tried on a real PyInstaller build of the whole app (≈ 95 MB, Linux):
 
 ---
 
-## Step 7 — `build.py`
+## Step 7 — `build.py` ✅ done
 
 One command: `python build.py`. It:
 
@@ -356,6 +356,20 @@ Choices for now:
 
 After the first build, read `build/AVS/warn-AVS.txt` and add `--hidden-import` lines for
 anything missing.
+
+**Built.** `python build.py [--onedir] [--zonder-tests]`. Differences from the sketch above:
+- It clears `build/` and `dist/` **first**, so a failed build never leaves an old .exe behind.
+- Every own module is a `--hidden-import` (step 6); pytest, tkinter, IPython, matplotlib and
+  pandas are excluded (`NIET_MEENEMEN`); they were pulled in through optional imports.
+- **Privacy check after building:** it reads the build's table of contents and refuses if
+  anything looks like data (`.db`, `.csv`, `.xlsx`, `instellingen.json`, `data/`, `tests/`).
+- It writes `dist/AVS-pakketten.txt` (`pip freeze`): the exact versions this .exe was built with.
+- A failed self-test points to PyInstaller's `warn-AVS.txt`.
+- Tests: `tests/test_build.py` (arguments, privacy filter, order, stopping at the first failure).
+
+Tried for real (Linux): the gate refuses while `test_regels` fails; with `--zonder-tests` the
+build passes the privacy check (410 entries) and the self-test; one file of 95 MB (`--onedir`:
+a folder of 324 MB). Building on Windows is step 8.
 
 ---
 

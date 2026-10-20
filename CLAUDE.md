@@ -62,10 +62,19 @@ This project holds personal data about athletes, many of them minors.
   'HH:MM'. Storage and form values stay 'HH:MM' and Monday-first. Sort athletes
   with `instellingen.naam_sleutel` / `op_naam()` (and `naam_tekst()` for
   `data-sort`), never with a hard-coded `ORDER BY achternaam`.
-- **Distribution**: PyInstaller, driven by `build.py` (one command → `.exe`).
-  Code must work both from source and frozen: use `sys.frozen` checks as in
-  `standaard_map()` and never assume the current working directory. The build
-  needs `--hidden-import keyring.backends.Windows`.
+- **Distribution**: PyInstaller, driven by `build.py` (one command → `.exe`):
+  `python build.py` clears `build/` + `dist/`, runs the tests (no build if they
+  fail), builds `dist/AVS.exe` (`--onedir`: a folder), checks the build's
+  contents for anything that looks like data (`.db`, `.csv`, `.xlsx`,
+  `instellingen.json`, `data/`, `tests/` → refused), runs `AVS.exe --zelftest`
+  and writes the exact package versions to `dist/AVS-pakketten.txt`.
+  `--zonder-tests` is for trial builds only. What goes in is listed in
+  `build.bronnen()`; every own module is passed as `--hidden-import` (from
+  `zelftest_modules.txt`), plus `keyring.backends.Windows`, `--collect-all
+  curl_cffi`, `--collect-binaries sqlcipher3`; optional packages AVS doesn't use
+  are excluded (`NIET_MEENEMEN`). Code must work both from source and frozen:
+  use `sys.frozen` checks as in `standaard_map()` and never assume the current
+  working directory.
 
 ### Layout (`src/`)
 
@@ -90,9 +99,8 @@ edits and additions), then the copy built into the `.exe`; an empty file
 (only whitespace/#-comments) never hides a filled one. Loaded files are cached
 by path + modification time, so an edited YAML file counts without a restart. Design of the team feature: `docs/Ploegopstelling_ontwerp.md`.
 
-Many files are still placeholders (a docstring or `#This is an empty temporary
-file`): `build.py` and some YAML rule sets. The docstring in
-each placeholder describes its intended role — follow it when implementing.
+Some YAML rule sets (`competitie_u16.yaml`, `standaard.yaml`) are still empty
+placeholders (`#This is an empty temporary file`).
 
 **Dependencies** are in `pyproject.toml` (Python 3.13), installed into the
 conda environment with `pip install -e .[dev]` (`[dev]` = pytest + PyInstaller).

@@ -27,6 +27,7 @@ pip install -e .[dev]     # afhankelijkheden + pytest en PyInstaller
 python -m pytest          # tests
 python src                # AVS starten (opent de browser)
 python src --zelftest     # controleren of alles werkt (ook: AVS.exe --zelftest)
+python build.py           # de .exe bouwen: tests, bouwen, controle, zelftest -> dist/AVS.exe
 ```
 
 Het plan voor de .exe staat in [Exe_bouwplan](docs/Exe_bouwplan.md).
