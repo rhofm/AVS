@@ -128,6 +128,7 @@ AVS/
 │   │   ├── rooster.py            planned training content: fill in, import, apply to trainings
 │   │   ├── doelen.py             goals: status per line, forms
 │   │   ├── leerdoelen_scoren.py  page 'Leerdoelen scoren': score a whole group on one leerdoel
+│   │   ├── testen_invullen.py    page 'Testresultaten invullen': enter a test for a whole group (all-or-nothing, error per athlete)
 │   │   └── overzichten.py        group tables: PRs, test results (parts + total), leerdoelen, attendance
 │   │
 │   ├── testen/                   ✅ test templates and results
@@ -151,11 +152,12 @@ AVS/
 │       ├── templates/            ~60 pages
 │       └── static/               avs.css, filter.js, sorteer.js, levend.js
 │
-└── tests/                        fake data only; run with `python -m pytest` (72 test files)
+└── tests/                        fake data only; run with `python -m pytest` (73 test files)
     ├── test_<feature>.py         one file per feature (models, queries, atleten, groepen, wedstrijden, importers,
     │                             ploegen, regels, punten, rooster, periodisering, doelen, build, zelftest, ...)
     ├── test_testen_*.py          formula engine, templates, results (incl. migration), editor and pages
     ├── test_groep_leerdoelen_scoren.py   scoring a whole group on a leerdoel
+    ├── test_groep_testen_invullen.py     entering a test for a whole group
     ├── test_opstelling.py        📝 placeholder
     └── fixtures/                 saved, anonymised atletiek.nu/Seltec pages (profile, meet results, timetables)
 ```
@@ -221,7 +223,8 @@ ui/  ──►  atleten/ · wedstrijden/ · ploeg/ · groepen/ · leerlijnen/ ·
 
 - [ ] Fill in the masters age-grading factors in `config/puntentelling/masters_agegrading.yaml` (from the Atletiekunie tables; never invent them).
 - [x] Entry form for test results, based on YAML test templates (`testen/`, pages 'Testsjablonen' and 'Testresultaat').
-- [ ] Enter test results for a whole group in one go; progress chart per test.
+- [x] Enter test results for a whole group in one go (`groepen/testen_invullen.py`).
+- [ ] Progress chart per test.
 - [x] Score a whole group on a leerdoel in one go.
 - [ ] Progress chart per athlete.
 - [ ] Run the manual `.exe` checklist in `docs/Exe_bouwplan.md` (first start, key recovery, imports, optimiser, PDF, edited config, no write access, SmartScreen).

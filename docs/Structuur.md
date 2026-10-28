@@ -14,7 +14,8 @@
   * Zijn er minstens twee onderdelen met een formule, dan is er een vinkje 'scores optellen tot totaalscore' (standaard aan). Bij een totaal moeten alle onderdelen met een formule ingevuld worden
   * Sjablonen zijn `.yaml`-bestanden (de bestandsnaam is de id), dus makkelijk te delen: de map `testsjablonen` in de datamap (eigen sjablonen) en `config/testen/` (meegeleverd; een eigen bestand met dezelfde naam gaat voor). Op de pagina 'Testsjablonen' zijn ze te bekijken, te bewerken, te downloaden en te verwijderen
   * Scores worden bij het invullen berekend en opgeslagen; een latere wijziging van een formule verandert oude scores niet. Zijn er al resultaten, dan kan het sjabloon wel van naam/formule veranderen, maar niet van aantal onderdelen, soort of 'totaal optellen'
-  * Nog te doen: resultaten van een hele groep in één keer invullen, voortgangsgrafiek per test
+  * Een hele groep in één keer: pagina 'Testresultaten invullen' van de groep (knop '+ Resultaten invullen' op de testpagina van de groep). Kies een test, zie per atleet het laatste resultaat en vul per onderdeel in; één datum voor allen. Atleten met lege velden worden overgeslagen; klopt de invoer van iemand niet, dan wordt er niets opgeslagen en staat de fout bij die atleet. Een nieuw sjabloon maken kan ook vanaf deze pagina, waarna je meteen de groep invult
+  * Nog te doen: voortgangsgrafiek per test
 * Trainingsschema: op welke dagen van de week de atleet traint
 * Notities: vrije tekst per atleet per datum (wat opviel op training of wedstrijd), zoekbaar op tekst en datum
 * Doelen: eigen regels uit groepsdoelen en persoonlijke doelen, met de stand (zie Groepen)

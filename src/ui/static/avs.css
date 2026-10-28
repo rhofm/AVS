@@ -1111,3 +1111,7 @@ th[aria-sort="descending"] .sorteer__naam::after { content: " \2193"; opacity: 1
 .testdelen li { display: flex; flex-wrap: wrap; gap: .1rem .75rem; }
 .testdelen .score { color: var(--tekst-zacht); }
 .testtotaal { font-weight: 700; }
+
+/* Testresultaten van een groep invullen: rij met een fout */
+.tabel tr.invulrij--fout > th, .tabel tr.invulrij--fout > td { box-shadow: inset 0 -2px 0 var(--rood); }
+.invulrij__fout { display: block; color: var(--rood); font-weight: 400; font-size: var(--maat-xs); }

@@ -4,20 +4,22 @@
     bib      – testen.sjabloon.Bibliotheek (bronnen + fouten)
     map      – de map met eigen sjablonen (pad)
     atleet   – optioneel, models.Atleet: waar je vandaan kwam (voor de terug-link en 'Nieuw sjabloon')
+    groep    – optioneel, models.Groep: idem, vanaf de pagina Testresultaten van een groep
     melding  – optioneel
 #}
 {% extends "basis.html" %}
 {% block titel %}Testsjablonen{% endblock %}
 
 {% block inhoud %}
+{% set van = {'atleet': atleet.master_id} if atleet else ({'groep': groep.id} if groep else {}) %}
 <article class="vel">
   <header class="blok__kop">
     <div>
-      {% if atleet %}<a class="terug" href="{{ url_for('atleet_testen', master_id=atleet.master_id) }}">&larr; Testresultaten {{ atleet.naam }}</a>{% endif %}
+      {% if atleet %}<a class="terug" href="{{ url_for('atleet_testen', master_id=atleet.master_id) }}">&larr; Testresultaten {{ atleet.naam }}</a>{% elif groep %}<a class="terug" href="{{ url_for('groep_testen', groep_id=groep.id) }}">&larr; Testresultaten {{ groep.naam }}</a>{% endif %}
       <h1 class="kop kop--pagina">Testsjablonen</h1>
       <p class="subkop">Een sjabloon beschrijft een test: de onderdelen, en hoe een meting een score wordt</p>
     </div>
-    <a class="knop knop--vol" href="{{ url_for('testsjabloon_nieuw', **({'atleet': atleet.master_id} if atleet else {})) }}">+ Nieuw sjabloon</a>
+    <a class="knop knop--vol" href="{{ url_for('testsjabloon_nieuw', **van) }}">+ Nieuw sjabloon</a>
   </header>
 
   {% if melding %}<p class="melding" role="status">{{ melding }}</p>{% endif %}
@@ -42,7 +44,7 @@
               </td>
               <td class="zacht nowrap">{{ b.pad.name }}<br>{{ "eigen" if b.eigen else "meegeleverd" }}</td>
               <td class="rechts nowrap">
-                <a class="knop knop--klein" href="{{ url_for('testsjabloon_bewerken', slug=s.slug, **({'atleet': atleet.master_id} if atleet else {})) }}">Aanpassen</a>
+                <a class="knop knop--klein" href="{{ url_for('testsjabloon_bewerken', slug=s.slug, **van) }}">Aanpassen</a>
                 <a class="knop knop--klein" href="{{ url_for('testsjabloon_yaml', slug=s.slug) }}">Download</a>
               </td>
             </tr>

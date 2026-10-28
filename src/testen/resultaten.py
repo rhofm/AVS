@@ -116,15 +116,12 @@ def sjabloon_verwijderen(db: Opslag, slug: str, datamap: Path | str | None = Non
 
 
 # ------------------------------------------------------------------ vastleggen
-def resultaat_vastleggen(db: Opslag, master_id: str, s: Sjabloon, datum: date, invoer: Sequence[str | float | None],
-                         notities: str | None = None) -> Testresultaat:
-    """Leg een resultaat vast: één invoer per onderdeel van het sjabloon (leeg = niet gedaan).
+def uitrekenen(s: Sjabloon, datum: date, invoer: Sequence[str | float | None]) -> tuple[float, float | None, list[TestDeel]]:
+    """Controleer één invoer en reken de scores uit: (hoofdwaarde, score, onderdelen). Raakt de database niet.
 
-    Rekent de scores uit. OpslagFout met uitleg als de invoer niet klopt; er wordt dan niets opgeslagen.
-    Met een totaalscore moeten alle onderdelen met een formule zijn ingevuld.
+    OpslagFout met uitleg als de invoer niet klopt. Met een totaalscore moeten alle onderdelen met een
+    formule zijn ingevuld.
     """
-    if db.atleet(master_id) is None:
-        raise OpslagFout("Onbekende atleet.")
     if datum > date.today():
         raise OpslagFout("De datum mag niet in de toekomst liggen.")
     if len(invoer) != len(s.onderdelen):
@@ -149,11 +146,21 @@ def resultaat_vastleggen(db: Opslag, master_id: str, s: Sjabloon, datum: date, i
     ingevuld = [i for i, w in enumerate(waarden) if w is not None]
     hoofd = totaal if s.telt_totaal else waarden[ingevuld[0]]
     losse_score = next((sc for sc in scores if sc is not None), None) if s.aantal_formules == 1 else None
+    return hoofd, (totaal if s.telt_totaal else losse_score), [TestDeel(i, waarden[i], scores[i]) for i in ingevuld]
+
+
+def resultaat_vastleggen(db: Opslag, master_id: str, s: Sjabloon, datum: date, invoer: Sequence[str | float | None],
+                         notities: str | None = None) -> Testresultaat:
+    """Leg een resultaat vast: één invoer per onderdeel van het sjabloon (leeg = niet gedaan).
+
+    Rekent de scores uit. OpslagFout met uitleg als de invoer niet klopt; er wordt dan niets opgeslagen.
+    """
+    if db.atleet(master_id) is None:
+        raise OpslagFout("Onbekende atleet.")
+    hoofd, score, delen = uitrekenen(s, datum, invoer)
     test = test_voor_sjabloon(db, s)
-    r = Testresultaat(master_id, test.id, datum, hoofd, (notities or "").strip() or None,
-                      score=totaal if s.telt_totaal else losse_score,
-                      delen=[TestDeel(i, waarden[i], scores[i]) for i in ingevuld])
-    return db.testresultaat_opslaan(r)
+    return db.testresultaat_opslaan(Testresultaat(master_id, test.id, datum, hoofd, (notities or "").strip() or None,
+                                                  score=score, delen=delen))
 
 
 # ------------------------------------------------------------------ weergeven

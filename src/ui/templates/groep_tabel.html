@@ -28,7 +28,8 @@
       <a class="knop" href="{{ url_for('groep_testen', groep_id=groep.id) }}">Testresultaten &rarr;</a>
     {% else %}
       <span class="knoppen">
-        <a class="knop" href="{{ url_for('testsjablonen') }}">Testsjablonen</a>
+        <a class="knop knop--vol" href="{{ url_for('groep_testen_invullen', groep_id=groep.id) }}">+ Resultaten invullen</a>
+        <a class="knop" href="{{ url_for('testsjablonen', groep=groep.id) }}">Testsjablonen</a>
         <a class="knop" href="{{ url_for('groep_prs', groep_id=groep.id) }}">PR's &rarr;</a>
       </span>
     {% endif %}

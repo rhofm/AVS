@@ -5,6 +5,7 @@
     nieuw     – True als het sjabloon nog niet bestaat
     fouten    – optioneel, lijst met meldingen na een mislukte poging om op te slaan
     atleet    – optioneel, models.Atleet: na opslaan meteen een resultaat voor deze atleet invoeren
+    groep     – optioneel, models.Groep: na opslaan meteen de resultaten van deze groep invoeren (niet samen met atleet)
     vast      – True als er al resultaten zijn (aantal/soort onderdelen kan niet meer veranderen)
     kan_verwijderen – True bij een eigen sjabloon zonder resultaten
     soorten   – {soort: label}
@@ -15,9 +16,10 @@
 {% block titel %}{{ "Nieuw testsjabloon" if nieuw else "Testsjabloon " ~ c.naam }}{% endblock %}
 
 {% block inhoud %}
+{% set van = {'atleet': atleet.master_id} if atleet else ({'groep': groep.id} if groep else {}) %}
 <article class="vel">
   <header class="blok">
-    <a class="terug" href="{{ url_for('testsjablonen', **({'atleet': atleet.master_id} if atleet else {})) }}">&larr; Testsjablonen</a>
+    <a class="terug" href="{{ url_for('testsjablonen', **van) }}">&larr; Testsjablonen</a>
     <h1 class="kop kop--pagina">{{ "Nieuw testsjabloon" if nieuw else "Testsjabloon aanpassen" }}</h1>
     <p class="subkop">Geef de test een naam, voeg de onderdelen toe die je meet en kies eventueel een scoreformule</p>
   </header>
@@ -33,7 +35,7 @@
   <form class="blok" method="post" action="" novalidate>
     <input type="hidden" name="slug" value="{{ c.slug }}">
     <input type="hidden" name="totaal_getoond" value="{{ 1 if c.totaal_getoond else 0 }}">
-    {% if atleet %}<input type="hidden" name="atleet" value="{{ atleet.master_id }}">{% endif %}
+    {% for naam, waarde in van.items() %}<input type="hidden" name="{{ naam }}" value="{{ waarde }}">{% endfor %}
     {# Enter in een tekstveld: eerst de knop 'Bijwerken', niet per ongeluk Opslaan of een rij verwijderen. #}
     <button type="submit" name="actie" value="bijwerken" id="bijwerken" class="verborgen" tabindex="-1" aria-hidden="true">Bijwerken</button>
 
@@ -104,8 +106,8 @@
     </details>
 
     <div class="opslaan opslaan--onder">
-      <a class="knop" href="{{ url_for('testsjablonen', **({'atleet': atleet.master_id} if atleet else {})) }}">Annuleren</a>
-      <button class="knop knop--vol" type="submit" name="actie" value="opslaan">{{ "Opslaan en resultaat invoeren" if atleet else "Opslaan" }}</button>
+      <a class="knop" href="{{ url_for('testsjablonen', **van) }}">Annuleren</a>
+      <button class="knop knop--vol" type="submit" name="actie" value="opslaan">{{ "Opslaan en resultaat invoeren" if atleet else ("Opslaan en resultaten invoeren" if groep else "Opslaan") }}</button>
     </div>
 
     {% if kan_verwijderen %}

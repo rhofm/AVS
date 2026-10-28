@@ -1,0 +1,129 @@
+{#
+  Testresultaten van een hele groep in één keer invullen.
+  Context:
+    ip      – groepen.testen_invullen.InvulPagina
+    datum   – ingevulde datum (tekst), optioneel
+    melding – optioneel, bijv. '5 resultaten opgeslagen'
+    fout    – optioneel, foutmelding na opslaan
+  Kiezen: GET ?sjabloon=<slug>. Opslaan: POST met 'sjabloon', 'datum' en per atleet per onderdeel
+  'waarde-<master_id>-<i>' → groepen.testen_invullen.resultaten_opslaan().
+  Werkt zonder JavaScript.
+#}
+{% extends "basis.html" %}
+{% set groep = ip.groep %}
+{% set s = ip.sjabloon %}
+{% block titel %}Testresultaten invullen {{ groep.naam }}{% endblock %}
+
+{% block inhoud %}
+<article class="vel">
+  <header class="blok__kop">
+    <div>
+      <a class="terug" href="{{ url_for('groep_testen', groep_id=groep.id) }}">&larr; Testresultaten {{ groep.naam }}</a>
+      <h1 class="kop kop--pagina">Testresultaten invullen</h1>
+      <p class="subkop">Kies een test en vul de resultaten van {{ groep.naam }} in één keer in</p>
+    </div>
+    <a class="knop" href="{{ url_for('testsjablonen', groep=groep.id) }}">Testsjablonen</a>
+  </header>
+
+  {% if melding %}<p class="melding" role="status">{{ melding }}</p>{% endif %}
+  {% if fout %}<p class="melding melding--fout" role="alert">{{ fout }}</p>{% endif %}
+
+  {% if ip.bibliotheek.bronnen %}
+    <form class="blok opslaan" method="get" action="{{ url_for('groep_testen_invullen', groep_id=groep.id) }}">
+      <label for="kies-sjabloon">Test</label>
+      <select class="invoer" id="kies-sjabloon" name="sjabloon" required>
+        <option value="">Kies een test&hellip;</option>
+        {% for b in ip.bibliotheek.bronnen %}
+          <option value="{{ b.sjabloon.slug }}"{% if s and s.slug == b.sjabloon.slug %} selected{% endif %}>{{ b.sjabloon.naam }}{% if b.sjabloon.onderdelen | length > 1 %} ({{ b.sjabloon.onderdelen | length }} onderdelen){% endif %}</option>
+        {% endfor %}
+      </select>
+      <button class="knop" type="submit">Tonen</button>
+    </form>
+    <p class="zacht uitleg">Staat de test er niet bij? <a href="{{ url_for('testsjabloon_nieuw', groep=groep.id) }}">Maak een nieuw sjabloon</a> en vul daarna meteen de resultaten in.</p>
+  {% else %}
+    <p class="leeg">Er zijn nog geen testsjablonen.</p>
+    <p><a class="knop knop--vol" href="{{ url_for('testsjabloon_nieuw', groep=groep.id) }}">+ Nieuw sjabloon maken</a></p>
+  {% endif %}
+
+  {% if s %}
+    <form class="blok" method="post" action="{{ url_for('groep_testen_invullen_opslaan', groep_id=groep.id) }}" novalidate>
+      <input type="hidden" name="sjabloon" value="{{ s.slug }}">
+      <section aria-labelledby="kop-test">
+        <div class="blok__kop">
+          <div>
+            <h2 class="subkop" id="kop-test">{{ s.naam }}</h2>
+            <p class="zacht">
+              {% for o in s.onderdelen %}{{ o.naam }} ({{ o.eenheid }}){% if not loop.last %} · {% endif %}{% endfor %}
+              {% if s.telt_totaal %} — de scores worden opgeteld tot een totaalscore{% endif %}
+            </p>
+          </div>
+          <span class="zacht getallen" style="font-size: var(--maat-s)">{{ ip.rijen | length }} {{ "atleten" if ip.rijen | length != 1 else "atleet" }}</span>
+        </div>
+
+        <div class="opslaan">
+          <label for="test-datum">Datum van de test</label>
+          <input type="date" id="test-datum" name="datum" value="{{ datum or ip.vandaag.isoformat() }}" max="{{ ip.vandaag.isoformat() }}" required>
+          <span class="zacht">Atleten met lege velden worden overgeslagen. Een komma of punt voor de decimalen kan allebei.</span>
+          <button class="knop knop--vol" type="submit">Opslaan</button>
+        </div>
+
+        {% if s.telt_totaal %}
+          <p class="zacht uitleg">Vul bij een atleet alle onderdelen in die een score geven, of laat die atleet helemaal leeg.</p>
+        {% elif s.onderdelen | length > 1 %}
+          <p class="zacht uitleg">Een onderdeel dat een atleet niet gedaan heeft mag leeg blijven.</p>
+        {% endif %}
+
+        {% if ip.rijen %}
+          <div class="tabelvak">
+            <table class="tabel matrix">
+              <thead>
+                <tr>
+                  <th scope="col">Atleet</th>
+                  <th scope="col" class="midden">Cat.</th>
+                  <th scope="col">Laatste</th>
+                  {% for o in s.onderdelen %}<th scope="col">{{ o.naam }} <span class="zacht">({{ o.eenheid }})</span></th>{% endfor %}
+                </tr>
+              </thead>
+              <tbody>
+                {% for r in ip.rijen %}
+                  <tr{% if r.fout %} class="invulrij--fout"{% endif %}>
+                    <th scope="row">{{ r.atleet.naam }}
+                      {% if r.fout %}<span class="invulrij__fout" role="alert">{{ r.fout }}</span>{% endif %}
+                    </th>
+                    <td class="midden zacht">{{ r.categorie_code or "–" }}</td>
+                    <td class="zacht nowrap">
+                      {% if r.laatste %}
+                        {% if r.laatste.is_totaal %}{{ r.laatste.resultaat.score | getal }} punten
+                        {% else %}{% for d in r.laatste.delen %}{{ d.waarde | getal }} {{ d.eenheid }}{% if not loop.last %} · {% endif %}{% else %}{{ r.laatste.resultaat.waarde | getal }}{% endfor %}{% endif %}
+                        <br><span class="matrix__sub">{{ r.laatste.resultaat.datum | datum_lang }}</span>
+                      {% else %}–{% endif %}
+                    </td>
+                    {% for o in s.onderdelen %}
+                      <td>
+                        <label class="verborgen" for="w-{{ r.atleet.master_id }}-{{ loop.index0 }}">{{ o.naam }} voor {{ r.atleet.naam }}</label>
+                        <input class="invoer invoer--getal" type="text" inputmode="decimal" id="w-{{ r.atleet.master_id }}-{{ loop.index0 }}"
+                               name="waarde-{{ r.atleet.master_id }}-{{ loop.index0 }}" value="{{ r.invoer[loop.index0] }}">
+                      </td>
+                    {% endfor %}
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <p class="leeg">Nog geen atleten in deze groep.</p>
+        {% endif %}
+
+        <div class="opslaan opslaan--onder">
+          <a class="knop" href="{{ url_for('groep_testen', groep_id=groep.id) }}">Annuleren</a>
+          <button class="knop knop--vol" type="submit">Opslaan</button>
+        </div>
+      </section>
+    </form>
+  {% elif ip.bibliotheek.bronnen %}
+    <p class="leeg">Kies hierboven een test om de atleten te zien.</p>
+  {% endif %}
+
+  <footer class="vel__voet">Atleet Volg Systeem<br>Testresultaten invullen {{ groep.naam }}</footer>
+</article>
+{% endblock %}
