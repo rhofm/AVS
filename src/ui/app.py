@@ -49,6 +49,9 @@ from groepen import groep_importeren
 from groepen.groepenoverzicht import GEEN_SEIZOEN, groepenoverzicht
 from groepen import landingspagina as groep_landingspagina
 from groepen import leerdoelen_scoren
+from testen import editor as testeditor
+from testen import resultaten as testuitslagen
+from testen import sjabloon as testsjabloon
 from groepen import periodeplan as periodisering
 from groepen import rooster as roosterbeheer
 from groepen import doelen as doelbeheer
@@ -947,7 +950,7 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
     @app.get("/groep/<int:groep_id>/testen")
     def groep_testen(groep_id: int):
         return render_template(
-            "groep_tabel.html", tabel=groep_overzichten.testresultaten(db(), haal_groep(groep_id)),
+            "groep_tabel.html", tabel=groep_overzichten.testresultaten(db(), haal_groep(groep_id), bibliotheek=_bibliotheek()),
             titel="Testresultaten", soort="testen",
             uitleg="Het laatste resultaat per test, met de testdatum. Vet met rode streep: beste binnen de eigen categorie.",
             leeg="Nog geen testresultaten.", actief_menu="groepen")
@@ -1234,6 +1237,160 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
         # Post/Redirect/Get: verversen stuurt het formulier niet nog eens.
         return redirect(url_for("atleet_leerdoelen", master_id=master_id,
                                 **({"doorlopend": "1"} if request.args.get("doorlopend") == "1" else {})))
+
+    # ---------------- testen: sjablonen en resultaten ----------------
+    def _datamap() -> Path:
+        return Path(app.config["AVS_MAP"] or standaard_map())
+
+    def _bibliotheek():
+        return testsjabloon.laad_bibliotheek(_datamap())
+
+    def _atleet_of_none(master_id: str | None):
+        """De atleet uit ?atleet=... (waar je vandaan kwam), of None als die niet bestaat."""
+        return db().atleet(master_id) if master_id else None
+
+    def _testen_pagina(master_id: str, *, fout: str | None = None, status: int = 200):
+        a = haal_atleet(master_id)
+        meldingen = get_flashed_messages()
+        bib = _bibliotheek()
+        return render_template(
+            "atleet_testen.html", a=a, basis_url=url_for("atleet", master_id=master_id), bib=bib,
+            regels=testuitslagen.resultaatregels(db(), master_id, bibliotheek=bib),
+            melding=meldingen[0] if meldingen else None, fout=fout, actief_menu="atleten"), status
+
+    @app.get("/atleet/<master_id>/testen")
+    def atleet_testen(master_id: str):
+        return _testen_pagina(master_id)
+
+    def _test_invoer(master_id: str, slug: str | None, *, invoer=None, datum=None, notities=None,
+                     fout: str | None = None, status: int = 200):
+        a = haal_atleet(master_id)
+        bron = _bibliotheek().vind(slug)
+        if bron is None:
+            abort(404)
+        return render_template(
+            "atleet_test_nieuw.html", a=a, s=bron.sjabloon, basis_url=url_for("atleet", master_id=master_id),
+            invoer=invoer, datum=datum, notities=notities, vandaag=date.today(), fout=fout, actief_menu="atleten"), status
+
+    @app.get("/atleet/<master_id>/testen/nieuw")
+    def atleet_test_nieuw(master_id: str):
+        return _test_invoer(master_id, request.args.get("sjabloon"))
+
+    @app.post("/atleet/<master_id>/testen/nieuw")
+    def atleet_test_opslaan(master_id: str):
+        haal_atleet(master_id)
+        slug = request.form.get("sjabloon")
+        bron = _bibliotheek().vind(slug)
+        if bron is None:
+            abort(404)
+        s = bron.sjabloon
+        invoer = [request.form.get(f"waarde-{i}", "") for i in range(len(s.onderdelen))]
+        datum_tekst, notities = request.form.get("datum", ""), request.form.get("notities", "")
+        try:
+            datum = date.fromisoformat(datum_tekst)
+        except ValueError:
+            return _test_invoer(master_id, slug, invoer=invoer, datum=datum_tekst, notities=notities,
+                                fout="Vul een geldige datum in.", status=400)
+        try:
+            testuitslagen.resultaat_vastleggen(db(), master_id, s, datum, invoer, notities)
+        except OpslagFout as e:
+            return _test_invoer(master_id, slug, invoer=invoer, datum=datum_tekst, notities=notities,
+                                fout=str(e), status=400)
+        flash(f"Resultaat van {s.naam} opgeslagen.")
+        return redirect(url_for("atleet_testen", master_id=master_id))
+
+    @app.post("/atleet/<master_id>/testen/<int:resultaat_id>/verwijderen")
+    def atleet_test_verwijderen(master_id: str, resultaat_id: int):
+        haal_atleet(master_id)
+        if not db().testresultaat_verwijderen(master_id, resultaat_id):
+            abort(404)
+        flash("Testresultaat verwijderd.")
+        return redirect(url_for("atleet_testen", master_id=master_id))
+
+    @app.get("/testen/sjablonen")
+    def testsjablonen():
+        meldingen = get_flashed_messages()
+        return render_template("testsjablonen.html", bib=_bibliotheek(), map=testsjabloon.sjabloonmap(_datamap()),
+                               atleet=_atleet_of_none(request.args.get("atleet")),
+                               melding=meldingen[0] if meldingen else None, actief_menu="atleten")
+
+    def _sjabloonformulier(concept, *, nieuw: bool, atleet, fouten=None, status: int = 200):
+        vast = False
+        kan_verwijderen = False
+        if concept.slug:
+            test = db().test_op_sjabloon(concept.slug)
+            vast = bool(test and db().aantal_testresultaten(test.id))
+            bron = _bibliotheek().vind(concept.slug)
+            kan_verwijderen = bool(bron and bron.eigen and not vast)
+        return render_template("testsjabloon_bewerken.html", c=concept, nieuw=nieuw, fouten=fouten, atleet=atleet,
+                               vast=vast, kan_verwijderen=kan_verwijderen, soorten=testsjabloon.SOORT_LABELS,
+                               actief_menu="atleten"), status
+
+    def _sjabloon_posten(concept, *, nieuw: bool):
+        atleet = _atleet_of_none(request.form.get("atleet"))
+        actie = request.form.get("actie", "bijwerken")
+        if actie == "verwijderen":
+            if request.form.get("zeker") != "1":
+                return _sjabloonformulier(testeditor.normaliseer(concept), nieuw=nieuw, atleet=atleet,
+                                          fouten=["Vink 'Ja, dit sjabloon verwijderen' aan om te bevestigen."], status=400)
+            bron = _bibliotheek().vind(concept.slug)
+            if bron is None or not bron.eigen:
+                abort(404)
+            try:
+                testuitslagen.sjabloon_verwijderen(db(), concept.slug, _datamap())
+            except (testsjabloon.SjabloonFout, OpslagFout) as e:
+                return _sjabloonformulier(testeditor.normaliseer(concept), nieuw=nieuw, atleet=atleet,
+                                          fouten=getattr(e, "problemen", [str(e)]), status=400)
+            flash("Sjabloon verwijderd.")
+            return redirect(url_for("testsjablonen", **({"atleet": atleet.master_id} if atleet else {})))
+        if actie != "opslaan":
+            return _sjabloonformulier(testeditor.pas_toe(concept, actie), nieuw=nieuw, atleet=atleet)
+        concept = testeditor.normaliseer(concept)
+        try:
+            bewaard = testuitslagen.sjabloon_opslaan(db(), testeditor.naar_sjabloon(concept), _datamap())
+        except (testsjabloon.SjabloonFout, OpslagFout) as e:
+            return _sjabloonformulier(concept, nieuw=nieuw, atleet=atleet,
+                                      fouten=getattr(e, "problemen", [str(e)]), status=400)
+        if atleet is not None:
+            return redirect(url_for("atleet_test_nieuw", master_id=atleet.master_id, sjabloon=bewaard.slug))
+        flash(f"Sjabloon {bewaard.naam} opgeslagen.")
+        return redirect(url_for("testsjablonen"))
+
+    @app.get("/testen/sjablonen/nieuw")
+    def testsjabloon_nieuw():
+        return _sjabloonformulier(testeditor.normaliseer(testeditor.Concept()), nieuw=True,
+                                  atleet=_atleet_of_none(request.args.get("atleet")))
+
+    @app.post("/testen/sjablonen/nieuw")
+    def testsjabloon_nieuw_posten():
+        concept = testeditor.concept_uit_formulier(request.form)
+        concept.slug = ""                                  # een nieuw sjabloon krijgt zijn bestandsnaam bij opslaan
+        return _sjabloon_posten(concept, nieuw=True)
+
+    def _bestaand_sjabloon(slug: str):
+        bron = _bibliotheek().vind(slug)
+        if bron is None:
+            abort(404)
+        return bron
+
+    @app.get("/testen/sjablonen/<slug>")
+    def testsjabloon_bewerken(slug: str):
+        bron = _bestaand_sjabloon(slug)
+        return _sjabloonformulier(testeditor.concept_uit_sjabloon(bron.sjabloon), nieuw=False,
+                                  atleet=_atleet_of_none(request.args.get("atleet")))
+
+    @app.post("/testen/sjablonen/<slug>")
+    def testsjabloon_bewerken_posten(slug: str):
+        _bestaand_sjabloon(slug)
+        concept = testeditor.concept_uit_formulier(request.form)
+        concept.slug = slug                                 # de bestandsnaam staat vast, ook als de naam verandert
+        return _sjabloon_posten(concept, nieuw=False)
+
+    @app.get("/testen/sjablonen/<slug>/yaml")
+    def testsjabloon_yaml(slug: str):
+        bron = _bestaand_sjabloon(slug)
+        return Response(bron.sjabloon.naar_yaml(), mimetype="text/yaml; charset=utf-8",
+                        headers={"Content-Disposition": f'attachment; filename="{slug}.yaml"'})
 
     # ---------------- importeren ----------------
     @app.get("/importeren")

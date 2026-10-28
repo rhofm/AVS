@@ -36,6 +36,7 @@ AVS/
 │   ├── leerdoelen_overzicht.md   ✅ overview of the leerdoelen (the .csv version is git-ignored)
 │
 ├── config/
+│   ├── testen/                   ✅ shipped test templates (YAML); own ones go in <data folder>/testsjablonen/
 │   ├── ploeg_regels/             lineup rules (YAML), editable by the team leader
 │   │   ├── u14_u16_2026-2027.yaml        ✅
 │   │   ├── u18_u20_2026-2027.yaml        ✅
@@ -73,6 +74,7 @@ AVS/
 │   │       │                     006 several trainings per day · 007 periodisering (+ old periodeplan → doelen) ·
 │   │       │                     008 rooster · 009 AU licence number · 010 ploeg_opstelling · 011 preferences
 │   │       │                     (there is no 003: two clashing 003s were replaced; init_db moves their data)
+│   │       ├── testen/           002 sjablonen (test.sjabloon, testresultaat.score, testresultaat_deel)
 │   │       ├── prestaties/       002 PR only wind-legal · 003 wedstrijd_programma (timetable) · 004 doelen
 │   │       └── trainingsschema/  002 trainingskeuze (which training on a day with several)
 │   │
@@ -91,7 +93,7 @@ AVS/
 │   │   ├── koppelen.py           link imported results to an athlete (master_id)
 │   │   ├── prestaties.py         manual entry, PR history, season bests
 │   │   ├── prs_importeren.py · importeer_atletieknu.py · atleet_toevoegen_atletieknu.py   PRs from atletiek.nu
-│   │   ├── testen.py             test results, progress over time (back end only: no entry form in the UI yet ⚠️)
+│   │   ├── testen.py             test results, progress over time (also for template-based tests)
 │   │   ├── trainingsschema.py    training days per athlete
 │   │   ├── aanwezigheid.py       attendance of one athlete (list + month calendar)
 │   │   └── notities.py           notes per athlete per date
@@ -125,7 +127,14 @@ AVS/
 │   │   ├── periodeplan.py        periodisering: mega/meso cycle, year view, copy
 │   │   ├── rooster.py            planned training content: fill in, import, apply to trainings
 │   │   ├── doelen.py             goals: status per line, forms
-│   │   └── overzichten.py        group tables: PRs, test results, leerdoelen, attendance
+│   │   ├── leerdoelen_scoren.py  page 'Leerdoelen scoren': score a whole group on one leerdoel
+│   │   └── overzichten.py        group tables: PRs, test results (parts + total), leerdoelen, attendance
+│   │
+│   ├── testen/                   ✅ test templates and results
+│   │   ├── formule.py            safe formula engine (+ - * / ^, sqrt, parentheses; L/T/M and C1..Cn; no eval)
+│   │   ├── sjabloon.py           Sjabloon/Onderdeel, YAML read/write, library (config/testen + <data>/testsjablonen)
+│   │   ├── resultaten.py         record a result (values, scores, total), edit guard, delete, lines for the pages
+│   │   └── editor.py             server-side state of the template form (rows, parameters, total checkbox)
 │   │
 │   ├── leerlijnen/               ✅
 │   │   ├── voortgang.py          leerdoelen of one athlete with latest scores; saving scores
@@ -142,9 +151,11 @@ AVS/
 │       ├── templates/            ~60 pages
 │       └── static/               avs.css, filter.js, sorteer.js, levend.js
 │
-└── tests/                        fake data only; run with `python -m pytest` (67 test files)
+└── tests/                        fake data only; run with `python -m pytest` (72 test files)
     ├── test_<feature>.py         one file per feature (models, queries, atleten, groepen, wedstrijden, importers,
     │                             ploegen, regels, punten, rooster, periodisering, doelen, build, zelftest, ...)
+    ├── test_testen_*.py          formula engine, templates, results (incl. migration), editor and pages
+    ├── test_groep_leerdoelen_scoren.py   scoring a whole group on a leerdoel
     ├── test_opstelling.py        📝 placeholder
     └── fixtures/                 saved, anonymised atletiek.nu/Seltec pages (profile, meet results, timetables)
 ```
@@ -159,7 +170,7 @@ The data is split over eight encrypted files (SQLCipher). Only `personen.db` con
 |------|----------|-----------------------|
 | `personen.db` | athletes, groups, training times, group members, trainings (parts, variants), periodisering, rooster, leerlijnen (old), ploegen (`ploeg`, `ploeg_lid`, `ploeg_opstelling`), preferences | `master_id` |
 | `prestaties.db` | onderdelen, wedstrijden (planned and past), prestaties, inschrijvingen, timetables (`wedstrijd_programma`), goals (`doel`, `doel_regel`), `pr` view | pseudonym |
-| `testen.db` | tests and test results | pseudonym |
+| `testen.db` | tests (with their template slug), results with per-part values and scores | pseudonym |
 | `trainingsschema.db` | training days per athlete, `trainingskeuze` | pseudonym |
 | `absentie.db` | attendance in long format: `aanwezig` / `afgemeld` / `afwezig` / `blessure` | pseudonym |
 | `leerlijnen.db` | catalogue: leerlijnen, leerdoelen (U10–U20, 215 goals), score scale. No personal data | — |
@@ -174,7 +185,7 @@ python src/db/init_db.py --herstel <sleutel>  # restore the key on a new compute
 
 The recovery key can also be shown and restored on the **Instellingen** page, so the `.exe` needs no terminal.
 
-Schema versions: `personen` 11 · `prestaties` 4 · `testen` 1 · `trainingsschema` 2 · `absentie` 1 · `leerlijnen` 1 · `leerdoelscores` 1 · `notities` 1.
+Schema versions: `personen` 11 · `prestaties` 4 · `testen` 2 · `trainingsschema` 2 · `absentie` 1 · `leerlijnen` 1 · `leerdoelscores` 1 · `notities` 1.
 
 ### When does a performance count as a PR?
 
@@ -209,8 +220,10 @@ ui/  ──►  atleten/ · wedstrijden/ · ploeg/ · groepen/ · leerlijnen/ ·
 ## Open items
 
 - [ ] Fill in the masters age-grading factors in `config/puntentelling/masters_agegrading.yaml` (from the Atletiekunie tables; never invent them).
-- [ ] Entry form for test results (`atleten/testen.py` has the logic, the UI has no form yet).
-- [ ] Score a whole group on leerdoelen in one go; progress chart per athlete.
+- [x] Entry form for test results, based on YAML test templates (`testen/`, pages 'Testsjablonen' and 'Testresultaat').
+- [ ] Enter test results for a whole group in one go; progress chart per test.
+- [x] Score a whole group on a leerdoel in one go.
+- [ ] Progress chart per athlete.
 - [ ] Run the manual `.exe` checklist in `docs/Exe_bouwplan.md` (first start, key recovery, imports, optimiser, PDF, edited config, no write access, SmartScreen).
 - [ ] Fill or remove the placeholders `config/ploeg_regels/standaard.yaml` and `competitie_u16.yaml`.
 - [ ] Timetable: add or delete rows by hand; upload a saved page when atletiek.nu blocks the import.

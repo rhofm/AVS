@@ -1,0 +1,64 @@
+{#
+  Lijst met testsjablonen.
+  Context:
+    bib      – testen.sjabloon.Bibliotheek (bronnen + fouten)
+    map      – de map met eigen sjablonen (pad)
+    atleet   – optioneel, models.Atleet: waar je vandaan kwam (voor de terug-link en 'Nieuw sjabloon')
+    melding  – optioneel
+#}
+{% extends "basis.html" %}
+{% block titel %}Testsjablonen{% endblock %}
+
+{% block inhoud %}
+<article class="vel">
+  <header class="blok__kop">
+    <div>
+      {% if atleet %}<a class="terug" href="{{ url_for('atleet_testen', master_id=atleet.master_id) }}">&larr; Testresultaten {{ atleet.naam }}</a>{% endif %}
+      <h1 class="kop kop--pagina">Testsjablonen</h1>
+      <p class="subkop">Een sjabloon beschrijft een test: de onderdelen, en hoe een meting een score wordt</p>
+    </div>
+    <a class="knop knop--vol" href="{{ url_for('testsjabloon_nieuw', **({'atleet': atleet.master_id} if atleet else {})) }}">+ Nieuw sjabloon</a>
+  </header>
+
+  {% if melding %}<p class="melding" role="status">{{ melding }}</p>{% endif %}
+  {% for f in bib.fouten %}<p class="melding melding--fout" role="alert">Sjabloon overgeslagen &mdash; {{ f }}</p>{% endfor %}
+
+  {% if bib.bronnen %}
+    <div class="tabelvak">
+      <table class="tabel">
+        <thead><tr><th scope="col">Test</th><th scope="col">Onderdelen</th><th scope="col">Score</th><th scope="col">Bestand</th><th scope="col"><span class="verborgen">Acties</span></th></tr></thead>
+        <tbody>
+          {% for b in bib.bronnen %}
+            {% set s = b.sjabloon %}
+            <tr>
+              <th scope="row">{{ s.naam }}</th>
+              <td>
+                <ul class="testdelen">
+                  {% for o in s.onderdelen %}<li><span>{{ o.naam }}</span><span class="zacht">{{ o.eenheid }}</span></li>{% endfor %}
+                </ul>
+              </td>
+              <td class="zacht">
+                {% if s.telt_totaal %}totaalscore (som van {{ s.aantal_formules }}){% elif s.aantal_formules %}{{ s.aantal_formules }} met formule{% else %}geen formule{% endif %}
+              </td>
+              <td class="zacht nowrap">{{ b.pad.name }}<br>{{ "eigen" if b.eigen else "meegeleverd" }}</td>
+              <td class="rechts nowrap">
+                <a class="knop knop--klein" href="{{ url_for('testsjabloon_bewerken', slug=s.slug, **({'atleet': atleet.master_id} if atleet else {})) }}">Aanpassen</a>
+                <a class="knop knop--klein" href="{{ url_for('testsjabloon_yaml', slug=s.slug) }}">Download</a>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <p class="leeg">Nog geen sjablonen. Maak er een met &lsquo;Nieuw sjabloon&rsquo;.</p>
+  {% endif %}
+
+  <details class="uitleg">
+    <summary>Sjablonen delen</summary>
+    <p>Elk sjabloon is één .yaml-bestand. Je eigen sjablonen staan in <code>{{ map }}</code>. Kopieer een bestand uit die map naar een collega, of zet een ontvangen .yaml-bestand in die map: het staat dan direct in deze lijst. Meegeleverde sjablonen staan in de map <code>config/testen</code>; als je er een aanpast, bewaart AVS jouw versie in je eigen map.</p>
+  </details>
+
+  <footer class="vel__voet">Atleet Volg Systeem<br>Testsjablonen</footer>
+</article>
+{% endblock %}

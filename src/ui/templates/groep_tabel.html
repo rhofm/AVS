@@ -27,7 +27,10 @@
     {% if soort == "prs" %}
       <a class="knop" href="{{ url_for('groep_testen', groep_id=groep.id) }}">Testresultaten &rarr;</a>
     {% else %}
-      <a class="knop" href="{{ url_for('groep_prs', groep_id=groep.id) }}">PR's &rarr;</a>
+      <span class="knoppen">
+        <a class="knop" href="{{ url_for('testsjablonen') }}">Testsjablonen</a>
+        <a class="knop" href="{{ url_for('groep_prs', groep_id=groep.id) }}">PR's &rarr;</a>
+      </span>
     {% endif %}
   </header>
 

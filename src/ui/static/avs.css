@@ -1088,3 +1088,26 @@ th[aria-sort="descending"] .sorteer__naam::after { content: " \2193"; opacity: 1
 .keuzelijst { border: 0; margin: 0; padding: 0; display: grid; gap: .6rem; }
 .keuzelijst .vinkje { align-items: flex-start; font-weight: 400; }
 .keuzelijst input { accent-color: var(--rood); margin-top: .25rem; }
+
+/* ---------------- testen: sjablonen en resultaten ---------------- */
+.invoer { font: inherit; font-size: var(--maat-s); padding: .35rem .5rem; border: 1px solid var(--rand); background: var(--papier);
+          color: var(--tekst); min-width: 0; }
+.invoer:focus-visible { outline: 2px solid var(--rood); outline-offset: 1px; }
+.invoer--getal { width: 6.5rem; }
+.invoer--breed { width: 100%; }
+.sjabloonrij { display: grid; gap: .6rem; padding: .75rem; border: 1px solid var(--rand); background: var(--papier); }
+.sjabloonrij__kop { display: flex; flex-wrap: wrap; align-items: end; gap: .6rem 1rem; }
+.sjabloonrij__kop > label { display: grid; gap: .25rem; font-size: var(--maat-s); font-weight: 700; }
+.sjabloonrij__kop .naamveld { flex: 1 1 14rem; }
+.sjabloonrij__formule { display: flex; flex-wrap: wrap; align-items: end; gap: .6rem 1rem; }
+.sjabloonrij__formule > label { display: grid; gap: .25rem; font-size: var(--maat-s); font-weight: 700; }
+.sjabloonrij__formule .formuleveld { flex: 1 1 18rem; font-family: ui-monospace, Consolas, monospace; }
+.parameters { display: flex; flex-wrap: wrap; gap: .5rem 1rem; align-items: end; }
+.parameters label { display: grid; gap: .2rem; font-size: var(--maat-xs); font-weight: 700; }
+.vinkjerij { display: flex; align-items: center; gap: .5rem; font-size: var(--maat-s); }
+.vinkjerij input { width: 1.15rem; height: 1.15rem; accent-color: var(--rood); }
+.resultaatveld { display: grid; grid-template-columns: minmax(8rem, 1fr) auto; gap: .5rem 1rem; align-items: center; }
+.testdelen { margin: 0; padding: 0; list-style: none; display: grid; gap: .15rem; font-size: var(--maat-s); }
+.testdelen li { display: flex; flex-wrap: wrap; gap: .1rem .75rem; }
+.testdelen .score { color: var(--tekst-zacht); }
+.testtotaal { font-weight: 700; }

@@ -74,11 +74,11 @@ def test_ontbrekend_bestand(sql_kopie, tmp_path, weg, melding):
 
 def test_lege_of_dubbele_migratie(sql_kopie):
     (sql_kopie / "migrations" / "testen").mkdir(exist_ok=True)
-    (sql_kopie / "migrations" / "testen" / "002_leeg.sql").write_text("  \n")
-    with pytest.raises(InstallatieFout, match="002_leeg.sql is leeg"):
+    (sql_kopie / "migrations" / "testen" / "003_leeg.sql").write_text("  \n")
+    with pytest.raises(InstallatieFout, match="003_leeg.sql is leeg"):
         controleer_sql_bestanden()
-    (sql_kopie / "migrations" / "testen" / "002_leeg.sql").write_text("SELECT 1;")
-    (sql_kopie / "migrations" / "testen" / "002_ook.sql").write_text("SELECT 1;")
+    (sql_kopie / "migrations" / "testen" / "003_leeg.sql").write_text("SELECT 1;")
+    (sql_kopie / "migrations" / "testen" / "003_ook.sql").write_text("SELECT 1;")
     with pytest.raises(InstallatieFout, match="hetzelfde nummer"):
         controleer_sql_bestanden()
 

@@ -1,0 +1,14 @@
+# Testsjablonen voor AVS: één bestand per test. Dit bestand is alleen uitleg (alles is commentaar)
+# en verschijnt dus niet in de lijst. Maak sjablonen het makkelijkst in AVS zelf (Testresultaten >
+# Nieuw sjabloon); eigen sjablonen komen in de map 'testsjablonen' in de gegevensmap. Een .yaml-bestand
+# in die map, of in deze map (config/testen, ook naast de .exe), verschijnt vanzelf in de lijst.
+#
+# naam: Sprongkracht                  # de naam van de test (uniek)
+# totaal_optellen: true               # scores van de onderdelen optellen (alleen bij minstens twee formules)
+# onderdelen:                         # een of meer resultaatrijen
+#   - naam: Hoogspringen staand
+#     soort: lengte                   # lengte (m) | tijd (s) | gewicht (kg)
+#     formule: C1 * sqrt(L)           # optioneel; + - * / ^ sqrt( ) haakjes; L, T of M is het resultaat
+#     parameters: [10]                # waarden van C1, C2, ... in die volgorde
+#   - naam: 30 m sprint
+#     soort: tijd

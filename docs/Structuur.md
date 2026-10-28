@@ -8,7 +8,13 @@
 * AU-licentienummer (licentienummer van de Atletiekunie): optioneel, alleen cijfers, uniek; in te vullen bij 'Nieuwe atleet' en 'Gegevens aanpassen', of mee te importeren met 'Groep importeren' / de CSV-import (kolom 'licentienummer'; alleen met kopregel). Een bestaande atleet krijgt het nummer alleen als hij er nog geen heeft; hoort het al bij een andere atleet, dan wordt die regel niet geïmporteerd. Zichtbaar op de pagina van de atleet. Staat alleen in personen.db
 * PR's
 * Specialisatie (?)
-* Testresultaten
+* Testresultaten: een test is gebaseerd op een **testsjabloon** (naam, één of meer onderdelen). Bij 'Testresultaat' op de atleetpagina kiest de trainer een bestaand sjabloon of maakt een nieuw sjabloon en vult daarna meteen de resultaten in. Alle resultaten staan op de pagina 'Alle resultaten' van de atleet
+  * Een sjabloon heeft een naam en een uitbreidbare tabel met onderdelen (voor een test die uit meerdere deeltesten bestaat). Per onderdeel: een naam, de soort (lengte in m, tijd in s of gewicht in kg) en optioneel een scoreformule
+  * Scoreformule: basisrekenen met `+ - * / ^`, `sqrt()` en haakjes. Het resultaat heet `L` (lengte), `T` (tijd) of `M` (gewicht); met het veld 'aantal parameters' komen de constanten `C1`, `C2`, … beschikbaar. Bijvoorbeeld `C1 / T` met C1 = 150
+  * Zijn er minstens twee onderdelen met een formule, dan is er een vinkje 'scores optellen tot totaalscore' (standaard aan). Bij een totaal moeten alle onderdelen met een formule ingevuld worden
+  * Sjablonen zijn `.yaml`-bestanden (de bestandsnaam is de id), dus makkelijk te delen: de map `testsjablonen` in de datamap (eigen sjablonen) en `config/testen/` (meegeleverd; een eigen bestand met dezelfde naam gaat voor). Op de pagina 'Testsjablonen' zijn ze te bekijken, te bewerken, te downloaden en te verwijderen
+  * Scores worden bij het invullen berekend en opgeslagen; een latere wijziging van een formule verandert oude scores niet. Zijn er al resultaten, dan kan het sjabloon wel van naam/formule veranderen, maar niet van aantal onderdelen, soort of 'totaal optellen'
+  * Nog te doen: resultaten van een hele groep in één keer invullen, voortgangsgrafiek per test
 * Trainingsschema: op welke dagen van de week de atleet traint
 * Notities: vrije tekst per atleet per datum (wat opviel op training of wedstrijd), zoekbaar op tekst en datum
 * Doelen: eigen regels uit groepsdoelen en persoonlijke doelen, met de stand (zie Groepen)
@@ -34,7 +40,7 @@
 * Wat staat waar:
   * personen.db: persoonsgegevens, groepen, trainingen, periodisering (megacyclus en mesocycli), roosters, leerlijnen, ploegen
   * prestaties.db: onderdelen, wedstrijden, prestaties, PR's, doelen (groep of atleet, meestal bij een wedstrijd)
-  * testen.db: testen en testresultaten
+  * testen.db: testen (met verwijzing naar hun sjabloon) en testresultaten met per onderdeel de waarde en score
   * trainingsschema.db: per atleet een kolom per weekdag (maandag t/m zondag) of hij/zij die dag traint
   * leerlijnen.db: leerlijnen en leerdoelen van de club (Leerlijn baanatletiek jeugd NA), aangevuld met de Atletiekunie-leerlijnen (dec 2013), per categorie U10 t/m U20, elk met een vaste id (bijv. SPR-U10-01). Geen persoonsgegevens
   * leerdoelscores.db: lang formaat, één rij per atleet per leerdoel per datum met een score 1-5. Het overzicht atleten x leerdoelen (breed) wordt berekend, niet opgeslagen
@@ -124,7 +130,8 @@
 * ~~Leerlijnen integreren en volgbaar maken~~ Gedaan: leerlijnen.db (215 leerdoelen) + leerdoelscores.db
 * Per atleet per leerdoel een score 1-5 met datum; geschiedenis blijft bewaard
 * Pagina 'Leerlijnen' (hoofdmenu): alle leerdoelen per onderdeel en/of leeftijdscategorie, met bron (NA/AU)
-* Nog te doen: scherm om een hele groep in één keer te scoren, voortgangsgrafiek per atleet
+* Een hele groep in één keer scoren op een leerdoel: gedaan (pagina 'Leerdoelen scoren' van een groep)
+* Nog te doen: voortgangsgrafiek per atleet
 
 
 

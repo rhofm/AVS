@@ -88,9 +88,11 @@ This project holds personal data about athletes, many of them minors.
 | `groepen/`    | Groups, `absentie`, `periodeplan` (periodisering pages: mega/meso cycle, year view, copy), `rooster` (planned training content, import, apply to trainings), `doelen` (goals: status, forms), `leerdoelen_scoren` (score a whole group on one leerdoel) |
 | `wedstrijden/` | `planning`: upcoming meets, who goes, which events (uses `wedstrijd` + `inschrijving` in `prestaties.db`) |
 | `atleten/`, `leerlijnen/` | Feature logic for athletes and learning pathways |
+| `testen/`     | Test templates and results: `formule` (safe formula engine), `sjabloon` (YAML templates + library), `resultaten` (record results/scores), `editor` (template form state) |
 | `ui/`         | Web UI |
 
 Other folders: `config/ploeg_regels/*.yaml` (team rule sets, per competition),
+`config/testen/*.yaml` (shipped test templates; the team's own go in `<data folder>/testsjablonen/`, same file name wins),
 `config/puntentelling/<uitgave>.yaml` (AU scoring constants, one file per
 edition of "Formules & Constanten"), `tests/`, `docs/`. Find config files with
 `ploeg.config.config_bestand(submap, naam)` / `config_bestanden(submap)` (works
@@ -163,7 +165,7 @@ Instellingen page shows the data folder. Never hard-code `data/` elsewhere. The 
 |------------------|----------|-----------------------|
 | `personen.db`    | `atleet` (personal details), `groep` (id + name), `groep_trainingstijden` (one row per group: `groep_id` + `maandag` … `zondag`, start time 'HH:MM' or NULL = no training), `groep_extra_trainingstijd` (extra start times on a fixed day: `groep_id`, `dag`, `starttijd`), `groep_lid` (long: one row per athlete per group; an athlete can be in several groups), `training` (`warming_up`, `kern_a`, `kern_b`, `cooling_down`, `notities`; `hoofdtraining_id` for a deviating variant), `training_atleet` (long: who follows a variant), `groep_fase` (mega cycle: `groep_id`, `startdatum`, `fase`), `mesocyclus` + `mesocyclus_week` (meso cycles and week names), `rooster` + `rooster_regel` (training-content templates) + `groep_rooster` (which group follows which template from when), leerlijnen, `ploeg` (+ `categorie`, `programma`, `datum`, `prestatiebasis`), `ploeg_lid` (who is on the form: `rol` deelnemer/reserve, `beschikbaar`), `ploeg_opstelling` (athlete + programme key from the rule file, `groep`, `vast`), `atleet_voorkeur` + `ploeg_voorkeur` (team-selection preferences); `periodeplan` is obsolete and always empty | `master_id` |
 | `prestaties.db`  | `onderdeel`, `wedstrijd`, `prestatie`, `inschrijving`, `wedstrijd_programma` (meet timetable / chronoloog: one row per item, no personal data), `doel` + `doel_regel` (goals for a group or athlete, usually at a meet), `pr` view | `atleet_ref` (pseudonym) |
-| `testen.db`      | `test`, `testresultaat` | `atleet_ref` (pseudonym) |
+| `testen.db`      | `test` (+ `sjabloon` = slug of its YAML template), `testresultaat` (`waarde` = main value, `score`), `testresultaat_deel` (one row per part of a multi-part result: `deel`, `waarde`, `score`) | `atleet_ref` (pseudonym) |
 | `trainingsschema.db` | `trainingsschema`: one row per athlete, columns `maandag` … `zondag` (0/1); `trainingskeuze`: which (`groep_id`, `starttijd`) the athlete picks on a day with several trainings | `atleet_ref` (pseudonym) |
 | `absentie.db`    | `absentie`: long format, one row per athlete per training (`training_id`, `status`, `reden`) | `atleet_ref` (pseudonym) |
 | `leerlijnen.db`  | Catalogue, no personal data: `leerlijn`, `leerdoel` (id `SPR-U10-01`, per category U10–U20), `categorie`, `scoreschaal` | — |

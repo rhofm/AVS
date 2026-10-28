@@ -1,0 +1,85 @@
+{#
+  Testresultaten van één atleet: een resultaat toevoegen (met een sjabloon) en de eerdere resultaten.
+  Context:
+    a        – de atleet (models.Atleet)
+    basis_url – '/atleet/<master_id>'
+    bib      – testen.sjabloon.Bibliotheek
+    regels   – lijst testen.resultaten.ResultaatRegel, nieuwste eerst
+    melding / fout – optioneel
+#}
+{% extends "basis.html" %}
+{% block titel %}Testresultaten {{ a.naam }}{% endblock %}
+
+{% block inhoud %}
+<article class="vel">
+  <header class="blok">
+    <a class="terug" href="{{ basis_url }}">&larr; {{ a.naam }}</a>
+    <h1 class="kop kop--pagina">Testresultaten</h1>
+    <p class="subkop">{{ a.naam }}</p>
+  </header>
+
+  {% if melding %}<p class="melding" role="status">{{ melding }}</p>{% endif %}
+  {% if fout %}<p class="melding melding--fout" role="alert">{{ fout }}</p>{% endif %}
+
+  <section class="blok" aria-labelledby="kop-toevoegen">
+    <h2 class="kop" id="kop-toevoegen">Resultaat toevoegen</h2>
+    {% if bib.bronnen %}
+      <form class="opslaan" method="get" action="{{ basis_url }}/testen/nieuw">
+        <label for="kies-sjabloon">Test</label>
+        <select class="invoer" id="kies-sjabloon" name="sjabloon" required>
+          <option value="">Kies een sjabloon&hellip;</option>
+          {% for b in bib.bronnen %}<option value="{{ b.sjabloon.slug }}">{{ b.sjabloon.naam }}{% if b.sjabloon.onderdelen | length > 1 %} ({{ b.sjabloon.onderdelen | length }} onderdelen){% endif %}</option>{% endfor %}
+        </select>
+        <button class="knop knop--vol" type="submit">Verder</button>
+      </form>
+      <p class="zacht uitleg">Staat de test er niet bij? <a href="{{ url_for('testsjabloon_nieuw', atleet=a.master_id) }}">Maak een nieuw sjabloon</a> en voer daarna meteen het resultaat in.
+        Alle sjablonen: <a href="{{ url_for('testsjablonen', atleet=a.master_id) }}">Testsjablonen</a>.</p>
+    {% else %}
+      <p class="leeg">Er zijn nog geen testsjablonen.</p>
+      <p><a class="knop knop--vol" href="{{ url_for('testsjabloon_nieuw', atleet=a.master_id) }}">+ Nieuw sjabloon maken</a></p>
+    {% endif %}
+    {% for f in bib.fouten %}<p class="melding melding--fout" role="alert">Sjabloon overgeslagen &mdash; {{ f }}</p>{% endfor %}
+  </section>
+
+  <section class="blok" aria-labelledby="kop-eerder">
+    <h2 class="kop" id="kop-eerder">Eerdere resultaten</h2>
+    {% if regels %}
+      <div class="tabelvak">
+        <table class="tabel">
+          <thead><tr><th scope="col">Datum</th><th scope="col">Test</th><th scope="col">Resultaat</th><th scope="col"><span class="verborgen">Acties</span></th></tr></thead>
+          <tbody>
+            {% for r in regels %}
+              <tr id="resultaat-{{ r.resultaat.id }}">
+                <td class="nowrap">{{ r.resultaat.datum | datum_lang }}</td>
+                <th scope="row">{{ r.test.naam }}{% if r.resultaat.notities %}<br><span class="zacht" style="font-weight: 400">{{ r.resultaat.notities }}</span>{% endif %}</th>
+                <td>
+                  {% if r.delen %}
+                    <ul class="testdelen">
+                      {% for d in r.delen %}
+                        <li><span>{{ d.naam }}: <strong>{{ d.waarde | getal }}</strong> {{ d.eenheid }}</span>{% if d.score is not none %}<span class="score">score {{ d.score | getal }}</span>{% endif %}</li>
+                      {% endfor %}
+                      {% if r.resultaat.score is not none and r.is_totaal %}<li class="testtotaal">Totaal: {{ r.resultaat.score | getal }} punten</li>{% endif %}
+                    </ul>
+                  {% else %}
+                    <strong>{{ r.resultaat.waarde | getal }}</strong> {{ r.test.eenheid }}
+                  {% endif %}
+                </td>
+                <td class="rechts">
+                  <form method="post" action="{{ basis_url }}/testen/{{ r.resultaat.id }}/verwijderen"
+                        onsubmit="return confirm('Dit testresultaat verwijderen?');">
+                    <button class="knop knop--klein knop--gevaar" type="submit">Verwijderen</button>
+                  </form>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="leeg">Nog geen testresultaten.</p>
+    {% endif %}
+  </section>
+
+  <footer class="vel__voet">Atleet Volg Systeem<br>Testresultaten {{ a.naam }}</footer>
+</article>
+{% endblock %}

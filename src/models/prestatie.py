@@ -153,12 +153,21 @@ class PR:
 @dataclass(slots=True)
 class Test:
     naam: str                       # bijv. '30m vliegend', 'Kogelstoten achterwaarts'
-    eenheid: str
+    eenheid: str                    # van de hoofdwaarde: 'punten' bij een totaalscore, anders die van het eerste onderdeel
     lager_is_beter: bool
     id: int | None = None
+    sjabloon: str | None = None     # bestandsnaam van het sjabloon (testen/sjabloon.py); None = test zonder sjabloon
 
     def is_beter(self, a: float, b: float) -> bool:
         return a < b if self.lager_is_beter else a > b
+
+
+@dataclass(slots=True)
+class TestDeel:
+    """De meting (en score) van één onderdeel van een testresultaat."""
+    deel: int                       # plek in het sjabloon, vanaf 0
+    waarde: float                   # lengte in m, tijd in s of gewicht in kg
+    score: float | None = None      # uit de scoreformule van het onderdeel; None = geen formule
 
 
 @dataclass(slots=True)
@@ -166,6 +175,8 @@ class Testresultaat:
     atleet_id: str                  # master_id
     test_id: int
     datum: date
-    waarde: float
+    waarde: float                   # hoofdwaarde: totaalscore, anders de meting van het eerste onderdeel
     notities: str | None = None
     id: int | None = None
+    score: float | None = None      # totaalscore (of de score van het ene onderdeel); None = geen score
+    delen: list[TestDeel] = field(default_factory=list)   # leeg bij een test zonder sjabloon

@@ -229,16 +229,30 @@
     </section>
 
     <section class="blok" aria-labelledby="kop-test">
-      <h2 class="kop" id="kop-test">Testen</h2>
+      <div class="blok__kop">
+        <h2 class="kop" id="kop-test">Testen</h2>
+        <span class="knoppen">
+          <a class="knop" href="{{ basis }}/testen#kop-eerder">Alle resultaten</a>
+          <a class="knop" href="{{ basis }}/testen#kop-toevoegen">+ Testresultaat</a>
+        </span>
+      </div>
       {% if p.testen %}
         <div class="tabelvak">
           <table class="tabel">
             <thead><tr><th scope="col">Test</th><th scope="col" class="rechts">Laatste</th></tr></thead>
             <tbody>
               {% for t in p.testen %}
+                {% set l = t.laatste %}
                 <tr>
-                  <td>{{ t.test.naam }}<br><span class="zacht">{{ t.laatste.datum | datum_lang }}</span></td>
-                  <td class="rechts"><strong>{{ t.laatste.waarde | getal }}</strong> {{ t.test.eenheid }}</td>
+                  <td>{{ t.test.naam }}<br><span class="zacht">{{ l.datum | datum_lang }}</span></td>
+                  <td class="rechts">
+                    {% if l.delen | length > 1 and l.score is none %}
+                      {{ l.delen | length }} onderdelen
+                    {% else %}
+                      <strong>{{ l.waarde | getal }}</strong> {{ t.test.eenheid }}
+                      {% if l.score is not none and t.test.eenheid != "punten" %}<br><span class="zacht">score {{ l.score | getal }}</span>{% endif %}
+                    {% endif %}
+                  </td>
                 </tr>
               {% endfor %}
             </tbody>

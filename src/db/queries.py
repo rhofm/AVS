@@ -72,6 +72,7 @@ from models import (
     Prestatie,
     ProgrammaOnderdeel,
     Test,
+    TestDeel,
     Testresultaat,
     Training,
     normaliseer_tijd,
@@ -706,47 +707,99 @@ class Opslag:
     # Testen (testen.db)
     # ============================================================
     def test_opslaan(self, t: Test) -> Test:
+        """Een test opslaan. Met `id`: die test aanpassen (ook zijn naam); zonder: op naam toevoegen of bijwerken."""
+        if t.id is not None:
+            if self.testen_db.execute("SELECT 1 FROM test WHERE naam = ? AND id <> ?", (t.naam, t.id)).fetchone():
+                raise OpslagFout(f"Er is al een test met de naam '{t.naam}'.")
+            with self.testen_db:
+                self.testen_db.execute(
+                    "UPDATE test SET naam = ?, eenheid = ?, lager_is_beter = ?, sjabloon = ? WHERE id = ?",
+                    (t.naam, t.eenheid, int(t.lager_is_beter), t.sjabloon, t.id))
+            return t
         with self.testen_db:
             r = self.testen_db.execute(
-                """INSERT INTO test (naam, eenheid, lager_is_beter) VALUES (?, ?, ?)
+                """INSERT INTO test (naam, eenheid, lager_is_beter, sjabloon) VALUES (?, ?, ?, ?)
                    ON CONFLICT (naam) DO UPDATE SET eenheid = excluded.eenheid,
-                       lager_is_beter = excluded.lager_is_beter
+                       lager_is_beter = excluded.lager_is_beter,
+                           sjabloon = COALESCE(excluded.sjabloon, test.sjabloon)
                    RETURNING id""",
-                (t.naam, t.eenheid, int(t.lager_is_beter)),
+                (t.naam, t.eenheid, int(t.lager_is_beter), t.sjabloon),
             ).fetchone()
         t.id = r[0]
         return t
 
+    @staticmethod
+    def _test(r) -> Test:
+        return Test(r["naam"], r["eenheid"], bool(r["lager_is_beter"]), r["id"], r["sjabloon"])
+
     def testen(self) -> list[Test]:
-        return [Test(r["naam"], r["eenheid"], bool(r["lager_is_beter"]), r["id"])
-                for r in self.testen_db.execute("SELECT * FROM test ORDER BY naam")]
+        return [self._test(r) for r in self.testen_db.execute("SELECT * FROM test ORDER BY naam")]
+
+    def test_op_sjabloon(self, sjabloon: str) -> Test | None:
+        """De test die bij dit sjabloon hoort (bestandsnaam zonder .yaml), of None."""
+        r = self.testen_db.execute("SELECT * FROM test WHERE sjabloon = ?", (sjabloon,)).fetchone()
+        return self._test(r) if r else None
+
+    def test_op_naam(self, naam: str) -> Test | None:
+        r = self.testen_db.execute("SELECT * FROM test WHERE naam = ? COLLATE NOCASE", (naam,)).fetchone()
+        return self._test(r) if r else None
+
+    def test_verwijderen(self, test_id: int) -> None:
+        """Een test zonder resultaten weghalen (bijv. als het sjabloon wordt verwijderd)."""
+        if self.aantal_testresultaten(test_id):
+            raise OpslagFout("Er zijn nog resultaten op deze test; die blijven bewaard.")
+        with self.testen_db:
+            self.testen_db.execute("DELETE FROM test WHERE id = ?", (test_id,))
+
+    def aantal_testresultaten(self, test_id: int) -> int:
+        """Hoeveel resultaten (van alle atleten) er op deze test zijn."""
+        return self.testen_db.execute("SELECT COUNT(*) FROM testresultaat WHERE test_id = ?", (test_id,)).fetchone()[0]
 
     def testresultaat_opslaan(self, t: Testresultaat) -> Testresultaat:
+        """Een resultaat opslaan, met zijn onderdelen (`delen`): bij een bestaand resultaat worden ze vervangen."""
         ref = self._ref(t.atleet_id, "testen")
         with self.testen_db:
-            waarden = (ref, t.test_id, _naar_tekst(t.datum), t.waarde, t.notities)
+            waarden = (ref, t.test_id, _naar_tekst(t.datum), t.waarde, t.notities, t.score)
             if t.id is None:
                 t.id = self.testen_db.execute(
-                    "INSERT INTO testresultaat (atleet_ref, test_id, datum, waarde, notities) VALUES (?, ?, ?, ?, ?)",
-                    waarden,
-                ).lastrowid
+                    "INSERT INTO testresultaat (atleet_ref, test_id, datum, waarde, notities, score) "
+                    "VALUES (?, ?, ?, ?, ?, ?)", waarden).lastrowid
             else:
                 self.testen_db.execute(
-                    "UPDATE testresultaat SET atleet_ref = ?, test_id = ?, datum = ?, waarde = ?, notities = ? WHERE id = ?",
-                    (*waarden, t.id),
-                )
+                    "UPDATE testresultaat SET atleet_ref = ?, test_id = ?, datum = ?, waarde = ?, notities = ?, "
+                    "score = ? WHERE id = ?", (*waarden, t.id))
+                self.testen_db.execute("DELETE FROM testresultaat_deel WHERE resultaat_id = ?", (t.id,))
+            self.testen_db.executemany(
+                "INSERT INTO testresultaat_deel (resultaat_id, deel, waarde, score) VALUES (?, ?, ?, ?)",
+                [(t.id, d.deel, d.waarde, d.score) for d in t.delen])
         return t
 
     def testresultaten(self, master_id: str, test_id: int | None = None) -> list[Testresultaat]:
-        """Testresultaten van één atleet, oudste eerst (handig voor een verloop)."""
+        """Testresultaten van één atleet, oudste eerst (handig voor een verloop), met hun onderdelen."""
         sql = "SELECT * FROM testresultaat WHERE atleet_ref = ?"
         args: list = [self._ref(master_id, "testen")]
         if test_id is not None:
             sql += " AND test_id = ?"
             args.append(test_id)
-        sql += " ORDER BY datum"
-        return [Testresultaat(master_id, r["test_id"], _naar_datum(r["datum"]), r["waarde"], r["notities"], r["id"])
-                for r in self.testen_db.execute(sql, args)]
+        sql += " ORDER BY datum, id"
+        rijen = self.testen_db.execute(sql, args).fetchall()
+        delen: dict[int, list[TestDeel]] = {}
+        if rijen:
+            ids = [r["id"] for r in rijen]
+            for d in self.testen_db.execute(
+                    f"SELECT * FROM testresultaat_deel WHERE resultaat_id IN ({_vraagtekens(len(ids))}) "
+                    "ORDER BY resultaat_id, deel", ids):
+                delen.setdefault(d["resultaat_id"], []).append(TestDeel(d["deel"], d["waarde"], d["score"]))
+        return [Testresultaat(master_id, r["test_id"], _naar_datum(r["datum"]), r["waarde"], r["notities"], r["id"],
+                              r["score"], delen.get(r["id"], []))
+                for r in rijen]
+
+    def testresultaat_verwijderen(self, master_id: str, resultaat_id: int) -> bool:
+        """Verwijder één resultaat van deze atleet (met zijn onderdelen). False als het er niet (van hem) was."""
+        with self.testen_db:
+            n = self.testen_db.execute("DELETE FROM testresultaat WHERE id = ? AND atleet_ref = ?",
+                                       (resultaat_id, self._ref(master_id, "testen"))).rowcount
+        return n > 0
 
     # ============================================================
     # Trainingsschema (trainingsschema.db)

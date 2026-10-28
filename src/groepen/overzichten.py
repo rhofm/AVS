@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import date, timedelta
+from typing import Callable
 
 from atleten.aanwezigheid import NIET_INGEVULD, STATUS_TEKST
 from atleten.landingspagina import categorie_code, leeftijdscategorie
@@ -19,7 +20,8 @@ from atleten.testen import laatste_per_test
 from db.queries import Opslag
 from instellingen import naam_tekst
 from leerlijnen.voortgang import leerdoelenpagina
-from models import Atleet, Groep, Training
+from models import Atleet, Groep, Testresultaat, Training
+from testen.sjabloon import Bibliotheek
 
 from .landingspagina import DagAanwezigheid, GroepLid, LeerlijnGemiddelde, _aanwezigheid, _leerdoelen
 
@@ -162,25 +164,53 @@ def _getal(x: float) -> str:
     return f"{x:.2f}".rstrip("0").rstrip(".").replace(".", ",")
 
 
-def testresultaten(db: Opslag, groep: Groep, *, peildatum: date | None = None) -> Tabel:
-    """Het laatste resultaat per test van alle atleten: één kolom per test met minstens één resultaat."""
+def testresultaten(db: Opslag, groep: Groep, *, peildatum: date | None = None,
+                   bibliotheek: Bibliotheek | None = None) -> Tabel:
+    """Het laatste resultaat per test van alle atleten.
+
+    Een test zonder sjabloon, of met één onderdeel, krijgt één kolom. Een test met meerdere onderdelen
+    krijgt een kolom per onderdeel, en een kolom 'totaal' als de scores worden opgeteld. De namen komen
+    uit het sjabloon in `bibliotheek`; zonder sjabloon heten ze 'Onderdeel 1', 'Onderdeel 2', ...
+    """
     vandaag = peildatum or date.today()
+    bib = bibliotheek or Bibliotheek([], [])
     atleten = _atleten(db, groep, vandaag)
     testen = {t.id: t for t in db.testen()}
     per_atleet = {a.master_id: laatste_per_test(db, a.master_id) for a, _ in atleten}
     gebruikt = sorted({tid for p in per_atleet.values() for tid in p}, key=lambda tid: testen[tid].naam)
+
+    # Per kolom: hoe die heet en hoe je er de waarde van een resultaat uit haalt.
+    kolommen: list[tuple[Kolom, int, Callable[[Testresultaat], float | None]]] = []
+    for tid in gebruikt:
+        t = testen[tid]
+        resultaten = [p[tid] for p in per_atleet.values() if tid in p]
+        aantal = max((len(r.delen) for r in resultaten), default=0)
+        if aantal <= 1:
+            kolommen.append((Kolom(t.naam, t.eenheid, t.lager_is_beter), tid, lambda r: r.waarde))
+            continue
+        bron = bib.vind(t.sjabloon)
+        onderdelen = bron.sjabloon.onderdelen if bron else []
+        for i in range(aantal):
+            o = onderdelen[i] if i < len(onderdelen) else None
+            kolommen.append((Kolom(f"{t.naam} · {o.naam if o else f'onderdeel {i + 1}'}", o.eenheid if o else None,
+                                   o.lager_is_beter if o else None), tid,
+                             lambda r, i=i: next((d.waarde for d in r.delen if d.deel == i), None)))
+        if t.eenheid == "punten":
+            kolommen.append((Kolom(f"{t.naam} · totaal", "punten", False), tid, lambda r: r.score))
+
     rijen = []
     for a, cat in atleten:
         p = per_atleet[a.master_id]
-        rijen.append(Rij(a, cat, [None if tid not in p else Waarde(_getal(p[tid].waarde), datum=p[tid].datum,
-                                                                                 waarde=p[tid].waarde)
-                                  for tid in gebruikt]))
+        cellen = []
+        for _, tid, haal in kolommen:
+            r = p.get(tid)
+            w = haal(r) if r else None
+            cellen.append(None if w is None else Waarde(_getal(w), datum=r.datum, waarde=w))
+        rijen.append(Rij(a, cat, cellen))
     rijen.sort(key=_volgorde)
-    _markeer_beste(rijen, [[per_atleet[r.atleet.master_id][tid].waarde if tid in per_atleet[r.atleet.master_id]
-                            else None for tid in gebruikt] for r in rijen],
-                   [testen[tid].lager_is_beter for tid in gebruikt])
-    return Tabel(groep, [Kolom(testen[tid].naam, testen[tid].eenheid, testen[tid].lager_is_beter)
-                         for tid in gebruikt], rijen)
+    _markeer_beste(rijen, [[c.waarde if c else None for c in r.cellen] for r in rijen],
+                   [bool(k.lager_is_beter) for k, _, _ in kolommen])
+    return Tabel(groep, [k for k, _, _ in kolommen], rijen)
 
 
 # ============================================================

@@ -143,6 +143,20 @@ def _config() -> str:
     return f"{len(bestanden)} regelbestanden geldig, puntentelling {punten.STANDAARD_UITGAVE}"
 
 
+def _testsjablonen(tmp: Path) -> str:
+    from testen.formule import Formule
+    from testen.sjabloon import laad_bibliotheek
+    bib = laad_bibliotheek(tmp)                       # lege gegevensmap: alleen de meegeleverde sjablonen
+    if bib.fouten:
+        raise RuntimeError("; ".join(bib.fouten))
+    if not bib.bronnen:
+        from ploeg import config
+        raise RuntimeError(f"geen testsjablonen gevonden in {config.gezocht_in('testen')}")
+    if Formule("C1 * sqrt(L) ^ 2", 1, "L").bereken(4, [2]) != 8:
+        raise RuntimeError("de formulerekenmachine rekent verkeerd")
+    return f"{len(bib.bronnen)} testsjablonen geldig, formules rekenen"
+
+
 def _strategieen() -> str:
     from ploeg.strategieen import STRATEGIEEN
     if not STRATEGIEEN:
@@ -207,6 +221,7 @@ def controles(tmp: Path) -> list[tuple[str, Callable[[], str]]]:
         ("databases", lambda: _databases(tmp / "data")),
         ("sleutelkluis", _sleutelkluis),
         ("config", _config),
+        ("testsjablonen", lambda: _testsjablonen(tmp / "testen")),
         ("strategieën", _strategieen),
         ("optimaliseren", _optimaliseren),
         ("PDF", _pdf),

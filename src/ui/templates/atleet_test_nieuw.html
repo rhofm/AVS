@@ -1,0 +1,62 @@
+{#
+  Een testresultaat invoeren, volgens een sjabloon.
+  Context:
+    a         – de atleet (models.Atleet)
+    s         – testen.sjabloon.Sjabloon
+    basis_url – '/atleet/<master_id>'
+    invoer    – lijst met wat er in elk veld stond (ruwe tekst), optioneel
+    datum     – ingevulde datum (tekst), notities – ingevulde notities
+    vandaag   – date; fout – optioneel
+  POST naar {{ basis_url }}/testen/nieuw met 'sjabloon', 'datum', 'waarde-<i>' en 'notities'.
+#}
+{% extends "basis.html" %}
+{% block titel %}{{ s.naam }} · {{ a.naam }}{% endblock %}
+
+{% block inhoud %}
+<article class="vel">
+  <header class="blok">
+    <a class="terug" href="{{ basis_url }}/testen">&larr; Testresultaten {{ a.naam }}</a>
+    <h1 class="kop kop--pagina">{{ s.naam }}</h1>
+    <p class="subkop">{{ a.naam }}</p>
+  </header>
+
+  {% if fout %}<p class="melding melding--fout" role="alert">Niet opgeslagen: {{ fout }}</p>{% endif %}
+
+  <form class="blok notitieform" method="post" action="{{ basis_url }}/testen/nieuw" novalidate>
+    <input type="hidden" name="sjabloon" value="{{ s.slug }}">
+    <div class="notitieform__datum">
+      <label for="test-datum">Datum</label>
+      <input type="date" id="test-datum" name="datum" required max="{{ vandaag.isoformat() }}" value="{{ datum or vandaag.isoformat() }}">
+    </div>
+
+    {% for o in s.onderdelen %}
+      {% set i = loop.index0 %}
+      <div class="resultaatveld">
+        <label for="waarde-{{ i }}">{{ o.naam }}
+          {% if o.heeft_formule %}<span class="zacht">(geeft een score)</span>{% endif %}</label>
+        <span><input class="invoer invoer--getal" type="text" inputmode="decimal" id="waarde-{{ i }}" name="waarde-{{ i }}"
+                     value="{{ invoer[i] if invoer else '' }}"{% if loop.first %} autofocus{% endif %}> {{ o.eenheid }}</span>
+      </div>
+    {% endfor %}
+
+    {% if s.telt_totaal %}
+      <p class="zacht uitleg">Vul alle onderdelen in die een score geven: de scores worden opgeteld tot een totaalscore.</p>
+    {% elif s.onderdelen | length > 1 %}
+      <p class="zacht uitleg">Een onderdeel dat je niet gedaan hebt mag leeg blijven.</p>
+    {% endif %}
+    <p class="zacht uitleg">Tijd in seconden, lengte in meters, gewicht in kilogram. Een komma of punt voor de decimalen kan allebei.</p>
+
+    <div class="notitieform__datum">
+      <label for="test-notities">Opmerking</label>
+      <input class="invoer invoer--breed" type="text" id="test-notities" name="notities" maxlength="300" value="{{ notities or '' }}" placeholder="optioneel, feitelijk houden">
+    </div>
+
+    <div class="opslaan opslaan--onder">
+      <a class="knop" href="{{ basis_url }}/testen">Annuleren</a>
+      <button class="knop knop--vol" type="submit">Opslaan</button>
+    </div>
+  </form>
+
+  <footer class="vel__voet">Atleet Volg Systeem<br>{{ s.naam }} · {{ a.naam }}</footer>
+</article>
+{% endblock %}

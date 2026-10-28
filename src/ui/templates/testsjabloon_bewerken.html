@@ -1,0 +1,121 @@
+{#
+  Een testsjabloon maken of aanpassen.
+  Context:
+    c         – testen.editor.Concept
+    nieuw     – True als het sjabloon nog niet bestaat
+    fouten    – optioneel, lijst met meldingen na een mislukte poging om op te slaan
+    atleet    – optioneel, models.Atleet: na opslaan meteen een resultaat voor deze atleet invoeren
+    vast      – True als er al resultaten zijn (aantal/soort onderdelen kan niet meer veranderen)
+    kan_verwijderen – True bij een eigen sjabloon zonder resultaten
+    soorten   – {soort: label}
+  Alle knoppen versturen het formulier naar dezelfde pagina (actie=...), zonder JavaScript:
+  bijwerken, rij-toevoegen, weg-<i>, opslaan.
+#}
+{% extends "basis.html" %}
+{% block titel %}{{ "Nieuw testsjabloon" if nieuw else "Testsjabloon " ~ c.naam }}{% endblock %}
+
+{% block inhoud %}
+<article class="vel">
+  <header class="blok">
+    <a class="terug" href="{{ url_for('testsjablonen', **({'atleet': atleet.master_id} if atleet else {})) }}">&larr; Testsjablonen</a>
+    <h1 class="kop kop--pagina">{{ "Nieuw testsjabloon" if nieuw else "Testsjabloon aanpassen" }}</h1>
+    <p class="subkop">Geef de test een naam, voeg de onderdelen toe die je meet en kies eventueel een scoreformule</p>
+  </header>
+
+  {% if fouten %}
+    <div class="melding melding--fout" role="alert">
+      <p><strong>Nog niet opgeslagen:</strong></p>
+      <ul>{% for f in fouten %}<li>{{ f }}</li>{% endfor %}</ul>
+    </div>
+  {% endif %}
+  {% if vast %}<p class="melding melding--let-op" role="status">Er zijn al resultaten met deze test. Namen en formules kun je aanpassen; het aantal onderdelen en hun soort staan vast.</p>{% endif %}
+
+  <form class="blok" method="post" action="" novalidate>
+    <input type="hidden" name="slug" value="{{ c.slug }}">
+    <input type="hidden" name="totaal_getoond" value="{{ 1 if c.totaal_getoond else 0 }}">
+    {% if atleet %}<input type="hidden" name="atleet" value="{{ atleet.master_id }}">{% endif %}
+    {# Enter in een tekstveld: eerst de knop 'Bijwerken', niet per ongeluk Opslaan of een rij verwijderen. #}
+    <button type="submit" name="actie" value="bijwerken" id="bijwerken" class="verborgen" tabindex="-1" aria-hidden="true">Bijwerken</button>
+
+    <div class="veld veld--breed">
+      <label for="test-naam">Naam van de test *</label>
+      <input class="invoer invoer--breed" type="text" id="test-naam" name="naam" value="{{ c.naam }}" maxlength="80" required autofocus>
+    </div>
+
+    <h2 class="subkop">Onderdelen</h2>
+    <p class="zacht uitleg">Elke rij is een onderdeel van de test: een lengte, een tijd of een gewicht dat je noteert. Is de test maar één meting, houd dan één rij.</p>
+
+    {% for o in c.onderdelen %}
+      {% set i = loop.index0 %}
+      <fieldset class="sjabloonrij">
+        <legend class="verborgen">Onderdeel {{ loop.index }}</legend>
+        <div class="sjabloonrij__kop">
+          <label class="naamveld">Naam van het onderdeel {{ loop.index }}
+            <input class="invoer invoer--breed" type="text" name="onderdeel-naam-{{ i }}" value="{{ o.naam }}" maxlength="80" placeholder="bijv. Hoogspringen staand">
+          </label>
+          <label>Soort
+            <select class="invoer" name="onderdeel-soort-{{ i }}">
+              {% for s, label in soorten.items() %}<option value="{{ s }}"{% if o.soort == s %} selected{% endif %}>{{ label }}</option>{% endfor %}
+            </select>
+          </label>
+          {% if c.onderdelen | length > 1 %}
+            <button class="knop knop--klein knop--gevaar" type="submit" name="actie" value="weg-{{ i }}" aria-label="Onderdeel {{ loop.index }} verwijderen">Verwijderen</button>
+          {% endif %}
+        </div>
+        <div class="sjabloonrij__formule">
+          <label class="formuleveld-vak" style="flex: 1 1 18rem">Scoreformule (optioneel)
+            <input class="invoer invoer--breed formuleveld" type="text" name="onderdeel-formule-{{ i }}" value="{{ o.formule }}" maxlength="300"
+                   placeholder="bijv. C1 * sqrt(L) + C2" autocomplete="off" spellcheck="false">
+          </label>
+          <label>Aantal parameters
+            <select class="invoer" name="onderdeel-aantal-{{ i }}" onchange="this.form.requestSubmit(document.getElementById('bijwerken'))">
+              {% for n in range(0, 10) %}<option value="{{ n }}"{% if o.aantal == n %} selected{% endif %}>{{ n }}</option>{% endfor %}
+            </select>
+          </label>
+        </div>
+        {% if o.aantal %}
+          <div class="parameters">
+            {% for j in range(o.aantal) %}
+              <label>C{{ j + 1 }}
+                <input class="invoer invoer--getal" type="text" inputmode="decimal" name="onderdeel-par-{{ i }}-{{ j }}" value="{{ o.parameters[j] }}">
+              </label>
+            {% endfor %}
+          </div>
+        {% endif %}
+      </fieldset>
+    {% endfor %}
+
+    <div class="opslaan opslaan--onder" style="justify-content: space-between">
+      <button class="knop" type="submit" name="actie" value="rij-toevoegen">+ Onderdeel toevoegen</button>
+      <button class="knop" type="submit" name="actie" value="bijwerken">Bijwerken</button>
+    </div>
+
+    {% if c.totaal_mogelijk %}
+      <div class="vinkjerij">
+        <input type="checkbox" id="totaal" name="totaal" value="1"{% if c.totaal_optellen %} checked{% endif %}>
+        <label for="totaal">De scores van de onderdelen optellen tot een totaalscore</label>
+      </div>
+    {% endif %}
+
+    <details class="uitleg">
+      <summary>Hoe schrijf je een formule?</summary>
+      <p>Je kunt <code>+</code> <code>-</code> <code>*</code> <code>/</code> <code>^</code> (macht), <code>sqrt( )</code> (wortel) en haakjes gebruiken. Het resultaat dat je meet heet <code>L</code> bij een lengte (in meters), <code>T</code> bij een tijd (in seconden) en <code>M</code> bij een gewicht (in kg). Parameters heten <code>C1</code>, <code>C2</code>, &hellip;: kies het aantal bij &lsquo;Aantal parameters&rsquo; en vul hun waarde in. Voorbeeld: <code>C1 * sqrt(L) + C2</code>. Een formule gebruikt alleen het resultaat van dit ene onderdeel. Laat de formule leeg als je alleen de meting wilt bewaren.</p>
+      <p>Verandert het aantal parameters niet meteen? Klik dan op &lsquo;Bijwerken&rsquo;.</p>
+    </details>
+
+    <div class="opslaan opslaan--onder">
+      <a class="knop" href="{{ url_for('testsjablonen', **({'atleet': atleet.master_id} if atleet else {})) }}">Annuleren</a>
+      <button class="knop knop--vol" type="submit" name="actie" value="opslaan">{{ "Opslaan en resultaat invoeren" if atleet else "Opslaan" }}</button>
+    </div>
+
+    {% if kan_verwijderen %}
+      <div class="opslaan opslaan--onder" style="justify-content: flex-start">
+        <label class="vinkjerij"><input type="checkbox" name="zeker" value="1"> Ja, dit sjabloon verwijderen</label>
+        <button class="knop knop--klein knop--gevaar" type="submit" name="actie" value="verwijderen">Sjabloon verwijderen</button>
+      </div>
+    {% endif %}
+  </form>
+
+  <footer class="vel__voet">Atleet Volg Systeem<br>Testsjabloon</footer>
+</article>
+{% endblock %}

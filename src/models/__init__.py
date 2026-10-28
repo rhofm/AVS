@@ -30,6 +30,7 @@ from .prestatie import (
     Onderdeel,
     Prestatie,
     Test,
+    TestDeel,
     Testresultaat,
     Wedstrijd,
     heeft_windmeting,
@@ -39,7 +40,7 @@ from .trainingsschema import DAGEN, Trainingsschema
 __all__ = [
     "Atleet", "Geslacht", "GESLACHTEN",
     "Doel", "DoelRegel", "DOELSOORTEN", "BEOORDELINGEN", "STATUSSEN",
-    "Onderdeel", "Wedstrijd", "Prestatie", "Inschrijving", "PR", "Test", "Testresultaat",
+    "Onderdeel", "Wedstrijd", "Prestatie", "Inschrijving", "PR", "Test", "TestDeel", "Testresultaat",
     "Bron", "BRONNEN", "Eenheid", "EENHEDEN", "MAX_WIND", "heeft_windmeting",
     "Groep", "normaliseer_tijd", "Training", "TRAININGSONDERDELEN", "Absentie", "AbsentieStatus", "ABSENTIE_STATUSSEN",
     "Fase", "FASEN", "FASE_CODES", "Mesocyclus", "MesoWeek", "Periode", "Periodisering",
