@@ -1,0 +1,126 @@
+{#
+  Een hele groep in één keer scoren op één leerdoel.
+  Context:
+    sp      – groepen.leerdoelen_scoren.ScorePagina
+    melding – optioneel, bijv. '3 scores opgeslagen'
+    fout    – optioneel, foutmelding na opslaan
+  Kiezen: GET ?leerdoel=<id>. Opslaan: POST met 'leerdoel', 'datum' en per atleet
+  'score-<master_id>' = 1..5 → groepen.leerdoelen_scoren.scores_opslaan().
+  Werkt zonder JavaScript.
+#}
+{% extends "basis.html" %}
+{% set groep = sp.groep %}
+{% block titel %}Leerdoelen scoren {{ groep.naam }}{% endblock %}
+
+{% macro blokjes(waarde) -%}
+  <span class="blokjes" aria-hidden="true">{% for i in range(1, 6) %}<span class="{{ 'aan' if waarde and i <= waarde }}"></span>{% endfor %}</span>
+{%- endmacro %}
+
+{% block inhoud %}
+<article class="vel">
+  <header class="blok__kop">
+    <div>
+      <a class="terug" href="{{ url_for('groep_leerdoelen', groep_id=groep.id) }}">&larr; Leerdoelen {{ groep.naam }}</a>
+      <h1 class="kop kop--pagina">Leerdoelen scoren</h1>
+      <p class="subkop">Kies een leerdoel en geef alle atleten van {{ groep.naam }} in één keer een score</p>
+    </div>
+  </header>
+
+  {% if melding %}<p class="melding" role="status">{{ melding }}</p>{% endif %}
+  {% if fout %}<p class="melding melding--fout" role="alert">{{ fout }}</p>{% endif %}
+
+  {% if not sp.keuzes %}
+    <p class="leeg">Geen leerdoelen om te scoren: er zijn nog geen atleten in deze groep, of hun leeftijdscategorie is onbekend.</p>
+  {% else %}
+    <form class="blok opslaan" method="get" action="{{ url_for('groep_leerdoelen_scoren', groep_id=groep.id) }}">
+      <label for="leerdoel-kies">Leerdoel</label>
+      <select id="leerdoel-kies" name="leerdoel" required>
+        <option value="">Kies een leerdoel&hellip;</option>
+        {% for k in sp.keuzes %}
+          <optgroup label="{{ k.naam }}">
+            {% for d in k.doelen %}
+              <option value="{{ d.id }}"{% if sp.leerdoel and sp.leerdoel.id == d.id %} selected{% endif %}>{{ d.categorie }} · {{ d.omschrijving }}</option>
+            {% endfor %}
+          </optgroup>
+        {% endfor %}
+      </select>
+      <button class="knop" type="submit">Tonen</button>
+    </form>
+  {% endif %}
+
+  {% if sp.leerdoel %}
+    {% set d = sp.leerdoel %}
+    <form class="blok" method="post" action="{{ url_for('groep_leerdoelen_scoren_opslaan', groep_id=groep.id) }}">
+      <input type="hidden" name="leerdoel" value="{{ d.id }}">
+      <section aria-labelledby="kop-doel">
+        <div class="blok__kop">
+          <div>
+            <h2 class="subkop" id="kop-doel">{{ sp.leerlijn_naam }} · {{ d.categorie }}</h2>
+            <p>{{ d.omschrijving }}{% if d.alleen_specialisten %} <span class="kenmerk kenmerk--licht">specialisten</span>{% endif %}</p>
+          </div>
+          <span class="zacht getallen" style="font-size: var(--maat-s)">{{ sp.beoordeeld }} van {{ sp.rijen | length }} beoordeeld</span>
+        </div>
+
+        <ol class="schaal" aria-label="Scoreschaal">
+          {% for s, label in sp.scoreschaal.items() %}
+            <li>{{ blokjes(s) }}<span><strong>{{ s }}</strong> {{ label }}</span></li>
+          {% endfor %}
+        </ol>
+
+        <div class="opslaan">
+          <label for="score-datum">Datum van beoordeling</label>
+          <input type="date" id="score-datum" name="datum" value="{{ sp.vandaag.isoformat() }}" max="{{ sp.vandaag.isoformat() }}" required>
+          <span class="zacht">Alleen gewijzigde scores worden opgeslagen; eerdere scores blijven bewaard.</span>
+          <button class="knop knop--vol" type="submit">Opslaan</button>
+        </div>
+
+        {% if sp.rijen %}
+          <div class="tabelvak">
+            <table class="tabel leerdoeltabel">
+              <thead>
+                <tr><th scope="col">Atleet</th><th scope="col" class="midden">Cat.</th><th scope="col">Laatste score</th><th scope="col">Nieuwe score</th></tr>
+              </thead>
+              <tbody>
+                {% for r in sp.rijen %}
+                  <tr class="{{ '' if r.eigen_categorie else 'eerder' }}">
+                    <th scope="row">{{ r.atleet.naam }}</th>
+                    <td class="midden zacht">{{ r.categorie_code or "–" }}</td>
+                    <td>
+                      {% if r.score %}
+                        {{ blokjes(r.waarde) }}
+                        <span class="scorecel__tekst">{{ sp.scoreschaal[r.waarde] }}<br><span class="zacht">{{ r.score.datum | datum_lang }}</span></span>
+                      {% else %}
+                        {{ blokjes(none) }}<span class="scorecel__tekst zacht">Nog niet beoordeeld</span>
+                      {% endif %}
+                    </td>
+                    <td class="scorecel">
+                      <fieldset class="kiezer">
+                        <legend class="verborgen">Score voor {{ r.atleet.naam }}</legend>
+                        {% for s in range(1, 6) %}
+                          <input type="radio" id="s-{{ r.atleet.master_id }}-{{ s }}" name="score-{{ r.atleet.master_id }}" value="{{ s }}"{% if r.waarde == s %} checked{% endif %}>
+                          <label for="s-{{ r.atleet.master_id }}-{{ s }}" title="{{ sp.scoreschaal[s] }}">{{ s }}</label>
+                        {% endfor %}
+                      </fieldset>
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          <p class="zacht" style="font-size: var(--maat-xs); margin: 0">Een gekleurde regel is een atleet voor wie dit leerdoel bij een andere categorie hoort; je kunt hem of haar toch scoren.</p>
+        {% else %}
+          <p class="leeg">Nog geen atleten in deze groep.</p>
+        {% endif %}
+
+        <div class="opslaan opslaan--onder">
+          <button class="knop knop--vol" type="submit">Opslaan</button>
+        </div>
+      </section>
+    </form>
+  {% elif sp.keuzes %}
+    <p class="leeg">Kies hierboven een leerdoel om de atleten te zien.</p>
+  {% endif %}
+
+  <footer class="vel__voet">Atleet Volg Systeem<br>Leerdoelen scoren {{ groep.naam }}</footer>
+</article>
+{% endblock %}

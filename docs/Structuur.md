@@ -93,7 +93,7 @@
 * Lid worden van een groep vult de trainingsdagen van de groep aan in het trainingsschema van de atleet; per atleet blijft het aan te passen
 * Weekrooster per atleet over al zijn groepen (dag, tijd, groep)
 * Tijden invullen: bij 'Nieuwe groep' en 'Wijzigen' op de groepspagina
-* Nog te doen: weekrooster tonen op de atleetpagina
+* ~~Weekrooster tonen op de atleetpagina~~ Gedaan
 * Absentie tool: lijst per training, vooraf ingevuld met 'aanwezig' volgens het trainingsschema; trainer past alleen de uitzonderingen aan
 * Periodisering per groep (optioneel), pagina 'Periodisering' vanaf de groepspagina:
   * Megacyclus: fasen V1 (algemene voorbereiding), V2 (specifieke voorbereiding), WP (wedstrijdperiode), Rust en 'Geen' (einde). Per fase alleen een startdatum; een fase geldt tot de volgende begint en mag vaker per jaar voorkomen
@@ -115,7 +115,7 @@
   * Te zien op de groepspagina (komende doelen, markering in het jaaroverzicht), de atleetpagina (eigen regels, '+ Persoonlijk doel') en de wedstrijdpagina
 * Trainingen: per training groep, datum, warming-up, kern A, kern B, cooling-down en notities. Tekstvelden met meerdere regels; eenvoudige markdown (**vet**, *schuin*, - lijstjes, # kopjes) wordt opgemaakt getoond
 * Afwijkende training voor enkele atleten: een variant van de gewone training met eigen inhoud en een lijst atleten (één rij per atleet). Aanwezigheid blijft bij de gewone training
-* Nog te doen: formulier om de inhoud van een training en de varianten in te vullen
+* ~~Formulier om de inhoud van een training en de varianten in te vullen~~ Gedaan
 
 
 

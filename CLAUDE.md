@@ -85,7 +85,7 @@ This project holds personal data about athletes, many of them minors.
 | `db/`         | `schema_<database>.sql`, `init_db.py` (keys, connect, create/migrate), `queries.py`, `migrations/<database>/` |
 | `importers/`  | Import results from links: atletiek.nu PRs, atletiek.nu competitions, Seltec competitions |
 | `ploeg/`      | Team selection: `vergelijk` (compare athletes), `voorspeller` (predictions), `estafettes` (relays), `regels` (rules), `opstelling` (lineup), `optimaliseer` + `strategieen/` (selection "mentalities") |
-| `groepen/`    | Groups, `absentie`, `periodeplan` (periodisering pages: mega/meso cycle, year view, copy), `rooster` (planned training content, import, apply to trainings), `doelen` (goals: status, forms) |
+| `groepen/`    | Groups, `absentie`, `periodeplan` (periodisering pages: mega/meso cycle, year view, copy), `rooster` (planned training content, import, apply to trainings), `doelen` (goals: status, forms), `leerdoelen_scoren` (score a whole group on one leerdoel) |
 | `wedstrijden/` | `planning`: upcoming meets, who goes, which events (uses `wedstrijd` + `inschrijving` in `prestaties.db`) |
 | `atleten/`, `leerlijnen/` | Feature logic for athletes and learning pathways |
 | `ui/`         | Web UI |

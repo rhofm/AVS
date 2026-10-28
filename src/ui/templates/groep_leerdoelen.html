@@ -20,6 +20,7 @@
       <h1 class="kop kop--pagina">Leerdoelen</h1>
       <p class="subkop">Per atleet, met de leerdoelen van de eigen categorie</p>
     </div>
+    <a class="knop" href="{{ url_for('groep_leerdoelen_scoren', groep_id=groep.id) }}">Hele groep scoren</a>
   </header>
 
   {% if tabel.rijen and tabel.kolommen %}

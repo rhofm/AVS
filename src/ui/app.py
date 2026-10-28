@@ -48,6 +48,7 @@ from groepen import groep as groepsbeheer
 from groepen import groep_importeren
 from groepen.groepenoverzicht import GEEN_SEIZOEN, groepenoverzicht
 from groepen import landingspagina as groep_landingspagina
+from groepen import leerdoelen_scoren
 from groepen import periodeplan as periodisering
 from groepen import rooster as roosterbeheer
 from groepen import doelen as doelbeheer
@@ -955,6 +956,40 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
     def groep_leerdoelen(groep_id: int):
         return render_template("groep_leerdoelen.html", tabel=groep_overzichten.leerdoelen(db(), haal_groep(groep_id)),
                                actief_menu="groepen")
+
+    def _groep_scoren(groep_id: int, leerdoel_id: str | None, *, fout: str | None = None, status: int = 200):
+        gr = haal_groep(groep_id)
+        try:
+            sp = leerdoelen_scoren.scorepagina(db(), gr, leerdoel_id)
+        except OpslagFout:
+            abort(404)
+        meldingen = get_flashed_messages()
+        return render_template("groep_leerdoelen_scoren.html", sp=sp, melding=meldingen[0] if meldingen else None,
+                               fout=fout, actief_menu="groepen"), status
+
+    @app.get("/groep/<int:groep_id>/leerdoelen/scoren")
+    def groep_leerdoelen_scoren(groep_id: int):
+        return _groep_scoren(groep_id, request.args.get("leerdoel") or None)
+
+    @app.post("/groep/<int:groep_id>/leerdoelen/scoren")
+    def groep_leerdoelen_scoren_opslaan(groep_id: int):
+        gr = haal_groep(groep_id)
+        leerdoel_id = request.form.get("leerdoel") or None
+        if leerdoel_id is None:
+            abort(400)
+        try:
+            datum = date.fromisoformat(request.form.get("datum", ""))
+        except ValueError:
+            return _groep_scoren(groep_id, leerdoel_id, fout="Vul een geldige datum in.", status=400)
+        if datum > date.today():
+            return _groep_scoren(groep_id, leerdoel_id, fout="De datum mag niet in de toekomst liggen.", status=400)
+        try:
+            aantal = leerdoelen_scoren.scores_opslaan(db(), gr, leerdoel_id, request.form, datum)
+        except (OpslagFout, ValueError) as e:
+            return _groep_scoren(groep_id, leerdoel_id, fout=f"Niet opgeslagen: {e}", status=400)
+        flash("Geen scores gewijzigd." if aantal == 0 else
+              f"{aantal} score{'s' if aantal != 1 else ''} opgeslagen.")
+        return redirect(url_for("groep_leerdoelen_scoren", groep_id=groep_id, leerdoel=leerdoel_id))
 
     @app.get("/groep/<int:groep_id>/aanwezigheid")
     def groep_aanwezigheid(groep_id: int):
