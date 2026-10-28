@@ -2,20 +2,16 @@
 route /training/<id>/export.<md|pdf>). Namen bij afwijkende trainingen alleen met ?namen=1.
 
 Alleen nepgegevens en een vaste testsleutel. De PDF-test wordt overgeslagen als fpdf2
-niet is geïnstalleerd. Werkt met pytest en los: `python tests/test_training_export.py`.
+niet is geïnstalleerd.
 """
 
 import importlib.util
-import sys
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+from test_trainingen_inhoud import _basis, opslag
 
-from test_trainingen_inhoud import TESTSLEUTEL, _basis, opslag  # noqa: E402
-
-from groepen import trainingen as trainingsbeheer  # noqa: E402
-from ui import export  # noqa: E402
+from groepen import trainingen as trainingsbeheer
+from ui import export
+from hulp import app_client
 
 HEEFT_FPDF = importlib.util.find_spec("fpdf") is not None
 
@@ -58,12 +54,9 @@ def test_pdf():
 
 
 def test_routes():
-    from ui.app import maak_app
     with opslag() as (db, tmp):
         anna, g, t = _met_variant(db)
-        app = maak_app(map=tmp, hoofd=TESTSLEUTEL)
-        app.config["TESTING"] = True
-        c = app.test_client()
+        c = app_client(tmp)
         html = c.get(f"/training/{t.id}").get_data(as_text=True)
         assert f'/training/{t.id}/export.md' in html and f'/training/{t.id}/export.pdf' in html
         assert 'name="namen"' in html
@@ -82,10 +75,3 @@ def test_routes():
         # Zonder afwijkende trainingen geen keuze voor namen.
         db.training_verwijderen(db.varianten(t.id)[0].id)
         assert 'name="namen"' not in c.get(f"/training/{t.id}").get_data(as_text=True)
-
-
-if __name__ == "__main__":
-    for naam, fn in list(globals().items()):
-        if naam.startswith("test_") and callable(fn):
-            fn()
-            print("ok ", naam)

@@ -2,35 +2,23 @@
 model, opslag in personen.db (migratie 009), de formulieren 'Nieuwe atleet' en 'Aanpassen',
 en de landingspagina.
 
-Alleen nepgegevens en een vaste testsleutel. Werkt met pytest en los:
-`python tests/test_au_licentienummer.py`.
+Alleen nepgegevens en een vaste testsleutel.
 """
 
 import contextlib
 import io
 import shutil
-import sys
 import tempfile
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+from test_app import client
+from test_landingspagina import opslag, voorbeeld
 
-from test_app import TESTSLEUTEL, client, tekst  # noqa: E402
-from test_landingspagina import opslag, voorbeeld  # noqa: E402
-
-from atleten import aanpassen, beheer, nieuw  # noqa: E402
-from db.init_db import init_db  # noqa: E402
-from db.queries import Opslag  # noqa: E402
-from models import Atleet  # noqa: E402
-
-
-def _verwacht(fout, fn):
-    try:
-        fn()
-    except fout as e:
-        return e
-    raise AssertionError(f"{fout.__name__} verwacht")
+from atleten import aanpassen, beheer, nieuw
+from db.init_db import init_db
+from db.queries import Opslag
+from models import Atleet
+from hulp import TESTSLEUTEL, tekst, verwacht as _verwacht
 
 
 def _form(db, mid, **wijzig) -> dict:
@@ -155,11 +143,3 @@ def test_paginas():
         assert "Opgeslagen: gewijzigd: AU-licentienummer." in tekst(r) and "licentie 1234567" in tekst(r)
         r = c.post(f"/atleet/{mid}/aanpassen", data={**form, "au_licentienummer": "12a"})
         assert r.status_code == 400 and "Het AU-licentienummer bestaat alleen uit cijfers." in tekst(r)
-
-
-if __name__ == "__main__":
-    tests = [(n, f) for n, f in globals().items() if n.startswith("test_") and callable(f)]
-    for naam, fn in tests:
-        fn()
-        print(f"ok  {naam}")
-    print(f"{len(tests)} tests geslaagd")

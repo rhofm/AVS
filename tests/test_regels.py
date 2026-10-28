@@ -3,34 +3,24 @@ config/ploeg_regels/u14_u16_2026-2027.yaml.
 
 Verwachte programma's komen uit de Wedstrijdbepalingen Competitie 2026-2027,
 bepalingen 70 en 72. Alleen nep-master_ids, geen namen.
-Werkt met pytest en los: `python tests/test_regels.py`.
+
 """
 
 import copy
 import os
-import sys
 import tempfile
 import time
 from pathlib import Path
 
 import yaml
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-
-from models import Inzet, PloegLid  # noqa: E402
-from ploeg import regels  # noqa: E402
-from ploeg.regels import RegelFout, Regelset, categorie_code, controleer_dag  # noqa: E402
+from models import Inzet, PloegLid
+from ploeg import regels
+from ploeg.regels import RegelFout, Regelset, categorie_code, controleer_dag
+from hulp import verwacht as _verwacht
 
 BESTAND = "u14_u16_2026-2027"
 A, B, C, D, E, F = (c * 32 for c in "abcdef")
-
-
-def _verwacht(fout, fn) -> None:
-    try:
-        fn()
-    except fout as e:
-        return e
-    raise AssertionError(f"{fout.__name__} verwacht")
 
 
 def rs() -> Regelset:
@@ -293,11 +283,3 @@ def test_modellen():
     _verwacht(ValueError, lambda: Inzet(A, ""))
     _verwacht(ValueError, lambda: Inzet(A, "verspringen", groep=0))
     assert Inzet(A, "verspringen", 2).groep == 2
-
-
-if __name__ == "__main__":
-    tests = [(n, f) for n, f in globals().items() if n.startswith("test_") and callable(f)]
-    for naam, fn in tests:
-        fn()
-        print(f"ok  {naam}")
-    print(f"{len(tests)} tests geslaagd")

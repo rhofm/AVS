@@ -1,17 +1,13 @@
 """Tests voor src/testen/formule.py: de veilige rekenmachine voor scoreformules.
 
-Werkt met pytest en los: `python tests/test_testen_formule.py`.
+
 """
 
 import math
-import sys
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+import pytest
 
-import pytest  # noqa: E402
-
-from testen.formule import MAX_LENGTE, Formule, FormuleFout  # noqa: E402
+from testen.formule import MAX_LENGTE, Formule, FormuleFout
 
 
 def rek(tekst, x=0.0, par=(), var="L"):
@@ -105,7 +101,3 @@ def test_geen_eval():
 def test_uitkomst_is_float():
     uit = rek("L", 3)
     assert isinstance(uit, float) and uit == 3.0 and math.isfinite(uit)
-
-
-if __name__ == "__main__":
-    raise SystemExit(pytest.main([__file__, "-q"]))

@@ -2,32 +2,26 @@
 (ploeg/estafettes.py), en hoe die meetellen in de stand, de optimalisatie, de
 pagina en de csv.
 
-Alleen nepgegevens. Werkt met pytest en los: `python tests/test_voorspeller.py`.
+Alleen nepgegevens.
 """
 
 import copy
 import dataclasses
 import itertools
 import random
-import sys
 from datetime import date
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+import yaml
+from test_ploegen import BESTAND, DAG, JAAR, opslag
 
-import yaml  # noqa: E402
-from test_landingspagina import TESTSLEUTEL  # noqa: E402
-from test_ploegen import BESTAND, DAG, JAAR, _verwacht, opslag  # noqa: E402
-
-from atleten import beheer  # noqa: E402
-from models import Atleet, Inzet, Ploeg, PloegLid, Prestatie  # noqa: E402
-from ploeg import estafettes, opstelling, punten, regels, strategieen, vergelijk  # noqa: E402
-from ploeg.config import config_map  # noqa: E402
-from ploeg.optimaliseer import optimaliseer  # noqa: E402
-from ploeg.vergelijk import Cel, Matrix, Rij  # noqa: E402
-from ploeg.voorspeller import Beentijd  # noqa: E402
-from ui.app import maak_app  # noqa: E402
+from atleten import beheer
+from models import Atleet, Inzet, Ploeg, PloegLid, Prestatie
+from ploeg import estafettes, opstelling, punten, regels, strategieen, vergelijk
+from ploeg.config import config_map
+from ploeg.optimaliseer import optimaliseer
+from ploeg.vergelijk import Cel, Matrix, Rij
+from ploeg.voorspeller import Beentijd
+from hulp import app_client, verwacht as _verwacht
 
 RS = regels.laad(BESTAND)
 PT = punten.puntentelling(RS.puntentelling)
@@ -312,9 +306,7 @@ def test_pagina_en_csv_met_voorspelling_en_estafette():
         inzet = [Inzet(a, "4x80m") for a in meisjes] + [Inzet(ids["cato"], "kogelstoten")]
         db.ploeg_opstelling_opslaan(p.id, [PloegLid(a) for a in meisjes], inzet)
         db.sluit()
-        app = maak_app(map=tmp, hoofd=TESTSLEUTEL)
-        app.config["TESTING"] = True
-        c = app.test_client()
+        c = app_client(tmp)
         html = c.get(f"/ploeg/{p.id}").get_data(as_text=True)
         assert "ploegcel--voorspeld" in html and "voorspeld uit Kogelstoten 2kg" in html
         assert "Geschat:" in html and "nog niet mee" not in html            # estafette telt mee
@@ -324,11 +316,3 @@ def test_pagina_en_csv_met_voorspelling_en_estafette():
         cato = next(r.split(";") for r in csv[1:] if r.split(";")[1].startswith("Cato"))
         assert cato[kop.index("Kogelstoten")] == "x"                         # geen echte prestatie: geen waarde
         assert cato[kop.index("4 x 80 meter")] == "x"
-
-
-if __name__ == "__main__":
-    tests = [(n, f) for n, f in globals().items() if n.startswith("test_") and callable(f)]
-    for naam, fn in tests:
-        fn()
-        print(f"ok  {naam}")
-    print(f"{len(tests)} tests geslaagd")

@@ -1,29 +1,26 @@
 """Tests voor src/testen/resultaten.py en de testtabellen in db/queries.py (testen.db, migratie 002).
 
 Alleen nepgegevens en een vaste testsleutel (de nepgroep uit test_groep_landingspagina).
-Werkt met pytest en los: `python tests/test_testen_resultaten.py`.
+
 """
 
 import contextlib
 import io
 import shutil
-import sys
 import tempfile
 from datetime import date
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+import pytest
+from test_groep_landingspagina import opslag, voorbeeldgroep
 
-import pytest  # noqa: E402
-from test_groep_landingspagina import TESTSLEUTEL, opslag, voorbeeldgroep  # noqa: E402
-
-from atleten import beheer  # noqa: E402
-from db.queries import Opslag, OpslagFout  # noqa: E402
-from models import Test, Testresultaat  # noqa: E402
-from testen import resultaten as res  # noqa: E402
-from testen import sjabloon as sj  # noqa: E402
-from testen.sjabloon import Onderdeel, Sjabloon, SjabloonFout  # noqa: E402
+from atleten import beheer
+from db.queries import Opslag, OpslagFout
+from models import Test, Testresultaat
+from testen import resultaten as res
+from testen import sjabloon as sj
+from testen.sjabloon import Onderdeel, Sjabloon, SjabloonFout
+from hulp import TESTSLEUTEL
 
 DAG = date(2026, 10, 20)
 
@@ -286,7 +283,3 @@ def test_migratie_op_bestaande_database():
             s = Sjabloon("30m vliegend", [Onderdeel("Tijd", "tijd")], True, "30m")
             r = res.resultaat_vastleggen(db, anna, s, date(2026, 10, 1), ["4,1"])
             assert r.test_id == test.id and len(db.testresultaten(anna)) == 2
-
-
-if __name__ == "__main__":
-    raise SystemExit(pytest.main([__file__, "-q"]))

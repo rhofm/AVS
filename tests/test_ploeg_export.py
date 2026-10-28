@@ -1,27 +1,19 @@
 """Tests voor stap 4: csv voor atletiek.nu (ploeg/export.py) en de ploeg op de
 wedstrijdpagina (ploeg/inschrijven.py: inschrijvingen in prestaties.db).
 
-Alleen nep-atleten en een vaste testsleutel. Werkt met pytest en los:
-`python tests/test_ploeg_export.py`.
+Alleen nep-atleten en een vaste testsleutel.
 """
 
-import contextlib
 import csv
 import io
-import sys
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+from test_ploegen import BESTAND, DAG, opslag
 
-from test_landingspagina import TESTSLEUTEL  # noqa: E402
-from test_ploegen import BESTAND, DAG, opslag  # noqa: E402
-
-from db.queries import Opslag  # noqa: E402
-from models import Inzet, Onderdeel, Ploeg, PloegLid, Wedstrijd  # noqa: E402
-from ploeg import export, paginas  # noqa: E402
-from ui.app import maak_app  # noqa: E402
-from wedstrijden import planning  # noqa: E402
+from db.queries import Opslag
+from models import Inzet, Onderdeel, Ploeg, PloegLid, Wedstrijd
+from ploeg import export, paginas
+from wedstrijden import planning
+from hulp import TESTSLEUTEL, app_client
 
 
 class Form(dict):
@@ -84,9 +76,7 @@ def test_csv_route():
         p = _ploeg(db)
         db.ploeg_opstelling_opslaan(p.id, [PloegLid(ids["anna"])], [Inzet(ids["anna"], "80m")])
         db.sluit()
-        app = maak_app(map=tmp, hoofd=TESTSLEUTEL)
-        app.config["TESTING"] = True
-        c = app.test_client()
+        c = app_client(tmp)
         r = c.get(f"/ploeg/{p.id}/atletieknu.csv")
         assert r.status_code == 200 and r.mimetype == "text/csv"
         assert r.headers["Content-Disposition"].startswith("attachment;") and r.headers["Cache-Control"] == "no-store"
@@ -153,19 +143,9 @@ def test_pagina_meldt_wedstrijd_bijgewerkt():
         w = db.wedstrijd_opslaan(Wedstrijd("Competitie 1", DAG))
         p = _ploeg(db, w.id)
         db.sluit()
-        app = maak_app(map=tmp, hoofd=TESTSLEUTEL)
-        app.config["TESTING"] = True
-        c = app.test_client()
+        c = app_client(tmp)
         html = c.post(f"/ploeg/{p.id}", data={"inzet": [f"{ids['anna']}|80m"]}).get_data(as_text=True)
         assert "Wedstrijd Competitie 1 bijgewerkt: 1 ingeschreven, 0 afgemeld." in html
         assert "Opslaan zet de ploeg ook op de wedstrijdpagina" in html
         with Opslag(map=tmp, hoofd=TESTSLEUTEL) as db2:
             assert len(db2.deelnemers(w.id)) == 1
-
-
-if __name__ == "__main__":
-    tests = [(n, f) for n, f in globals().items() if n.startswith("test_") and callable(f)]
-    for naam, fn in tests:
-        fn()
-        print(f"ok  {naam}")
-    print(f"{len(tests)} tests geslaagd")

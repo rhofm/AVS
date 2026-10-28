@@ -1,23 +1,19 @@
 """Tests voor de pagina's onder een groep: groepen/overzichten.py, groepen/trainingen.py en de routes.
 
 Gebruikt de nepgroep uit test_groep_landingspagina (alleen nepgegevens, testsleutel).
-Werkt met pytest en los: `python tests/test_groep_paginas.py`.
+
 """
 
 import re
-import sys
 from datetime import date
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+from test_groep_landingspagina import MAANDAG, VANDAAG, opslag, voorbeeldgroep
 
-from test_groep_landingspagina import MAANDAG, TESTSLEUTEL, VANDAAG, opslag, voorbeeldgroep  # noqa: E402
-
-from atleten import beheer, prestaties  # noqa: E402
-from db.queries import OpslagFout  # noqa: E402
-from groepen import overzichten, trainingen  # noqa: E402
-from models import Test, Testresultaat  # noqa: E402
+from atleten import beheer, prestaties
+from db.queries import OpslagFout
+from groepen import overzichten, trainingen
+from models import Test, Testresultaat
+from hulp import app_client
 
 
 def _met_prestaties(db, ids):
@@ -150,15 +146,12 @@ def test_trainingen_en_invullen():
 
 
 def test_routes():
-    from ui.app import maak_app
     with opslag() as (db, tmp):
         ids = voorbeeldgroep(db)
         _met_prestaties(db, ids)
         gid = ids["groep"]
         di = [t for t in db.trainingen(gid) if t.datum == MAANDAG.replace(day=MAANDAG.day + 1)][0]
-        app = maak_app(map=tmp, hoofd=TESTSLEUTEL)
-        app.config["TESTING"] = True
-        c = app.test_client()
+        c = app_client(tmp)
         for pad in ("prs", "testen", "leerdoelen", "aanwezigheid", "aanwezigheid?weken=4", "aanwezigheid?weken=x",
                     "trainingen", "wedstrijden"):
             r = c.get(f"/groep/{gid}/{pad}")
@@ -193,10 +186,3 @@ def test_routes():
         assert c.get("/training/9999").status_code == 404
         assert c.get("/training/9999/aanwezigheid").status_code == 404
         assert c.post("/training/9999/aanwezigheid", data={}).status_code == 404
-
-
-if __name__ == "__main__":
-    for naam, f in list(globals().items()):
-        if naam.startswith("test_") and callable(f):
-            f()
-            print("ok", naam)

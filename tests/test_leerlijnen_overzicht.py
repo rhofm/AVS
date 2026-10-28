@@ -1,24 +1,20 @@
 """Tests voor src/leerlijnen/overzicht.py en de pagina /leerlijnen (templates/leerlijnen.html).
 
 Alleen de catalogus uit schema_leerlijnen.sql; geen persoonsgegevens nodig.
-Werkt met pytest en los: `python tests/test_leerlijnen_overzicht.py`.
+
 """
 
 import contextlib
 import io
-import sys
 import tempfile
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-
-from db.init_db import init_db  # noqa: E402
-from db.queries import Opslag  # noqa: E402
-from leerlijnen.overzicht import leerlijnoverzicht  # noqa: E402
-from models import CATEGORIEEN  # noqa: E402
-from ui.app import maak_app  # noqa: E402
-
-TESTSLEUTEL = "44" * 32
+from db.init_db import init_db
+from db.queries import Opslag
+from leerlijnen.overzicht import leerlijnoverzicht
+from models import CATEGORIEEN
+from ui.app import maak_app
+from hulp import TESTSLEUTEL
 
 
 @contextlib.contextmanager
@@ -146,10 +142,3 @@ def test_pagina_lege_keuze_en_rommel():
         # Kogelslingeren begint pas in U12: in U10 geen doelen.
         html = c.get("/leerlijnen?onderdeel=SLI&categorie=U10").get_data(as_text=True)
         assert "Geen leerdoelen voor deze keuze" in html
-
-
-if __name__ == "__main__":
-    for naam, f in list(globals().items()):
-        if naam.startswith("test_") and callable(f):
-            f()
-            print("ok", naam)

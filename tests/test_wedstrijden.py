@@ -1,42 +1,16 @@
 """Tests voor src/wedstrijden/planning.py (komende wedstrijden plannen), met echte versleutelde databases.
 
-Alleen nepgegevens en een vaste testsleutel. Werkt met pytest en los:
-`python tests/test_wedstrijden.py`.
+Alleen nepgegevens en een vaste testsleutel.
 """
 
-import contextlib
-import io
-import sys
-import tempfile
 from datetime import date
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+from db.queries import OpslagFout
+from models import Atleet, Onderdeel, Prestatie
+from wedstrijden import planning
+from hulp import opslag, verwacht as _verwacht
 
-from db.init_db import init_db  # noqa: E402
-from db.queries import Opslag, OpslagFout  # noqa: E402
-from models import Atleet, Onderdeel, Prestatie  # noqa: E402
-from wedstrijden import planning  # noqa: E402
-
-TESTSLEUTEL = "33" * 32
 LINK = "https://www.atletiek.nu/wedstrijd/main/45678/"
-
-
-@contextlib.contextmanager
-def opslag():
-    with tempfile.TemporaryDirectory() as tmp:
-        with contextlib.redirect_stdout(io.StringIO()):
-            init_db(Path(tmp), hoofd=TESTSLEUTEL)
-        with Opslag(map=Path(tmp), hoofd=TESTSLEUTEL) as db:
-            yield db
-
-
-def _verwacht(fout, fn) -> None:
-    try:
-        fn()
-    except fout:
-        return
-    raise AssertionError(f"{fout.__name__} verwacht")
 
 
 def _basis(db):
@@ -131,11 +105,3 @@ def test_verwijderde_atleet_verdwijnt_van_deelnemerslijst():
         planning.inschrijven(db, w.id, bas.master_id, ["100m"])
         db.atleet_verwijderen(anna.master_id)
         assert list(planning.overzicht(db, w.id).deelnemers) == [bas.master_id]
-
-
-if __name__ == "__main__":
-    tests = [(n, f) for n, f in globals().items() if n.startswith("test_") and callable(f)]
-    for naam, fn in tests:
-        fn()
-        print(f"ok  {naam}")
-    print(f"{len(tests)} tests geslaagd")

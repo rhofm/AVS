@@ -1,22 +1,17 @@
 """Tests voor het wijzigen van naam en seizoen van een groep
 (groepen.groep.gegevens_opslaan, pagina /groep/<id>/gegevens).
 
-Alleen nepgegevens en een vaste testsleutel. Werkt met pytest en los:
-`python tests/test_groep_gegevens.py`.
+Alleen nepgegevens en een vaste testsleutel.
 """
 
-import sys
 from datetime import date
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+from test_groep_landingspagina import opslag
 
-from test_groep_landingspagina import TESTSLEUTEL, opslag  # noqa: E402
-
-from db.queries import OpslagFout  # noqa: E402
-from groepen import groep as groepsbeheer  # noqa: E402
-from models import Atleet, Groep  # noqa: E402
+from db.queries import OpslagFout
+from groepen import groep as groepsbeheer
+from models import Atleet, Groep
+from hulp import app_client
 
 
 def _verwacht_fout(fn, tekst):
@@ -70,12 +65,9 @@ def test_seizoenkeuzes():
 
 
 def test_routes():
-    from ui.app import maak_app
     with opslag() as (db, tmp):
         g, _ = _groepen(db)
-        app = maak_app(map=tmp, hoofd=TESTSLEUTEL)
-        app.config["TESTING"] = True
-        c = app.test_client()
+        c = app_client(tmp)
         assert f'href="/groep/{g.id}/gegevens"' in c.get(f"/groep/{g.id}").get_data(as_text=True)
 
         html = c.get(f"/groep/{g.id}/gegevens").get_data(as_text=True)
@@ -94,10 +86,3 @@ def test_routes():
 
         assert c.get("/groep/9999/gegevens").status_code == 404
         assert c.post("/groep/9999/gegevens", data={"naam": "X"}).status_code == 404
-
-
-if __name__ == "__main__":
-    for naam, fn in list(globals().items()):
-        if naam.startswith("test_") and callable(fn):
-            fn()
-            print("ok ", naam)

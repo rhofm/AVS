@@ -1,32 +1,18 @@
 """Tests voor leerlijnen.db (leerdoelen) en leerdoelscores.db, met echte versleutelde databases.
 
-Alleen nepgegevens en een vaste testsleutel. Werkt met pytest en los:
-`python tests/test_leerdoelen.py`.
+Alleen nepgegevens en een vaste testsleutel.
 """
 
 import contextlib
 import io
-import sys
 import tempfile
 from datetime import date
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-
-from db.init_db import init_db, pseudoniem, verbind  # noqa: E402
-from db.queries import Opslag, OpslagFout  # noqa: E402
-from models import CATEGORIEEN, Atleet, Leerdoel, LeerdoelScore  # noqa: E402
-
-TESTSLEUTEL = "33" * 32
-
-
-@contextlib.contextmanager
-def opslag():
-    with tempfile.TemporaryDirectory() as tmp:
-        with contextlib.redirect_stdout(io.StringIO()):
-            init_db(Path(tmp), hoofd=TESTSLEUTEL)
-        with Opslag(map=Path(tmp), hoofd=TESTSLEUTEL) as db:
-            yield db
+from db.init_db import init_db, pseudoniem, verbind
+from db.queries import Opslag, OpslagFout
+from models import CATEGORIEEN, Atleet, Leerdoel, LeerdoelScore
+from hulp import TESTSLEUTEL, opslag
 
 
 def _verwacht_fout(fout, functie, *args):
@@ -151,10 +137,3 @@ def test_privacy_alleen_pseudoniem_en_verwijderen():
             db.atleet_verwijderen(anna.master_id)
         with contextlib.closing(verbind("leerdoelscores", Path(tmp), TESTSLEUTEL)) as conn:
             assert conn.execute("SELECT count(*) FROM leerdoelscore").fetchone()[0] == 0
-
-
-if __name__ == "__main__":
-    for naam, functie in list(globals().items()):
-        if naam.startswith("test_"):
-            functie()
-            print("OK", naam)

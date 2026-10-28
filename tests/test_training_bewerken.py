@@ -2,20 +2,15 @@
 en het toevoegen, bewerken en verwijderen van een afwijkende training voor enkele atleten.
 
 Logica in groepen.trainingen, routes /training/<id>/bewerken, /variant/nieuw en /verwijderen.
-Alleen nepgegevens en een vaste testsleutel. Werkt met pytest en los:
-`python tests/test_training_bewerken.py`.
+Alleen nepgegevens en een vaste testsleutel.
 """
 
-import sys
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+from test_trainingen_inhoud import _basis, opslag
 
-from test_trainingen_inhoud import TESTSLEUTEL, _basis, _verwacht, opslag  # noqa: E402
-
-from db.queries import OpslagFout  # noqa: E402
-from groepen import trainingen as trainingsbeheer  # noqa: E402
+from db.queries import OpslagFout
+from groepen import trainingen as trainingsbeheer
+from hulp import app_client, verwacht as _verwacht
 
 
 def test_training_bewerken():
@@ -63,12 +58,9 @@ def test_variant_toevoegen_bewerken_verwijderen():
 
 
 def test_routes():
-    from ui.app import maak_app
     with opslag() as (db, tmp):
         anna, bas, cor, buiten, g, t = _basis(db)
-        app = maak_app(map=tmp, hoofd=TESTSLEUTEL)
-        app.config["TESTING"] = True
-        c = app.test_client()
+        c = app_client(tmp)
 
         html = c.get(f"/training/{t.id}").get_data(as_text=True)
         assert f'href="/training/{t.id}/bewerken"' in html and f'href="/training/{t.id}/variant/nieuw"' in html
@@ -110,10 +102,3 @@ def test_routes():
         for url in ("/training/9999/bewerken", "/training/9999/variant/nieuw", f"/training/{v.id}/bewerken"):
             assert c.get(url).status_code == 404, url
         assert c.post("/training/9999/verwijderen").status_code == 404
-
-
-if __name__ == "__main__":
-    for naam, fn in list(globals().items()):
-        if naam.startswith("test_") and callable(fn):
-            fn()
-            print("ok ", naam)

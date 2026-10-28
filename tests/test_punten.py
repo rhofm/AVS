@@ -2,28 +2,19 @@
 
 De verwachte waarden komen uit "Formules & Constanten" (december 2025) en de
 Mastersploeg-spreadsheet van de Atletiekunie, niet uit de code zelf.
-Werkt met pytest en los: `python tests/test_punten.py`.
+
 """
 
 import sys
 import tempfile
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-
-from ploeg import config, punten  # noqa: E402
-from ploeg.punten import PuntenFout, Puntentelling, handtijd_correctie  # noqa: E402
+from ploeg import config, punten
+from ploeg.punten import PuntenFout, Puntentelling, handtijd_correctie
+from hulp import verwacht as _verwacht
 
 P = punten.punten
 PV = punten.prestatie_voor
-
-
-def _verwacht(fout, fn) -> None:
-    try:
-        fn()
-    except fout:
-        return
-    raise AssertionError(f"{fout.__name__} verwacht")
 
 
 # ------------------------------------------------------------
@@ -221,11 +212,3 @@ def test_config_map():
                 del sys.frozen
             else:
                 sys.frozen = oud_frozen
-
-
-if __name__ == "__main__":
-    tests = [(n, f) for n, f in globals().items() if n.startswith("test_") and callable(f)]
-    for naam, fn in tests:
-        fn()
-        print(f"ok  {naam}")
-    print(f"{len(tests)} tests geslaagd")

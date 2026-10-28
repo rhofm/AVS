@@ -1,20 +1,14 @@
 """Tests voor src/wedstrijden/kalender.py en het template ui/templates/wedstrijdplanning.html.
 
-Alleen nepgegevens en een vaste testsleutel. Werkt met pytest en los:
-`python tests/test_wedstrijdkalender.py`.
+Alleen nepgegevens en een vaste testsleutel.
 """
 
-import sys
 from datetime import date, timedelta
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+from test_landingspagina import TEMPLATES, VANDAAG, opslag, voorbeeld
 
-from test_landingspagina import TEMPLATES, VANDAAG, opslag, voorbeeld  # noqa: E402
-
-from atleten import beheer  # noqa: E402
-from wedstrijden import kalender, planning  # noqa: E402
+from atleten import beheer
+from wedstrijden import kalender, planning
 
 
 def test_een_atleet():
@@ -75,10 +69,3 @@ def test_template():
         bas = beheer.nieuwe_atleet(db, "Bas", "Proef").master_id
         html = render(kalender.wedstrijdplanning(db, [mid, bas], peildatum=VANDAAG))
         assert "Atleten &amp; onderdelen" in html and "<strong>Anna Voorbeeld</strong>" in html
-
-
-if __name__ == "__main__":
-    for naam, f in list(globals().items()):
-        if naam.startswith("test_") and callable(f):
-            f()
-            print("ok", naam)

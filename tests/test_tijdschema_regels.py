@@ -6,21 +6,18 @@ Alleen opgeslagen, geanonimiseerde pagina's uit tests/fixtures/ (niets van inter
 """
 
 import io
-import sys
 from datetime import date
 from pathlib import Path
 
 import pytest
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+from test_tijdschema_import import MEERKAMP
+from hulp import app_client
+from test_wedstrijd_nieuw import BROWSERCONTROLE, opslag
 
-from test_tijdschema_import import MEERKAMP  # noqa: E402
-from test_wedstrijd_nieuw import BROWSERCONTROLE, _client, opslag  # noqa: E402
-
-from db.queries import OpslagFout  # noqa: E402
-from wedstrijden import detail, planning, tijdschema_import  # noqa: E402
-from wedstrijden.detail import NieuweRegel  # noqa: E402
+from db.queries import OpslagFout
+from wedstrijden import detail, planning, tijdschema_import
+from wedstrijden.detail import NieuweRegel
 
 SELTEC = Path(__file__).resolve().parent / "fixtures" / "seltec_tijdschema"
 
@@ -119,7 +116,7 @@ def test_upload_laat_niets_achter_op_schijf(tmp_path, monkeypatch):
 def test_routes():
     with opslag() as (db, tmp):
         w = _wedstrijd(db)
-        c = _client(tmp)
+        c = app_client(tmp)
         pagina = c.get(f"/wedstrijd/{w.id}/tijdschema/regels").get_data(as_text=True)
         assert "Regel toevoegen" in pagina and 'type="file"' in pagina and "Nog geen regels" in pagina
         assert f"/wedstrijd/{w.id}/tijdschema/regels" in c.get(f"/wedstrijd/{w.id}").get_data(as_text=True)

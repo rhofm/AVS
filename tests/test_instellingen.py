@@ -1,21 +1,17 @@
 """Tests voor src/instellingen (eerste weekdag, thema, tijdnotatie) en de pagina Instellingen.
 
-Alleen nepgegevens in een tijdelijke map. Werkt met pytest (conftest.py zet 'de computer'
-op maandag + 24-uurs); los draaien kan ook: `python tests/test_instellingen.py`.
+Alleen nepgegevens in een tijdelijke map.
+conftest.py zet 'de computer' op maandag + 24-uurs.
 """
 
 import json
 import re
-import sys
 import tempfile
 from datetime import date
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-
-import instellingen  # noqa: E402
-from instellingen import Instellingen, systeem  # noqa: E402
+import instellingen
+from instellingen import Instellingen, systeem
 
 
 # ---------------- tijden ----------------
@@ -128,7 +124,7 @@ def test_pagina_en_opslaan():
 def test_tijden_op_groepspagina():
     from test_app import client, tekst
     from db.queries import Opslag
-    from test_landingspagina import TESTSLEUTEL
+    from hulp import TESTSLEUTEL
     with client() as (c, mid, map):
         with Opslag(map=map, hoofd=TESTSLEUTEL) as db:
             g = db.groepen()[0]
@@ -157,7 +153,7 @@ def test_naam_sleutel():
 def test_naamvolgorde_in_de_app():
     from test_app import client, tekst
     from db.queries import Opslag
-    from test_landingspagina import TESTSLEUTEL
+    from hulp import TESTSLEUTEL
     from atleten import beheer
     with client() as (c, mid, map):
         with Opslag(map=map, hoofd=TESTSLEUTEL) as db:
@@ -193,10 +189,3 @@ def test_groepsleden_op_voornaam():
             assert namen(db.groep(groep.id)) == ["Anna", "Bram", "Cas"]
         finally:
             instellingen.activeer(instellingen.NEDERLANDS)
-
-
-if __name__ == "__main__":
-    for naam, f in list(globals().items()):
-        if naam.startswith("test_") and callable(f) and f.__code__.co_argcount == 0:
-            f()
-            print("ok", naam)

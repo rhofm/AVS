@@ -1,33 +1,13 @@
 """Tests voor src/groepen/absentie.py (de absentie-tool), met echte versleutelde databases.
 
-Alleen nepgegevens en een vaste testsleutel. Werkt met pytest en los:
-`python tests/test_absentie.py`.
+Alleen nepgegevens en een vaste testsleutel.
 """
 
-import contextlib
-import io
-import sys
-import tempfile
 from datetime import date, timedelta
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-
-from db.init_db import init_db  # noqa: E402
-from db.queries import Opslag  # noqa: E402
-from groepen import absentie  # noqa: E402
-from models import Atleet, Groep, Training, Trainingsschema  # noqa: E402
-
-TESTSLEUTEL = "22" * 32
-
-
-@contextlib.contextmanager
-def opslag():
-    with tempfile.TemporaryDirectory() as tmp:
-        with contextlib.redirect_stdout(io.StringIO()):
-            init_db(Path(tmp), hoofd=TESTSLEUTEL)
-        with Opslag(map=Path(tmp), hoofd=TESTSLEUTEL) as db:
-            yield db
+from groepen import absentie
+from models import Atleet, Groep, Training, Trainingsschema
+from hulp import opslag
 
 
 def _groep(db):
@@ -81,11 +61,3 @@ def test_overzicht():
         assert o["aanwezig"] == 3 and o["afgemeld"] == 1 and o["blessure"] == 0
         assert o["totaal"] == 4 and o["percentage_aanwezig"] == 75.0
         assert absentie.overzicht(db, "0" * 32)["percentage_aanwezig"] == 0.0
-
-
-if __name__ == "__main__":
-    tests = [(n, f) for n, f in globals().items() if n.startswith("test_") and callable(f)]
-    for naam, fn in tests:
-        fn()
-        print(f"ok  {naam}")
-    print(f"{len(tests)} tests geslaagd")

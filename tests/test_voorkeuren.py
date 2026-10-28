@@ -2,25 +2,19 @@
 vaste voorkeuren per atleet, voorkeuren per ploeg, wat de optimalisatie en de
 controle ermee doen, en de pagina's.
 
-Alleen nepgegevens. Werkt met pytest en los: `python tests/test_voorkeuren.py`.
+Alleen nepgegevens.
 """
 
-import sys
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+from test_optimaliseer import nep_matrix
+from test_ploegen import BESTAND, DAG, opslag
 
-from test_landingspagina import TESTSLEUTEL  # noqa: E402
-from test_optimaliseer import nep_matrix  # noqa: E402
-from test_ploegen import BESTAND, DAG, _verwacht, opslag  # noqa: E402
-
-from db.queries import Opslag, OpslagFout  # noqa: E402
-from models import Inzet, Ploeg, PloegLid  # noqa: E402
-from ploeg import opstelling, paginas, regels, strategieen, voorkeuren  # noqa: E402
-from ploeg.optimaliseer import OptimalisatieFout, optimaliseer  # noqa: E402
-from ploeg.voorkeuren import Effectief  # noqa: E402
-from ui.app import maak_app  # noqa: E402
+from db.queries import Opslag, OpslagFout
+from models import Inzet, Ploeg, PloegLid
+from ploeg import opstelling, paginas, regels, strategieen, voorkeuren
+from ploeg.optimaliseer import OptimalisatieFout, optimaliseer
+from ploeg.voorkeuren import Effectief
+from hulp import TESTSLEUTEL, app_client, verwacht as _verwacht
 
 RS = regels.laad(BESTAND)
 
@@ -176,9 +170,7 @@ def test_paginas():
         p = _ploeg(db)
         db.ploeg_opstelling_opslaan(p.id, [PloegLid(bo)], [Inzet(bo, "80m")])
         db.sluit()
-        app = maak_app(map=tmp, hoofd=TESTSLEUTEL)
-        app.config["TESTING"] = True
-        c = app.test_client()
+        c = app_client(tmp)
 
         assert f"/atleet/{anna}/voorkeuren" in c.get(f"/atleet/{anna}").get_data(as_text=True)
         html = c.get(f"/atleet/{anna}/voorkeuren").get_data(as_text=True)
@@ -203,11 +195,3 @@ def test_paginas():
         assert "Moet 800 meter doen, maar staat er niet op." in html
         with Opslag(map=tmp, hoofd=TESTSLEUTEL) as db2:
             assert db2.ploeg_voorkeuren(p.id) == {(anna, "kogelstoten"): "neutraal", (bo, "800m"): "moet"}
-
-
-if __name__ == "__main__":
-    tests = [(n, f) for n, f in globals().items() if n.startswith("test_") and callable(f)]
-    for naam, fn in tests:
-        fn()
-        print(f"ok  {naam}")
-    print(f"{len(tests)} tests geslaagd")

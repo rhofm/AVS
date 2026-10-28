@@ -3,48 +3,28 @@
 Training: groep, datum, warming-up, kern A, kern B, cooling-down, notities.
 Afwijkende training: variant van de gewone training voor enkele atleten
 (training_atleet, lang formaat). Alleen nepgegevens en een vaste testsleutel.
-Werkt met pytest en los: `python tests/test_trainingen_inhoud.py`.
+
 """
 
 import contextlib
 import io
-import sys
 import tempfile
 from datetime import date
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+from db.init_db import DB_DIR, init_db, verbind
+from db.queries import Opslag, OpslagFout
+from groepen import trainingen as trainingsbeheer
+from models import Absentie, Atleet, Groep, Training
+from ui.markdown import naar_html
+from hulp import TESTSLEUTEL, lege_opslag as opslag, verwacht as _verwacht
 
-from db.init_db import DB_DIR, init_db, verbind  # noqa: E402
-from db.queries import Opslag, OpslagFout  # noqa: E402
-from groepen import trainingen as trainingsbeheer  # noqa: E402
-from models import Absentie, Atleet, Groep, Training  # noqa: E402
-from ui.markdown import naar_html  # noqa: E402
-
-TESTSLEUTEL = "55" * 32
 DINSDAG = date(2026, 10, 20)
 
 KERN_A = """# Starts
 - 6x **30 m** uit startblok
 - *rustig* teruglopen
 Herstel 2 min"""
-
-
-@contextlib.contextmanager
-def opslag():
-    with tempfile.TemporaryDirectory() as tmp:
-        with contextlib.redirect_stdout(io.StringIO()):
-            init_db(Path(tmp), hoofd=TESTSLEUTEL)
-        with Opslag(map=Path(tmp), hoofd=TESTSLEUTEL) as db:
-            yield db, Path(tmp)
-
-
-def _verwacht(fout, fn) -> None:
-    try:
-        fn()
-    except fout:
-        return
-    raise AssertionError(f"{fout.__name__} verwacht")
 
 
 def _basis(db):
@@ -170,11 +150,3 @@ def test_oude_inhoud_wordt_notities():
             assert (t.onderwerp, t.notities, t.warming_up) == ("Kracht", "Squats 3x8\nLunges", None)
             kolommen = {r[1] for r in db.personen.execute("PRAGMA table_info(training)")}
             assert "inhoud" not in kolommen and {"warming_up", "kern_a", "kern_b", "cooling_down"} <= kolommen
-
-
-if __name__ == "__main__":
-    tests = [(n, f) for n, f in globals().items() if n.startswith("test_") and callable(f)]
-    for naam, fn in tests:
-        fn()
-        print(f"ok  {naam}")
-    print(f"{len(tests)} tests geslaagd")

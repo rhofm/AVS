@@ -2,35 +2,17 @@
 
 Gebruikt een nagebouwde, geanonimiseerde profielpagina (tests/fixtures/atletieknu_profiel.html)
 en een tijdelijke map met een vaste testsleutel: raakt atletiek.nu, de sleutelkluis en data/ nooit aan.
-Werkt met pytest en ook los: `python tests/test_atleet_toevoegen.py`.
 """
 
-import contextlib
-import io
-import sys
-import tempfile
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-
-from atleten import beheer  # noqa: E402
-from atleten.atleet_toevoegen_atletieknu import (  # noqa: E402
+from atleten import beheer
+from atleten.atleet_toevoegen_atletieknu import (
     atletieknu_id_uit, voeg_toe,
 )
-from db.init_db import init_db  # noqa: E402
-from db.queries import Opslag  # noqa: E402
+from hulp import opslag
 
-TESTSLEUTEL = "22" * 32
 PROFIEL = (Path(__file__).parent / "fixtures" / "atletieknu_profiel.html").read_text(encoding="utf-8")
-
-
-@contextlib.contextmanager
-def opslag():
-    with tempfile.TemporaryDirectory() as tmp:
-        with contextlib.redirect_stdout(io.StringIO()):
-            init_db(Path(tmp), hoofd=TESTSLEUTEL)
-        with Opslag(map=Path(tmp), hoofd=TESTSLEUTEL) as db:
-            yield db
 
 
 def test_hulpjes():
@@ -86,10 +68,3 @@ def test_niet_bevestigd_of_ander_id_wordt_nieuwe_atleet():
         u = voeg_toe(db, "Test", "Jansen", "999999", html=PROFIEL, bevestig=lambda a: False)
         assert u.status == "nieuw"
         assert len(db.atleten(alleen_actief=False)) == 3
-
-
-if __name__ == "__main__":
-    for naam, fn in list(globals().items()):
-        if naam.startswith("test_"):
-            fn()
-            print("ok", naam)

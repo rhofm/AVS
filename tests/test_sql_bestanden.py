@@ -13,13 +13,10 @@ from pathlib import Path
 
 import pytest
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-
-from db import init_db as db_init  # noqa: E402
-from db.init_db import DATABASES, InstallatieFout, controleer_sql_bestanden, init_db, verbind  # noqa: E402
-from ui.app import maak_app  # noqa: E402
-
-TESTSLEUTEL = "3c" * 32
+from db import init_db as db_init
+from db.init_db import DATABASES, InstallatieFout, controleer_sql_bestanden, init_db, verbind
+from ui.app import maak_app
+from hulp import TESTSLEUTEL
 
 
 @pytest.fixture

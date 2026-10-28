@@ -5,44 +5,22 @@ training). Leden staan in groep_lid (lang formaat); een atleet kan in meerdere
 groepen zitten. Ook: het overzetten van de twee oude varianten (allebei ooit
 migratie 003) en de controle op dubbele migratienummers.
 
-Alleen nepgegevens en een vaste testsleutel. Werkt met pytest en los:
-`python tests/test_groep_starttijden.py`.
+Alleen nepgegevens en een vaste testsleutel.
 """
 
 import contextlib
 import io
-import sys
 import tempfile
 from datetime import date
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-
-from atleten import trainingsschema as schema_pagina  # noqa: E402
-from db import init_db as init_module  # noqa: E402
-from db.init_db import _migraties, DB_DIR, huidige_versie, init_db, verbind  # noqa: E402
-from db.queries import Opslag, OpslagFout  # noqa: E402
-from groepen import groep as groepsbeheer  # noqa: E402
-from models import Atleet, Groep, Trainingsschema, normaliseer_tijd  # noqa: E402
-
-TESTSLEUTEL = "44" * 32
-
-
-@contextlib.contextmanager
-def opslag():
-    with tempfile.TemporaryDirectory() as tmp:
-        with contextlib.redirect_stdout(io.StringIO()):
-            init_db(Path(tmp), hoofd=TESTSLEUTEL)
-        with Opslag(map=Path(tmp), hoofd=TESTSLEUTEL) as db:
-            yield db
-
-
-def _verwacht(fout, fn) -> None:
-    try:
-        fn()
-    except fout:
-        return
-    raise AssertionError(f"{fout.__name__} verwacht")
+from atleten import trainingsschema as schema_pagina
+from db import init_db as init_module
+from db.init_db import _migraties, DB_DIR, huidige_versie, init_db, verbind
+from db.queries import Opslag, OpslagFout
+from groepen import groep as groepsbeheer
+from models import Atleet, Trainingsschema, normaliseer_tijd
+from hulp import TESTSLEUTEL, opslag, verwacht as _verwacht
 
 
 def _basis(db):
@@ -188,11 +166,3 @@ def test_dubbele_migratienummers_worden_geweigerd():
             _verwacht(RuntimeError, lambda: init_module._migraties("personen"))
         finally:
             init_module.MIGRATIONS_DIR = oud
-
-
-if __name__ == "__main__":
-    tests = [(n, f) for n, f in globals().items() if n.startswith("test_") and callable(f)]
-    for naam, fn in tests:
-        fn()
-        print(f"ok  {naam}")
-    print(f"{len(tests)} tests geslaagd")

@@ -1,27 +1,23 @@
 """Tests voor src/db/queries.py, met echte (versleutelde) databases in een tijdelijke map.
 
 Gebruikt een vaste testsleutel: raakt de sleutelkluis en data/ nooit aan.
-Alleen nepgegevens. Werkt met pytest en ook los: `python tests/test_queries.py`.
+Alleen nepgegevens.
 Vereist: pip install sqlcipher3-wheels keyring
 """
 
 import contextlib
 import io
-import sys
 import tempfile
 from datetime import date
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-
-from db.init_db import DB_DIR, init_db, pseudoniem, verbind  # noqa: E402
-from db.queries import Opslag, OpslagFout  # noqa: E402
-from models import (  # noqa: E402
+from db.init_db import DB_DIR, init_db, pseudoniem, verbind
+from db.queries import Opslag, OpslagFout
+from models import (
     PR, heeft_windmeting, Absentie, Atleet, Groep, Inschrijving, Leerlijn, LeerlijnStap, LeerlijnVoortgang,
     Onderdeel, Prestatie, Test, Testresultaat, Training, Trainingsschema, Wedstrijd, Notitie,
 )
-
-TESTSLEUTEL = "11" * 32
+from hulp import TESTSLEUTEL, verwacht as _verwacht
 
 
 @contextlib.contextmanager
@@ -31,14 +27,6 @@ def opslag():
             init_db(Path(tmp), hoofd=TESTSLEUTEL)
         with Opslag(map=Path(tmp), hoofd=TESTSLEUTEL) as db:
             yield db
-
-
-def _verwacht(fout, fn) -> None:
-    try:
-        fn()
-    except fout:
-        return
-    raise AssertionError(f"{fout.__name__} verwacht")
 
 
 def _basis(db: Opslag):
@@ -465,11 +453,3 @@ def test_atleet_verwijderen_wist_alles():
         assert [n.inhoud for n in db.notities()] == ["Notitie over Tim"]
         assert db.groep(g.id).leden == [tim.master_id]
         assert len(db.prestaties(tim.master_id)) == 1  # Tim blijft
-
-
-if __name__ == "__main__":
-    tests = [(n, f) for n, f in globals().items() if n.startswith("test_") and callable(f)]
-    for naam, fn in tests:
-        fn()
-        print(f"ok  {naam}")
-    print(f"{len(tests)} tests geslaagd")

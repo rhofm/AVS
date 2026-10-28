@@ -2,40 +2,24 @@
 src/importers/atletieknu_tijdschema.py en src/wedstrijden/tijdschema_import.py.
 
 Tegen opgeslagen, geanonimiseerde pagina's in fixtures/atletieknu_tijdschema/ (zie de
-README daar); er wordt niets van internet gehaald. Werkt met pytest en los:
-`python tests/test_tijdschema_import.py`.
+README daar); er wordt niets van internet gehaald.
 """
 
-import contextlib
-import io
-import sys
-import tempfile
 from datetime import date
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-
-from db.init_db import init_db  # noqa: E402
-from db.queries import Opslag, OpslagFout  # noqa: E402
-from importers import detect  # noqa: E402
-from importers.atletieknu_tijdschema import (AtletiekNuTijdschemaImporter, groep_uit,  # noqa: E402
+from db.queries import OpslagFout
+from importers import detect
+from importers.atletieknu_tijdschema import (AtletiekNuTijdschemaImporter, groep_uit,
                                              laad_tijdschema)
-from importers.base import ImportFout  # noqa: E402
-from models import Atleet, Inschrijving, Onderdeel, lees_categorie  # noqa: E402
-from wedstrijden import chronoloog, planning  # noqa: E402
-from wedstrijden.tijdschema_import import tijdschema_importeren, zoek_onderdeel  # noqa: E402
+from importers.base import ImportFout
+from models import Atleet, Inschrijving, Onderdeel, lees_categorie
+from wedstrijden import chronoloog, planning
+from wedstrijden.tijdschema_import import tijdschema_importeren, zoek_onderdeel
+from hulp import opslag, verwacht as _verwacht
 
 MAP = Path(__file__).resolve().parent / "fixtures" / "atletieknu_tijdschema"
 MEERKAMP, TEAMS = MAP / "meerkamp.html", MAP / "teams.html"
-TESTSLEUTEL = "77" * 32
-
-
-def _verwacht(fout, fn) -> None:
-    try:
-        fn()
-    except fout:
-        return
-    raise AssertionError(f"{fout.__name__} verwacht")
 
 
 def _laad(pad):
@@ -124,14 +108,6 @@ def test_links_en_detectie():
 
 # ---------------------------------------------------------------- in de database
 
-@contextlib.contextmanager
-def opslag():
-    with tempfile.TemporaryDirectory() as tmp:
-        with contextlib.redirect_stdout(io.StringIO()):
-            init_db(Path(tmp), hoofd=TESTSLEUTEL)
-        with Opslag(map=Path(tmp), hoofd=TESTSLEUTEL) as db:
-            yield db
-
 
 def test_importeren_in_database():
     with opslag() as db:
@@ -183,11 +159,3 @@ def test_importeren_randgevallen():
         ander = planning.plan_wedstrijd(db, "Andere dag", date(2026, 10, 3))
         v = tijdschema_importeren(db, ander.id, str(TEAMS))
         assert v.waarschuwingen and "Klopt de link?" in v.tekst
-
-
-if __name__ == "__main__":
-    tests = [(n, f) for n, f in globals().items() if n.startswith("test_") and callable(f)]
-    for naam, fn in tests:
-        fn()
-        print(f"ok  {naam}")
-    print(f"{len(tests)} tests geslaagd")

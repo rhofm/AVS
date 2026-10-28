@@ -1,21 +1,15 @@
 """Tests voor src/atleten/nieuw.py en de pagina /atleten/nieuw.
 
-Alleen nepgegevens en een vaste testsleutel. Werkt met pytest en los:
-`python tests/test_atleet_nieuw.py`.
+Alleen nepgegevens en een vaste testsleutel.
 """
 
-import sys
-from datetime import date
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+from test_app import client
+from test_landingspagina import VANDAAG, opslag, voorbeeld
 
-from test_app import TESTSLEUTEL, client, tekst  # noqa: E402
-from test_landingspagina import VANDAAG, opslag, voorbeeld  # noqa: E402
-
-from atleten import beheer, nieuw  # noqa: E402
-from db.queries import Opslag  # noqa: E402
+from atleten import beheer, nieuw
+from db.queries import Opslag
+from hulp import TESTSLEUTEL, tekst
 
 
 def _fout(fn) -> dict:
@@ -97,10 +91,3 @@ def test_paginas():
         assert r.status_code == 302
         with Opslag(map=tmp, hoofd=TESTSLEUTEL) as db:
             assert len([a for a in db.atleten() if a.naam == "Lieke Proef"]) == 2
-
-
-if __name__ == "__main__":
-    for naam, f in list(globals().items()):
-        if naam.startswith("test_") and callable(f):
-            f()
-            print("ok", naam)

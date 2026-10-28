@@ -1,18 +1,14 @@
 """Tests voor src/testen/sjabloon.py: sjablonen controleren, scoren, als YAML opslaan en laden.
 
-Werkt met pytest en los: `python tests/test_testen_sjabloon.py`.
+
 """
 
-import sys
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+import pytest
 
-import pytest  # noqa: E402
-
-from testen import sjabloon as sj  # noqa: E402
-from testen.formule import FormuleFout  # noqa: E402
-from testen.sjabloon import Onderdeel, Sjabloon, SjabloonFout  # noqa: E402
+from testen import sjabloon as sj
+from testen.formule import FormuleFout
+from testen.sjabloon import Onderdeel, Sjabloon, SjabloonFout
 
 
 def sprong() -> Sjabloon:
@@ -186,7 +182,3 @@ def test_meegeleverde_sjablonen_zijn_geldig(tmp_path):
     assert bib.fouten == []
     assert {"30m_vliegend", "verspringen_vanuit_stand"} <= {b.sjabloon.slug for b in bib.bronnen}
     assert not any("uitleg" in b.sjabloon.slug for b in bib.bronnen)    # voorbeeld_uitleg.yaml is alleen commentaar
-
-
-if __name__ == "__main__":
-    raise SystemExit(pytest.main([__file__, "-q"]))

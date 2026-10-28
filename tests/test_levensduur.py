@@ -7,17 +7,14 @@ Werkt met pytest.
 import contextlib
 import io
 import socket
-import sys
 import threading
 import urllib.request
 from pathlib import Path
 
 import pytest
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-
-from ui import levensduur  # noqa: E402
-from ui.levensduur import EERSTE_PAGINA, HARTSLAG, TIJDLIMIET, WEG_WACHTTIJD, Bewaker  # noqa: E402
+from ui import levensduur
+from ui.levensduur import EERSTE_PAGINA, HARTSLAG, TIJDLIMIET, WEG_WACHTTIJD, Bewaker
 
 
 class Klok:

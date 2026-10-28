@@ -7,8 +7,8 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
 
-from src.importers import atletieknu_prs, atletieknu_wedstrijd, base, detect, seltec  # noqa: E402
-from src.importers import seltec  # noqa: E402
+from src.importers import atletieknu_prs, atletieknu_wedstrijd, base, detect, seltec
+from src.importers import seltec
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 SELTEC_URL = "https://uitslagen.atletiek.nl/Competitions/Resultoverview/19133"
@@ -323,7 +323,3 @@ class TestBase(unittest.TestCase):
                 imp.haal_op(basis + "/fout")
         finally:
             server.shutdown()
-
-
-if __name__ == "__main__":
-    unittest.main()

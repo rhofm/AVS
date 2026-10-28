@@ -1,44 +1,23 @@
 """Tests voor het tijdschema (chronoloog) van wedstrijden: prestaties-migratie 003,
 models/programma.py, Opslag.programma_* en wedstrijden/chronoloog.py.
 
-Alleen nepgegevens en een vaste testsleutel. Werkt met pytest en los:
-`python tests/test_chronoloog.py`.
+Alleen nepgegevens en een vaste testsleutel.
 """
 
 import contextlib
 import io
-import sys
 import tempfile
 from datetime import date
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+from db.init_db import huidige_versie, init_db, verbind
+from db.queries import Opslag, OpslagFout
+from models import Atleet, Inschrijving, Onderdeel, ProgrammaOnderdeel, Wedstrijd, lees_categorie
+from wedstrijden import chronoloog
+from hulp import TESTSLEUTEL, opslag, verwacht as _verwacht
 
-from db.init_db import DB_DIR, huidige_versie, init_db, verbind  # noqa: E402
-from db.queries import Opslag, OpslagFout  # noqa: E402
-from models import Atleet, Inschrijving, Onderdeel, ProgrammaOnderdeel, Wedstrijd, lees_categorie  # noqa: E402
-from wedstrijden import chronoloog  # noqa: E402
-
-TESTSLEUTEL = "66" * 32
 ZA = date(2027, 3, 13)
 ZO = date(2027, 3, 14)
-
-
-@contextlib.contextmanager
-def opslag():
-    with tempfile.TemporaryDirectory() as tmp:
-        with contextlib.redirect_stdout(io.StringIO()):
-            init_db(Path(tmp), hoofd=TESTSLEUTEL)
-        with Opslag(map=Path(tmp), hoofd=TESTSLEUTEL) as db:
-            yield db
-
-
-def _verwacht(fout, fn) -> None:
-    try:
-        fn()
-    except fout:
-        return
-    raise AssertionError(f"{fout.__name__} verwacht")
 
 
 def P(w, dag, tijd, onderdeel=None, tekst=None, **kw):
@@ -207,11 +186,3 @@ def test_migratie_op_bestaande_database():
             w = db.wedstrijden()[0]
             db.programma_opslaan(ProgrammaOnderdeel(w.id, w.datum, "10:00", None, "Verspringen", groep=1, duur=45))
             assert db.programma(w.id)[0].eindtijd == "10:45"
-
-
-if __name__ == "__main__":
-    tests = [(n, f) for n, f in globals().items() if n.startswith("test_") and callable(f)]
-    for naam, fn in tests:
-        fn()
-        print(f"ok  {naam}")
-    print(f"{len(tests)} tests geslaagd")

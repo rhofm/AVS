@@ -3,7 +3,7 @@ wedstrijden.uitslag_import en de knop 'Uitslagen importeren' op de wedstrijdpagi
 
 Tegen opgeslagen, geanonimiseerde pagina's (fixtures/atletieknu_wedstrijd/teams en
 fixtures/seltec_uitslagenoverzicht.html); er wordt niets van internet gehaald.
-Werkt met pytest en los: `python tests/test_uitslag_import.py`.
+
 
 In de atletiek.nu-fixture (Test Teamwedstrijd 2026, 19-09-2026) staan van 'Atletiek Teststad'
 o.a. Anna Voorbeeld (100m 11,54 +0,5; ver 6,64) en Pim Voorbeeld (100m 13,61 +0,4; ver 4,66),
@@ -11,36 +11,20 @@ plus atleten van andere clubs en estafetteteams.
 """
 
 import contextlib
-import io
-import sys
-import tempfile
 from datetime import date, timedelta
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-
-from test_landingspagina import TESTSLEUTEL  # noqa: E402
-
-from atleten import beheer  # noqa: E402
-from db.init_db import init_db  # noqa: E402
-from db.queries import Opslag, OpslagFout  # noqa: E402
-from importers.atletieknu_wedstrijd import AtletiekNuWedstrijdImporter  # noqa: E402
-from importers.seltec import SeltecImporter  # noqa: E402
-from wedstrijden import detail, planning, uitslag_import  # noqa: E402
+from atleten import beheer
+from db.queries import OpslagFout
+from importers.atletieknu_wedstrijd import AtletiekNuWedstrijdImporter
+from importers.seltec import SeltecImporter
+from wedstrijden import detail, planning, uitslag_import
+from hulp import app_client, lege_opslag, verwacht as _verwacht
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 TEAMS = FIXTURES / "atletieknu_wedstrijd" / "teams"
 SELTEC = FIXTURES / "seltec_uitslagenoverzicht.html"
 DAG = date(2026, 9, 19)
-
-
-def _verwacht(fout, fn) -> None:
-    try:
-        fn()
-    except fout:
-        return
-    raise AssertionError(f"{fout.__name__} verwacht")
 
 
 def _stil():
@@ -50,19 +34,16 @@ def _stil():
 @contextlib.contextmanager
 def opslag(link: str | None = "https://www.atletiek.nu/wedstrijd/main/90002/"):
     """(db, map, ids): een gehouden wedstrijd en vier nep-atleten."""
-    with tempfile.TemporaryDirectory() as tmp:
-        with contextlib.redirect_stdout(io.StringIO()):
-            init_db(Path(tmp), hoofd=TESTSLEUTEL)
-        with Opslag(map=Path(tmp), hoofd=TESTSLEUTEL) as db:
-            anna = beheer.nieuwe_atleet(db, "Anna", "Voorbeeld", geslacht="V", geboortedatum="2004",
-                                        club="Atletiek Teststad").master_id      # zeker: naam + club
-            pim = beheer.nieuwe_atleet(db, "Pim", "Voorbeeld", geslacht="M").master_id   # ingeschreven
-            niels = beheer.nieuwe_atleet(db, "Niels", "van Proefstra", geslacht="M").master_id  # alleen naam
-            kiki = beheer.nieuwe_atleet(db, "Kiki", "van Proefstra", geslacht="V",
-                                        club="Andere Club").master_id               # club botst: iemand anders
-            w = planning.plan_wedstrijd(db, "Test Teamwedstrijd 2026", DAG, "Teststad", link=link)
-            planning.inschrijven(db, w.id, pim, [])
-            yield db, Path(tmp), dict(w=w.id, anna=anna, pim=pim, niels=niels, kiki=kiki)
+    with lege_opslag() as (db, tmp):
+        anna = beheer.nieuwe_atleet(db, "Anna", "Voorbeeld", geslacht="V", geboortedatum="2004",
+                                    club="Atletiek Teststad").master_id      # zeker: naam + club
+        pim = beheer.nieuwe_atleet(db, "Pim", "Voorbeeld", geslacht="M").master_id   # ingeschreven
+        niels = beheer.nieuwe_atleet(db, "Niels", "van Proefstra", geslacht="M").master_id  # alleen naam
+        kiki = beheer.nieuwe_atleet(db, "Kiki", "van Proefstra", geslacht="V",
+                                    club="Andere Club").master_id               # club botst: iemand anders
+        w = planning.plan_wedstrijd(db, "Test Teamwedstrijd 2026", DAG, "Teststad", link=link)
+        planning.inschrijven(db, w.id, pim, [])
+        yield db, Path(tmp), dict(w=w.id, anna=anna, pim=pim, niels=niels, kiki=kiki)
 
 
 def _van(db, mid):
@@ -143,17 +124,10 @@ def test_detail_toont_uitslagen():
         assert not detail.wedstrijd_detail(db, ids["w"], peildatum=DAG - timedelta(days=1)).uitslag_mogelijk
 
 
-def _client(tmp):
-    from ui.app import maak_app
-    app = maak_app(map=tmp, hoofd=TESTSLEUTEL)
-    app.config["TESTING"] = True
-    return app.test_client()
-
-
 def test_pagina_en_knop():
     # De wedstrijd 'linkt' naar de opgeslagen map, zodat de knop zonder internet werkt.
     with opslag(link=str(TEAMS)) as (db, tmp, ids):
-        c = _client(tmp)
+        c = app_client(tmp)
         html = c.get(f"/wedstrijd/{ids['w']}").get_data(as_text=True)          # 19-09-2026 is geweest
         assert ">Uitslagen importeren</button>" in html and 'id="kop-uitslagen"' in html
         r = c.post(f"/wedstrijd/{ids['w']}/uitslagen")
@@ -180,16 +154,9 @@ def test_knop_alleen_na_de_wedstrijd():
     with opslag() as (db, tmp, ids):
         later = planning.plan_wedstrijd(db, "Straks", date.today() + timedelta(days=5),
                                         link="https://www.atletiek.nu/wedstrijd/main/12345/")
-        html = _client(tmp).get(f"/wedstrijd/{later.id}").get_data(as_text=True)
+        html = app_client(tmp).get(f"/wedstrijd/{later.id}").get_data(as_text=True)
         assert "Uitslagen importeren" not in html and 'id="kop-uitslagen"' not in html
         los = planning.plan_wedstrijd(db, "Zonder link", DAG)
-        html = _client(tmp).get(f"/wedstrijd/{los.id}").get_data(as_text=True)
+        html = app_client(tmp).get(f"/wedstrijd/{los.id}").get_data(as_text=True)
         assert "Uitslagen importeren</button>" not in html and "Gegevens wijzigen</a>" in html
         assert "de link naar de wedstrijd op atletiek.nu of Seltec in" in html
-
-
-if __name__ == "__main__":
-    for naam, fn in list(globals().items()):
-        if naam.startswith("test_") and callable(fn):
-            fn()
-            print("ok ", naam)

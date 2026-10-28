@@ -2,23 +2,18 @@
 pagina 'Gegevens wijzigen': wedstrijden.detail.tijdschema_wijzigingen / tijdschema_aanpassen
 en de route /wedstrijd/<id>/bewerken. Na opslaan staat het tijdschema weer op dag en tijd.
 
-Alleen nepgegevens en een vaste testsleutel; niets van internet. Werkt met pytest en los:
-`python tests/test_tijdschema_aanpassen.py`.
+Alleen nepgegevens en een vaste testsleutel; niets van internet.
 """
 
-import sys
 from datetime import timedelta
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+from hulp import app_client, verwacht as _verwacht
+from test_wedstrijdpagina import DAG, opslag
+from test_wedstrijd_nieuw import nep_site
 
-from test_wedstrijdpagina import DAG, _client, _verwacht, opslag  # noqa: E402
-from test_wedstrijd_nieuw import nep_site  # noqa: E402
-
-from db.queries import OpslagFout  # noqa: E402
-from models import ProgrammaOnderdeel  # noqa: E402
-from wedstrijden import detail  # noqa: E402
+from db.queries import OpslagFout
+from models import ProgrammaOnderdeel
+from wedstrijden import detail
 
 # Het tijdschema uit test_wedstrijdpagina.opslag():
 #   10:00 100m Meisjes U16 (30 min) · 10:15 Verspringen MU16 (45) · 10:30 100m Jongens U16 (30)
@@ -81,7 +76,7 @@ def test_meerdaags():
 
 def test_pagina():
     with opslag() as (db, tmp, ids):
-        c = _client(tmp)
+        c = app_client(tmp)
         kogel = ids["regels"][3]
         html = c.get(f"/wedstrijd/{ids['w']}/bewerken").get_data(as_text=True)
         assert f'name="tijd-{kogel}" value="11:00"' in html and f'name="duur-{ids["regels"][0]}" value="30"' in html
@@ -106,7 +101,7 @@ def test_pagina():
 def test_opnieuw_ophalen_wint():
     """Wie ook 'tijdschema opnieuw ophalen' aanvinkt, krijgt het tijdschema van de site (en een melding)."""
     with opslag() as (db, tmp, ids):
-        c = _client(tmp)
+        c = app_client(tmp)
         kogel = ids["regels"][3]
         with nep_site():
             r = c.post(f"/wedstrijd/{ids['w']}/bewerken", data={
@@ -116,10 +111,3 @@ def test_opnieuw_ophalen_wint():
         assert "niet bewaard" in html and "Tijdschema geïmporteerd: 15 regels" in html
         assert len(db.programma(ids["w"])) == 15                           # oude tijdschema is vervangen
         assert all(r.naam != "Kogelstoten" for r in db.programma(ids["w"]))
-
-
-if __name__ == "__main__":
-    for naam, fn in list(globals().items()):
-        if naam.startswith("test_") and callable(fn):
-            fn()
-            print("ok ", naam)

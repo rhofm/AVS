@@ -7,27 +7,22 @@
   * init_db: oude periodeplannen worden doelen in prestaties.db;
   * de pagina's /groep/<id>/periodisering en .../kopieren.
 
-Alleen nepgegevens en een testsleutel. Werkt met pytest en los:
-`python tests/test_periodisering.py`.
+Alleen nepgegevens en een testsleutel.
 """
 
 import contextlib
 import io
-import sys
 from datetime import date, timedelta
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+from test_groep_landingspagina import MAANDAG, VANDAAG, opslag, voorbeeldgroep
 
-from test_groep_landingspagina import MAANDAG, TESTSLEUTEL, VANDAAG, opslag, voorbeeldgroep  # noqa: E402
-
-import instellingen  # noqa: E402
-from db.init_db import init_db  # noqa: E402
-from db.queries import OpslagFout  # noqa: E402
-from groepen import periodeplan  # noqa: E402
-from groepen import trainingen as trainingsbeheer  # noqa: E402
-from models import Fase, Groep, Mesocyclus, Periode, Periodisering, Training  # noqa: E402
+import instellingen
+from db.init_db import init_db
+from db.queries import OpslagFout
+from groepen import periodeplan
+from groepen import trainingen as trainingsbeheer
+from models import Fase, Groep, Mesocyclus, Periode, Periodisering, Training
+from hulp import TESTSLEUTEL, app_client
 
 
 def _fout(f, *, soort=OpslagFout):
@@ -304,14 +299,11 @@ def test_periodeplannen_worden_doelen():
 # Pagina's
 # ============================================================
 def test_routes():
-    from ui.app import maak_app
     with opslag() as (db, tmp):
         ids = voorbeeldgroep(db)
         gid = ids["groep"]
         anderen = db.groep_opslaan(Groep("U14 sprint", "2026-2027"))
-        app = maak_app(map=tmp, hoofd=TESTSLEUTEL)
-        app.config["TESTING"] = True
-        c = app.test_client()
+        c = app_client(tmp)
 
         html = c.get(f"/groep/{gid}").get_data(as_text=True)
         assert f'href="/groep/{gid}/periodisering"' in html and "jaar__balk" in html
@@ -356,10 +348,3 @@ def test_routes():
         # De trainingspagina toont fase en mesoweek.
         tr = db.trainingen(gid, van=MAANDAG + timedelta(days=8))[0]
         assert "Overgang / rust (Rust)" in c.get(f"/training/{tr.id}").get_data(as_text=True)
-
-
-if __name__ == "__main__":
-    for naam, f in list(globals().items()):
-        if naam.startswith("test_") and callable(f):
-            f()
-            print("ok", naam)

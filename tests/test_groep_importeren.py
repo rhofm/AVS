@@ -2,25 +2,21 @@
 
 Gebruikt de geanonimiseerde profielpagina uit tests/fixtures/ in plaats van atletiek.nu, een
 tijdelijke map met versleutelde databases en een vaste testsleutel; alleen nepgegevens.
-Werkt met pytest en los: `python tests/test_groep_importeren.py`.
+
 """
 
 import re
-import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+from test_startpagina import opslag
 
-from test_landingspagina import TESTSLEUTEL  # noqa: E402
-from test_startpagina import opslag  # noqa: E402
-
-from atleten import beheer  # noqa: E402
-from db.queries import OpslagFout  # noqa: E402
-from groepen import groep_importeren as gi  # noqa: E402
-from importers.base import ImportFout  # noqa: E402
-from ui.app import maak_app  # noqa: E402
-from werkzeug.datastructures import MultiDict  # noqa: E402
+from atleten import beheer
+from db.queries import OpslagFout
+from groepen import groep_importeren as gi
+from importers.base import ImportFout
+from ui.app import maak_app
+from werkzeug.datastructures import MultiDict
+from hulp import TESTSLEUTEL
 
 PROFIEL = (Path(__file__).parent / "fixtures" / "atletieknu_profiel.html").read_text(encoding="utf-8")
 
@@ -262,10 +258,3 @@ def test_pagina_fouten_en_regels_toevoegen():
         assert len(re.findall(r'name="voornaam" value="Test"', html)) == 9
         assert html.count('name="voornaam"') >= 9 + gi.RIJEN_ERBIJ
         assert len(db.groepen()) == 1
-
-
-if __name__ == "__main__":
-    for naam, fn in list(globals().items()):
-        if naam.startswith("test_") and callable(fn):
-            fn()
-            print("ok", naam)

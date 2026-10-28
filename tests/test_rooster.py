@@ -7,22 +7,18 @@
   * importeren: geplakte tabel (tab), CSV (; en ,), datums, fouten en waarschuwingen;
   * de pagina's.
 
-Alleen nepgegevens en een testsleutel. Werkt met pytest en los: `python tests/test_rooster.py`.
+Alleen nepgegevens en een testsleutel.
 """
 
-import sys
 from datetime import date, timedelta
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+from test_groep_landingspagina import VANDAAG, opslag
 
-from test_groep_landingspagina import TESTSLEUTEL, VANDAAG, opslag  # noqa: E402
-
-from db.queries import OpslagFout  # noqa: E402
-from groepen import rooster as roosterbeheer  # noqa: E402
-from groepen import trainingen as trainingsbeheer  # noqa: E402
-from models import Absentie, Atleet, Groep, GroepRooster, Rooster, RoosterRegel, Training  # noqa: E402
+from db.queries import OpslagFout
+from groepen import rooster as roosterbeheer
+from groepen import trainingen as trainingsbeheer
+from models import Absentie, Atleet, Groep, GroepRooster, Rooster, RoosterRegel, Training
+from hulp import app_client
 
 START = date(2026, 10, 19)            # maandag na VANDAAG (vr 16 okt): begin van roosterweek 1
 DI1, ZA1, DI2, DI3 = START + timedelta(1), START + timedelta(5), START + timedelta(8), START + timedelta(15)
@@ -327,12 +323,9 @@ def test_importeren():
 # Pagina's
 # ============================================================
 def test_routes():
-    from ui.app import maak_app
     with opslag() as (db, tmp):
         g = _groep(db)
-        app = maak_app(map=tmp, hoofd=TESTSLEUTEL)
-        app.config["TESTING"] = True
-        c = app.test_client()
+        c = app_client(tmp)
         assert f'href="/groep/{g.id}/rooster"' in c.get(f"/groep/{g.id}").get_data(as_text=True)
         assert f'href="/groep/{g.id}/rooster"' in c.get(f"/groep/{g.id}/trainingen").get_data(as_text=True)
         html = c.get(f"/groep/{g.id}/rooster").get_data(as_text=True)
@@ -389,10 +382,3 @@ def test_routes():
 
         r = c.post(f"/groep/{g.id}/rooster/ontkoppelen", data={"start": "2026-10-19"})
         assert r.status_code == 302 and "Koppeling weggehaald" in c.get(r.headers["Location"]).get_data(as_text=True)
-
-
-if __name__ == "__main__":
-    for naam, f in list(globals().items()):
-        if naam.startswith("test_") and callable(f):
-            f()
-            print("ok", naam)

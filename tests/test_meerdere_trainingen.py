@@ -6,50 +6,23 @@
   een weekdag kiest. Geen keuze = alle trainingen van die dag.
 - De keuze bepaalt wie vooraf op 'aanwezig' staat; de lijst toont wel alle leden.
 
-Alleen nepgegevens en een vaste testsleutel. Werkt met pytest en los:
-`python tests/test_meerdere_trainingen.py`.
+Alleen nepgegevens en een vaste testsleutel.
 """
 
-import contextlib
-import io
-import sys
-import tempfile
 from datetime import date, timedelta
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+from test_app import client
 
-from test_app import TESTSLEUTEL as APP_SLEUTEL, client, tekst  # noqa: E402
+from atleten import trainingsschema as schema_pagina
+from db.queries import Opslag, OpslagFout
+from groepen import absentie, trainingen
+from groepen import groep as groepsbeheer
+from models import Atleet, Trainingsschema
+from hulp import TESTSLEUTEL, opslag, tekst, verwacht as _verwacht
 
-from atleten import trainingsschema as schema_pagina  # noqa: E402
-from db.init_db import init_db  # noqa: E402
-from db.queries import Opslag, OpslagFout  # noqa: E402
-from groepen import absentie, trainingen  # noqa: E402
-from groepen import groep as groepsbeheer  # noqa: E402
-from models import Atleet, Trainingsschema  # noqa: E402
-
-TESTSLEUTEL = "45" * 32
 MAANDAG = date(2026, 10, 12)
 DONDERDAG = MAANDAG + timedelta(days=3)
 ZATERDAG = MAANDAG + timedelta(days=5)
-
-
-@contextlib.contextmanager
-def opslag():
-    with tempfile.TemporaryDirectory() as tmp:
-        with contextlib.redirect_stdout(io.StringIO()):
-            init_db(Path(tmp), hoofd=TESTSLEUTEL)
-        with Opslag(map=Path(tmp), hoofd=TESTSLEUTEL) as db:
-            yield db
-
-
-def _verwacht(fout, fn) -> None:
-    try:
-        fn()
-    except fout:
-        return
-    raise AssertionError(f"{fout.__name__} verwacht")
 
 
 def _basis(db):
@@ -201,7 +174,7 @@ def test_lees_trainingen():
 
 def test_pagina_en_route():
     with client() as (c, mid, tmp):
-        with Opslag(map=tmp, hoofd=APP_SLEUTEL) as db:
+        with Opslag(map=tmp, hoofd=TESTSLEUTEL) as db:
             g = groepsbeheer.groep_aanmaken(db, "Zaterdaggroep", "2026-2027", [mid], {"zaterdag": "09:00"},
                                             {"zaterdag": ["10:30"]})
         r = c.get(f"/atleet/{mid}/trainingsschema")
@@ -211,18 +184,10 @@ def test_pagina_en_route():
 
         r = c.post(f"/atleet/{mid}/trainingsschema", data={"training-zaterdag": [f"{g.id}|10:30"]})
         assert r.status_code == 302
-        with Opslag(map=tmp, hoofd=APP_SLEUTEL) as db:
+        with Opslag(map=tmp, hoofd=TESTSLEUTEL) as db:
             assert db.trainingsschema(mid).keuze == {"zaterdag": {(g.id, "10:30")}}
         r = c.get(f"/atleet/{mid}/trainingsschema")
         assert f'value="{g.id}|09:00">' in tekst(r) and f'value="{g.id}|10:30" checked' in tekst(r)
 
         r = c.post(f"/atleet/{mid}/trainingsschema", data={"training-zaterdag": ["kapot"]})
         assert r.status_code == 400 and "Niet opgeslagen" in tekst(r)
-
-
-if __name__ == "__main__":
-    tests = [(n, f) for n, f in globals().items() if n.startswith("test_") and callable(f)]
-    for naam, fn in tests:
-        fn()
-        print(f"ok  {naam}")
-    print(f"{len(tests)} tests geslaagd")

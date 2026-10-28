@@ -2,77 +2,60 @@
 (ploeg/vergelijk.py), punten en controle van een opstelling (ploeg/opstelling.py)
 en de pagina's /ploegen, /ploegen/nieuw, /ploeg/<id>.
 
-Alleen nep-atleten en een vaste testsleutel. Werkt met pytest en los:
-`python tests/test_ploegen.py`.
+Alleen nep-atleten en een vaste testsleutel.
 """
 
 import contextlib
 import io
-import sys
 import tempfile
 from datetime import date
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-
-from test_landingspagina import TESTSLEUTEL  # noqa: E402
-
-from atleten import beheer  # noqa: E402
-from db.init_db import huidige_versie, init_db, verbind  # noqa: E402
-from db.queries import Opslag, OpslagFout  # noqa: E402
-from models import Inzet, Onderdeel, Ploeg, PloegLid, Prestatie, Wedstrijd  # noqa: E402
-from ploeg import opstelling, regels, vergelijk  # noqa: E402
-from ploeg.paginas import programma_label  # noqa: E402
-from ui.app import maak_app  # noqa: E402
+from atleten import beheer
+from db.init_db import huidige_versie, init_db, verbind
+from db.queries import Opslag, OpslagFout
+from models import Inzet, Onderdeel, Ploeg, PloegLid, Prestatie, Wedstrijd
+from ploeg import opstelling, regels, vergelijk
+from ploeg.paginas import programma_label
+from ui.app import maak_app
+from hulp import TESTSLEUTEL, lege_opslag, verwacht as _verwacht
 
 DAG = date(2027, 5, 15)            # wedstrijddag (zaterdag)
 JAAR = DAG.year
 BESTAND = "u14_u16_2026-2027"
 
 
-def _verwacht(fout, fn) -> None:
-    try:
-        fn()
-    except fout:
-        return
-    raise AssertionError(f"{fout.__name__} verwacht")
-
-
 @contextlib.contextmanager
 def opslag():
     """(Opslag, map, ids). Atleten op de wedstrijddag: anna U16-V, bo U16-V, cato U14-V, dirk U16-M."""
-    with tempfile.TemporaryDirectory() as tmp:
-        with contextlib.redirect_stdout(io.StringIO()):
-            init_db(Path(tmp), hoofd=TESTSLEUTEL)
-        with Opslag(map=Path(tmp), hoofd=TESTSLEUTEL) as db:
-            ids = {
-                "anna": beheer.nieuwe_atleet(db, "Anna", "Proef", geslacht="V", geboortedatum=f"{JAAR - 15}-03-01"),
-                "bo": beheer.nieuwe_atleet(db, "Bo", "Proef", geslacht="V", geboortedatum=f"{JAAR - 14}-06-01"),
-                "cato": beheer.nieuwe_atleet(db, "Cato", "Proef", geslacht="V", geboortedatum=f"{JAAR - 13}"),
-                "dirk": beheer.nieuwe_atleet(db, "Dirk", "Proef", geslacht="M", geboortedatum=f"{JAAR - 15}"),
-            }
-            ids = {k: a.master_id for k, a in ids.items()}
-            o = {n: db.onderdeel_opslaan(Onderdeel(n, e, e == "tijd")) for n, e in (
-                ("80 meter", "tijd"), ("80 meter Handtijd", "tijd"), ("800 meter", "tijd"),
-                ("80 meter horden 76,2cm", "tijd"), ("Verspringen", "afstand"), ("Hoogspringen", "hoogte"),
-                ("Kogelstoten 3kg", "afstand"), ("Kogelstoten 2kg", "afstand"), ("Discuswerpen 1kg", "afstand"))}
+    with lege_opslag() as (db, tmp):
+        ids = {
+            "anna": beheer.nieuwe_atleet(db, "Anna", "Proef", geslacht="V", geboortedatum=f"{JAAR - 15}-03-01"),
+            "bo": beheer.nieuwe_atleet(db, "Bo", "Proef", geslacht="V", geboortedatum=f"{JAAR - 14}-06-01"),
+            "cato": beheer.nieuwe_atleet(db, "Cato", "Proef", geslacht="V", geboortedatum=f"{JAAR - 13}"),
+            "dirk": beheer.nieuwe_atleet(db, "Dirk", "Proef", geslacht="M", geboortedatum=f"{JAAR - 15}"),
+        }
+        ids = {k: a.master_id for k, a in ids.items()}
+        o = {n: db.onderdeel_opslaan(Onderdeel(n, e, e == "tijd")) for n, e in (
+            ("80 meter", "tijd"), ("80 meter Handtijd", "tijd"), ("800 meter", "tijd"),
+            ("80 meter horden 76,2cm", "tijd"), ("Verspringen", "afstand"), ("Hoogspringen", "hoogte"),
+            ("Kogelstoten 3kg", "afstand"), ("Kogelstoten 2kg", "afstand"), ("Discuswerpen 1kg", "afstand"))}
 
-            def pr(wie, onderdeel, waarde, datum, wind=None):
-                db.prestatie_opslaan(Prestatie(onderdeel, datum, waarde, atleet_id=ids[wie],
-                                               onderdeel_id=o[onderdeel].id, wind=wind))
+        def pr(wie, onderdeel, waarde, datum, wind=None):
+            db.prestatie_opslaan(Prestatie(onderdeel, datum, waarde, atleet_id=ids[wie],
+                                           onderdeel_id=o[onderdeel].id, wind=wind))
 
-            pr("anna", "80 meter", 10.60, date(JAAR, 4, 20), wind=1.0)
-            pr("anna", "80 meter", 10.20, date(JAAR, 4, 21), wind=3.1)       # te veel rugwind: telt niet
-            pr("anna", "80 meter", 10.10, date(JAAR - 3, 6, 1), wind=0.0)    # te oud voor 'seizoen', wel PR
-            pr("anna", "Verspringen", 5.10, date(JAAR - 1, 7, 1), wind=0.5)
-            pr("bo", "80 meter", 10.90, date(JAAR, 4, 20), wind=0.0)
-            pr("bo", "80 meter horden 76,2cm", 12.80, date(JAAR, 4, 20), wind=1.5)
-            pr("cato", "80 meter Handtijd", 10.80, date(JAAR, 4, 20))        # handtijd: +0,24
-            pr("cato", "Kogelstoten 2kg", 9.80, date(JAAR, 4, 20))           # U14-materiaal: hint
-            pr("bo", "Kogelstoten 3kg", 10.50, date(JAAR, 5, 20))            # na de wedstrijddag: telt niet
-            pr("anna", "Kogelstoten 3kg", 9.00, date(JAAR, 4, 1))
-            yield db, Path(tmp), ids
+        pr("anna", "80 meter", 10.60, date(JAAR, 4, 20), wind=1.0)
+        pr("anna", "80 meter", 10.20, date(JAAR, 4, 21), wind=3.1)       # te veel rugwind: telt niet
+        pr("anna", "80 meter", 10.10, date(JAAR - 3, 6, 1), wind=0.0)    # te oud voor 'seizoen', wel PR
+        pr("anna", "Verspringen", 5.10, date(JAAR - 1, 7, 1), wind=0.5)
+        pr("bo", "80 meter", 10.90, date(JAAR, 4, 20), wind=0.0)
+        pr("bo", "80 meter horden 76,2cm", 12.80, date(JAAR, 4, 20), wind=1.5)
+        pr("cato", "80 meter Handtijd", 10.80, date(JAAR, 4, 20))        # handtijd: +0,24
+        pr("cato", "Kogelstoten 2kg", 9.80, date(JAAR, 4, 20))           # U14-materiaal: hint
+        pr("bo", "Kogelstoten 3kg", 10.50, date(JAAR, 5, 20))            # na de wedstrijddag: telt niet
+        pr("anna", "Kogelstoten 3kg", 9.00, date(JAAR, 4, 1))
+        yield db, Path(tmp), ids
 
 
 def _ploeg(db, naam="U16 meisjes A", **kw) -> Ploeg:
@@ -309,11 +292,3 @@ def test_paginas_nieuwe_ploeg_opstellen_en_verwijderen():
         assert c.post(f"{pad}/verwijderen").status_code == 302
         assert c.get(pad).status_code == 404
         assert "Nog geen ploegen" in tekst(c.get("/ploegen"))
-
-
-if __name__ == "__main__":
-    tests = [(n, f) for n, f in globals().items() if n.startswith("test_") and callable(f)]
-    for naam, fn in tests:
-        fn()
-        print(f"ok  {naam}")
-    print(f"{len(tests)} tests geslaagd")
