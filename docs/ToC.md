@@ -49,7 +49,7 @@ AVS/
 │   │   └── competitie_u16.yaml   📝
 │   └── puntentelling/            scoring constants, one file per edition
 │       ├── au_2025.yaml          ✅ AU "Formules & Constanten"
-│       └── masters_agegrading.yaml ⚠️ still empty: the age-grading factors have to come from the Atletiekunie tables
+│       └── masters_agegrading.yaml ✅ age-grading factors per 5-year class (from the AU spreadsheet 'Mastersploeg 2023')
 │
 ├── data/                         🔒 real databases and test data
 │   ├── personen.db · prestaties.db · testen.db · trainingsschema.db · absentie.db ·
@@ -152,9 +152,10 @@ AVS/
 │       ├── templates/            ~60 pages
 │       └── static/               avs.css, filter.js, sorteer.js, levend.js
 │
-└── tests/                        fake data only; run with `python -m pytest` (73 test files)
+└── tests/                        fake data only; run with `python -m pytest` (74 test files)
     ├── test_<feature>.py         one file per feature (models, queries, atleten, groepen, wedstrijden, importers,
     │                             ploegen, regels, punten, rooster, periodisering, doelen, build, zelftest, ...)
+    ├── test_masters_agegrading.py  age grading: factors, rounding, 24 example lines of the AU spreadsheet
     ├── test_testen_*.py          formula engine, templates, results (incl. migration), editor and pages
     ├── test_groep_leerdoelen_scoren.py   scoring a whole group on a leerdoel
     ├── test_groep_testen_invullen.py     entering a test for a whole group
@@ -221,7 +222,7 @@ ui/  ──►  atleten/ · wedstrijden/ · ploeg/ · groepen/ · leerlijnen/ ·
 
 ## Open items
 
-- [ ] Fill in the masters age-grading factors in `config/puntentelling/masters_agegrading.yaml` (from the Atletiekunie tables; never invent them).
+- [x] Masters age-grading factors in `config/puntentelling/masters_agegrading.yaml` (from the AU spreadsheet 'Mastersploeg 2023'; tested against its example lines).
 - [x] Entry form for test results, based on YAML test templates (`testen/`, pages 'Testsjablonen' and 'Testresultaat').
 - [x] Enter test results for a whole group in one go (`groepen/testen_invullen.py`).
 - [ ] Progress chart per test.

@@ -3,30 +3,54 @@
 # age-grading-tabellen. Deze worden gepubliceerd op de website van de
 # Atletiekunie."
 #
-# NOG LEEG: vul de factoren in uit de tabellen van de Atletiekunie (of de
-# Mastersploeg-spreadsheet). Zolang een factor ontbreekt, rekent AVS met de
-# gewone seniorenpunten en meldt de ploegpagina dat.
+# Bron: de tabel 'Gradings' uit de spreadsheet 'Mastersploeg 2023' (Age grading in
+# de Masterscompetitie, dec 2022, gemaakt door Weia Reinboud). De factoren in
+# 'Formules & Constanten' (meerkampen masters) zijn NIET voor de competitie bedoeld
+# en staan hier dus niet in.
 #
-# Let op: de factoren in 'Formules & Constanten' (meerkampen masters) zijn NIET
-# voor de competitie bedoeld.
+# De tabel is per leeftijdsklasse van vijf jaar: de sleutel is de ondergrens van
+# de klasse (35 = M35/V35, dus 35 t/m 39 jaar; 40 = 40 t/m 44 jaar; ... 100 = 100+).
+# Leeftijd = leeftijd op de wedstrijddag; AVS neemt de dichtstbijzijnde lagere
+# sleutel, dus een atleet van 47 krijgt de factor van 45.
 #
-# Hoe AVS rekent: gecorrigeerde prestatie = prestatie x factor (een handtijd eerst
-# met de handtijdcorrectie), dan de seniorenformule. Lopen: factor < 1;
-# springen en werpen: factor > 1. Onderdeel = sleutel uit au_2025.yaml.
-# Leeftijd = leeftijd op de wedstrijddag; zonder eigen regel telt de
-# dichtstbijzijnde lagere leeftijd. Een tabel per jaar (35, 36, 37, ...) of per
-# klasse (35, 40, 45, ...) werkt allebei. Voorbeeld van de vorm (geen echte
-# getallen):
+# Hoe AVS rekent (zoals de spreadsheet): gecorrigeerde prestatie = prestatie x factor
+# (een handtijd eerst met de handtijdcorrectie), een tijd naar boven en een afstand
+# naar beneden afgerond op 0,01, dan de seniorenformule (au_senioren).
+# Lopen: factor < 1; springen en werpen: factor > 1.
+# Onderdeel = sleutel uit au_2025.yaml.
 #
-# factoren:
-#   M:
-#     100m:        {35: 0.99, 36: 0.98, 37: 0.98}
-#     verspringen: {35: 1.01, 36: 1.02}
-#   V:
-#     100m:        {35: 0.99}
+# Estafettes (4x100m, 4x200m, Zweedse) hebben geen leeftijdsfactor: de spreadsheet
+# rekent ze zonder correctie. Gewichtwerpen staat niet in de tabel (geen onderdeel
+# van de competitie). Het materiaal is dat van de eigen klasse (65.1), de kogel- en
+# andere werpfactoren gelden dus voor het gewicht van de eigen klasse.
 
 naam: Age grading Mastercompetitie
-bron: nog in te vullen (Atletiekunie, age-grading-tabellen competitie)
+bron: Mastersploeg 2023 (spreadsheet age grading Masterscompetitie, Atletiekunie), blad Gradings
 factoren:
-  M: {}
-  V: {}
+  M:   # mannen
+    100m:           {35: 0.9999, 40: 0.9668, 45: 0.9345, 50: 0.9031, 55: 0.8726, 60: 0.8429, 65: 0.8139, 70: 0.7858, 75: 0.7584, 80: 0.7317, 85: 0.6946, 90: 0.6396, 95: 0.5666, 100: 0.4757}
+    200m:           {35: 0.9791, 40: 0.9482, 45: 0.9179, 50: 0.8883, 55: 0.8594, 60: 0.8312, 65: 0.8035, 70: 0.7764, 75: 0.75, 80: 0.717, 85: 0.6669, 90: 0.5998, 95: 0.5156, 100: 0.4142}
+    400m:           {35: 0.9824, 40: 0.9513, 45: 0.9208, 50: 0.8909, 55: 0.8616, 60: 0.8329, 65: 0.8047, 70: 0.777, 75: 0.744, 80: 0.697, 85: 0.636, 90: 0.5609, 95: 0.4718, 100: 0.3686}
+    800m:           {35: 0.9965, 40: 0.958, 45: 0.9205, 50: 0.8842, 55: 0.8489, 60: 0.8147, 65: 0.7814, 70: 0.749, 75: 0.7169, 80: 0.6737, 85: 0.6156, 90: 0.5425, 95: 0.4544, 100: 0.3514}
+    1500m:          {35: 0.9849, 40: 0.9532, 45: 0.9206, 50: 0.8871, 55: 0.8527, 60: 0.8174, 65: 0.7814, 70: 0.7446, 75: 0.707, 80: 0.6651, 85: 0.6076, 90: 0.5341, 95: 0.4446, 100: 0.339}
+    5000m:          {35: 1, 40: 0.9701, 45: 0.9299, 50: 0.89, 55: 0.8502, 60: 0.8106, 65: 0.7713, 70: 0.7321, 75: 0.693, 80: 0.6541, 85: 0.6034, 90: 0.5326, 95: 0.4419, 100: 0.3313}
+    hoogspringen:   {35: 1.0136, 40: 1.0631, 45: 1.1159, 50: 1.1724, 55: 1.233, 60: 1.2981, 65: 1.3683, 70: 1.4442, 75: 1.5267, 80: 1.6166, 85: 1.7149, 90: 1.8493, 95: 2.0563, 100: 2.3825}
+    verspringen:    {35: 1.0385, 40: 1.0972, 45: 1.1608, 50: 1.2299, 55: 1.3051, 60: 1.3876, 65: 1.4783, 70: 1.5787, 75: 1.6917, 80: 1.8448, 85: 2.0674, 90: 2.4042, 95: 2.9522, 100: 3.9676}
+    kogelstoten:    {35: 1.0462, 40: 1.1125, 45: 1.1867, 50: 1.1551, 55: 1.242, 60: 1.2252, 65: 1.3317, 70: 1.3036, 75: 1.4385, 80: 1.3885, 85: 1.5671, 90: 1.7971, 95: 2.1043, 100: 2.5361}
+    discuswerpen:   {35: 1, 40: 1.0187, 45: 1.0856, 50: 1.0078, 55: 1.0873, 60: 0.9653, 65: 1.059, 70: 1.1746, 75: 1.3205, 80: 1.5103, 85: 1.7672, 90: 2.1341, 95: 2.7, 100: 3.6863}
+    speerwerpen:    {35: 1.0438, 40: 1.1218, 45: 1.211, 50: 1.2293, 55: 1.3425, 60: 1.3675, 65: 1.5184, 70: 1.5566, 75: 1.7731, 80: 1.8402, 85: 2.1894, 90: 2.6989, 95: 3.4861, 100: 4.7841}
+    kogelslingeren: {35: 1, 40: 1.0496, 45: 1.119, 50: 1.0911, 55: 1.1783, 60: 1.1709, 65: 1.2865, 70: 1.2785, 75: 1.4403, 80: 1.4301, 85: 1.6779, 90: 2.0327, 95: 2.5823, 100: 3.5446}
+
+  V:   # vrouwen
+    100m:           {35: 1, 40: 0.981, 45: 0.9441, 50: 0.908, 55: 0.8726, 60: 0.8379, 65: 0.8038, 70: 0.7705, 75: 0.7377, 80: 0.704, 85: 0.659, 90: 0.6011, 95: 0.5302, 100: 0.4464}
+    200m:           {35: 1, 40: 0.9787, 45: 0.9411, 50: 0.904, 55: 0.8673, 60: 0.8309, 65: 0.795, 70: 0.7594, 75: 0.7242, 80: 0.6875, 85: 0.6374, 90: 0.5723, 95: 0.492, 100: 0.3965}
+    400m:           {35: 0.9783, 40: 0.9441, 45: 0.9084, 50: 0.8711, 55: 0.8324, 60: 0.7924, 65: 0.751, 70: 0.7084, 75: 0.6647, 80: 0.6148, 85: 0.5556, 90: 0.4869, 95: 0.409, 100: 0.3219}
+    800m:           {35: 0.9929, 40: 0.9563, 45: 0.9192, 50: 0.8814, 55: 0.8432, 60: 0.8044, 65: 0.7651, 70: 0.7254, 75: 0.6848, 80: 0.6354, 85: 0.5746, 90: 0.5024, 95: 0.4188, 100: 0.3239}
+    1500m:          {35: 0.9812, 40: 0.9441, 45: 0.9069, 50: 0.8697, 55: 0.8324, 60: 0.7951, 65: 0.7576, 70: 0.7202, 75: 0.6812, 80: 0.6316, 85: 0.5698, 90: 0.496, 95: 0.4102, 100: 0.3122}
+    3000m:          {35: 1, 40: 0.9767, 45: 0.9355, 50: 0.8935, 55: 0.8509, 60: 0.8076, 65: 0.7637, 70: 0.7193, 75: 0.6743, 80: 0.6288, 85: 0.5762, 90: 0.5067, 95: 0.4204, 100: 0.3171}
+    hoogspringen:   {35: 1.0205, 40: 1.0715, 45: 1.1255, 50: 1.1826, 55: 1.243, 60: 1.3071, 65: 1.3751, 70: 1.4473, 75: 1.5242, 80: 1.6061, 85: 1.7029, 90: 1.8509, 95: 2.0785, 100: 2.4406}
+    verspringen:    {35: 1.0323, 40: 1.0905, 45: 1.1537, 50: 1.2226, 55: 1.2982, 60: 1.3814, 65: 1.4736, 70: 1.5764, 75: 1.6928, 80: 1.8499, 85: 2.0771, 90: 2.4193, 95: 2.9746, 100: 4.001}
+    kogelstoten:    {35: 1.0368, 40: 1.1164, 45: 1.2062, 50: 1.133, 55: 1.2347, 60: 1.3534, 65: 1.4938, 70: 1.6631, 75: 1.5282, 80: 1.7433, 85: 2.0244, 90: 2.4079, 95: 2.9631, 100: 3.8399}
+    discuswerpen:   {35: 1, 40: 1.0733, 45: 1.1772, 50: 1.2949, 55: 1.43, 60: 1.5873, 65: 1.7735, 70: 1.9985, 75: 1.9717, 80: 2.2786, 85: 2.6843, 90: 3.2477, 95: 4.0861, 100: 5.4702}
+    speerwerpen:    {35: 1.0236, 40: 1.1298, 45: 1.2495, 50: 1.265, 55: 1.4077, 60: 1.5732, 65: 1.768, 70: 2.0006, 75: 2.0428, 80: 2.3589, 85: 2.7698, 90: 3.3387, 95: 4.183, 100: 5.5753}
+    kogelslingeren: {35: 1.0573, 40: 1.1616, 45: 1.2787, 50: 1.2225, 55: 1.3551, 60: 1.5099, 65: 1.694, 70: 1.9176, 75: 1.673, 80: 1.9458, 85: 2.311, 90: 2.8273, 95: 3.6161, 100: 4.9754}

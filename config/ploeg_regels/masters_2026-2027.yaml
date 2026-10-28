@@ -10,9 +10,9 @@
 # eigen klasse (65.1): 'V50+: 3kg' = vanaf V50 (tot de volgende grens).
 #
 # De punten worden met 'age grading' berekend (65.2): prestatie x leeftijdsfactor,
-# dan de seniorentabel. De factoren staan in config/puntentelling/masters_agegrading.yaml
-# en moeten nog worden ingevuld; zolang een factor ontbreekt, telt de gewone
-# seniorenpunt (de ploegpagina meldt dat). Estafettes: zonder leeftijdsfactor.
+# dan de seniorentabel. De factoren (per klasse van vijf jaar) staan in
+# config/puntentelling/masters_agegrading.yaml; zolang een factor ontbreekt, telt
+# de gewone seniorenpunt (de ploegpagina meldt dat). Estafettes: zonder leeftijdsfactor.
 # CONTROLEREN: werpgewichten per klasse volgens het wedstrijdreglement (WMA).
 
 naam: Mastercompetitie

@@ -388,7 +388,7 @@ class Leeftijdsfactoren:
     """Leeftijdsfactoren uit `config/puntentelling/<naam>.yaml`.
 
     Gecorrigeerde prestatie = prestatie x factor (een handtijd eerst met de
-    handtijdcorrectie); daarna de gewone formule. Bij lopen is de factor dus
+    handtijdcorrectie, daarna afgerond: zie `gecorrigeerd()`); daarna de gewone formule. Bij lopen is de factor dus
     kleiner dan 1, bij springen en werpen groter dan 1. Per geslacht en
     onderdeel (sleutel uit de puntentelling) een tabel leeftijd -> factor; een
     leeftijd zonder eigen regel neemt de dichtstbijzijnde lagere (zo werkt een
@@ -431,7 +431,7 @@ class Leeftijdsfactoren:
                 for leeftijd, f in tabel.items():
                     if isinstance(leeftijd, bool) or not isinstance(leeftijd, int) or not 30 <= leeftijd <= 110:
                         raise PuntenFout(f"{bron}: {g}.{onderdeel}: leeftijd {leeftijd!r} is geen leeftijd.")
-                    if isinstance(f, bool) or not isinstance(f, (int, float)) or not 0.2 <= f <= 5:
+                    if isinstance(f, bool) or not isinstance(f, (int, float)) or not 0.1 <= f <= 10:
                         raise PuntenFout(f"{bron}: {g}.{onderdeel}.{leeftijd}: factor {f!r} klopt niet.")
                     rij[leeftijd] = float(f)
                 factoren[g][str(onderdeel)] = rij
@@ -458,6 +458,16 @@ def leeftijdsfactoren(naam: str, map: Path | None = None) -> Leeftijdsfactoren:
     return _laad_factoren(str(pad), _gewijzigd(pad))
 
 
+_TECHNISCH = {"hoogspringen", "polsstokhoogspringen", "verspringen", "hinkstapspringen", "kogelstoten",
+              "discuswerpen", "speerwerpen", "kogelslingeren", "gewichtwerpen", "balwerpen"}
+
+
 def gecorrigeerd(prestatie: float, factor: float, onderdeel: str, handtijd: bool = False) -> float:
-    """Prestatie na leeftijdscorrectie: (prestatie + handtijdcorrectie) x factor."""
-    return (prestatie + (handtijd_correctie(onderdeel) if handtijd else 0.0)) * factor
+    """Prestatie na leeftijdscorrectie: (prestatie + handtijdcorrectie) x factor.
+
+    Afgerond op 0,01 zoals de spreadsheet van de Masterscompetitie: een tijd naar boven
+    (CEILING), een afstand naar beneden (FLOOR); zo wint de atleet nooit iets door afronden.
+    """
+    w = (prestatie + (handtijd_correctie(onderdeel) if handtijd else 0.0)) * factor
+    honderdsten = round(w * 100, 6)                  # zonder het ruis van kommagetallen (12,6 x 100 = 1260,0000000000002)
+    return (math.floor(honderdsten) if onderdeel in _TECHNISCH else math.ceil(honderdsten)) / 100

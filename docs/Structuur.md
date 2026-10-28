@@ -63,7 +63,7 @@
 * Ploeg en tijdschema: tijden in de tabel, botsingen en dagdelen (hele dag/ochtend/middag) meegenomen bij het maken van de opstelling, groepen bij technische onderdelen automatisch (ploeg/tijdschema.py)
 * Voorkeuren van atleten (doet graag / wil niet / moet): vast op de atletenpagina, en per ploeg aan te passen; de opstelling houdt er rekening mee
 * Meer ploegen op één dag samen laten maken, A eerst (pagina Ploegen > 'n ploegen samen')
-* Masters: age grading voorbereid; de leeftijdsfactoren moeten nog in config/puntentelling/masters_agegrading.yaml
+* Masters: age grading (bepaling 65.2) is ingebouwd: de leeftijdsfactoren per klasse van vijf jaar (35 t/m 100) staan in config/puntentelling/masters_agegrading.yaml (bron: de spreadsheet 'Mastersploeg 2023', blad Gradings). AVS rekent zoals die spreadsheet: prestatie x factor (een tijd naar boven, een afstand naar beneden afgerond op 0,01), dan de seniorenformule. Estafettes hebben geen factor
 * Makkelijk aan te passen
 * Verschillende 'mentaliteiten' van ploegenopstelling
 * Opstellingsregels makkelijk aan te passen voor de ploegleider

@@ -222,12 +222,12 @@ def test_leeftijdsfactoren_lezen():
     assert lf.factor("V", "100m", 47) == 0.90 and lf.factor("V", "100m", 44) == 0.99
     assert lf.factor("V", "100m", 34) is None and lf.factor("M", "100m", 50) is None
     assert lf.factor("V", "200m", 50) is None and lf.factor(None, "100m", 50) is None
-    assert punten.gecorrigeerd(58.4, 0.8616, "400m", handtijd=True) == (58.4 + 0.14) * 0.8616
+    assert punten.gecorrigeerd(58.4, 0.8616, "400m", handtijd=True) == 50.44       # 50,4381 naar boven op 0,01
     for fout in ({"factoren": {"X": {}}}, {"factoren": {"V": {"100m": {"oud": 1.0}}}},
-                 {"factoren": {"V": {"100m": {40: 9}}}}, {"tabel": 1}, []):
+                 {"factoren": {"V": {"100m": {40: 99}}}}, {"tabel": 1}, []):
         _verwacht(punten.PuntenFout, lambda f=fout: punten.Leeftijdsfactoren.uit_dict(f))
-    # het meegeleverde bestand is nog leeg; het mastersbestand verwijst ernaar
-    assert punten.leeftijdsfactoren("masters_agegrading").leeg
+    # het meegeleverde bestand is gevuld (zie test_masters_agegrading.py); het mastersbestand verwijst ernaar
+    assert not punten.leeftijdsfactoren("masters_agegrading").leeg
     assert regels.laad("masters_2026-2027").leeftijdsfactoren == "masters_agegrading"
 
 
