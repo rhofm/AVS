@@ -440,8 +440,13 @@ before anything is touched. A new database needs its `schema_<naam>.sql` in
   earlier ploeg picks first, 10.10).
 - Masters age grading: `leeftijdsfactoren:` in the rule file names a file in
   `config/puntentelling/` (`punten.Leeftijdsfactoren`; performance x factor,
-  then the senior formula). The shipped `masters_agegrading.yaml` is still
-  empty: never invent factors; they must come from the AU tables.
+  then the senior formula). `masters_agegrading.yaml` holds the factors per
+  class of five years (key = lower bound: 35, 40, … 100; an age takes the
+  nearest lower key), copied from the 'Gradings' sheet of the AU spreadsheet
+  'Mastersploeg 2023'. `punten.gecorrigeerd()` rounds like that sheet: a time up,
+  a distance down, to 0.01 (so use it, never multiply by hand). Relays have no
+  factor. Never invent factors; a new table = edit the file from the AU source and
+  check against the sheet's example lines (`tests/test_masters_agegrading.py`).
 - Athlete preferences (`ploeg/voorkeuren.py`, migration personen/011): standing
   per athlete in `atleet_voorkeur` (event name without specification, matched
   with `normaliseer`) and per ploeg in `ploeg_voorkeur` (programme key; wins over

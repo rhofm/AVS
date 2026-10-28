@@ -162,7 +162,7 @@ def config_bestanden(submap: str, patroon: str = "*.yaml") -> list[Path]:
     """All files from all folders, combined by name; the external file wins."""
 ```
 
-- An **empty** external file (the 34-byte placeholders such as `standaard.yaml`) does not win:
+- An **empty** external file (a 34-byte placeholder file) does not win:
   fall back to the built-in one. Otherwise a leftover placeholder would hide a real rule file.
 - Keep `config_map()` for backward compatibility (returns the first folder), but stop using
   it for lookups.
