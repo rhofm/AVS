@@ -24,8 +24,10 @@ Geen SQL: alles via `Opslag`.
 from __future__ import annotations
 
 import re
+import tempfile
 from dataclasses import dataclass, field
 from datetime import date
+from pathlib import Path
 
 from db.queries import Opslag, OpslagFout
 from importers.atletieknu_tijdschema import AtletiekNuTijdschemaImporter, TijdschemaRegel
@@ -148,6 +150,46 @@ def tijdschema_importeren(db: Opslag, wedstrijd_id: int, bron: str | None = None
         raise OpslagFout("Deze wedstrijd heeft geen link naar atletiek.nu of Seltec; "
                          "geef de link van het tijdschema op.")
     bron_wedstrijd, regels = _ophalen(bron, w, importer)
+    return _opslaan(db, w, bron_wedstrijd, regels)
+
+
+MAX_BESTAND = 5 * 1024 * 1024          # een opgeslagen tijdschemapagina is een paar honderd kB
+MAX_BESTANDEN = 10                     # Seltec: één pagina per wedstrijddag
+
+
+def _decodeer(inhoud: bytes) -> str:
+    for codering in ("utf-8-sig", "cp1252"):
+        try:
+            return inhoud.decode(codering)
+        except UnicodeDecodeError:
+            continue
+    raise OpslagFout("Dit bestand is geen opgeslagen webpagina (HTML).")
+
+
+def tijdschema_uit_bestanden(db: Opslag, wedstrijd_id: int,
+                             bestanden: list[tuple[str, bytes]]) -> ImportVerslag:
+    """Het tijdschema vervangen door één of meer opgeslagen pagina's (atletiek.nu of Seltec).
+
+    Voor als de site een browsercontrole geeft: de trainer slaat de pagina in de browser op
+    (Ctrl+S, 'Alleen HTML') en uploadt hem. Seltec heeft één pagina per dag: upload ze samen.
+    `bestanden` = [(bestandsnaam, inhoud)]. De pagina's gaan alleen naar een tijdelijke map die
+    meteen weer verdwijnt; er blijft niets van op schijf. Alles of niets, zoals een gewone import.
+    """
+    w = db.wedstrijd(wedstrijd_id)
+    if w is None:
+        raise OpslagFout(f"Wedstrijd {wedstrijd_id} bestaat niet.")
+    bestanden = [(n, i) for n, i in bestanden if i]
+    if not bestanden:
+        raise OpslagFout("Kies eerst een opgeslagen tijdschemapagina (een .html-bestand).")
+    if len(bestanden) > MAX_BESTANDEN:
+        raise OpslagFout(f"Maximaal {MAX_BESTANDEN} bestanden tegelijk.")
+    if any(len(i) > MAX_BESTAND for _, i in bestanden):
+        raise OpslagFout("Een bestand is te groot voor een tijdschemapagina.")
+    teksten = [_decodeer(i) for _, i in bestanden]
+    with tempfile.TemporaryDirectory(prefix="avs-tijdschema-") as tmp:
+        for nr, tekst in enumerate(teksten, 1):
+            (Path(tmp) / f"pagina{nr:02d}.html").write_text(tekst, encoding="utf-8")
+        bron_wedstrijd, regels = _ophalen(tmp, w)
     return _opslaan(db, w, bron_wedstrijd, regels)
 
 

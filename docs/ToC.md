@@ -44,9 +44,7 @@ AVS/
 │   │   ├── nk_teams_2026-2027.yaml       ✅
 │   │   ├── senioren_1e_divisie_2026-2027.yaml ✅
 │   │   ├── senioren_2e_divisie_2026-2027.yaml ✅
-│   │   ├── senioren_3e_divisie_2026-2027.yaml ✅
-│   │   ├── standaard.yaml        📝
-│   │   └── competitie_u16.yaml   📝
+│   │   └── senioren_3e_divisie_2026-2027.yaml ✅
 │   └── puntentelling/            scoring constants, one file per edition
 │       ├── au_2025.yaml          ✅ AU "Formules & Constanten"
 │       └── masters_agegrading.yaml ✅ age-grading factors per 5-year class (from the AU spreadsheet 'Mastersploeg 2023')
@@ -229,8 +227,8 @@ ui/  ──►  atleten/ · wedstrijden/ · ploeg/ · groepen/ · leerlijnen/ ·
 - [x] Score a whole group on a leerdoel in one go.
 - [ ] Progress chart per athlete.
 - [ ] Run the manual `.exe` checklist in `docs/Exe_bouwplan.md` (first start, key recovery, imports, optimiser, PDF, edited config, no write access, SmartScreen).
-- [ ] Fill or remove the placeholders `config/ploeg_regels/standaard.yaml` and `competitie_u16.yaml`.
-- [ ] Timetable: add or delete rows by hand; upload a saved page when atletiek.nu blocks the import.
+- [x] Removed the empty placeholders `config/ploeg_regels/standaard.yaml` and `competitie_u16.yaml`.
+- [x] Timetable: add or delete rows by hand; upload a saved page when atletiek.nu blocks the import (page 'Tijdschema: regels & upload').
 - [ ] Mark existing indoor competitions as `indoor` (existing ones all default to outdoor).
 - [ ] Refine the predictor defaults (`voorspelling_factor`, `verhouding`, `correctie_s`) with real data.
 - [ ] `src/db/schema.sql`: remove it; it has been replaced by the eight `schema_*.sql` files.

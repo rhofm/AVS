@@ -526,6 +526,71 @@ def tijdschema_aanpassen(db: Opslag, wijzigingen: Iterable[TijdWijziging]) -> in
 
 
 # ============================================================
+# Regels met de hand toevoegen of verwijderen
+# ============================================================
+# Voor een wedstrijd zonder online tijdschema, of een onderdeel dat ontbreekt. Een volgende
+# import vervangt het hele tijdschema, dus ook deze regels.
+
+@dataclass
+class NieuweRegel:
+    """Wat in het formulier 'Regel toevoegen' staat (als tekst, zoals getypt)."""
+    dag: str = ""
+    tijd: str = ""
+    onderdeel_id: str = ""             # keuze uit de lijst, of ...
+    onderdeel_tekst: str = ""          # ... een eigen naam
+    categorie: str = ""
+    ronde: str = ""
+    groep: str = ""
+    duur: str = ""
+    opmerking: str = ""
+
+    @classmethod
+    def van(cls, formulier) -> "NieuweRegel":
+        return cls(**{v: (formulier.get(f"nieuw-{v}") or "").strip() for v in cls.__dataclass_fields__})
+
+
+def regel_toevoegen(db: Opslag, wedstrijd_id: int, invoer: NieuweRegel) -> ProgrammaOnderdeel:
+    """Controleer het formulier en voeg de regel toe; OpslagFout met een leesbare tekst bij een fout."""
+    w = db.wedstrijd(wedstrijd_id)
+    if w is None:
+        raise OpslagFout(f"Wedstrijd {wedstrijd_id} bestaat niet.")
+    try:
+        datum = date.fromisoformat(invoer.dag) if invoer.dag else w.datum
+    except ValueError:
+        raise OpslagFout("Kies een geldige dag.") from None
+    if not invoer.tijd:
+        raise OpslagFout("Vul een starttijd in.")
+    onderdeel_id = None
+    if invoer.onderdeel_id:
+        if not invoer.onderdeel_id.isdigit() or db.onderdeel(int(invoer.onderdeel_id)) is None:
+            raise OpslagFout("Kies een onderdeel uit de lijst.")
+        onderdeel_id = int(invoer.onderdeel_id)
+    if onderdeel_id is None and not invoer.onderdeel_tekst:
+        raise OpslagFout("Kies een onderdeel uit de lijst of typ de naam.")
+    if invoer.groep and not invoer.groep.isdigit():
+        raise OpslagFout("Groep is een nummer: 1, 2, 3, ...")
+    if invoer.duur and not invoer.duur.isdigit():
+        raise OpslagFout("De duur is een aantal minuten (of leeg).")
+    try:
+        regel = ProgrammaOnderdeel(
+            wedstrijd_id, datum, invoer.tijd, onderdeel_id, invoer.onderdeel_tekst or None,
+            invoer.categorie or None, invoer.ronde, int(invoer.groep) if invoer.groep else None,
+            int(invoer.duur) if invoer.duur else None, invoer.opmerking or None)
+    except ValueError as e:
+        raise OpslagFout(str(e)) from None
+    return db.programma_opslaan(regel)
+
+
+def regel_verwijderen(db: Opslag, wedstrijd_id: int, regel_id: int) -> ProgrammaOnderdeel:
+    """Verwijder één regel van dit tijdschema; geeft de verwijderde regel. OpslagFout als hij er niet is."""
+    regel = db.programma_regel(regel_id)
+    if regel is None or regel.wedstrijd_id != wedstrijd_id:
+        raise OpslagFout("Deze regel staat niet (meer) in het tijdschema.")
+    db.programma_verwijderen(regel_id)
+    return regel
+
+
+# ============================================================
 # Een wedstrijd kiezen om één atleet in te schrijven
 # ============================================================
 # Vanaf de wedstrijdplanning van een atleet ('+ Inschrijven'): kies een komende

@@ -794,6 +794,62 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
         flash(tekst)
         return redirect(url_for("wedstrijd", wedstrijd_id=wedstrijd_id) + "#kop-tijdschema")
 
+    def _regelspagina(wedstrijd_id: int, invoer=None, fout: str | None = None, status: int = 200):
+        w = db().wedstrijd(wedstrijd_id)
+        if w is None:
+            abort(404)
+        meldingen = get_flashed_messages()
+        return render_template("wedstrijd_tijdschema_regels.html", w=w, regels=db().programma(wedstrijd_id),
+                               onderdelen=db().onderdelen(), nieuw=invoer or wedstrijddetail.NieuweRegel(),
+                               melding=meldingen[0] if meldingen else None, fout=fout,
+                               actief_menu="wedstrijden"), status
+
+    @app.get("/wedstrijd/<int:wedstrijd_id>/tijdschema/regels")
+    def wedstrijd_tijdschema_regels(wedstrijd_id: int):
+        return _regelspagina(wedstrijd_id)
+
+    @app.post("/wedstrijd/<int:wedstrijd_id>/tijdschema/regels")
+    def wedstrijd_regel_toevoegen(wedstrijd_id: int):
+        """Een regel met de hand aan het tijdschema toevoegen."""
+        if db().wedstrijd(wedstrijd_id) is None:
+            abort(404)
+        invoer = wedstrijddetail.NieuweRegel.van(request.form)
+        try:
+            r = wedstrijddetail.regel_toevoegen(db(), wedstrijd_id, invoer)
+        except OpslagFout as e:
+            return _regelspagina(wedstrijd_id, invoer, fout=f"Niet toegevoegd: {e}", status=400)
+        flash(f"Regel toegevoegd: {r.omschrijving}.")
+        return redirect(url_for("wedstrijd_tijdschema_regels", wedstrijd_id=wedstrijd_id) + "#kop-regel-nieuw")
+
+    @app.post("/wedstrijd/<int:wedstrijd_id>/tijdschema/regels/<int:regel_id>/verwijderen")
+    def wedstrijd_regel_verwijderen(wedstrijd_id: int, regel_id: int):
+        if db().wedstrijd(wedstrijd_id) is None:
+            abort(404)
+        try:
+            r = wedstrijddetail.regel_verwijderen(db(), wedstrijd_id, regel_id)
+        except OpslagFout as e:
+            return _regelspagina(wedstrijd_id, fout=str(e), status=404)
+        flash(f"Regel verwijderd: {r.omschrijving}.")
+        return redirect(url_for("wedstrijd_tijdschema_regels", wedstrijd_id=wedstrijd_id))
+
+    @app.post("/wedstrijd/<int:wedstrijd_id>/tijdschema/uploaden")
+    def wedstrijd_tijdschema_uploaden(wedstrijd_id: int):
+        """Een opgeslagen tijdschemapagina (atletiek.nu of Seltec) uploaden als de site een browsercontrole geeft."""
+        if db().wedstrijd(wedstrijd_id) is None:
+            abort(404)
+        max_b = tijdschema_import.MAX_BESTAND
+        bestanden = [(f.filename, f.read(max_b + 1)) for f in request.files.getlist("bestanden") if f.filename]
+        try:
+            verslag = tijdschema_import.tijdschema_uit_bestanden(db(), wedstrijd_id, bestanden)
+        except OpslagFout as e:
+            return _regelspagina(wedstrijd_id, fout=f"Tijdschema niet geïmporteerd: {e}", status=400)
+        except Exception as e:                         # onverwachte pagina
+            app.logger.warning("Tijdschema uploaden mislukt: %s", type(e).__name__)
+            return _regelspagina(wedstrijd_id, fout="Tijdschema niet geïmporteerd: dit bestand is niet te lezen "
+                                 "als tijdschema.", status=400)
+        flash(verslag.tekst)
+        return redirect(url_for("wedstrijd", wedstrijd_id=wedstrijd_id) + "#kop-tijdschema")
+
     @app.post("/wedstrijd/<int:wedstrijd_id>/uitslagen")
     def wedstrijd_uitslagen(wedstrijd_id: int):
         """Uitslag van atletiek.nu of Seltec ophalen en de prestaties van onze atleten opslaan.

@@ -102,9 +102,6 @@ edits and additions), then the copy built into the `.exe`; an empty file
 (only whitespace/#-comments) never hides a filled one. Loaded files are cached
 by path + modification time, so an edited YAML file counts without a restart. Design of the team feature: `docs/Ploegopstelling_ontwerp.md`.
 
-Some YAML rule sets (`competitie_u16.yaml`, `standaard.yaml`) are still empty
-placeholders (`#This is an empty temporary file`).
-
 **Dependencies** are in `pyproject.toml` (Python 3.13), installed into the
 conda environment with `pip install -e .[dev]` (`[dev]` = pytest + PyInstaller).
 It installs only the dependencies: `[tool.setuptools] packages = []`, so the
@@ -343,7 +340,11 @@ before anything is touched. A new database needs its `schema_<naam>.sql` in
   exists when the page has the timeline tab ('visueel'); otherwise it stays
   empty. `wedstrijden/tijdschema_import.py` writes it to `wedstrijd_programma`
   (replacing the old version) and never creates events itself: unmatched
-  events are stored as text and listed in the report.
+  events are stored as text and listed in the report. When the site shows a
+  browser check, the trainer uploads the saved page(s) on 'Tijdschema: regels &
+  upload' (`tijdschema_uit_bestanden`: temp folder, deleted right away, nothing
+  kept); rows can also be added/removed by hand (`detail.regel_toevoegen` /
+  `regel_verwijderen`). Any import or upload replaces all rows, hand-made ones too.
 - The Seltec timetable importer (`importers/seltec_tijdschema.py`) reads
   `/Competitions/Details/<id>` plus one page per day (`/Details/<id>/<dag>`);
   the date is the first day from the header + (day − 1). Seltec gives no end

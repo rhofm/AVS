@@ -31,6 +31,7 @@
     </div>
     <div class="knoppen paginaknoppen">
       <a class="knop" href="{{ url_for('wedstrijd_bewerken', wedstrijd_id=w.id) }}">Gegevens wijzigen</a>
+      <a class="knop" href="{{ url_for('wedstrijd_tijdschema_regels', wedstrijd_id=w.id) }}">Tijdschema: regels &amp; upload</a>
       {% if w.bron_url %}
         <form method="post" action="{{ url_for('wedstrijd_tijdschema', wedstrijd_id=w.id) }}">
           <button class="knop" type="submit" title="Haal het tijdschema opnieuw op van {{ w.bron_url }}">

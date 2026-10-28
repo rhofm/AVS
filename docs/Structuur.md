@@ -89,7 +89,7 @@
 * Atleten inschrijven (/wedstrijd/<id>/inschrijven): onderdelen en atleten aanvinken; vanuit een regel van het tijdschema ('+') staat het onderdeel al aan en staan atleten uit andere categorieën achter een vinkje
 * Op de wedstrijdpagina: 'Gegevens wijzigen' (naam, datum, locatie, link, indoor; een link mag maar bij één wedstrijd horen) en 'Tijdschema bijwerken' (haalt het tijdschema opnieuw op van de bewaarde link; zonder link: link plakken en bewaren)
 * Tijdschema aanpassen op 'Gegevens wijzigen': per regel starttijd, duur en (bij meer dagen) de dag, voor als een paar onderdelen verschuiven. Alleen gewijzigde regels worden opgeslagen; daarna staat het tijdschema weer op dag en tijd. Opnieuw ophalen van de site overschrijft deze aanpassingen
-* Nog te doen: regels met de hand toevoegen of verwijderen; een opgeslagen tijdschema-pagina uploaden als atletiek.nu een browsercontrole geeft
+* Pagina 'Tijdschema: regels & upload' (knop op de wedstrijdpagina): regels met de hand toevoegen (dag, start, duur, onderdeel uit de lijst of eigen naam, categorie, ronde, groep, opmerking) of verwijderen, en een opgeslagen pagina van atletiek.nu of Seltec uploaden als de site een browsercontrole geeft (Seltec: de dagpagina's samen kiezen). Het bestand gaat alleen naar een tijdelijke map en wordt niet bewaard; een upload of nieuwe import vervangt het hele tijdschema, ook de handmatige regels
 
 
 

@@ -70,6 +70,7 @@
       {% else %}
         <p class="leeg">Nog geen tijdschema. Importeer het op de wedstrijdpagina met &lsquo;Tijdschema importeren&rsquo;.</p>
       {% endif %}
+      <p class="zacht"><a href="{{ url_for('wedstrijd_tijdschema_regels', wedstrijd_id=w.id) }}">Regels toevoegen of verwijderen, of een opgeslagen pagina uploaden</a></p>
     </section>
 
     <div class="opslaan">

@@ -1,0 +1,110 @@
+{#
+  Tijdschema van een wedstrijd: regels met de hand toevoegen of verwijderen, en een
+  opgeslagen pagina van atletiek.nu of Seltec uploaden (als de site een browsercontrole geeft).
+  Context:
+    w         – models.Wedstrijd
+    regels    – list[ProgrammaOnderdeel] (op dag en tijd)
+    onderdelen – list[Onderdeel]
+    nieuw     – wedstrijden.detail.NieuweRegel (wat in het formulier staat)
+    melding, fout – optioneel
+  Werkt zonder script: elk knopje is een eigen formulier.
+#}
+{% extends "basis.html" %}
+{% block titel %}Tijdschema · {{ w.naam }}{% endblock %}
+
+{% block inhoud %}
+<article class="vel">
+  <header class="blok__kop">
+    <div>
+      <a class="terug" href="{{ url_for('wedstrijd', wedstrijd_id=w.id) }}">&larr; {{ w.naam }}</a>
+      <h1 class="kop kop--pagina">Tijdschema: regels &amp; upload</h1>
+      <p class="subkop">Voeg een onderdeel met de hand toe, haal er een weg, of laad een opgeslagen pagina.</p>
+    </div>
+  </header>
+
+  {% if melding %}<p class="melding" role="status">{{ melding }}</p>{% endif %}
+  {% if fout %}<p class="melding melding--fout" role="alert">{{ fout }}</p>{% endif %}
+
+  <section class="blok" aria-labelledby="kop-regels">
+    <h2 class="kop" id="kop-regels">Regels <span class="zacht getallen">({{ regels | length }})</span></h2>
+    {% if regels %}
+      <div class="tabelvak">
+        <table class="tabel">
+          <thead>
+            <tr><th scope="col">Dag</th><th scope="col">Start</th><th scope="col">Duur</th>
+                <th scope="col">Onderdeel</th><th scope="col">Categorie</th><th scope="col"><span class="verborgen">Verwijderen</span></th></tr>
+          </thead>
+          <tbody>
+            {% for r in regels %}
+              <tr>
+                <td>{{ r.datum | datum_kort }}</td>
+                <td class="getallen">{{ r.starttijd | tijd }}</td>
+                <td class="getallen">{{ r.duur if r.duur else "?" }}</td>
+                <td>{{ r.naam }}{% set det = [r.ronde, ("groep " ~ r.groep) if r.groep else ""] | select | join(", ") %}{% if det %} <span class="zacht">· {{ det }}</span>{% endif %}
+                  {% if r.opmerking %}<span class="zacht"> · {{ r.opmerking }}</span>{% endif %}</td>
+                <td>{{ r.categorie or "Alle" }}</td>
+                <td>
+                  <form method="post" action="{{ url_for('wedstrijd_regel_verwijderen', wedstrijd_id=w.id, regel_id=r.id) }}">
+                    <button class="knop" type="submit" aria-label="Verwijder {{ r.omschrijving }}">Verwijderen</button>
+                  </form>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="leeg">Nog geen regels.</p>
+    {% endif %}
+    <p class="zacht">Een nieuwe import van het tijdschema vervangt alle regels, ook de regels die je met de hand toevoegde.</p>
+  </section>
+
+  <section class="blok" aria-labelledby="kop-regel-nieuw">
+    <h2 class="kop" id="kop-regel-nieuw">Regel toevoegen</h2>
+    <form method="post" action="{{ url_for('wedstrijd_regel_toevoegen', wedstrijd_id=w.id) }}" class="blok">
+      <div class="velden">
+        <label>Dag
+          <input type="date" name="nieuw-dag" value="{{ nieuw.dag or w.datum.isoformat() }}" required></label>
+        <label>Starttijd
+          <input type="time" name="nieuw-tijd" value="{{ nieuw.tijd }}" required></label>
+        <label>Duur <span class="zacht">(min, mag leeg)</span>
+          <input type="number" name="nieuw-duur" value="{{ nieuw.duur }}" min="1" max="720" step="1" inputmode="numeric"></label>
+      </div>
+      <div class="velden">
+        <label>Onderdeel uit de lijst
+          <select name="nieuw-onderdeel_id">
+            <option value="">&mdash; of typ hieronder een naam &mdash;</option>
+            {% for o in onderdelen %}<option value="{{ o.id }}"{% if nieuw.onderdeel_id == o.id | string %} selected{% endif %}>{{ o.naam }}</option>{% endfor %}
+          </select></label>
+        <label>Of een eigen naam
+          <input type="text" name="nieuw-onderdeel_tekst" value="{{ nieuw.onderdeel_tekst }}" maxlength="80" placeholder="bijv. 60m horden 76,2cm"></label>
+      </div>
+      <div class="velden">
+        <label>Categorie <span class="zacht">(leeg = iedereen)</span>
+          <input type="text" name="nieuw-categorie" value="{{ nieuw.categorie }}" maxlength="40" placeholder="bijv. Meisjes U16"></label>
+        <label>Ronde
+          <input type="text" name="nieuw-ronde" value="{{ nieuw.ronde }}" maxlength="30" placeholder="serie, finale, ..."></label>
+        <label>Groep
+          <input type="number" name="nieuw-groep" value="{{ nieuw.groep }}" min="1" step="1" inputmode="numeric"></label>
+        <label>Opmerking
+          <input type="text" name="nieuw-opmerking" value="{{ nieuw.opmerking }}" maxlength="120"></label>
+      </div>
+      <div class="opslaan"><button class="knop knop--vol" type="submit">Regel toevoegen</button></div>
+    </form>
+  </section>
+
+  <section class="blok" aria-labelledby="kop-uploaden">
+    <h2 class="kop" id="kop-uploaden">Opgeslagen pagina uploaden</h2>
+    <p class="zacht">Geeft atletiek.nu of Seltec een browsercontrole, dan werkt de link niet. Open het tijdschema dan zelf in je browser, sla de pagina op
+      (Ctrl+S, &lsquo;Alleen HTML&rsquo;) en kies het bestand hier. Bij Seltec sla je elke wedstrijddag apart op en kies je ze samen.
+      Het bestand wordt niet bewaard; het hele tijdschema wordt vervangen.</p>
+    <form method="post" enctype="multipart/form-data" action="{{ url_for('wedstrijd_tijdschema_uploaden', wedstrijd_id=w.id) }}" class="importbalk">
+      <label class="verborgen" for="tijdschema-bestanden">Opgeslagen tijdschemapagina&rsquo;s (.html)</label>
+      <input type="file" id="tijdschema-bestanden" name="bestanden" accept=".html,.htm,text/html" multiple required>
+      <button class="knop" type="submit">Tijdschema uploaden</button>
+    </form>
+  </section>
+
+  <footer class="vel__voet">Atleet Volg Systeem<br>{{ w.naam }}</footer>
+</article>
+{% endblock %}
