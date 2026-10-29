@@ -1,0 +1,3963 @@
+{
+ "absentie": {
+  "objecten": {
+   "index:idx_absentie_atleet": {
+    "sql": "CREATE INDEX idx_absentie_atleet ON absentie(atleet_ref)",
+    "tbl": "absentie",
+    "xinfo": [
+     [
+      0,
+      1,
+      "atleet_ref",
+      0,
+      "BINARY",
+      1
+     ],
+     [
+      1,
+      0,
+      "training_id",
+      0,
+      "BINARY",
+      0
+     ]
+    ]
+   },
+   "table:absentie": {
+    "fk": [],
+    "indexen": [
+     [
+      "idx_absentie_atleet",
+      0,
+      "c",
+      0
+     ],
+     [
+      "sqlite_autoindex_absentie_1",
+      1,
+      "pk",
+      0
+     ]
+    ],
+    "kolommen": [
+     [
+      0,
+      "training_id",
+      "INTEGER",
+      1,
+      null,
+      1,
+      0
+     ],
+     [
+      1,
+      "atleet_ref",
+      "TEXT",
+      1,
+      null,
+      2,
+      0
+     ],
+     [
+      2,
+      "status",
+      "TEXT",
+      1,
+      null,
+      0,
+      0
+     ],
+     [
+      3,
+      "reden",
+      "TEXT",
+      0,
+      null,
+      0,
+      0
+     ]
+    ],
+    "sql": "CREATE TABLE absentie(training_id INTEGER NOT NULL,atleet_ref TEXT NOT NULL CHECK(length(atleet_ref)= 32),status TEXT NOT NULL CHECK(status IN('aanwezig','afgemeld','afwezig','blessure')),reden TEXT,PRIMARY KEY(training_id,atleet_ref))WITHOUT ROWID",
+    "tbl": "absentie"
+   },
+   "table:schema_version": {
+    "fk": [],
+    "indexen": [],
+    "kolommen": [
+     [
+      0,
+      "versie",
+      "INTEGER",
+      1,
+      null,
+      0,
+      0
+     ],
+     [
+      1,
+      "toegepast_op",
+      "TEXT",
+      1,
+      "datetime('now')",
+      0,
+      0
+     ]
+    ],
+    "sql": "CREATE TABLE schema_version(versie INTEGER NOT NULL,toegepast_op TEXT NOT NULL DEFAULT(datetime('now')))",
+    "tbl": "schema_version"
+   }
+  },
+  "versie": 1
+ },
+ "leerdoelscores": {
+  "objecten": {
+   "index:idx_leerdoelscore_leerdoel": {
+    "sql": "CREATE INDEX idx_leerdoelscore_leerdoel ON leerdoelscore(leerdoel_id)",
+    "tbl": "leerdoelscore",
+    "xinfo": [
+     [
+      0,
+      1,
+      "leerdoel_id",
+      0,
+      "BINARY",
+      1
+     ],
+     [
+      1,
+      0,
+      "atleet_ref",
+      0,
+      "BINARY",
+      0
+     ],
+     [
+      2,
+      3,
+      "datum",
+      0,
+      "BINARY",
+      0
+     ]
+    ]
+   },
+   "table:leerdoelscore": {
+    "fk": [],
+    "indexen": [
+     [
+      "idx_leerdoelscore_leerdoel",
+      0,
+      "c",
+      0
+     ],
+     [
+      "sqlite_autoindex_leerdoelscore_1",
+      1,
+      "pk",
+      0
+     ]
+    ],
+    "kolommen": [
+     [
+      0,
+      "atleet_ref",
+      "TEXT",
+      1,
+      null,
+      1,
+      0
+     ],
+     [
+      1,
+      "leerdoel_id",
+      "TEXT",
+      1,
+      null,
+      2,
+      0
+     ],
+     [
+      2,
+      "score",
+      "INTEGER",
+      1,
+      null,
+      0,
+      0
+     ],
+     [
+      3,
+      "datum",
+      "TEXT",
+      1,
+      null,
+      3,
+      0
+     ],
+     [
+      4,
+      "notities",
+      "TEXT",
+      0,
+      null,
+      0,
+      0
+     ]
+    ],
+    "sql": "CREATE TABLE leerdoelscore(atleet_ref TEXT NOT NULL CHECK(length(atleet_ref)= 32),leerdoel_id TEXT NOT NULL,score INTEGER NOT NULL CHECK(score BETWEEN 1 AND 5),datum TEXT NOT NULL CHECK(datum GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),notities TEXT,PRIMARY KEY(atleet_ref,leerdoel_id,datum))WITHOUT ROWID",
+    "tbl": "leerdoelscore"
+   },
+   "table:schema_version": {
+    "fk": [],
+    "indexen": [],
+    "kolommen": [
+     [
+      0,
+      "versie",
+      "INTEGER",
+      1,
+      null,
+      0,
+      0
+     ],
+     [
+      1,
+      "toegepast_op",
+      "TEXT",
+      1,
+      "datetime('now')",
+      0,
+      0
+     ]
+    ],
+    "sql": "CREATE TABLE schema_version(versie INTEGER NOT NULL,toegepast_op TEXT NOT NULL DEFAULT(datetime('now')))",
+    "tbl": "schema_version"
+   },
+   "view:laatste_leerdoelscore": {
+    "kolommen": [
+     [
+      0,
+      "atleet_ref",
+      "TEXT",
+      0,
+      null,
+      0,
+      0
+     ],
+     [
+      1,
+      "leerdoel_id",
+      "TEXT",
+      0,
+      null,
+      0,
+      0
+     ],
+     [
+      2,
+      "score",
+      "INTEGER",
+      0,
+      null,
+      0,
+      0
+     ],
+     [
+      3,
+      "datum",
+      "TEXT",
+      0,
+      null,
+      0,
+      0
+     ],
+     [
+      4,
+      "notities",
+      "TEXT",
+      0,
+      null,
+      0,
+      0
+     ]
+    ],
+    "sql": "CREATE VIEW laatste_leerdoelscore AS SELECT s.atleet_ref,s.leerdoel_id,s.score,s.datum,s.notities FROM leerdoelscore s WHERE s.datum =(SELECT MAX(t.datum)FROM leerdoelscore t WHERE t.atleet_ref = s.atleet_ref AND t.leerdoel_id = s.leerdoel_id)",
+    "tbl": "laatste_leerdoelscore"
+   }
+  },
+  "versie": 1
+ },
+ "leerlijnen": {
+  "objecten": {
+   "index:idx_leerdoel_categorie": {
+    "sql": "CREATE INDEX idx_leerdoel_categorie ON leerdoel(categorie,leerlijn)",
+    "tbl": "leerdoel",
+    "xinfo": [
+     [
+      0,
+      2,
+      "categorie",
+      0,
+      "BINARY",
+      1
+     ],
+     [
+      1,
+      1,
+      "leerlijn",
+      0,
+      "BINARY",
+      1
+     ],
+     [
+      2,
+      -1,
+      null,
+      0,
+      "BINARY",
+      0
+     ]
+    ]
+   },
+   "table:categorie": {
+    "fk": [],
+    "indexen": [
+     [
+      "sqlite_autoindex_categorie_1",
+      1,
+      "pk",
+      0
+     ],
+     [
+      "sqlite_autoindex_categorie_2",
+      1,
+      "u",
+      0
+     ]
+    ],
+    "kolommen": [
+     [
+      0,
+      "code",
+      "TEXT",
+      0,
+      null,
+      1,
+      0
+     ],
+     [
+      1,
+      "volgorde",
+      "INTEGER",
+      1,
+      null,
+      0,
+      0
+     ]
+    ],
+    "sql": "CREATE TABLE categorie(code TEXT PRIMARY KEY,volgorde INTEGER NOT NULL UNIQUE)",
+    "tbl": "categorie"
+   },
+   "table:leerdoel": {
+    "fk": [
+     [
+      0,
+      0,
+      "categorie",
+      "categorie",
+      "code",
+      "NO ACTION",
+      "NO ACTION",
+      "NONE"
+     ],
+     [
+      1,
+      0,
+      "leerlijn",
+      "leerlijn",
+      "code",
+      "NO ACTION",
+      "NO ACTION",
+      "NONE"
+     ]
+    ],
+    "indexen": [
+     [
+      "idx_leerdoel_categorie",
+      0,
+      "c",
+      0
+     ],
+     [
+      "sqlite_autoindex_leerdoel_1",
+      1,
+      "pk",
+      0
+     ],
+     [
+      "sqlite_autoindex_leerdoel_2",
+      1,
+      "u",
+      0
+     ]
+    ],
+    "kolommen": [
+     [
+      0,
+      "id",
+      "TEXT",
+      0,
+      null,
+      1,
+      0
+     ],
+     [
+      1,
+      "leerlijn",
+      "TEXT",
+      1,
+      null,
+      0,
+      0
+     ],
+     [
+      2,
+      "categorie",
+      "TEXT",
+      1,
+      null,
+      0,
+      0
+     ],
+     [
+      3,
+      "volgorde",
+      "INTEGER",
+      1,
+      null,
+      0,
+      0
+     ],
+     [
+      4,
+      "omschrijving",
+      "TEXT",
+      1,
+      null,
+      0,
+      0
+     ],
+     [
+      5,
+      "bron",
+      "TEXT",
+      1,
+      null,
+      0,
+      0
+     ],
+     [
+      6,
+      "fase",
+      "TEXT",
+      0,
+      null,
+      0,
+      0
+     ],
+     [
+      7,
+      "alleen_specialisten",
+      "INTEGER",
+      1,
+      "0",
+      0,
+      0
+     ],
+     [
+      8,
+      "actief",
+      "INTEGER",
+      1,
+      "1",
+      0,
+      0
+     ]
+    ],
+    "sql": "CREATE TABLE leerdoel(id TEXT PRIMARY KEY CHECK(id GLOB '[A-Z][A-Z][A-Z]-U[0-9][0-9]-[0-9][0-9]'),leerlijn TEXT NOT NULL REFERENCES leerlijn(code),categorie TEXT NOT NULL REFERENCES categorie(code),volgorde INTEGER NOT NULL,omschrijving TEXT NOT NULL,bron TEXT NOT NULL CHECK(bron IN('NA','AU','eigen')),fase TEXT CHECK(fase IN('fundament','leren_trainen','trainen_omvang','trainen_niveau','stabiel_element')),alleen_specialisten INTEGER NOT NULL DEFAULT 0 CHECK(alleen_specialisten IN(0,1)),actief INTEGER NOT NULL DEFAULT 1 CHECK(actief IN(0,1)),UNIQUE(leerlijn,categorie,volgorde))",
+    "tbl": "leerdoel"
+   },
+   "table:leerlijn": {
+    "fk": [],
+    "indexen": [
+     [
+      "sqlite_autoindex_leerlijn_1",
+      1,
+      "pk",
+      0
+     ],
+     [
+      "sqlite_autoindex_leerlijn_2",
+      1,
+      "u",
+      0
+     ],
+     [
+      "sqlite_autoindex_leerlijn_3",
+      1,
+      "u",
+      0
+     ]
+    ],
+    "kolommen": [
+     [
+      0,
+      "code",
+      "TEXT",
+      0,
+      null,
+      1,
+      0
+     ],
+     [
+      1,
+      "naam",
+      "TEXT",
+      1,
+      null,
+      0,
+      0
+     ],
+     [
+      2,
+      "volgorde",
+      "INTEGER",
+      1,
+      null,
+      0,
+      0
+     ]
+    ],
+    "sql": "CREATE TABLE leerlijn(code TEXT PRIMARY KEY CHECK(length(code)= 3),naam TEXT NOT NULL UNIQUE,volgorde INTEGER NOT NULL UNIQUE)",
+    "tbl": "leerlijn"
+   },
+   "table:schema_version": {
+    "fk": [],
+    "indexen": [],
+    "kolommen": [
+     [
+      0,
+      "versie",
+      "INTEGER",
+      1,
+      null,
+      0,
+      0
+     ],
+     [
+      1,
+      "toegepast_op",
+      "TEXT",
+      1,
+      "datetime('now')",
+      0,
+      0
+     ]
+    ],
+    "sql": "CREATE TABLE schema_version(versie INTEGER NOT NULL,toegepast_op TEXT NOT NULL DEFAULT(datetime('now')))",
+    "tbl": "schema_version"
+   },
+   "table:scoreschaal": {
+    "fk": [],
+    "indexen": [],
+    "kolommen": [
+     [
+      0,
+      "score",
+      "INTEGER",
+      0,
+      null,
+      1,
+      0
+     ],
+     [
+      1,
+      "label",
+      "TEXT",
+      1,
+      null,
+      0,
+      0
+     ],
+     [
+      2,
+      "omschrijving",
+      "TEXT",
+      1,
+      null,
+      0,
+      0
+     ]
+    ],
+    "sql": "CREATE TABLE scoreschaal(score INTEGER PRIMARY KEY CHECK(score BETWEEN 1 AND 5),label TEXT NOT NULL,omschrijving TEXT NOT NULL)",
+    "tbl": "scoreschaal"
+   }
+  },
+  "versie": 1
+ },
+ "notities": {
+  "objecten": {
+   "index:idx_notitie_atleet": {
+    "sql": "CREATE INDEX idx_notitie_atleet ON notitie(atleet_ref,datum)",
+    "tbl": "notitie",
+    "xinfo": [
+     [
+      0,
+      1,
+      "atleet_ref",
+      0,
+      "BINARY",
+      1
+     ],
+     [
+      1,
+      2,
+      "datum",
+      0,
+      "BINARY",
+      1
+     ],
+     [
+      2,
+      -1,
+      null,
+      0,
+      "BINARY",
+      0
+     ]
+    ]
+   },
+   "index:idx_notitie_datum": {
+    "sql": "CREATE INDEX idx_notitie_datum ON notitie(datum)",
+    "tbl": "notitie",
+    "xinfo": [
+     [
+      0,
+      2,
+      "datum",
+      0,
+      "BINARY",
+      1
+     ],
+     [
+      1,
+      -1,
+      null,
+      0,
+      "BINARY",
+      0
+     ]
+    ]
+   },
+   "table:notitie": {
+    "fk": [],
+    "indexen": [
+     [
+      "idx_notitie_atleet",
+      0,
+      "c",
+      0
+     ],
+     [
+      "idx_notitie_datum",
+      0,
+      "c",
+      0
+     ]
+    ],
+    "kolommen": [
+     [
+      0,
+      "id",
+      "INTEGER",
+      0,
+      null,
+      1,
+      0
+     ],
+     [
+      1,
+      "atleet_ref",
+      "TEXT",
+      1,
+      null,
+      0,
+      0
+     ],
+     [
+      2,
+      "datum",
+      "TEXT",
+      1,
+      null,
+      0,
+      0
+     ],
+     [
+      3,
+      "inhoud",
+      "TEXT",
+      1,
+      null,
+      0,
+      0
+     ],
+     [
+      4,
+      "aangemaakt_op",
+      "TEXT",
+      1,
+      "datetime('now')",
+      0,
+      0
+     ],
+     [
+      5,
+      "bijgewerkt_op",
+      "TEXT",
+      0,
+      null,
+      0,
+      0
+     ]
+    ],
+    "sql": "CREATE TABLE notitie(id INTEGER PRIMARY KEY,atleet_ref TEXT NOT NULL CHECK(length(atleet_ref)= 32),datum TEXT NOT NULL CHECK(datum GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),inhoud TEXT NOT NULL CHECK(length(trim(inhoud))> 0),aangemaakt_op TEXT NOT NULL DEFAULT(datetime('now')),bijgewerkt_op TEXT)",
+    "tbl": "notitie"
+   },
+   "table:schema_version": {
+    "fk": [],
+    "indexen": [],
+    "kolommen": [
+     [
+      0,
+      "versie",
+      "INTEGER",
+      1,
+      null,
+      0,
+      0
+     ],
+     [
+      1,
+      "toegepast_op",
+      "TEXT",
+      1,
+      "datetime('now')",
+      0,
+      0
+     ]
+    ],
+    "sql": "CREATE TABLE schema_version(versie INTEGER NOT NULL,toegepast_op TEXT NOT NULL DEFAULT(datetime('now')))",
+    "tbl": "schema_version"
+   }
+  },
+  "versie": 1
+ },
+ "personen": {
+  "objecten": {
+   "index:atleet_au_licentienummer": {
+    "sql": "CREATE UNIQUE INDEX atleet_au_licentienummer ON atleet(au_licentienummer)",
+    "tbl": "atleet",
+    "xinfo": [
+     [
+      0,
+      12,
+      "au_licentienummer",
+      0,
+      "BINARY",
+      1
+     ],
+     [
+      1,
+      -1,
+      null,
+      0,
+      "BINARY",
+      0
+     ]
+    ]
+   },
+   "index:idx_ploeg_datum": {
+    "sql": "CREATE INDEX idx_ploeg_datum ON ploeg(datum)",
+    "tbl": "ploeg",
+    "xinfo": [
+     [
+      0,
+      9,
+      "datum",
+      0,
+      "BINARY",
+      1
+     ],
+     [
+      1,
+      -1,
+      null,
+      0,
+      "BINARY",
+      0
+     ]
+    ]
+   },
+   "index:idx_rooster_regel_rooster": {
+    "sql": "CREATE INDEX idx_rooster_regel_rooster ON rooster_regel(rooster_id)",
+    "tbl": "rooster_regel",
+    "xinfo": [
+     [
+      0,
+      1,
+      "rooster_id",
+      0,
+      "BINARY",
+      1
+     ],
+     [
+      1,
+      -1,
+      null,
+      0,
+      "BINARY",
+      0
+     ]
+    ]
+   },
+   "index:idx_training_hoofd": {
+    "sql": "CREATE INDEX idx_training_hoofd ON training(hoofdtraining_id)",
+    "tbl": "training",
+    "xinfo": [
+     [
+      0,
+      10,
+      "hoofdtraining_id",
+      0,
+      "BINARY",
+      1
+     ],
+     [
+      1,
+      -1,
+      null,
+      0,
+      "BINARY",
+      0
+     ]
+    ]
+   },
+   "table:atleet": {
+    "fk": [],
+    "indexen": [
+     [
+      "atleet_au_licentienummer",
+      1,
+      "c",
+      0
+     ],
+     [
+      "sqlite_autoindex_atleet_1",
+      1,
+      "pk",
+      0
+     ],
+     [
+      "sqlite_autoindex_atleet_2",
+      1,
+      "u",
+      0
+     ]
+    ],
+    "kolommen": [
+     [
+      0,
+      "master_id",
+      "TEXT",
+      0,
+      "lower(hex(randomblob(16)))",
+      1,
+      0
+     ],
+     [
+      1,
+      "voornaam",
+      "TEXT",
+      1,
+      null,
+      0,
+      0
+     ],
+     [
+      2,
+      "tussenvoegsel",
+      "TEXT",
+      0,
+      null,
+      0,
+      0
+     ],
+     [
+      3,
+      "achternaam",
+      "TEXT",
+      1,
+      null,
+      0,
+      0
+     ],
+     [
+      4,
+      "geslacht",
+      "TEXT",
+      0,
+      null,
+      0,
+      0
+     ],
+     [
+      5,
+      "geboortedatum",
+      "TEXT",
+      0,
+      null,
+      0,
+      0
+     ],
+     [
+      6,
+      "club",
+      "TEXT",
+      0,
+      null,
+      0,
+      0
+     ],
+     [
+      7,
+      "atletieknu_id",
+      "TEXT",
+      0,
+      null,
+      0,
+      0
+     ],
+     [
+      8,
+      "specialisatie",
+      "TEXT",
+      0,
+      null,
+      0,
+      0
+     ],
+     [
+      9,
+      "actief",
+      "INTEGER",
+      1,
+      "1",
+      0,
+      0
+     ],
+     [
+      10,
+      "notities",
+      "TEXT",
+      0,
+      null,
+      0,
+      0
+     ],
+     [
+      11,
+      "aangemaakt_op",
+      "TEXT",
+      1,
+      "datetime('now')",
+      0,
+      0
+     ],
+     [
+      12,
+      "au_licentienummer",
+      "TEXT",
+      0,
+      null,
+      0,
+      0
+     ]
+    ],
+    "sql": "CREATE TABLE atleet(master_id TEXT PRIMARY KEY DEFAULT(lower(hex(randomblob(16))))CHECK(length(master_id)= 32),voornaam TEXT NOT NULL,tussenvoegsel TEXT,achternaam TEXT NOT NULL,geslacht TEXT CHECK(geslacht IN('M','V','X')),geboortedatum TEXT,club TEXT,atletieknu_id TEXT UNIQUE,specialisatie TEXT,actief INTEGER NOT NULL DEFAULT 1,notities TEXT,aangemaakt_op TEXT NOT NULL DEFAULT(datetime('now')),au_licentienummer TEXT)",
+    "tbl": "atleet"
+   },
+   "table:atleet_leerlijn": {
+    "fk": [
+     [
+      0,
+      0,
+      "leerlijn_stap",
+      "stap_id",
+      "id",
+      "NO ACTION",
+      "CASCADE",
+      "NONE"
+     ],
+     [
+      1,
+      0,
+      "atleet",
+      "atleet_id",
+      "master_id",
+      "NO ACTION",
+      "CASCADE",
+      "NONE"
+     ]
+    ],
+    "indexen": [
+     [
+      "sqlite_autoindex_atleet_leerlijn_1",
+      1,
+      "pk",
+      0
+     ]
+    ],
+    "kolommen": [
+     [
+      0,
+      "atleet_id",
+      "TEXT",
+      1,
+      null,
+      1,
+      0
+     ],
+     [
+      1,
+      "stap_id",
+      "INTEGER",
+      1,
+      null,
+      2,
+      0
+     ],
+     [
+      2,
+      "behaald_op",
+      "TEXT",
+      0,
+      null,
+      0,
+      0
+     ],
+     [
+      3,
+      "notities",
+      "TEXT",
+      0,
+      null,
+      0,
+      0
+     ]
+    ],
+    "sql": "CREATE TABLE atleet_leerlijn(atleet_id TEXT NOT NULL REFERENCES atleet(master_id)ON DELETE CASCADE,stap_id INTEGER NOT NULL REFERENCES leerlijn_stap(id)ON DELETE CASCADE,behaald_op TEXT,notities TEXT,PRIMARY KEY(atleet_id,stap_id))",
+    "tbl": "atleet_leerlijn"
+   },
+   "table:atleet_voorkeur": {
+    "fk": [
+     [
+      0,
+      0,
+      "atleet",
+      "atleet_id",
+      "master_id",
+      "NO ACTION",
+      "CASCADE",
+      "NONE"
+     ]
+    ],
+    "indexen": [
+     [
+      "sqlite_autoindex_atleet_voorkeur_1",
+      1,
+      "pk",
+      0
+     ]
+    ],
+    "kolommen": [
+     [
+      0,
+      "atleet_id",
+      "TEXT",
+      1,
+      null,
+      1,
+      0
+     ],
+     [
+      1,
+      "onderdeel",
+      "TEXT",
+      1,
+      null,
+      2,
+      0
+     ],
+     [
+      2,
+      "voorkeur",
+      "TEXT",
+      1,
+      null,
+      0,
+      0
+     ]
+    ],
+    "sql": "CREATE TABLE atleet_voorkeur(atleet_id TEXT NOT NULL REFERENCES atleet(master_id)ON DELETE CASCADE,onderdeel TEXT NOT NULL,voorkeur TEXT NOT NULL CHECK(voorkeur IN('voorkeur','wil_niet','moet')),PRIMARY KEY(atleet_id,onderdeel))",
+    "tbl": "atleet_voorkeur"
+   },
+   "table:groep": {
+    "fk": [],
+    "indexen": [
+     [
+      "sqlite_autoindex_groep_1",
+      1,
+      "u",
+      0
+     ]
+    ],
+    "kolommen": [
+     [
+      0,
+      "id",
+      "INTEGER",
+      0,
+      null,
+      1,
+      0
+     ],
+     [
+      1,
+      "naam",
+      "TEXT",
+      1,
+      null,
+      0,
+      0
+     ],
+     [
+      2,
+      "seizoen",
+      "TEXT",
+      0,
+      null,
+      0,
+      0
+     ]
+    ],
+    "sql": "CREATE TABLE groep(id INTEGER PRIMARY KEY,naam TEXT NOT NULL,seizoen TEXT,UNIQUE(naam,seizoen))",
+    "tbl": "groep"
+   },
+   "table:groep_extra_trainingstijd": {
+    "fk": [
+     [
+      0,
+      0,
+      "groep",
+      "groep_id",
+      "id",
+      "NO ACTION",
+      "CASCADE",
+      "NONE"
+     ]
+    ],
+    "indexen": [
+     [
+      "sqlite_autoindex_groep_extra_trainingstijd_1",
+      1,
+      "pk",
+      0
+     ]
+    ],
+    "kolommen": [
+     [
+      0,
+      "groep_id",
+      "INTEGER",
+      1,
+      null,
+      1,
+      0
+     ],
+     [
+      1,
+      "dag",
+      "TEXT",
+      1,
+      null,
+      2,
+      0
+     ],
+     [
+      2,
+      "starttijd",
+      "TEXT",
+      1,
+      null,
+      3,
+      0
+     ]
+    ],
+    "sql": "CREATE TABLE groep_extra_trainingstijd(groep_id INTEGER NOT NULL REFERENCES groep(id)ON DELETE CASCADE,dag TEXT NOT NULL CHECK(dag IN('maandag','dinsdag','woensdag','donderdag','vrijdag','zaterdag','zondag')),starttijd TEXT NOT NULL CHECK(length(starttijd)= 5 AND starttijd GLOB '[0-2][0-9]:[0-5][0-9]' AND starttijd <= '23:59'),PRIMARY KEY(groep_id,dag,starttijd))",
+    "tbl": "groep_extra_trainingstijd"
+   },
+   "table:groep_fase": {
+    "fk": [
+     [
+      0,
+      0,
+      "groep",
+      "groep_id",
+      "id",
+      "NO ACTION",
+      "CASCADE",
+      "NONE"
+     ]
+    ],
+    "indexen": [
+     [
+      "sqlite_autoindex_groep_fase_1",
+      1,
+      "pk",
+      0
+     ]
+    ],
+    "kolommen": [
+     [
+      0,
+      "groep_id",
+      "INTEGER",
+      1,
+      null,
+      1,
+      0
+     ],
+     [
+      1,
+      "startdatum",
+      "TEXT",
+      1,
+      null,
+      2,
+      0
+     ],
+     [
+      2,
+      "fase",
+      "TEXT",
+      1,
+      null,
+      0,
+      0
+     ]
+    ],
+    "sql": "CREATE TABLE groep_fase(groep_id INTEGER NOT NULL REFERENCES groep(id)ON DELETE CASCADE,startdatum TEXT NOT NULL CHECK(length(startdatum)= 10 AND startdatum GLOB '[0-9][0-9][0-9][0-9]-[0-1][0-9]-[0-3][0-9]'),fase TEXT NOT NULL CHECK(fase IN('V1','V2','WP','Rust','Geen')),PRIMARY KEY(groep_id,startdatum))WITHOUT ROWID",
+    "tbl": "groep_fase"
+   },
+   "table:groep_lid": {
+    "fk": [
+     [
+      0,
+      0,
+      "atleet",
+      "atleet_id",
+      "master_id",
+      "NO ACTION",
+      "CASCADE",
+      "NONE"
+     ],
+     [
+      1,
+      0,
+      "groep",
+      "groep_id",
+      "id",
+      "NO ACTION",
+      "CASCADE",
+      "NONE"
+     ]
+    ],
+    "indexen": [
+     [
+      "sqlite_autoindex_groep_lid_1",
+      1,
+      "pk",
+      0
+     ]
+    ],
+    "kolommen": [
+     [
+      0,
+      "groep_id",
+      "INTEGER",
+      1,
+      null,
+      1,
+      0
+     ],
+     [
+      1,
+      "atleet_id",
+      "TEXT",
+      1,
+      null,
+      2,
+      0
+     ]
+    ],
+    "sql": "CREATE TABLE groep_lid(groep_id INTEGER NOT NULL REFERENCES groep(id)ON DELETE CASCADE,atleet_id TEXT NOT NULL REFERENCES atleet(master_id)ON DELETE CASCADE,PRIMARY KEY(groep_id,atleet_id))",
+    "tbl": "groep_lid"
+   },
+   "table:groep_rooster": {
+    "fk": [
+     [
+      0,
+      0,
+      "rooster",
+      "rooster_id",
+      "id",
+      "NO ACTION",
+      "CASCADE",
+      "NONE"
+     ],
+     [
+      1,
+      0,
+      "groep",
+      "groep_id",
+      "id",
+      "NO ACTION",
+      "CASCADE",
+      "NONE"
+     ]
+    ],
+    "indexen": [
+     [
+      "sqlite_autoindex_groep_rooster_1",
+      1,
+      "pk",
+      0
+     ]
+    ],
+    "kolommen": [
+     [
+      0,
+      "groep_id",
+      "INTEGER",
+      1,
+      null,
+      1,
+      0
+     ],
+     [
+      1,
+      "rooster_id",
+      "INTEGER",
+      1,
+      null,
+      0,
+      0
+     ],
+     [
+      2,
+      "startdatum",
+      "TEXT",
+      1,
+      null,
+      2,
+      0
+     ],
+     [
+      3,
+      "herhalen",
+      "INTEGER",
+      1,
+      "1",
+      0,
+      0
+     ],
+     [
+      4,
+      "einddatum",
+      "TEXT",
+      0,
+      null,
+      0,
+      0
+     ]
+    ],
+    "sql": "CREATE TABLE groep_rooster(groep_id INTEGER NOT NULL REFERENCES groep(id)ON DELETE CASCADE,rooster_id INTEGER NOT NULL REFERENCES rooster(id)ON DELETE CASCADE,startdatum TEXT NOT NULL CHECK(length(startdatum)= 10 AND startdatum GLOB '[0-9][0-9][0-9][0-9]-[0-1][0-9]-[0-3][0-9]'),herhalen INTEGER NOT NULL DEFAULT 1 CHECK(herhalen IN(0,1)),einddatum TEXT CHECK(einddatum IS NULL OR einddatum >= startdatum),PRIMARY KEY(groep_id,startdatum))WITHOUT ROWID",
+    "tbl": "groep_rooster"
+   },
+   "table:groep_trainingstijden": {
+    "fk": [
+     [
+      0,
+      0,
+      "groep",
+      "groep_id",
+      "id",
+      "NO ACTION",
+      "CASCADE",
+      "NONE"
+     ]
+    ],
+    "indexen": [],
+    "kolommen": [
+     [
+      0,
+      "groep_id",
+      "INTEGER",
+      0,
+      null,
+      1,
+      0
+     ],
+     [
+      1,
+      "maandag",
+      "TEXT",
+      0,
+      null,
+      0,
+      0
+     ],
+     [
+      2,
+      "dinsdag",
+      "TEXT",
+      0,
+      null,
+      0,
+      0
+     ],
+     [
+      3,
+      "woensdag",
+      "TEXT",
+      0,
+      null,
+      0,
+      0
+     ],
+     [
+      4,
+      "donderdag",
+      "TEXT",
+      0,
+      null,
+      0,
+      0
+     ],
+     [
+      5,
+      "vrijdag",
+      "TEXT",
+      0,
+      null,
+      0,
+      0
+     ],
+     [
+      6,
+      "zaterdag",
+      "TEXT",
+      0,
+      null,
+      0,
+      0
+     ],
+     [
+      7,
+      "zondag",
+      "TEXT",
+      0,
+      null,
+      0,
+      0
+     ]
+    ],
+    "sql": "CREATE TABLE groep_trainingstijden(groep_id INTEGER PRIMARY KEY REFERENCES groep(id)ON DELETE CASCADE,maandag TEXT CHECK(maandag IS NULL OR(length(maandag)= 5 AND maandag GLOB '[0-2][0-9]:[0-5][0-9]' AND maandag <= '23:59')),dinsdag TEXT CHECK(dinsdag IS NULL OR(length(dinsdag)= 5 AND dinsdag GLOB '[0-2][0-9]:[0-5][0-9]' AND dinsdag <= '23:59')),woensdag TEXT CHECK(woensdag IS NULL OR(length(woensdag)= 5 AND woensdag GLOB '[0-2][0-9]:[0-5][0-9]' AND woensdag <= '23:59')),donderdag TEXT CHECK(donderdag IS NULL OR(length(donderdag)= 5 AND donderdag GLOB '[0-2][0-9]:[0-5][0-9]' AND donderdag <= '23:59')),vrijdag TEXT CHECK(vrijdag IS NULL OR(length(vrijdag)= 5 AND vrijdag GLOB '[0-2][0-9]:[0-5][0-9]' AND vrijdag <= '23:59')),zaterdag TEXT CHECK(zaterdag IS NULL OR(length(zaterdag)= 5 AND zaterdag GLOB '[0-2][0-9]:[0-5][0-9]' AND zaterdag <= '23:59')),zondag TEXT CHECK(zondag IS NULL OR(length(zondag)= 5 AND zondag GLOB '[0-2][0-9]:[0-5][0-9]' AND zondag <= '23:59')))",
+    "tbl": "groep_trainingstijden"
+   },
+   "table:leerlijn": {
+    "fk": [],
+    "indexen": [
+     [
+      "sqlite_autoindex_leerlijn_1",
+      1,
+      "u",
+      0
+     ]
+    ],
+    "kolommen": [
+     [
+      0,
+      "id",
+      "INTEGER",
+      0,
+      null,
+      1,
+      0
+     ],
+     [
+      1,
+      "naam",
+      "TEXT",
+      1,
+      null,
+      0,
+      0
+     ],
+     [
+      2,
+      "beschrijving",
+      "TEXT",
+      0,
+      null,
+      0,
+      0
+     ]
+    ],
+    "sql": "CREATE TABLE leerlijn(id INTEGER PRIMARY KEY,naam TEXT NOT NULL UNIQUE,beschrijving TEXT)",
+    "tbl": "leerlijn"
+   },
+   "table:leerlijn_stap": {
+    "fk": [
+     [
+      0,
+      0,
+      "leerlijn",
+      "leerlijn_id",
+      "id",
+      "NO ACTION",
+      "CASCADE",
+      "NONE"
+     ]
+    ],
+    "indexen": [
+     [
+      "sqlite_autoindex_leerlijn_stap_1",
+      1,
+      "u",
+      0
+     ]
+    ],
+    "kolommen": [
+     [
+      0,
+      "id",
+      "INTEGER",
+      0,
+      null,
+      1,
+      0
+     ],
+     [
+      1,
+      "leerlijn_id",
+      "INTEGER",
+      1,
+      null,
+      0,
+      0
+     ],
+     [
+      2,
+      "volgorde",
+      "INTEGER",
+      1,
+      null,
+      0,
+      0
+     ],
+     [
+      3,
+      "naam",
+      "TEXT",
+      1,
+      null,
+      0,
+      0
+     ],
+     [
+      4,
+      "beschrijving",
+      "TEXT",
+      0,
+      null,
+      0,
+      0
+     ]
+    ],
+    "sql": "CREATE TABLE leerlijn_stap(id INTEGER PRIMARY KEY,leerlijn_id INTEGER NOT NULL REFERENCES leerlijn(id)ON DELETE CASCADE,volgorde INTEGER NOT NULL,naam TEXT NOT NULL,beschrijving TEXT,UNIQUE(leerlijn_id,volgorde))",
+    "tbl": "leerlijn_stap"
+   },
+   "table:mesocyclus": {
+    "fk": [
+     [
+      0,
+      0,
+      "groep",
+      "groep_id",
+      "id",
+      "NO ACTION",
+      "CASCADE",
+      "NONE"
+     ]
+    ],
+    "indexen": [
+     [
+      "sqlite_autoindex_mesocyclus_1",
+      1,
+      "u",
+      0
+     ]
+    ],
+    "kolommen": [
+     [
+      0,
+      "id",
+      "INTEGER",
+      0,
+      null,
+      1,
+      0
+     ],
+     [
+      1,
+      "groep_id",
+      "INTEGER",
+      1,
+      null,
+      0,
+      0
+     ],
+     [
+      2,
+      "startdatum",
+      "TEXT",
+      1,
+      null,
+      0,
+      0
+     ],
+     [
+      3,
+      "aantal_weken",
+      "INTEGER",
+      1,
+      null,
+      0,
+      0
+     ]
+    ],
+    "sql": "CREATE TABLE mesocyclus(id INTEGER PRIMARY KEY,groep_id INTEGER NOT NULL REFERENCES groep(id)ON DELETE CASCADE,startdatum TEXT NOT NULL CHECK(length(startdatum)= 10 AND startdatum GLOB '[0-9][0-9][0-9][0-9]-[0-1][0-9]-[0-3][0-9]'),aantal_weken INTEGER NOT NULL CHECK(aantal_weken BETWEEN 1 AND 12),UNIQUE(groep_id,startdatum))",
+    "tbl": "mesocyclus"
+   },
+   "table:mesocyclus_week": {
+    "fk": [
+     [
+      0,
+      0,
+      "mesocyclus",
+      "mesocyclus_id",
+      "id",
+      "NO ACTION",
+      "CASCADE",
+      "NONE"
+     ]
+    ],
+    "indexen": [
+     [
+      "sqlite_autoindex_mesocyclus_week_1",
+      1,
+      "pk",
+      0
+     ]
+    ],
+    "kolommen": [
+     [
+      0,
+      "mesocyclus_id",
+      "INTEGER",
+      1,
+      null,
+      1,
+      0
+     ],
+     [
+      1,
+      "weeknummer",
+      "INTEGER",
+      1,
+      null,
+      2,
+      0
+     ],
+     [
+      2,
+      "naam",
+      "TEXT",
+      1,
+      null,
+      0,
+      0
+     ]
+    ],
+    "sql": "CREATE TABLE mesocyclus_week(mesocyclus_id INTEGER NOT NULL REFERENCES mesocyclus(id)ON DELETE CASCADE,weeknummer INTEGER NOT NULL CHECK(weeknummer BETWEEN 1 AND 12),naam TEXT NOT NULL,PRIMARY KEY(mesocyclus_id,weeknummer))WITHOUT ROWID",
+    "tbl": "mesocyclus_week"
+   },
+   "table:periodeplan": {
+    "fk": [
+     [
+      0,
+      0,
+      "groep",
+      "groep_id",
+      "id",
+      "NO ACTION",
+      "CASCADE",
+      "NONE"
+     ]
+    ],
+    "indexen": [],
+    "kolommen": [
+     [
+      0,
+      "id",
+      "INTEGER",
+      0,
+      null,
+      1,
+      0
+     ],
+     [
+      1,
+      "groep_id",
+      "INTEGER",
+      0,
+      null,
+      0,
+      0
+     ],
+     [
+      2,
+      "naam",
+      "TEXT",
+      1,
+      null,
+      0,
+      0
+     ],
+     [
+      3,
+      "startdatum",
+      "TEXT",
+      1,
+      null,
+      0,
+      0
+     ],
+     [
+      4,
+      "einddatum",
+      "TEXT",
+      1,
+      null,
+      0,
+      0
+     ],
+     [
+      5,
+      "doel",
+      "TEXT",
+      0,
+      null,
+      0,
+      0
+     ]
+    ],
+    "sql": "CREATE TABLE periodeplan(id INTEGER PRIMARY KEY,groep_id INTEGER REFERENCES groep(id)ON DELETE CASCADE,naam TEXT NOT NULL,startdatum TEXT NOT NULL,einddatum TEXT NOT NULL,doel TEXT)",
+    "tbl": "periodeplan"
+   },
+   "table:ploeg": {
+    "fk": [],
+    "indexen": [
+     [
+      "idx_ploeg_datum",
+      0,
+      "c",
+      0
+     ]
+    ],
+    "kolommen": [
+     [
+      0,
+      "id",
+      "INTEGER",
+      0,
+      null,
+      1,
+      0
+     ],
+     [
+      1,
+      "naam",
+      "TEXT",
+      1,
+      null,
+      0,
+      0
+     ],
+     [
+      2,
+      "competitie",
+      "TEXT",
+      0,
+      null,
+      0,
+      0
+     ],
+     [
+      3,
+      "wedstrijd_id",
+      "INTEGER",
+      0,
+      null,
+      0,
+      0
+     ],
+     [
+      4,
+      "regelset",
+      "TEXT",
+      0,
+      null,
+      0,
+      0
+     ],
+     [
+      5,
+      "strategie",
+      "TEXT",
+      0,
+      null,
+      0,
+      0
+     ],
+     [
+      6,
+      "aangemaakt_op",
+      "TEXT",
+      1,
+      "datetime('now')",
+      0,
+      0
+     ],
+     [
+      7,
+      "categorie",
+      "TEXT",
+      0,
+      null,
+      0,
+      0
+     ],
+     [
+      8,
+      "programma",
+      "TEXT",
+      0,
+      null,
+      0,
+      0
+     ],
+     [
+      9,
+      "datum",
+      "TEXT",
+      0,
+      null,
+      0,
+      0
+     ],
+     [
+      10,
+      "prestatiebasis",
+      "TEXT",
+      1,
+      "'seizoen'",
+      0,
+      0
+     ]
+    ],
+    "sql": "CREATE TABLE ploeg(id INTEGER PRIMARY KEY,naam TEXT NOT NULL,competitie TEXT,wedstrijd_id INTEGER,regelset TEXT,strategie TEXT,aangemaakt_op TEXT NOT NULL DEFAULT(datetime('now')),categorie TEXT,programma TEXT,datum TEXT,prestatiebasis TEXT NOT NULL DEFAULT 'seizoen')",
+    "tbl": "ploeg"
+   },
+   "table:ploeg_lid": {
+    "fk": [
+     [
+      0,
+      0,
+      "atleet",
+      "atleet_id",
+      "master_id",
+      "NO ACTION",
+      "CASCADE",
+      "NONE"
+     ],
+     [
+      1,
+      0,
+      "ploeg",
+      "ploeg_id",
+      "id",
+      "NO ACTION",
+      "CASCADE",
+      "NONE"
+     ]
+    ],
+    "indexen": [
+     [
+      "sqlite_autoindex_ploeg_lid_1",
+      1,
+      "pk",
+      0
+     ]
+    ],
+    "kolommen": [
+     [
+      0,
+      "ploeg_id",
+      "INTEGER",
+      1,
+      null,
+      1,
+      0
+     ],
+     [
+      1,
+      "atleet_id",
+      "TEXT",
+      1,
+      null,
+      2,
+      0
+     ],
+     [
+      2,
+      "rol",
+      "TEXT",
+      1,
+      "'deelnemer'",
+      0,
+      0
+     ],
+     [
+      3,
+      "beschikbaar",
+      "TEXT",
+      1,
+      "'hele_dag'",
+      0,
+      0
+     ]
+    ],
+    "sql": "CREATE TABLE ploeg_lid(ploeg_id INTEGER NOT NULL REFERENCES ploeg(id)ON DELETE CASCADE,atleet_id TEXT NOT NULL REFERENCES atleet(master_id)ON DELETE CASCADE,rol TEXT NOT NULL DEFAULT 'deelnemer' CHECK(rol IN('deelnemer','reserve')),beschikbaar TEXT NOT NULL DEFAULT 'hele_dag' CHECK(beschikbaar IN('hele_dag','ochtend','middag')),PRIMARY KEY(ploeg_id,atleet_id))",
+    "tbl": "ploeg_lid"
+   },
+   "table:ploeg_opstelling": {
+    "fk": [
+     [
+      0,
+      0,
+      "ploeg_lid",
+      "ploeg_id",
+      "ploeg_id",
+      "NO ACTION",
+      "CASCADE",
+      "NONE"
+     ],
+     [
+      0,
+      1,
+      "ploeg_lid",
+      "atleet_id",
+      "atleet_id",
+      "NO ACTION",
+      "CASCADE",
+      "NONE"
+     ]
+    ],
+    "indexen": [
+     [
+      "sqlite_autoindex_ploeg_opstelling_1",
+      1,
+      "pk",
+      0
+     ]
+    ],
+    "kolommen": [
+     [
+      0,
+      "ploeg_id",
+      "INTEGER",
+      1,
+      null,
+      1,
+      0
+     ],
+     [
+      1,
+      "atleet_id",
+      "TEXT",
+      1,
+      null,
+      2,
+      0
+     ],
+     [
+      2,
+      "onderdeel",
+      "TEXT",
+      1,
+      null,
+      3,
+      0
+     ],
+     [
+      3,
+      "groep",
+      "INTEGER",
+      0,
+      null,
+      0,
+      0
+     ],
+     [
+      4,
+      "vast",
+      "INTEGER",
+      1,
+      "0",
+      0,
+      0
+     ]
+    ],
+    "sql": "CREATE TABLE ploeg_opstelling(ploeg_id INTEGER NOT NULL,atleet_id TEXT NOT NULL,onderdeel TEXT NOT NULL,groep INTEGER CHECK(groep IS NULL OR groep >= 1),vast INTEGER NOT NULL DEFAULT 0,PRIMARY KEY(ploeg_id,atleet_id,onderdeel),FOREIGN KEY(ploeg_id,atleet_id)REFERENCES ploeg_lid(ploeg_id,atleet_id)ON DELETE CASCADE)",
+    "tbl": "ploeg_opstelling"
+   },
+   "table:ploeg_voorkeur": {
+    "fk": [
+     [
+      0,
+      0,
+      "atleet",
+      "atleet_id",
+      "master_id",
+      "NO ACTION",
+      "CASCADE",
+      "NONE"
+     ],
+     [
+      1,
+      0,
+      "ploeg",
+      "ploeg_id",
+      "id",
+      "NO ACTION",
+      "CASCADE",
+      "NONE"
+     ]
+    ],
+    "indexen": [
+     [
+      "sqlite_autoindex_ploeg_voorkeur_1",
+      1,
+      "pk",
+      0
+     ]
+    ],
+    "kolommen": [
+     [
+      0,
+      "ploeg_id",
+      "INTEGER",
+      1,
+      null,
+      1,
+      0
+     ],
+     [
+      1,
+      "atleet_id",
+      "TEXT",
+      1,
+      null,
+      2,
+      0
+     ],
+     [
+      2,
+      "onderdeel",
+      "TEXT",
+      1,
+      null,
+      3,
+      0
+     ],
+     [
+      3,
+      "voorkeur",
+      "TEXT",
+      1,
+      null,
+      0,
+      0
+     ]
+    ],
+    "sql": "CREATE TABLE ploeg_voorkeur(ploeg_id INTEGER NOT NULL REFERENCES ploeg(id)ON DELETE CASCADE,atleet_id TEXT NOT NULL REFERENCES atleet(master_id)ON DELETE CASCADE,onderdeel TEXT NOT NULL,voorkeur TEXT NOT NULL CHECK(voorkeur IN('voorkeur','wil_niet','moet','neutraal')),PRIMARY KEY(ploeg_id,atleet_id,onderdeel))",
+    "tbl": "ploeg_voorkeur"
+   },
+   "table:rooster": {
+    "fk": [],
+    "indexen": [],
+    "kolommen": [
+     [
+      0,
+      "id",
+      "INTEGER",
+      0,
+      null,
+      1,
+      0
+     ],
+     [
+      1,
+      "naam",
+      "TEXT",
+      1,
+      null,
+      0,
+      0
+     ],
+     [
+      2,
+      "aantal_weken",
+      "INTEGER",
+      1,
+      null,
+      0,
+      0
+     ]
+    ],
+    "sql": "CREATE TABLE rooster(id INTEGER PRIMARY KEY,naam TEXT NOT NULL,aantal_weken INTEGER NOT NULL CHECK(aantal_weken BETWEEN 1 AND 60))",
+    "tbl": "rooster"
+   },
+   "table:rooster_regel": {
+    "fk": [
+     [
+      0,
+      0,
+      "rooster",
+      "rooster_id",
+      "id",
+      "NO ACTION",
+      "CASCADE",
+      "NONE"
+     ]
+    ],
+    "indexen": [
+     [
+      "idx_rooster_regel_rooster",
+      0,
+      "c",
+      0
+     ],
+     [
+      "sqlite_autoindex_rooster_regel_1",
+      1,
+      "u",
+      0
+     ]
+    ],
+    "kolommen": [
+     [
+      0,
+      "id",
+      "INTEGER",
+      0,
+      null,
+      1,
+      0
+     ],
+     [
+      1,
+      "rooster_id",
+      "INTEGER",
+      1,
+      null,
+      0,
+      0
+     ],
+     [
+      2,
+      "week",
+      "INTEGER",
+      1,
+      null,
+      0,
+      0
+     ],
+     [
+      3,
+      "dag",
+      "TEXT",
+      1,
+      null,
+      0,
+      0
+     ],
+     [
+      4,
+      "starttijd",
+      "TEXT",
+      0,
+      null,
+      0,
+      0
+     ],
+     [
+      5,
+      "onderwerp",
+      "TEXT",
+      0,
+      null,
+      0,
+      0
+     ],
+     [
+      6,
+      "warming_up",
+      "TEXT",
+      0,
+      null,
+      0,
+      0
+     ],
+     [
+      7,
+      "kern_a",
+      "TEXT",
+      0,
+      null,
+      0,
+      0
+     ],
+     [
+      8,
+      "kern_b",
+      "TEXT",
+      0,
+      null,
+      0,
+      0
+     ],
+     [
+      9,
+      "cooling_down",
+      "TEXT",
+      0,
+      null,
+      0,
+      0
+     ],
+     [
+      10,
+      "notities",
+      "TEXT",
+      0,
+      null,
+      0,
+      0
+     ]
+    ],
+    "sql": "CREATE TABLE rooster_regel(id INTEGER PRIMARY KEY,rooster_id INTEGER NOT NULL REFERENCES rooster(id)ON DELETE CASCADE,week INTEGER NOT NULL CHECK(week >= 1),dag TEXT NOT NULL CHECK(dag IN('maandag','dinsdag','woensdag','donderdag','vrijdag','zaterdag','zondag')),starttijd TEXT CHECK(starttijd IS NULL OR(length(starttijd)= 5 AND starttijd GLOB '[0-2][0-9]:[0-5][0-9]' AND starttijd <= '23:59')),onderwerp TEXT,warming_up TEXT,kern_a TEXT,kern_b TEXT,cooling_down TEXT,notities TEXT,UNIQUE(rooster_id,week,dag,starttijd))",
+    "tbl": "rooster_regel"
+   },
+   "table:schema_version": {
+    "fk": [],
+    "indexen": [],
+    "kolommen": [
+     [
+      0,
+      "versie",
+      "INTEGER",
+      1,
+      null,
+      0,
+      0
+     ],
+     [
+      1,
+      "toegepast_op",
+      "TEXT",
+      1,
+      "datetime('now')",
+      0,
+      0
+     ]
+    ],
+    "sql": "CREATE TABLE schema_version(versie INTEGER NOT NULL,toegepast_op TEXT NOT NULL DEFAULT(datetime('now')))",
+    "tbl": "schema_version"
+   },
+   "table:training": {
+    "fk": [
+     [
+      0,
+      0,
+      "rooster_regel",
+      "rooster_regel_id",
+      "id",
+      "NO ACTION",
+      "SET NULL",
+      "NONE"
+     ],
+     [
+      1,
+      0,
+      "training",
+      "hoofdtraining_id",
+      "id",
+      "NO ACTION",
+      "CASCADE",
+      "NONE"
+     ],
+     [
+      2,
+      0,
+      "periodeplan",
+      "periodeplan_id",
+      "id",
+      "NO ACTION",
+      "SET NULL",
+      "NONE"
+     ],
+     [
+      3,
+      0,
+      "groep",
+      "groep_id",
+      "id",
+      "NO ACTION",
+      "CASCADE",
+      "NONE"
+     ]
+    ],
+    "indexen": [
+     [
+      "idx_training_hoofd",
+      0,
+      "c",
+      0
+     ]
+    ],
+    "kolommen": [
+     [
+      0,
+      "id",
+      "INTEGER",
+      0,
+      null,
+      1,
+      0
+     ],
+     [
+      1,
+      "groep_id",
+      "INTEGER",
+      1,
+      null,
+      0,
+      0
+     ],
+     [
+      2,
+      "periodeplan_id",
+      "INTEGER",
+      0,
+      null,
+      0,
+      0
+     ],
+     [
+      3,
+      "datum",
+      "TEXT",
+      1,
+      null,
+      0,
+      0
+     ],
+     [
+      4,
+      "onderwerp",
+      "TEXT",
+      0,
+      null,
+      0,
+      0
+     ],
+     [
+      5,
+      "warming_up",
+      "TEXT",
+      0,
+      null,
+      0,
+      0
+     ],
+     [
+      6,
+      "kern_a",
+      "TEXT",
+      0,
+      null,
+      0,
+      0
+     ],
+     [
+      7,
+      "kern_b",
+      "TEXT",
+      0,
+      null,
+      0,
+      0
+     ],
+     [
+      8,
+      "cooling_down",
+      "TEXT",
+      0,
+      null,
+      0,
+      0
+     ],
+     [
+      9,
+      "notities",
+      "TEXT",
+      0,
+      null,
+      0,
+      0
+     ],
+     [
+      10,
+      "hoofdtraining_id",
+      "INTEGER",
+      0,
+      null,
+      0,
+      0
+     ],
+     [
+      11,
+      "starttijd",
+      "TEXT",
+      0,
+      null,
+      0,
+      0
+     ],
+     [
+      12,
+      "rooster_regel_id",
+      "INTEGER",
+      0,
+      null,
+      0,
+      0
+     ]
+    ],
+    "sql": "CREATE TABLE training(id INTEGER PRIMARY KEY,groep_id INTEGER NOT NULL REFERENCES groep(id)ON DELETE CASCADE,periodeplan_id INTEGER REFERENCES periodeplan(id)ON DELETE SET NULL,datum TEXT NOT NULL,onderwerp TEXT,warming_up TEXT,kern_a TEXT,kern_b TEXT,cooling_down TEXT,notities TEXT,hoofdtraining_id INTEGER REFERENCES training(id)ON DELETE CASCADE,starttijd TEXT CHECK(starttijd IS NULL OR(length(starttijd)= 5 AND starttijd GLOB '[0-2][0-9]:[0-5][0-9]' AND starttijd <= '23:59')),rooster_regel_id INTEGER REFERENCES rooster_regel(id)ON DELETE SET NULL)",
+    "tbl": "training"
+   },
+   "table:training_atleet": {
+    "fk": [
+     [
+      0,
+      0,
+      "atleet",
+      "atleet_id",
+      "master_id",
+      "NO ACTION",
+      "CASCADE",
+      "NONE"
+     ],
+     [
+      1,
+      0,
+      "training",
+      "training_id",
+      "id",
+      "NO ACTION",
+      "CASCADE",
+      "NONE"
+     ]
+    ],
+    "indexen": [
+     [
+      "sqlite_autoindex_training_atleet_1",
+      1,
+      "pk",
+      0
+     ]
+    ],
+    "kolommen": [
+     [
+      0,
+      "training_id",
+      "INTEGER",
+      1,
+      null,
+      1,
+      0
+     ],
+     [
+      1,
+      "atleet_id",
+      "TEXT",
+      1,
+      null,
+      2,
+      0
+     ]
+    ],
+    "sql": "CREATE TABLE training_atleet(training_id INTEGER NOT NULL REFERENCES training(id)ON DELETE CASCADE,atleet_id TEXT NOT NULL REFERENCES atleet(master_id)ON DELETE CASCADE,PRIMARY KEY(training_id,atleet_id))",
+    "tbl": "training_atleet"
+   }
+  },
+  "versie": 11
+ },
+ "prestaties": {
+  "objecten": {
+   "index:idx_doel_groep": {
+    "sql": "CREATE INDEX idx_doel_groep ON doel(groep_id)",
+    "tbl": "doel",
+    "xinfo": [
+     [
+      0,
+      1,
+      "groep_id",
+      0,
+      "BINARY",
+      1
+     ],
+     [
+      1,
+      -1,
+      null,
+      0,
+      "BINARY",
+      0
+     ]
+    ]
+   },
+   "index:idx_doel_regel_atl": {
+    "sql": "CREATE INDEX idx_doel_regel_atl ON doel_regel(atleet_ref)",
+    "tbl": "doel_regel",
+    "xinfo": [
+     [
+      0,
+      2,
+      "atleet_ref",
+      0,
+      "BINARY",
+      1
+     ],
+     [
+      1,
+      -1,
+      null,
+      0,
+      "BINARY",
+      0
+     ]
+    ]
+   },
+   "index:idx_doel_regel_doel": {
+    "sql": "CREATE INDEX idx_doel_regel_doel ON doel_regel(doel_id)",
+    "tbl": "doel_regel",
+    "xinfo": [
+     [
+      0,
+      1,
+      "doel_id",
+      0,
+      "BINARY",
+      1
+     ],
+     [
+      1,
+      -1,
+      null,
+      0,
+      "BINARY",
+      0
+     ]
+    ]
+   },
+   "index:idx_prestatie_atleet": {
+    "sql": "CREATE INDEX idx_prestatie_atleet ON prestatie(atleet_ref,onderdeel_id)",
+    "tbl": "prestatie",
+    "xinfo": [
+     [
+      0,
+      1,
+      "atleet_ref",
+      0,
+      "BINARY",
+      1
+     ],
+     [
+      1,
+      2,
+      "onderdeel_id",
+      0,
+      "BINARY",
+      1
+     ],
+     [
+      2,
+      -1,
+      null,
+      0,
+      "BINARY",
+      0
+     ]
+    ]
+   },
+   "index:idx_programma_onderdeel": {
+    "sql": "CREATE INDEX idx_programma_onderdeel ON wedstrijd_programma(onderdeel_id)",
+    "tbl": "wedstrijd_programma",
+    "xinfo": [
+     [
+      0,
+      5,
+      "onderdeel_id",
+      0,
+      "BINARY",
+      1
+     ],
+     [
+      1,
+      -1,
+      null,
+      0,
+      "BINARY",
+      0
+     ]
+    ]
+   },
+   "index:idx_programma_wedstrijd": {
+    "sql": "CREATE INDEX idx_programma_wedstrijd ON wedstrijd_programma(wedstrijd_id,datum,starttijd)",
+    "tbl": "wedstrijd_programma",
+    "xinfo": [
+     [
+      0,
+      1,
+      "wedstrijd_id",
+      0,
+      "BINARY",
+      1
+     ],
+     [
+      1,
+      2,
+      "datum",
+      0,
+      "BINARY",
+      1
+     ],
+     [
+      2,
+      3,
+      "starttijd",
+      0,
+      "BINARY",
+      1
+     ],
+     [
+      3,
+      -1,
+      null,
+      0,
+      "BINARY",
+      0
+     ]
+    ]
+   },
+   "table:doel": {
+    "fk": [
+     [
+      0,
+      0,
+      "wedstrijd",
+      "wedstrijd_id",
+      "id",
+      "NO ACTION",
+      "SET NULL",
+      "NONE"
+     ]
+    ],
+    "indexen": [
+     [
+      "idx_doel_groep",
+      0,
+      "c",
+      0
+     ]
+    ],
+    "kolommen": [
+     [
+      0,
+      "id",
+      "INTEGER",
+      0,
+      null,
+      1,
+      0
+     ],
+     [
+      1,
+      "groep_id",
+      "INTEGER",
+      0,
+      null,
+      0,
+      0
+     ],
+     [
+      2,
+      "titel",
+      "TEXT",
+      1,
+      null,
+      0,
+      0
+     ],
+     [
+      3,
+      "wedstrijd_id",
+      "INTEGER",
+      0,
+      null,
+      0,
+      0
+     ],
+     [
+      4,
+      "startdatum",
+      "TEXT",
+      1,
+      "date('now')",
+      0,
+      0
+     ],
+     [
+      5,
+      "datum",
+      "TEXT",
+      0,
+      null,
+      0,
+      0
+     ],
+     [
+      6,
+      "beschrijving",
+      "TEXT",
+      0,
+      null,
+      0,
+      0
+     ],
+     [
+      7,
+      "evaluatie",
+      "TEXT",
+      0,
+      null,
+      0,
+      0
+     ],
+     [
+      8,
+      "aangemaakt_op",
+      "TEXT",
+      1,
+      "datetime('now')",
+      0,
+      0
+     ]
+    ],
+    "sql": "CREATE TABLE doel(id INTEGER PRIMARY KEY,groep_id INTEGER,titel TEXT NOT NULL,wedstrijd_id INTEGER REFERENCES wedstrijd(id)ON DELETE SET NULL,startdatum TEXT NOT NULL DEFAULT(date('now')),datum TEXT,beschrijving TEXT,evaluatie TEXT,aangemaakt_op TEXT NOT NULL DEFAULT(datetime('now')))",
+    "tbl": "doel"
+   },
+   "table:doel_regel": {
+    "fk": [
+     [
+      0,
+      0,
+      "onderdeel",
+      "onderdeel_id",
+      "id",
+      "NO ACTION",
+      "NO ACTION",
+      "NONE"
+     ],
+     [
+      1,
+      0,
+      "doel",
+      "doel_id",
+      "id",
+      "NO ACTION",
+      "CASCADE",
+      "NONE"
+     ]
+    ],
+    "indexen": [
+     [
+      "idx_doel_regel_atl",
+      0,
+      "c",
+      0
+     ],
+     [
+      "idx_doel_regel_doel",
+      0,
+      "c",
+      0
+     ]
+    ],
+    "kolommen": [
+     [
+      0,
+      "id",
+      "INTEGER",
+      0,
+      null,
+      1,
+      0
+     ],
+     [
+      1,
+      "doel_id",
+      "INTEGER",
+      1,
+      null,
+      0,
+      0
+     ],
+     [
+      2,
+      "atleet_ref",
+      "TEXT",
+      0,
+      null,
+      0,
+      0
+     ],
+     [
+      3,
+      "soort",
+      "TEXT",
+      1,
+      null,
+      0,
+      0
+     ],
+     [
+      4,
+      "onderdeel_id",
+      "INTEGER",
+      0,
+      null,
+      0,
+      0
+     ],
+     [
+      5,
+      "leerdoel_id",
+      "TEXT",
+      0,
+      null,
+      0,
+      0
+     ],
+     [
+      6,
+      "streefwaarde",
+      "REAL",
+      0,
+      null,
+      0,
+      0
+     ],
+     [
+      7,
+      "omschrijving",
+      "TEXT",
+      0,
+      null,
+      0,
+      0
+     ],
+     [
+      8,
+      "beoordeling",
+      "TEXT",
+      0,
+      null,
+      0,
+      0
+     ]
+    ],
+    "sql": "CREATE TABLE doel_regel(id INTEGER PRIMARY KEY,doel_id INTEGER NOT NULL REFERENCES doel(id)ON DELETE CASCADE,atleet_ref TEXT CHECK(atleet_ref IS NULL OR length(atleet_ref)= 32),soort TEXT NOT NULL CHECK(soort IN('prestatie','leerdoel','vrij')),onderdeel_id INTEGER REFERENCES onderdeel(id),leerdoel_id TEXT,streefwaarde REAL,omschrijving TEXT,beoordeling TEXT CHECK(beoordeling IN('behaald','deels','niet')),CHECK(soort <> 'prestatie' OR(onderdeel_id IS NOT NULL AND streefwaarde IS NOT NULL)),CHECK(soort <> 'leerdoel' OR(leerdoel_id IS NOT NULL AND streefwaarde IS NOT NULL)),CHECK(soort <> 'vrij' OR omschrijving IS NOT NULL))",
+    "tbl": "doel_regel"
+   },
+   "table:inschrijving": {
+    "fk": [
+     [
+      0,
+      0,
+      "onderdeel",
+      "onderdeel_id",
+      "id",
+      "NO ACTION",
+      "NO ACTION",
+      "NONE"
+     ],
+     [
+      1,
+      0,
+      "wedstrijd",
+      "wedstrijd_id",
+      "id",
+      "NO ACTION",
+      "CASCADE",
+      "NONE"
+     ]
+    ],
+    "indexen": [
+     [
+      "sqlite_autoindex_inschrijving_1",
+      1,
+      "pk",
+      0
+     ]
+    ],
+    "kolommen": [
+     [
+      0,
+      "atleet_ref",
+      "TEXT",
+      1,
+      null,
+      1,
+      0
+     ],
+     [
+      1,
+      "wedstrijd_id",
+      "INTEGER",
+      1,
+      null,
+      2,
+      0
+     ],
+     [
+      2,
+      "onderdeel_id",
+      "INTEGER",
+      0,
+      null,
+      3,
+      0
+     ]
+    ],
+    "sql": "CREATE TABLE inschrijving(atleet_ref TEXT NOT NULL CHECK(length(atleet_ref)= 32),wedstrijd_id INTEGER NOT NULL REFERENCES wedstrijd(id)ON DELETE CASCADE,onderdeel_id INTEGER REFERENCES onderdeel(id),PRIMARY KEY(atleet_ref,wedstrijd_id,onderdeel_id))",
+    "tbl": "inschrijving"
+   },
+   "table:onderdeel": {
+    "fk": [],
+    "indexen": [
+     [
+      "sqlite_autoindex_onderdeel_1",
+      1,
+      "u",
+      0
+     ]
+    ],
+    "kolommen": [
+     [
+      0,
+      "id",
+      "INTEGER",
+      0,
+      null,
+      1,
+      0
+     ],
+     [
+      1,
+      "naam",
+      "TEXT",
+      1,
+      null,
+      0,
+      0
+     ],
+     [
+      2,
+      "categorie",
+      "TEXT",
+      0,
+      null,
+      0,
+      0
+     ],
+     [
+      3,
+      "eenheid",
+      "TEXT",
+      1,
+      null,
+      0,
+      0
+     ],
+     [
+      4,
+      "lager_is_beter",
+      "INTEGER",
+      1,
+      null,
+      0,
+      0
+     ],
+     [
+      5,
+      "windmeting",
+      "INTEGER",
+      1,
+      "0",
+      0,
+      0
+     ]
+    ],
+    "sql": "CREATE TABLE onderdeel(id INTEGER PRIMARY KEY,naam TEXT NOT NULL UNIQUE,categorie TEXT,eenheid TEXT NOT NULL CHECK(eenheid IN('tijd','afstand','hoogte','punten')),lager_is_beter INTEGER NOT NULL,windmeting INTEGER NOT NULL DEFAULT 0)",
+    "tbl": "onderdeel"
+   },
+   "table:prestatie": {
+    "fk": [
+     [
+      0,
+      0,
+      "wedstrijd",
+      "wedstrijd_id",
+      "id",
+      "NO ACTION",
+      "SET NULL",
+      "NONE"
+     ],
+     [
+      1,
+      0,
+      "onderdeel",
+      "onderdeel_id",
+      "id",
+      "NO ACTION",
+      "NO ACTION",
+      "NONE"
+     ]
+    ],
+    "indexen": [
+     [
+      "idx_prestatie_atleet",
+      0,
+      "c",
+      0
+     ],
+     [
+      "sqlite_autoindex_prestatie_1",
+      1,
+      "u",
+      0
+     ]
+    ],
+    "kolommen": [
+     [
+      0,
+      "id",
+      "INTEGER",
+      0,
+      null,
+      1,
+      0
+     ],
+     [
+      1,
+      "atleet_ref",
+      "TEXT",
+      1,
+      null,
+      0,
+      0
+     ],
+     [
+      2,
+      "onderdeel_id",
+      "INTEGER",
+      1,
+      null,
+      0,
+      0
+     ],
+     [
+      3,
+      "wedstrijd_id",
+      "INTEGER",
+      0,
+      null,
+      0,
+      0
+     ],
+     [
+      4,
+      "datum",
+      "TEXT",
+      1,
+      null,
+      0,
+      0
+     ],
+     [
+      5,
+      "waarde",
+      "REAL",
+      1,
+      null,
+      0,
+      0
+     ],
+     [
+      6,
+      "wind",
+      "REAL",
+      0,
+      null,
+      0,
+      0
+     ],
+     [
+      7,
+      "ronde",
+      "TEXT",
+      1,
+      "''",
+      0,
+      0
+     ],
+     [
+      8,
+      "bron",
+      "TEXT",
+      0,
+      null,
+      0,
+      0
+     ],
+     [
+      9,
+      "indoor",
+      "INTEGER",
+      1,
+      "0",
+      0,
+      0
+     ]
+    ],
+    "sql": "CREATE TABLE prestatie(id INTEGER PRIMARY KEY,atleet_ref TEXT NOT NULL CHECK(length(atleet_ref)= 32),onderdeel_id INTEGER NOT NULL REFERENCES onderdeel(id),wedstrijd_id INTEGER REFERENCES wedstrijd(id)ON DELETE SET NULL,datum TEXT NOT NULL,waarde REAL NOT NULL,wind REAL,ronde TEXT NOT NULL DEFAULT '',bron TEXT CHECK(bron IN('atletieknu','seltec','handmatig')),indoor INTEGER NOT NULL DEFAULT 0,UNIQUE(atleet_ref,onderdeel_id,datum,waarde,ronde))",
+    "tbl": "prestatie"
+   },
+   "table:schema_version": {
+    "fk": [],
+    "indexen": [],
+    "kolommen": [
+     [
+      0,
+      "versie",
+      "INTEGER",
+      1,
+      null,
+      0,
+      0
+     ],
+     [
+      1,
+      "toegepast_op",
+      "TEXT",
+      1,
+      "datetime('now')",
+      0,
+      0
+     ]
+    ],
+    "sql": "CREATE TABLE schema_version(versie INTEGER NOT NULL,toegepast_op TEXT NOT NULL DEFAULT(datetime('now')))",
+    "tbl": "schema_version"
+   },
+   "table:wedstrijd": {
+    "fk": [],
+    "indexen": [
+     [
+      "sqlite_autoindex_wedstrijd_1",
+      1,
+      "u",
+      0
+     ]
+    ],
+    "kolommen": [
+     [
+      0,
+      "id",
+      "INTEGER",
+      0,
+      null,
+      1,
+      0
+     ],
+     [
+      1,
+      "naam",
+      "TEXT",
+      1,
+      null,
+      0,
+      0
+     ],
+     [
+      2,
+      "datum",
+      "TEXT",
+      1,
+      null,
+      0,
+      0
+     ],
+     [
+      3,
+      "locatie",
+      "TEXT",
+      0,
+      null,
+      0,
+      0
+     ],
+     [
+      4,
+      "bron",
+      "TEXT",
+      0,
+      null,
+      0,
+      0
+     ],
+     [
+      5,
+      "bron_url",
+      "TEXT",
+      0,
+      null,
+      0,
+      0
+     ],
+     [
+      6,
+      "indoor",
+      "INTEGER",
+      1,
+      "0",
+      0,
+      0
+     ]
+    ],
+    "sql": "CREATE TABLE wedstrijd(id INTEGER PRIMARY KEY,naam TEXT NOT NULL,datum TEXT NOT NULL,locatie TEXT,bron TEXT CHECK(bron IN('atletieknu','seltec','handmatig')),bron_url TEXT UNIQUE,indoor INTEGER NOT NULL DEFAULT 0)",
+    "tbl": "wedstrijd"
+   },
+   "table:wedstrijd_programma": {
+    "fk": [
+     [
+      0,
+      0,
+      "onderdeel",
+      "onderdeel_id",
+      "id",
+      "NO ACTION",
+      "SET NULL",
+      "NONE"
+     ],
+     [
+      1,
+      0,
+      "wedstrijd",
+      "wedstrijd_id",
+      "id",
+      "NO ACTION",
+      "CASCADE",
+      "NONE"
+     ]
+    ],
+    "indexen": [
+     [
+      "idx_programma_onderdeel",
+      0,
+      "c",
+      0
+     ],
+     [
+      "idx_programma_wedstrijd",
+      0,
+      "c",
+      0
+     ]
+    ],
+    "kolommen": [
+     [
+      0,
+      "id",
+      "INTEGER",
+      0,
+      null,
+      1,
+      0
+     ],
+     [
+      1,
+      "wedstrijd_id",
+      "INTEGER",
+      1,
+      null,
+      0,
+      0
+     ],
+     [
+      2,
+      "datum",
+      "TEXT",
+      1,
+      null,
+      0,
+      0
+     ],
+     [
+      3,
+      "starttijd",
+      "TEXT",
+      1,
+      null,
+      0,
+      0
+     ],
+     [
+      4,
+      "duur",
+      "INTEGER",
+      0,
+      null,
+      0,
+      0
+     ],
+     [
+      5,
+      "onderdeel_id",
+      "INTEGER",
+      0,
+      null,
+      0,
+      0
+     ],
+     [
+      6,
+      "onderdeel_tekst",
+      "TEXT",
+      0,
+      null,
+      0,
+      0
+     ],
+     [
+      7,
+      "categorie",
+      "TEXT",
+      0,
+      null,
+      0,
+      0
+     ],
+     [
+      8,
+      "ronde",
+      "TEXT",
+      1,
+      "''",
+      0,
+      0
+     ],
+     [
+      9,
+      "groep",
+      "INTEGER",
+      0,
+      null,
+      0,
+      0
+     ],
+     [
+      10,
+      "opmerking",
+      "TEXT",
+      0,
+      null,
+      0,
+      0
+     ]
+    ],
+    "sql": "CREATE TABLE wedstrijd_programma(id INTEGER PRIMARY KEY,wedstrijd_id INTEGER NOT NULL REFERENCES wedstrijd(id)ON DELETE CASCADE,datum TEXT NOT NULL CHECK(datum GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),starttijd TEXT NOT NULL CHECK(length(starttijd)= 5 AND starttijd GLOB '[0-2][0-9]:[0-5][0-9]' AND starttijd <= '23:59'),duur INTEGER CHECK(duur IS NULL OR duur BETWEEN 1 AND 720),onderdeel_id INTEGER REFERENCES onderdeel(id)ON DELETE SET NULL,onderdeel_tekst TEXT,categorie TEXT,ronde TEXT NOT NULL DEFAULT '',groep INTEGER CHECK(groep IS NULL OR groep >= 1),opmerking TEXT,CHECK(onderdeel_id IS NOT NULL OR length(trim(coalesce(onderdeel_tekst,'')))> 0))",
+    "tbl": "wedstrijd_programma"
+   },
+   "view:pr": {
+    "kolommen": [
+     [
+      0,
+      "atleet_ref",
+      "TEXT",
+      0,
+      null,
+      0,
+      0
+     ],
+     [
+      1,
+      "onderdeel_id",
+      "INTEGER",
+      0,
+      null,
+      0,
+      0
+     ],
+     [
+      2,
+      "waarde",
+      "",
+      0,
+      null,
+      0,
+      0
+     ]
+    ],
+    "sql": "CREATE VIEW pr AS SELECT p.atleet_ref,p.onderdeel_id,CASE WHEN o.lager_is_beter = 1 THEN MIN(p.waarde)ELSE MAX(p.waarde)END AS waarde FROM prestatie p JOIN onderdeel o ON o.id = p.onderdeel_id WHERE o.windmeting = 0 OR p.indoor = 1 OR(p.wind IS NOT NULL AND p.wind <= 2.0)GROUP BY p.atleet_ref,p.onderdeel_id",
+    "tbl": "pr"
+   }
+  },
+  "versie": 4
+ },
+ "testen": {
+  "objecten": {
+   "index:idx_test_sjabloon": {
+    "sql": "CREATE UNIQUE INDEX idx_test_sjabloon ON test(sjabloon)WHERE sjabloon IS NOT NULL",
+    "tbl": "test",
+    "xinfo": [
+     [
+      0,
+      4,
+      "sjabloon",
+      0,
+      "BINARY",
+      1
+     ],
+     [
+      1,
+      -1,
+      null,
+      0,
+      "BINARY",
+      0
+     ]
+    ]
+   },
+   "index:idx_testresultaat_atleet": {
+    "sql": "CREATE INDEX idx_testresultaat_atleet ON testresultaat(atleet_ref,test_id)",
+    "tbl": "testresultaat",
+    "xinfo": [
+     [
+      0,
+      1,
+      "atleet_ref",
+      0,
+      "BINARY",
+      1
+     ],
+     [
+      1,
+      2,
+      "test_id",
+      0,
+      "BINARY",
+      1
+     ],
+     [
+      2,
+      -1,
+      null,
+      0,
+      "BINARY",
+      0
+     ]
+    ]
+   },
+   "table:schema_version": {
+    "fk": [],
+    "indexen": [],
+    "kolommen": [
+     [
+      0,
+      "versie",
+      "INTEGER",
+      1,
+      null,
+      0,
+      0
+     ],
+     [
+      1,
+      "toegepast_op",
+      "TEXT",
+      1,
+      "datetime('now')",
+      0,
+      0
+     ]
+    ],
+    "sql": "CREATE TABLE schema_version(versie INTEGER NOT NULL,toegepast_op TEXT NOT NULL DEFAULT(datetime('now')))",
+    "tbl": "schema_version"
+   },
+   "table:test": {
+    "fk": [],
+    "indexen": [
+     [
+      "idx_test_sjabloon",
+      1,
+      "c",
+      1
+     ],
+     [
+      "sqlite_autoindex_test_1",
+      1,
+      "u",
+      0
+     ]
+    ],
+    "kolommen": [
+     [
+      0,
+      "id",
+      "INTEGER",
+      0,
+      null,
+      1,
+      0
+     ],
+     [
+      1,
+      "naam",
+      "TEXT",
+      1,
+      null,
+      0,
+      0
+     ],
+     [
+      2,
+      "eenheid",
+      "TEXT",
+      1,
+      null,
+      0,
+      0
+     ],
+     [
+      3,
+      "lager_is_beter",
+      "INTEGER",
+      1,
+      null,
+      0,
+      0
+     ],
+     [
+      4,
+      "sjabloon",
+      "TEXT",
+      0,
+      null,
+      0,
+      0
+     ]
+    ],
+    "sql": "CREATE TABLE test(id INTEGER PRIMARY KEY,naam TEXT NOT NULL UNIQUE,eenheid TEXT NOT NULL,lager_is_beter INTEGER NOT NULL,sjabloon TEXT)",
+    "tbl": "test"
+   },
+   "table:testresultaat": {
+    "fk": [
+     [
+      0,
+      0,
+      "test",
+      "test_id",
+      "id",
+      "NO ACTION",
+      "NO ACTION",
+      "NONE"
+     ]
+    ],
+    "indexen": [
+     [
+      "idx_testresultaat_atleet",
+      0,
+      "c",
+      0
+     ]
+    ],
+    "kolommen": [
+     [
+      0,
+      "id",
+      "INTEGER",
+      0,
+      null,
+      1,
+      0
+     ],
+     [
+      1,
+      "atleet_ref",
+      "TEXT",
+      1,
+      null,
+      0,
+      0
+     ],
+     [
+      2,
+      "test_id",
+      "INTEGER",
+      1,
+      null,
+      0,
+      0
+     ],
+     [
+      3,
+      "datum",
+      "TEXT",
+      1,
+      null,
+      0,
+      0
+     ],
+     [
+      4,
+      "waarde",
+      "REAL",
+      1,
+      null,
+      0,
+      0
+     ],
+     [
+      5,
+      "notities",
+      "TEXT",
+      0,
+      null,
+      0,
+      0
+     ],
+     [
+      6,
+      "score",
+      "REAL",
+      0,
+      null,
+      0,
+      0
+     ]
+    ],
+    "sql": "CREATE TABLE testresultaat(id INTEGER PRIMARY KEY,atleet_ref TEXT NOT NULL CHECK(length(atleet_ref)= 32),test_id INTEGER NOT NULL REFERENCES test(id),datum TEXT NOT NULL,waarde REAL NOT NULL,notities TEXT,score REAL)",
+    "tbl": "testresultaat"
+   },
+   "table:testresultaat_deel": {
+    "fk": [
+     [
+      0,
+      0,
+      "testresultaat",
+      "resultaat_id",
+      "id",
+      "NO ACTION",
+      "CASCADE",
+      "NONE"
+     ]
+    ],
+    "indexen": [
+     [
+      "sqlite_autoindex_testresultaat_deel_1",
+      1,
+      "pk",
+      0
+     ]
+    ],
+    "kolommen": [
+     [
+      0,
+      "resultaat_id",
+      "INTEGER",
+      1,
+      null,
+      1,
+      0
+     ],
+     [
+      1,
+      "deel",
+      "INTEGER",
+      1,
+      null,
+      2,
+      0
+     ],
+     [
+      2,
+      "waarde",
+      "REAL",
+      1,
+      null,
+      0,
+      0
+     ],
+     [
+      3,
+      "score",
+      "REAL",
+      0,
+      null,
+      0,
+      0
+     ]
+    ],
+    "sql": "CREATE TABLE testresultaat_deel(resultaat_id INTEGER NOT NULL REFERENCES testresultaat(id)ON DELETE CASCADE,deel INTEGER NOT NULL CHECK(deel >= 0),waarde REAL NOT NULL,score REAL,PRIMARY KEY(resultaat_id,deel))WITHOUT ROWID",
+    "tbl": "testresultaat_deel"
+   }
+  },
+  "versie": 2
+ },
+ "trainingsschema": {
+  "objecten": {
+   "table:schema_version": {
+    "fk": [],
+    "indexen": [],
+    "kolommen": [
+     [
+      0,
+      "versie",
+      "INTEGER",
+      1,
+      null,
+      0,
+      0
+     ],
+     [
+      1,
+      "toegepast_op",
+      "TEXT",
+      1,
+      "datetime('now')",
+      0,
+      0
+     ]
+    ],
+    "sql": "CREATE TABLE schema_version(versie INTEGER NOT NULL,toegepast_op TEXT NOT NULL DEFAULT(datetime('now')))",
+    "tbl": "schema_version"
+   },
+   "table:trainingskeuze": {
+    "fk": [],
+    "indexen": [
+     [
+      "sqlite_autoindex_trainingskeuze_1",
+      1,
+      "pk",
+      0
+     ]
+    ],
+    "kolommen": [
+     [
+      0,
+      "atleet_ref",
+      "TEXT",
+      1,
+      null,
+      1,
+      0
+     ],
+     [
+      1,
+      "dag",
+      "TEXT",
+      1,
+      null,
+      2,
+      0
+     ],
+     [
+      2,
+      "groep_id",
+      "INTEGER",
+      1,
+      null,
+      3,
+      0
+     ],
+     [
+      3,
+      "starttijd",
+      "TEXT",
+      1,
+      null,
+      4,
+      0
+     ]
+    ],
+    "sql": "CREATE TABLE trainingskeuze(atleet_ref TEXT NOT NULL CHECK(length(atleet_ref)= 32),dag TEXT NOT NULL CHECK(dag IN('maandag','dinsdag','woensdag','donderdag','vrijdag','zaterdag','zondag')),groep_id INTEGER NOT NULL,starttijd TEXT NOT NULL CHECK(length(starttijd)= 5 AND starttijd GLOB '[0-2][0-9]:[0-5][0-9]' AND starttijd <= '23:59'),PRIMARY KEY(atleet_ref,dag,groep_id,starttijd))WITHOUT ROWID",
+    "tbl": "trainingskeuze"
+   },
+   "table:trainingsschema": {
+    "fk": [],
+    "indexen": [
+     [
+      "sqlite_autoindex_trainingsschema_1",
+      1,
+      "pk",
+      0
+     ]
+    ],
+    "kolommen": [
+     [
+      0,
+      "atleet_ref",
+      "TEXT",
+      0,
+      null,
+      1,
+      0
+     ],
+     [
+      1,
+      "maandag",
+      "INTEGER",
+      1,
+      "0",
+      0,
+      0
+     ],
+     [
+      2,
+      "dinsdag",
+      "INTEGER",
+      1,
+      "0",
+      0,
+      0
+     ],
+     [
+      3,
+      "woensdag",
+      "INTEGER",
+      1,
+      "0",
+      0,
+      0
+     ],
+     [
+      4,
+      "donderdag",
+      "INTEGER",
+      1,
+      "0",
+      0,
+      0
+     ],
+     [
+      5,
+      "vrijdag",
+      "INTEGER",
+      1,
+      "0",
+      0,
+      0
+     ],
+     [
+      6,
+      "zaterdag",
+      "INTEGER",
+      1,
+      "0",
+      0,
+      0
+     ],
+     [
+      7,
+      "zondag",
+      "INTEGER",
+      1,
+      "0",
+      0,
+      0
+     ]
+    ],
+    "sql": "CREATE TABLE trainingsschema(atleet_ref TEXT PRIMARY KEY CHECK(length(atleet_ref)= 32),maandag INTEGER NOT NULL DEFAULT 0 CHECK(maandag IN(0,1)),dinsdag INTEGER NOT NULL DEFAULT 0 CHECK(dinsdag IN(0,1)),woensdag INTEGER NOT NULL DEFAULT 0 CHECK(woensdag IN(0,1)),donderdag INTEGER NOT NULL DEFAULT 0 CHECK(donderdag IN(0,1)),vrijdag INTEGER NOT NULL DEFAULT 0 CHECK(vrijdag IN(0,1)),zaterdag INTEGER NOT NULL DEFAULT 0 CHECK(zaterdag IN(0,1)),zondag INTEGER NOT NULL DEFAULT 0 CHECK(zondag IN(0,1)))",
+    "tbl": "trainingsschema"
+   }
+  },
+  "versie": 2
+ }
+}

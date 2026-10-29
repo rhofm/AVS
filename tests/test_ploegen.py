@@ -1,4 +1,4 @@
-"""Tests voor ploegen (stap 3): migratie personen/010, Opslag.ploeg*, de matrix
+"""Tests voor ploegen (stap 3): tabellen ploeg/ploeg_lid/ploeg_opstelling, Opslag.ploeg*, de matrix
 (ploeg/vergelijk.py), punten en controle van een opstelling (ploeg/opstelling.py)
 en de pagina's /ploegen, /ploegen/nieuw, /ploeg/<id>.
 
@@ -12,7 +12,7 @@ from datetime import date
 from pathlib import Path
 
 from atleten import beheer
-from db.init_db import huidige_versie, init_db, verbind
+from db.init_db import init_db, verbind
 from db.queries import Opslag, OpslagFout
 from models import Inzet, Onderdeel, Ploeg, PloegLid, Prestatie, Wedstrijd
 from ploeg import opstelling, regels, vergelijk
@@ -71,38 +71,15 @@ def _matrix(db, ids, basis="seizoen"):
 # ------------------------------------------------------------
 # Database
 # ------------------------------------------------------------
-def test_migratie_010_op_bestaande_database():
-    """Een personen.db van vóór 010 met de oude ploeg_opstelling: leden blijven als ploeg_lid."""
+def test_ploeg_zonder_datum_wordt_overgeslagen():
+    """ploeg.datum mag leeg zijn (zo stond het in oudere databases); het overzicht slaat die over."""
     with tempfile.TemporaryDirectory() as tmp:
         with contextlib.redirect_stdout(io.StringIO()):
             init_db(Path(tmp), hoofd=TESTSLEUTEL)
-        with contextlib.closing(verbind("personen", Path(tmp), TESTSLEUTEL)) as c:
-            c.executescript("""
-                DROP TABLE ploeg_opstelling; DROP TABLE ploeg_lid; DROP INDEX idx_ploeg_datum;
-                CREATE TABLE ploeg_opstelling (ploeg_id INTEGER NOT NULL REFERENCES ploeg(id) ON DELETE CASCADE,
-                    atleet_id TEXT NOT NULL REFERENCES atleet(master_id) ON DELETE CASCADE,
-                    onderdeel_id INTEGER NOT NULL, reserve INTEGER NOT NULL DEFAULT 0,
-                    PRIMARY KEY (ploeg_id, atleet_id, onderdeel_id));
-                ALTER TABLE ploeg DROP COLUMN categorie; ALTER TABLE ploeg DROP COLUMN programma;
-                ALTER TABLE ploeg DROP COLUMN datum; ALTER TABLE ploeg DROP COLUMN prestatiebasis;
-            """)
-            c.execute("DELETE FROM schema_version WHERE versie >= 10")
-            c.execute("INSERT INTO atleet (master_id, voornaam, achternaam) VALUES (?, 'X', 'Y'), (?, 'Z', 'W')",
-                      ("a" * 32, "b" * 32))
-            c.execute("INSERT INTO ploeg (id, naam) VALUES (1, 'Oud')")
-            c.executemany("INSERT INTO ploeg_opstelling VALUES (1, ?, ?, ?)",
-                          [("a" * 32, 1, 0), ("a" * 32, 2, 0), ("b" * 32, 3, 1)])
-            c.commit()
-        with contextlib.redirect_stdout(io.StringIO()):
-            init_db(Path(tmp), hoofd=TESTSLEUTEL)
-        with contextlib.closing(verbind("personen", Path(tmp), TESTSLEUTEL)) as c:
-            assert huidige_versie(c) >= 10
-            leden = {r["atleet_id"]: r["rol"] for r in c.execute("SELECT * FROM ploeg_lid")}
-            assert leden == {"a" * 32: "deelnemer", "b" * 32: "reserve"}
-            kolommen = {r[1] for r in c.execute("PRAGMA table_info(ploeg_opstelling)")}
-            assert {"onderdeel", "groep", "vast"} <= kolommen and "onderdeel_id" not in kolommen
+        with contextlib.closing(verbind("personen", Path(tmp), TESTSLEUTEL)) as c, c:
+            c.execute("INSERT INTO ploeg (id, naam) VALUES (1, 'Zonder datum')")
         with Opslag(map=Path(tmp), hoofd=TESTSLEUTEL) as db:
-            assert db.ploegen() == []                        # oude ploeg zonder datum wordt overgeslagen
+            assert db.ploegen() == []
 
 
 def test_ploeg_opslaan_en_lezen():

@@ -11,7 +11,7 @@ import tempfile
 from datetime import date
 from pathlib import Path
 
-from db.init_db import DB_DIR, init_db, pseudoniem, verbind
+from db.init_db import init_db, pseudoniem
 from db.queries import Opslag, OpslagFout
 from models import (
     PR, heeft_windmeting, Absentie, Atleet, Groep, Inschrijving, Leerlijn, LeerlijnStap, LeerlijnVoortgang,
@@ -110,7 +110,7 @@ def test_prestaties_en_prs():
 def test_pr_alleen_windlegaal():
     with opslag() as db:
         versie = db.prestaties_db.execute("SELECT MAX(versie) FROM schema_version").fetchone()[0]
-        assert versie >= 2, "migratie prestaties/002 is niet toegepast"
+        assert versie >= 2, "prestaties.db mist de windlegale PR-view (versie 2)"
         anna, tim, sprint, ver = _basis(db)
         assert sprint.windmeting and ver.windmeting
         for waarde, wind in [(13.2, 1.1), (12.9, 2.6), (13.0, 2.0), (12.8, None)]:
@@ -171,51 +171,14 @@ WINDNAMEN = [
 ]
 
 
-def test_migratie_op_bestaande_database():
-    """Een database op versie 1 krijgt migratie 002 bij de volgende init_db().
-    De SQL-indeling van bestaande onderdelen moet gelijk zijn aan heeft_windmeting()."""
-    import db.init_db as init_mod
-    with tempfile.TemporaryDirectory() as tmp:
-        echte_map = init_mod.MIGRATIONS_DIR
-        try:
-            init_mod.MIGRATIONS_DIR = Path(tmp) / "geen_migraties"
-            init_mod.MIGRATIONS_DIR.mkdir()           # lege map: wel geïnstalleerd, geen migraties
-            with contextlib.redirect_stdout(io.StringIO()):
-                init_db(Path(tmp), hoofd=TESTSLEUTEL)
-        finally:
-            init_mod.MIGRATIONS_DIR = echte_map
-        with Opslag(map=Path(tmp), hoofd=TESTSLEUTEL) as db:
-            assert db.prestaties_db.execute("SELECT MAX(versie) FROM schema_version").fetchone()[0] == 1
-            # Versie 1 kent de kolom windmeting nog niet: onderdelen rechtstreeks invoeren.
-            with db.prestaties_db:
-                db.prestaties_db.executemany(
-                    "INSERT INTO onderdeel (naam, eenheid, lager_is_beter) VALUES (?, 'tijd', 1)",
-                    [(n,) for n in WINDNAMEN],
-                )
-            honderd = db.prestaties_db.execute("SELECT id FROM onderdeel WHERE naam = '100m'").fetchone()[0]
-            # Ook de atleet rechtstreeks: personen.db op versie 1 kent nieuwere kolommen
-            # (zoals au_licentienummer, migratie 009) nog niet.
-            with db.personen:
-                db.personen.execute("INSERT INTO atleet (master_id, voornaam, achternaam) VALUES (?, 'Anna', 'Voorbeeld')",
-                                    ("b" * 32,))
-            anna = Atleet("Anna", "Voorbeeld", master_id="b" * 32)
-            # Ook prestaties rechtstreeks: versie 1 kent de kolom indoor nog niet.
-            ref = pseudoniem(anna.master_id, "prestaties", TESTSLEUTEL)
-            with db.prestaties_db:
-                db.prestaties_db.executemany(
-                    "INSERT INTO prestatie (atleet_ref, onderdeel_id, datum, waarde, wind) VALUES (?, ?, ?, ?, ?)",
-                    [(ref, honderd, "2026-06-01", 12.9, 2.6), (ref, honderd, "2026-06-02", 13.1, None)],
-                )
-            assert db.prs(anna.master_id)[0].waarde == 12.9  # oude view telt alles mee
-        with contextlib.redirect_stdout(io.StringIO()):
-            init_db(Path(tmp), hoofd=TESTSLEUTEL)
-        with Opslag(map=Path(tmp), hoofd=TESTSLEUTEL) as db:
-            assert db.prestaties_db.execute("SELECT MAX(versie) FROM schema_version").fetchone()[0] == 4   # 002 + 003 (tijdschema) + 004 (doelen)
-            assert db.prs(anna.master_id) == []                  # te veel wind / geen meting
-            assert len(db.prestaties(anna.master_id)) == 2       # de prestaties zelf zijn er nog
-            sql = {o.naam: o.windmeting for o in db.onderdelen()}
-            python = {n: heeft_windmeting(n) for n in WINDNAMEN}
-            assert sql == python, {n: (sql[n], python[n]) for n in WINDNAMEN if sql[n] != python[n]}
+def test_windmeting_van_nieuwe_onderdelen():
+    """Een onderdeel zonder opgave krijgt windmeting uit de naam (heeft_windmeting()); de view `pr` gebruikt dat."""
+    with opslag() as db:
+        for naam in WINDNAMEN:
+            o = db.onderdeel_opslaan(Onderdeel(naam, "tijd", True))
+            assert o.windmeting == heeft_windmeting(naam), naam
+        opgeslagen = {o.naam: o.windmeting for o in db.onderdelen()}
+        assert opgeslagen == {n: heeft_windmeting(n) for n in WINDNAMEN}
 
 
 def test_prestatie_fouten():
@@ -386,33 +349,6 @@ def test_notities():
         _verwacht(OpslagFout, lambda: db.notitie_opslaan(Notitie(anna.master_id, date(2026, 10, 1), "x", id=999)))
         db.notitie_verwijderen(n3.id)
         assert db.notitie(n3.id) is None and db.notities(tim.master_id) == []
-
-
-def test_oude_absentie_wordt_verplaatst():
-    """Een personen.db van vóór absentie.db: de rijen verhuizen bij init_db, niets gaat verloren."""
-    with tempfile.TemporaryDirectory() as tmp:
-        map_ = Path(tmp)
-        mid = "ab" * 16
-        # Oude situatie nabootsen: alleen schema v1 van personen.db, met absentie erin.
-        with contextlib.closing(verbind("personen", map_, TESTSLEUTEL)) as c:
-            c.executescript((DB_DIR / "schema_personen.sql").read_text(encoding="utf-8"))
-            c.execute("INSERT INTO atleet (master_id, voornaam, achternaam) VALUES (?, 'Anna', 'Voorbeeld')", (mid,))
-            c.execute("INSERT INTO groep (naam) VALUES ('C')")
-            c.execute("INSERT INTO training (groep_id, datum) VALUES (1, '2026-10-13')")
-            c.execute("INSERT INTO training (groep_id, datum) VALUES (1, '2026-10-15')")
-            c.execute("INSERT INTO absentie VALUES (1, ?, 'aanwezig', NULL)", (mid,))
-            c.execute("INSERT INTO absentie VALUES (2, ?, 'blessure', 'knie')", (mid,))
-            c.commit()
-        uitvoer = io.StringIO()
-        with contextlib.redirect_stdout(uitvoer):
-            init_db(map_, hoofd=TESTSLEUTEL)
-            init_db(map_, hoofd=TESTSLEUTEL)   # tweede keer: niets meer te doen
-        assert uitvoer.getvalue().count("Absentie verplaatst") == 1
-        with Opslag(map=map_, hoofd=TESTSLEUTEL) as db:
-            assert [(a.training_id, a.status, a.reden) for a in db.absenties_van_atleet(mid)] == [
-                (1, "aanwezig", None), (2, "blessure", "knie")]
-            assert db.personen.execute(
-                "SELECT count(*) FROM sqlite_master WHERE name LIKE 'absentie%'").fetchone()[0] == 0
 
 
 def test_leerlijnen():

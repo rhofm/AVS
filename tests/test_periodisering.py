@@ -4,25 +4,21 @@
   * Opslag: opslaan en lezen (vervangt alles), fouten;
   * groepen/periodeplan.py: formulier lezen, start op het begin van de week,
     jaaroverzicht, kopiëren naar andere groepen;
-  * init_db: oude periodeplannen worden doelen in prestaties.db;
   * de pagina's /groep/<id>/periodisering en .../kopieren.
 
 Alleen nepgegevens en een testsleutel.
 """
 
-import contextlib
-import io
 from datetime import date, timedelta
 
 from test_groep_landingspagina import MAANDAG, VANDAAG, opslag, voorbeeldgroep
 
 import instellingen
-from db.init_db import init_db
 from db.queries import OpslagFout
 from groepen import periodeplan
 from groepen import trainingen as trainingsbeheer
-from models import Fase, Groep, Mesocyclus, Periode, Periodisering, Training
-from hulp import TESTSLEUTEL, app_client
+from models import Fase, Groep, Mesocyclus, Periode, Periodisering
+from hulp import app_client
 
 
 def _fout(f, *, soort=OpslagFout):
@@ -268,31 +264,6 @@ def test_trainingen_tonen_periode():
         assert oud.periode is None
         tp = trainingsbeheer.trainingpagina(db, startblok.training.id, peildatum=VANDAAG)
         assert tp.periode.lang == "Algemene voorbereiding (V1) · week 4 van 4: Herstel"
-
-
-# ============================================================
-# Oude periodeplannen worden doelen
-# ============================================================
-def test_periodeplannen_worden_doelen():
-    with opslag() as (db, tmp):
-        g = db.groep_opslaan(Groep("U16"))
-        with db.personen:
-            pid = db.personen.execute(
-                """INSERT INTO periodeplan (groep_id, naam, startdatum, einddatum, doel)
-                   VALUES (?, 'NK indoor', '2026-11-01', '2027-02-21', 'Iedereen een PR')""", (g.id,)).lastrowid
-            db.personen.execute("INSERT INTO training (groep_id, datum, periodeplan_id) VALUES (?, '2026-11-03', ?)",
-                                (g.id, pid))
-        uit = io.StringIO()
-        with contextlib.redirect_stdout(uit):
-            init_db(tmp, hoofd=TESTSLEUTEL)
-            init_db(tmp, hoofd=TESTSLEUTEL)                       # tweede keer: niets meer te doen
-        assert uit.getvalue().count("Periodeplannen overgezet") == 1
-        doelen = db.prestaties_db.execute("SELECT groep_id, titel, startdatum, datum, beschrijving FROM doel").fetchall()
-        assert [tuple(r) for r in doelen] == [(g.id, "NK indoor", "2026-11-01", "2027-02-21", "Iedereen een PR")]
-        assert db.personen.execute("SELECT COUNT(*) FROM periodeplan").fetchone()[0] == 0
-        assert db.personen.execute("SELECT periodeplan_id FROM training").fetchone()[0] is None
-        db.training_opslaan(Training(g.id, date(2026, 11, 5), "Nog steeds mogelijk"))   # tabel blijft dus bestaan
-        assert len(db.trainingen(g.id)) == 2
 
 
 # ============================================================

@@ -1,8 +1,8 @@
 """Tests voor meerdere trainingen op één dag en de keuze van de atleet daartussen.
 
-- personen-migratie 006: extra begintijden per groep per dag (groep_extra_trainingstijd)
+- personen.db: extra begintijden per groep per dag (groep_extra_trainingstijd)
   en een eigen begintijd per training (training.starttijd).
-- trainingsschema-migratie 002: trainingskeuze, welke (groep, tijd) een atleet op
+- trainingsschema.db: trainingskeuze, welke (groep, tijd) een atleet op
   een weekdag kiest. Geen keuze = alle trainingen van die dag.
 - De keuze bepaalt wie vooraf op 'aanwezig' staat; de lijst toont wel alle leden.
 

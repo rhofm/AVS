@@ -1,4 +1,4 @@
-"""Tests voor de inhoud van trainingen (personen-migratie 005) en de markdown-weergave.
+"""Tests voor de inhoud van trainingen (tabel training in personen.db) en de markdown-weergave.
 
 Training: groep, datum, warming-up, kern A, kern B, cooling-down, notities.
 Afwijkende training: variant van de gewone training voor enkele atleten
@@ -6,14 +6,9 @@ Afwijkende training: variant van de gewone training voor enkele atleten
 
 """
 
-import contextlib
-import io
-import tempfile
 from datetime import date
-from pathlib import Path
 
-from db.init_db import DB_DIR, init_db, verbind
-from db.queries import Opslag, OpslagFout
+from db.queries import OpslagFout
 from groepen import trainingen as trainingsbeheer
 from models import Absentie, Atleet, Groep, Training
 from ui.markdown import naar_html
@@ -130,23 +125,3 @@ def test_markdown_veilig_en_beperkt():
     # Rekenwerk met sterretjes en namen met underscores blijven zoals ze zijn.
     assert str(naar_html("3 * 4 * 5")) == "<p>3 * 4 * 5</p>"
     assert str(naar_html("bestand_naam_v2")) == "<p>bestand_naam_v2</p>"
-
-
-def test_oude_inhoud_wordt_notities():
-    """Een personen.db van vóór migratie 005: `inhoud` gaat naar `notities`, niets gaat verloren."""
-    with tempfile.TemporaryDirectory() as tmp:
-        # closing(): `with conn` alleen commit, maar sluit niet; op Windows blijft het bestand
-        # dan vergrendeld en kan de tijdelijke map niet worden opgeruimd.
-        with contextlib.closing(verbind("personen", Path(tmp), TESTSLEUTEL)) as c:
-            c.executescript((DB_DIR / "schema_personen.sql").read_text(encoding="utf-8"))
-            c.execute("INSERT INTO groep (id, naam) VALUES (1, 'Oud')")
-            c.execute("INSERT INTO training (groep_id, datum, onderwerp, inhoud) "
-                      "VALUES (1, '2026-09-01', 'Kracht', 'Squats 3x8\nLunges')")
-            c.commit()
-        with contextlib.redirect_stdout(io.StringIO()):
-            init_db(Path(tmp), hoofd=TESTSLEUTEL)
-        with Opslag(map=Path(tmp), hoofd=TESTSLEUTEL) as db:
-            t = db.trainingen(1)[0]
-            assert (t.onderwerp, t.notities, t.warming_up) == ("Kracht", "Squats 3x8\nLunges", None)
-            kolommen = {r[1] for r in db.personen.execute("PRAGMA table_info(training)")}
-            assert "inhoud" not in kolommen and {"warming_up", "kern_a", "kern_b", "cooling_down"} <= kolommen

@@ -24,7 +24,7 @@ class Trainingsschema:
     zaterdag: bool = False
     zondag: bool = False
     # Gekozen trainingen per weekdag als er meer zijn (trainingsschema.db: trainingskeuze,
-    # migratie 002): {'zaterdag': {(groep_id, '10:30')}}. Een dag zonder keuze = alle
+    # zie schema_trainingsschema.sql): {'zaterdag': {(groep_id, '10:30')}}. Een dag zonder keuze = alle
     # trainingen van de groepen van de atleet. Opslaan via Opslag.trainingskeuze_opslaan().
     keuze: dict[str, set[tuple[int, str]]] = field(default_factory=dict)
 

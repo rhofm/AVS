@@ -80,24 +80,114 @@ def test_lege_of_dubbele_migratie(sql_kopie):
         controleer_sql_bestanden()
 
 
+def _zet_versie(map: Path, database: str, versie: int) -> None:
+    """Doe alsof een database op een andere versie staat (alleen schema_version)."""
+    with contextlib.closing(verbind(database, map, TESTSLEUTEL)) as c, c:
+        c.execute("DELETE FROM schema_version")
+        c.execute("INSERT INTO schema_version (versie) VALUES (?)", (versie,))
+
+
+def _nieuwe_migratie(sql_kopie: Path, database: str) -> int:
+    """Een extra (onschuldige) migratie na de nieuwste versie. Geeft het nummer."""
+    nummer = db_init.nieuwste_versie(database) + 1
+    map_ = sql_kopie / "migrations" / database
+    map_.mkdir(parents=True, exist_ok=True)
+    (map_ / f"{nummer:03d}_test.sql").write_text("CREATE TABLE test_migratie (id INTEGER);")
+    return nummer
+
+
+def test_basisversie_uit_schema():
+    """Elke database begint op de versie uit de laatste regel van zijn schema."""
+    verwacht = {"personen": 11, "prestaties": 4, "testen": 2, "trainingsschema": 2,
+                "absentie": 1, "leerlijnen": 1, "leerdoelscores": 1, "notities": 1}
+    assert {d: db_init.basisversie(d) for d in DATABASES} == verwacht
+
+
+def test_nieuwe_database_op_basisversie(sql_kopie, tmp_path):
+    data = tmp_path / "data"
+    _stil(init_db, data, hoofd=TESTSLEUTEL)
+    for d in DATABASES:
+        assert _versie(data, d) == db_init.nieuwste_versie(d)
+    _stil(init_db, data, hoofd=TESTSLEUTEL)           # nog een keer starten gaat ook goed
+    assert _versie(data, "personen") == db_init.nieuwste_versie("personen")
+
+
+def test_migratie_niet_na_basisversie(sql_kopie):
+    """Een migratie met een nummer t/m de basisversie zou nergens draaien: weigeren."""
+    map_ = sql_kopie / "migrations" / "personen"
+    map_.mkdir(exist_ok=True)
+    basis = db_init.basisversie("personen")
+    (map_ / f"{basis:03d}_oude_branch.sql").write_text("SELECT 1;")
+    with pytest.raises(InstallatieFout, match=f"{basis:03d}_oude_branch.sql heeft nummer {basis}"):
+        controleer_sql_bestanden()
+    (map_ / f"{basis:03d}_oude_branch.sql").rename(map_ / f"{basis + 1:03d}_nieuw.sql")
+    controleer_sql_bestanden()                      # één hoger is goed
+
+
+def test_geen_oude_migraties_meer():
+    """De oude migraties zitten in de basisschema's; in de repo staan alleen nieuwere."""
+    for d in DATABASES:
+        assert all(n > db_init.basisversie(d) for n, _ in db_init._migraties(d)), d
+
+
+def test_schema_zonder_versieregel(sql_kopie):
+    schema = sql_kopie / "schema_testen.sql"
+    schema.write_text(schema.read_text(encoding="utf-8").replace("INSERT INTO schema_version", "-- weg"),
+                      encoding="utf-8")
+    with pytest.raises(InstallatieFout, match="schema_testen.sql moet precies één regel"):
+        controleer_sql_bestanden()
+
+
 def test_database_nieuwer_dan_avs(sql_kopie, tmp_path):
     """Oudere AVS op nieuwere databases: weigeren vóór er iets wordt bijgewerkt."""
     data = tmp_path / "data"
-    prestaties = sql_kopie / "migrations" / "prestaties"
-    laatste = max(prestaties.glob("*.sql"))
-    apart = tmp_path / laatste.name
-    shutil.move(laatste, apart)                     # prestaties.db blijft één versie achter
     _stil(init_db, data, hoofd=TESTSLEUTEL)
     prestaties_voor = _versie(data, "prestaties")
-    personen_voor = _versie(data, "personen")
-
-    shutil.move(apart, laatste)                     # prestaties-migratie weer beschikbaar, maar
-    for f in (sql_kopie / "migrations" / "personen").glob("*.sql"):     # personen kent er minder
-        if int(f.name[:3]) == personen_voor:
-            f.unlink()
-    with pytest.raises(InstallatieFout, match=f"personen.db is versie {personen_voor}"):
+    _nieuwe_migratie(sql_kopie, "prestaties")       # prestaties.db kan nog worden bijgewerkt, maar
+    te_nieuw = db_init.nieuwste_versie("personen") + 1
+    _zet_versie(data, "personen", te_nieuw)         # personen.db komt van een nieuwere AVS
+    with pytest.raises(InstallatieFout, match=f"personen.db is versie {te_nieuw}, maar deze AVS kent"):
         _stil(init_db, data, hoofd=TESTSLEUTEL)
     assert _versie(data, "prestaties") == prestaties_voor           # niet half bijgewerkt
+
+
+def test_database_ouder_dan_basisversie(sql_kopie, tmp_path):
+    """Een database van vóór het samenvoegen van de migraties: weigeren, niet stil overslaan."""
+    data = tmp_path / "data"
+    _stil(init_db, data, hoofd=TESTSLEUTEL)
+    prestaties_voor = _versie(data, "prestaties")
+    _nieuwe_migratie(sql_kopie, "prestaties")
+    te_oud = db_init.basisversie("personen") - 1
+    _zet_versie(data, "personen", te_oud)
+    with pytest.raises(InstallatieFout) as e:
+        _stil(init_db, data, hoofd=TESTSLEUTEL)
+    melding = str(e.value)
+    assert f"personen.db is versie {te_oud}" in melding
+    assert f"vanaf versie {db_init.basisversie('personen')}" in melding
+    assert "vorige versie van AVS" in melding and "niet aangeraakt" in melding
+    assert _versie(data, "prestaties") == prestaties_voor           # niets bijgewerkt
+    assert _versie(data, "personen") == te_oud
+
+
+def test_database_op_basisversie_krijgt_nieuwe_migratie(sql_kopie, tmp_path):
+    """Precies de basisversie is goed: latere migraties worden gewoon toegepast."""
+    data = tmp_path / "data"
+    _stil(init_db, data, hoofd=TESTSLEUTEL)
+    nummer = _nieuwe_migratie(sql_kopie, "personen")
+    _stil(init_db, data, hoofd=TESTSLEUTEL)
+    assert _versie(data, "personen") == nummer
+    with contextlib.closing(verbind("personen", data, TESTSLEUTEL)) as c:
+        assert c.execute("SELECT 1 FROM sqlite_master WHERE name = 'test_migratie'").fetchone()
+
+
+def test_leeg_bestand_is_niet_te_oud(sql_kopie, tmp_path):
+    """Versie 0 (bestand bestaat, nog geen tabellen) krijgt gewoon het basisschema."""
+    data = tmp_path / "data"
+    _stil(init_db, data, hoofd=TESTSLEUTEL)
+    db_init.db_pad("notities", data).unlink()
+    verbind("notities", data, TESTSLEUTEL).close()  # lege, versleutelde database
+    _stil(init_db, data, hoofd=TESTSLEUTEL)
+    assert _versie(data, "notities") == db_init.basisversie("notities")
 
 
 def test_sql_map_in_de_exe(monkeypatch, tmp_path):

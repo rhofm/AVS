@@ -1,21 +1,15 @@
 """Tests voor het AU-licentienummer (licentienummer van de Atletiekunie) van een atleet:
-model, opslag in personen.db (migratie 009), de formulieren 'Nieuwe atleet' en 'Aanpassen',
+model, opslag in personen.db (atleet.au_licentienummer), de formulieren 'Nieuwe atleet' en 'Aanpassen',
 en de landingspagina.
 
 Alleen nepgegevens en een vaste testsleutel.
 """
 
-import contextlib
-import io
-import shutil
-import tempfile
-from pathlib import Path
 
 from test_app import client
 from test_landingspagina import opslag, voorbeeld
 
 from atleten import aanpassen, beheer, nieuw
-from db.init_db import init_db
 from db.queries import Opslag
 from models import Atleet
 from hulp import TESTSLEUTEL, tekst, verwacht as _verwacht
@@ -58,45 +52,6 @@ def test_opslaan_en_zoeken():
         anna.au_licentienummer = None
         db.atleet_opslaan(anna)
         assert db.atleet_op_au_licentienummer("1234567") is None
-
-
-def test_migratie_op_bestaande_database():
-    """personen.db op versie 8 krijgt de kolom bij de volgende init_db(); de atleten blijven staan."""
-    import db.init_db as init_mod
-    with tempfile.TemporaryDirectory() as tmp:
-        echte_map = init_mod.MIGRATIONS_DIR
-        oud = Path(tmp) / "migraties_tot_008"
-        shutil.copytree(echte_map, oud)
-        for later in (oud / "personen").glob("*.sql"):          # 009 en alles wat daarna kwam
-            if int(later.name[:3]) >= 9:
-                later.unlink()
-        nieuwste = max(int(f.name[:3]) for f in (echte_map / "personen").glob("*.sql"))
-        data = Path(tmp) / "data"
-        data.mkdir()
-        try:
-            init_mod.MIGRATIONS_DIR = oud
-            with contextlib.redirect_stdout(io.StringIO()):
-                init_db(data, hoofd=TESTSLEUTEL)
-        finally:
-            init_mod.MIGRATIONS_DIR = echte_map
-        with Opslag(map=data, hoofd=TESTSLEUTEL) as db:
-            assert db.personen.execute("SELECT MAX(versie) FROM schema_version").fetchone()[0] == 8
-            kolommen = [r[1] for r in db.personen.execute("PRAGMA table_info(atleet)")]
-            assert "au_licentienummer" not in kolommen
-            with db.personen:
-                db.personen.execute("INSERT INTO atleet (master_id, voornaam, achternaam) VALUES (?, 'Anna', 'Proef')",
-                                    ("a" * 32,))
-        uitvoer = io.StringIO()
-        with contextlib.redirect_stdout(uitvoer):
-            init_db(data, hoofd=TESTSLEUTEL)
-        assert "009_au_licentienummer.sql" in uitvoer.getvalue()
-        with Opslag(map=data, hoofd=TESTSLEUTEL) as db:
-            assert db.personen.execute("SELECT MAX(versie) FROM schema_version").fetchone()[0] == nieuwste
-            anna = db.atleet("a" * 32)
-            assert anna.naam == "Anna Proef" and anna.au_licentienummer is None
-            anna.au_licentienummer = "1234567"
-            db.atleet_opslaan(anna)
-            assert db.atleet_op_au_licentienummer("1234567").naam == "Anna Proef"
 
 
 def test_formulier_nieuw():

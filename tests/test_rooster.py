@@ -12,16 +12,24 @@ Alleen nepgegevens en een testsleutel.
 
 from datetime import date, timedelta
 
+import pytest
+
 from test_groep_landingspagina import VANDAAG, opslag
 
 from db.queries import OpslagFout
 from groepen import rooster as roosterbeheer
 from groepen import trainingen as trainingsbeheer
 from models import Absentie, Atleet, Groep, GroepRooster, Rooster, RoosterRegel, Training
-from hulp import app_client
+from hulp import app_client, vaste_vandaag
 
 START = date(2026, 10, 19)            # maandag na VANDAAG (vr 16 okt): begin van roosterweek 1
 DI1, ZA1, DI2, DI3 = START + timedelta(1), START + timedelta(5), START + timedelta(8), START + timedelta(15)
+
+
+@pytest.fixture(autouse=True)
+def _vandaag_is_vandaag(monkeypatch):
+    """De tests rekenen met VANDAAG (vr 16 okt 2026); laat de code dat ook doen."""
+    vaste_vandaag(monkeypatch, VANDAAG)
 
 
 def _fout(f, *, soort=OpslagFout):

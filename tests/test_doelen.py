@@ -12,15 +12,23 @@ Alleen nepgegevens en een testsleutel.
 
 from datetime import date, timedelta
 
+import pytest
+
 from test_groep_landingspagina import VANDAAG, opslag
 
 from db.queries import OpslagFout
 from groepen import doelen as doelbeheer
 from models import (Atleet, Doel, DoelRegel, Groep, Inschrijving, LeerdoelScore, Prestatie,
                     Wedstrijd)
-from hulp import app_client
+from hulp import app_client, vaste_vandaag
 
 WEDSTRIJDDAG = VANDAAG + timedelta(days=8)              # za 24 okt 2026
+
+
+@pytest.fixture(autouse=True)
+def _vandaag_is_vandaag(monkeypatch):
+    """De tests rekenen met VANDAAG (vr 16 okt 2026); laat de code dat ook doen."""
+    vaste_vandaag(monkeypatch, VANDAAG)
 
 
 def _fout(f, *, soort=OpslagFout):
@@ -73,7 +81,7 @@ def test_opslag():
             DoelRegel("prestatie", ids["anna"], ids["100m"], streefwaarde=12.8),
             DoelRegel("vrij", omschrijving="Ploeg haalt 18 000 punten")]))
         terug = db.doel(d.id)
-        assert terug.startdatum == date.today() and terug.datum is None
+        assert terug.startdatum == VANDAAG and terug.datum is None   # standaard: vandaag
         assert [(r.soort, r.atleet_id, r.streefwaarde) for r in terug.regels] == [
             ("prestatie", ids["anna"], 12.8), ("vrij", None, None)]
         # In prestaties.db staat geen master_id, alleen het pseudoniem.

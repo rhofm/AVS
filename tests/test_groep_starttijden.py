@@ -1,26 +1,22 @@
-"""Tests voor de trainingstijden van groepen (tabel groep_trainingstijden, personen-migratie 004).
+"""Tests voor de trainingstijden van groepen (tabel groep_trainingstijden in personen.db).
 
 Eén rij per groep: groep_id + per weekdag een begintijd 'HH:MM' of leeg (= geen
 training). Leden staan in groep_lid (lang formaat); een atleet kan in meerdere
-groepen zitten. Ook: het overzetten van de twee oude varianten (allebei ooit
-migratie 003) en de controle op dubbele migratienummers.
+groepen zitten. Ook: de controle op dubbele migratienummers.
 
 Alleen nepgegevens en een vaste testsleutel.
 """
 
-import contextlib
-import io
 import tempfile
 from datetime import date
 from pathlib import Path
 
 from atleten import trainingsschema as schema_pagina
 from db import init_db as init_module
-from db.init_db import _migraties, DB_DIR, huidige_versie, init_db, verbind
-from db.queries import Opslag, OpslagFout
+from db.queries import OpslagFout
 from groepen import groep as groepsbeheer
 from models import Atleet, Trainingsschema, normaliseer_tijd
-from hulp import TESTSLEUTEL, opslag, verwacht as _verwacht
+from hulp import opslag, verwacht as _verwacht
 
 
 def _basis(db):
@@ -103,55 +99,6 @@ def test_rooster_en_schemapagina():
         assert opties["maandag"] == []
         per_dag = schema_pagina.groepsdagen(db, anna.master_id, date(2026, 10, 16))
         assert per_dag["donderdag"] == [] and per_dag["maandag"] == []
-
-
-def _oude_personen_db(map_: Path, extra_sql: str) -> None:
-    """personen.db zoals hij na een van de oude migraties 003 kon zijn (versie 3)."""
-    with contextlib.closing(verbind("personen", map_, TESTSLEUTEL)) as c:   # sluiten: anders vergrendeld op Windows
-        c.executescript((DB_DIR / "schema_personen.sql").read_text(encoding="utf-8"))
-        c.executescript((DB_DIR / "migrations" / "personen" / "002_absentie_naar_eigen_database.sql")
-                        .read_text(encoding="utf-8"))
-        c.execute("INSERT INTO groep (id, naam) VALUES (1, 'Sprint'), (2, 'Werpers')")
-        c.execute("INSERT INTO schema_version (versie) VALUES (2), (3)")
-        c.commit()
-        c.executescript(extra_sql)
-
-
-def test_oude_variant_kolommen_op_groep():
-    with tempfile.TemporaryDirectory() as tmp:
-        map_ = Path(tmp)
-        dagen = ("maandag", "dinsdag", "woensdag", "donderdag", "vrijdag", "zaterdag", "zondag")
-        _oude_personen_db(map_, "".join(f"ALTER TABLE groep ADD COLUMN {d} TEXT;" for d in dagen)
-                          + "UPDATE groep SET dinsdag = '18:30', donderdag = '18:30' WHERE id = 1;")
-        uit = io.StringIO()
-        with contextlib.redirect_stdout(uit):
-            init_db(map_, hoofd=TESTSLEUTEL)
-            init_db(map_, hoofd=TESTSLEUTEL)                     # tweede keer: niets meer te doen
-        assert uit.getvalue().count("overgezet") == 1
-        with Opslag(map=map_, hoofd=TESTSLEUTEL) as db:
-            assert huidige_versie(db.personen) == max(n for n, _ in _migraties("personen"))   # alle migraties toegepast
-            assert db.groep(1).trainingsdagen == {"dinsdag": "18:30", "donderdag": "18:30"}
-            assert db.groep(2).trainingsdagen == {}
-            kolommen = {r[1] for r in db.personen.execute("PRAGMA table_info(groep)")}
-            assert not kolommen & set(dagen)                     # oude kolommen weg
-
-
-def test_oude_variant_tabel_groep_trainingsdag():
-    with tempfile.TemporaryDirectory() as tmp:
-        map_ = Path(tmp)
-        _oude_personen_db(map_, """
-            CREATE TABLE groep_trainingsdag (groep_id INTEGER NOT NULL REFERENCES groep(id) ON DELETE CASCADE,
-                dag TEXT NOT NULL, starttijd TEXT, PRIMARY KEY (groep_id, dag));
-            INSERT INTO groep_trainingsdag VALUES (2, 'maandag', '19:00'), (2, 'woensdag', '19:00'),
-                                                  (2, 'zaterdag', NULL);""")
-        uit = io.StringIO()
-        with contextlib.redirect_stdout(uit):
-            init_db(map_, hoofd=TESTSLEUTEL)
-        assert "1 trainingsdag(en) zonder begintijd" in uit.getvalue()     # zaterdag had geen tijd
-        with Opslag(map=map_, hoofd=TESTSLEUTEL) as db:
-            assert db.groep(2).trainingsdagen == {"maandag": "19:00", "woensdag": "19:00"}
-            assert db.personen.execute(
-                "SELECT count(*) FROM sqlite_master WHERE name = 'groep_trainingsdag'").fetchone()[0] == 0
 
 
 def test_dubbele_migratienummers_worden_geweigerd():

@@ -125,11 +125,13 @@ The SQL files are read from `SQL_DIR` (`init_db._sql_map()`): `src/db/` from sou
 
 Two safety checks, both before any database is touched:
 - `controleer_sql_bestanden()` (first thing in `init_db()`): every `schema_<database>.sql`
-  exists and is not empty, `migrations/` exists, no empty or duplicate migrations.
-  Otherwise `InstallatieFout` ("AVS is niet volledig geïnstalleerd …").
-- `_controleer_versies()`: a database whose version is higher than the newest migration this
-  AVS knows (an older .exe, or a build without migrations) → `InstallatieFout`, before
-  anything is migrated.
+  exists, is not empty and has exactly one version line (`basisversie()`), `migrations/`
+  exists (it may hold only `.gitkeep`), no empty or duplicate migrations and none numbered at
+  or below the baseline. Otherwise `InstallatieFout` ("AVS is niet volledig geïnstalleerd …").
+- `_controleer_versies()`: a database whose version is higher than the newest version this
+  AVS knows (an older .exe, or a build without migrations), or lower than the baseline (from
+  before the October 2026 squash: start the previous release once first) → `InstallatieFout`,
+  before anything is migrated.
 
 `app.start()` shows an `InstallatieFout` on the error page without the "Sleutel herstellen"
 button. Checked with a real PyInstaller build: with the two `--add-data` lines all databases
@@ -395,7 +397,9 @@ install Python 3.13 → `pip install -e .[dev]` → `python build.py` → attach
 to a GitHub Release.
 
 Updating for users: replace `AVS.exe`. Their data stays in `%LOCALAPPDATA%\AVS\data`, migrations
-run on the next start, and their own `config\` edits keep priority (step 3).
+run on the next start, and their own `config\` edits keep priority (step 3). Exception: an
+installation from before the October 2026 squash of the migrations must first start the last
+release before it once; this release refuses older databases with that message (see README).
 
 ---
 

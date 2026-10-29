@@ -42,13 +42,21 @@ herstelsleutel op (--herstelsleutel) en bewaar die buiten deze computer.
 Dit script:
   1. maakt de map data/ aan als die nog niet bestaat,
   2. maakt zo nodig de hoofdsleutel aan in de sleutelkluis,
-  3. voert per database het basisschema uit op een lege database (versie 1),
-  4. voert daarna per database de migraties uit die nog niet zijn toegepast,
-  5. verplaatst zo nodig de oude absentie uit personen.db naar absentie.db
-     (eenmalig, zie migrations/personen/002_absentie_naar_eigen_database.sql).
+  3. voert per database het basisschema uit op een lege database (versie
+     basisversie(<database>): de laatste regel van schema_<database>.sql),
+  4. voert daarna per database de migraties uit die nog niet zijn toegepast
+     (een bestaande database ouder dan de basisversie wordt geweigerd, zie
+     _controleer_versies()).
 
 Migraties staan in migrations/<database>/NNN_beschrijving.sql (bijv.
-migrations/testen/002_add_testlocatie.sql) en worden op nummer gesorteerd.
+migrations/testen/003_add_testlocatie.sql) en worden op nummer gesorteerd. Het
+nummer moet hoger zijn dan de basisversie van die database: de oude migraties
+(t/m de basisversie) zijn samengevoegd in de basisschema's, en een migratie met
+een lager nummer zou nergens meer worden uitgevoerd. controleer_sql_bestanden()
+weigert dat. De basisschema's zelf zijn bevroren: tests/test_basisschema.py
+vergelijkt ze met tests/fixtures/basisschema.json. Een schemawijziging is dus
+altijd een nieuwe migratie.
+
 Een bestaande database wordt nooit gewist. Komt er een nieuwe database bij
 (zoals trainingsschema.db), dan maakt dit script hem bij de volgende start aan
 met de bestaande hoofdsleutel.
@@ -358,6 +366,29 @@ def huidige_versie(conn: sqlcipher3.Connection) -> int:
     return rij[0] or 0
 
 
+_BASISVERSIE_REGEL = re.compile(r"^\s*INSERT INTO schema_version \(versie\) VALUES \((\d+)\);", re.MULTILINE)
+
+
+def basisversie(database: str) -> int:
+    """De versie van een nieuwe database: het getal in de laatste regel van schema_<database>.sql.
+
+    De basisschema's zijn samengevoegd (versie 1 + alle oude migraties). Een
+    bestaande database die ouder is dan dit, kan deze AVS niet meer bijwerken:
+    de migraties daarvoor zijn er niet meer (zie _controleer_versies()).
+    """
+    tekst = (SQL_DIR / f"schema_{database}.sql").read_text(encoding="utf-8")
+    gevonden = _BASISVERSIE_REGEL.findall(tekst)
+    if len(gevonden) != 1:
+        raise RuntimeError(f"schema_{database}.sql moet precies één regel "
+                           "'INSERT INTO schema_version (versie) VALUES (<n>);' hebben")
+    return int(gevonden[0])
+
+
+def nieuwste_versie(database: str) -> int:
+    """De versie waar deze AVS een database naartoe brengt: de basisversie of de laatste migratie."""
+    return max([basisversie(database)] + [nummer for nummer, _ in _migraties(database)])
+
+
 def _migraties(database: str) -> list[tuple[int, Path]]:
     map_ = MIGRATIONS_DIR / database
     if not map_.is_dir():
@@ -385,18 +416,31 @@ def controleer_sql_bestanden() -> None:
     Raakt de databases en de sleutel niet aan; ook bruikbaar als zelftest van een build.
     """
     problemen = []
+    basis: dict[str, int] = {}
     for database in DATABASES:
         schema = SQL_DIR / f"schema_{database}.sql"
         if not schema.is_file() or not schema.read_text(encoding="utf-8").strip():
             problemen.append(f"schema_{database}.sql ontbreekt of is leeg")
+            continue
+        try:
+            basis[database] = basisversie(database)
+        except RuntimeError as e:                        # geen (of meer dan één) versieregel
+            problemen.append(str(e))
     if not MIGRATIONS_DIR.is_dir():
         problemen.append("de map migrations/ ontbreekt")
     else:
         for database in DATABASES:
             try:
-                for _, bestand in _migraties(database):
+                for nummer, bestand in _migraties(database):
                     if not bestand.read_text(encoding="utf-8").strip():
                         problemen.append(f"migrations/{database}/{bestand.name} is leeg")
+                    if database in basis and nummer <= basis[database]:
+                        # Zou nergens worden uitgevoerd: nieuwe databases beginnen op de
+                        # basisversie, oudere worden geweigerd. Bijv. een migratie van een
+                        # oude branch; geef hem een nummer na de basisversie.
+                        problemen.append(
+                            f"migrations/{database}/{bestand.name} heeft nummer {nummer}, maar "
+                            f"schema_{database}.sql is al versie {basis[database]} (nummer moet hoger zijn)")
             except RuntimeError as e:                    # twee migraties met hetzelfde nummer
                 problemen.append(str(e))
     if problemen:
@@ -407,21 +451,33 @@ def controleer_sql_bestanden() -> None:
 
 
 def _controleer_versies(map: Path, hoofd: bytes) -> None:
-    """InstallatieFout als een bestaande database nieuwer is dan deze AVS kent.
+    """InstallatieFout als een bestaande database te nieuw of te oud is voor deze AVS.
 
-    Gebeurt vóór er iets wordt bijgewerkt, zodat een oudere AVS (of een build zonder
-    migraties) nooit half doorstart op databases die hij niet kent.
+    Gebeurt vóór er iets wordt bijgewerkt, zodat AVS nooit half doorstart op
+    databases die hij niet kent:
+      * nieuwer dan nieuwste_versie(): een oudere AVS (of een build zonder migraties);
+      * ouder dan basisversie(): de migraties om die database bij te werken zitten
+        niet meer in AVS (ze zijn samengevoegd in de basisschema's). Zonder deze
+        controle zou zo'n database stil een paar migraties missen.
+    Versie 0 (een leeg bestand) is geen probleem: dat krijgt gewoon het basisschema.
     """
     for database in DATABASES:
         if not db_pad(database, map).exists():
             continue
-        bekend = max([1] + [nummer for nummer, _ in _migraties(database)])
+        basis = basisversie(database)
+        bekend = nieuwste_versie(database)
         with closing(verbind(database, map, hoofd)) as conn:
             versie = huidige_versie(conn)
         if versie > bekend:
             raise InstallatieFout(
                 f"{database}.db is versie {versie}, maar deze AVS kent alleen versies tot en met "
                 f"{bekend}. Gebruik de nieuwste versie van AVS. Je gegevens zijn niet aangeraakt."
+            )
+        if 0 < versie < basis:
+            raise InstallatieFout(
+                f"{database}.db is versie {versie}, maar deze AVS kan alleen databases vanaf versie "
+                f"{basis} bijwerken. Start eerst één keer de vorige versie van AVS (die werkt de "
+                "databases bij) en daarna deze. Je gegevens zijn niet aangeraakt."
             )
 
 
@@ -445,121 +501,6 @@ def _init_een(database: str, map: Path | None, hoofd: bytes) -> int:
             versie = nummer
             print(f"Migratie toegepast op {database}.db: {bestand.name}")
     return versie
-
-
-def _verplaats_absentie(map: Path | None, hoofd: bytes) -> int:
-    """Eenmalig: oude absentie uit personen.db naar absentie.db. Geeft het aantal rijen.
-
-    Eerst alles in absentie.db zetten, pas daarna de oude tabel weggooien. Gaat
-    het tussendoor mis, dan staat alles nog in personen.db en gaat het de
-    volgende keer verder; rijen die al verplaatst waren worden overgeslagen.
-    """
-    with closing(verbind("personen", map, hoofd)) as personen, personen:
-        bestaat = personen.execute(
-            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='absentie_te_verplaatsen'"
-        ).fetchone()
-        if not bestaat:
-            return 0
-        rijen = personen.execute(
-            "SELECT training_id, atleet_id, status, reden FROM absentie_te_verplaatsen"
-        ).fetchall()
-        with closing(verbind("absentie", map, hoofd)) as absentie:
-            with absentie:
-                absentie.executemany(
-                    """INSERT OR IGNORE INTO absentie (training_id, atleet_ref, status, reden)
-                       VALUES (?, ?, ?, ?)""",
-                    [(r["training_id"], pseudoniem(r["atleet_id"], "absentie", hoofd), r["status"], r["reden"])
-                     for r in rijen],
-                )
-        with personen:
-            personen.execute("DROP TABLE absentie_te_verplaatsen")
-    print(f"Absentie verplaatst naar absentie.db: {len(rijen)} rij(en)")
-    return len(rijen)
-
-
-_DAGEN = ("maandag", "dinsdag", "woensdag", "donderdag", "vrijdag", "zaterdag", "zondag")
-
-
-def _groep_trainingstijden_samenvoegen(map: Path | None, hoofd: bytes) -> int:
-    """Eenmalig: tijden uit de twee oude varianten naar groep_trainingstijden. Geeft het aantal groepen.
-
-    Oude varianten (allebei ooit migratie 003): kolommen maandag..zondag op
-    `groep`, of de tabel `groep_trainingsdag` (één rij per groep per dag, tijd
-    mocht leeg zijn). Een dag zonder begintijd kan niet mee: in de nieuwe tabel
-    betekent leeg 'geen training'. Dat wordt gemeld.
-    """
-    with verbind("personen", map, hoofd) as c:
-        tabellen = {r[0] for r in c.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
-        if "groep_trainingstijden" not in tabellen:
-            return 0
-        kolommen = {r[1] for r in c.execute("PRAGMA table_info(groep)")}
-        tijden: dict[int, dict[str, str]] = {}
-        zonder_tijd = 0
-        if "groep_trainingsdag" in tabellen:
-            for gid, dag, tijd in c.execute("SELECT groep_id, dag, starttijd FROM groep_trainingsdag"):
-                if tijd:
-                    tijden.setdefault(gid, {})[dag] = tijd
-                else:
-                    zonder_tijd += 1
-        oude_kolommen = [d for d in _DAGEN if d in kolommen]
-        if oude_kolommen:
-            for r in c.execute(f"SELECT id, {', '.join(oude_kolommen)} FROM groep"):
-                for i, d in enumerate(oude_kolommen, start=1):
-                    if r[i]:
-                        tijden.setdefault(r[0], {}).setdefault(d, r[i])
-        if "groep_trainingsdag" not in tabellen and not oude_kolommen:
-            return 0
-        with c:
-            for gid, per_dag in tijden.items():
-                bestaat = c.execute("SELECT 1 FROM groep_trainingstijden WHERE groep_id = ?", (gid,)).fetchone()
-                if bestaat:
-                    continue   # al overgezet (bijv. bij een eerdere, onderbroken poging)
-                c.execute(f"INSERT INTO groep_trainingstijden (groep_id, {', '.join(_DAGEN)}) "
-                          f"VALUES (?, {', '.join('?' * len(_DAGEN))})",
-                          (gid, *[per_dag.get(d) for d in _DAGEN]))
-            if "groep_trainingsdag" in tabellen:
-                c.execute("DROP TABLE groep_trainingsdag")
-            for d in oude_kolommen:
-                c.execute(f"ALTER TABLE groep DROP COLUMN {d}")   # d komt uit _DAGEN, vaste namen
-    print(f"Trainingstijden van {len(tijden)} groep(en) overgezet naar groep_trainingstijden.")
-    if zonder_tijd:
-        print(f"Let op: {zonder_tijd} trainingsdag(en) zonder begintijd konden niet mee; "
-              "vul die tijden opnieuw in bij de groep.")
-    return len(tijden)
-
-
-def _verplaats_periodeplannen(map: Path | None, hoofd: bytes) -> int:
-    """Eenmalig: oude periodeplannen uit personen.db als doel naar prestaties.db. Geeft het aantal.
-
-    Een periodeplan wordt een doel zonder regels: titel = naam, beschrijving =
-    doel, startdatum, datum = einddatum, zelfde groep. Eerst alles in
-    prestaties.db zetten, pas daarna de oude tabel leegmaken (de tabel zelf
-    blijft: training.periodeplan_id verwijst ernaar, zie migratie personen/007).
-    Gaat het tussendoor mis, dan gaat het de volgende keer verder; een doel dat
-    al is overgezet (zelfde groep, titel, startdatum en datum) komt er niet nog eens bij.
-    """
-    with closing(verbind("personen", map, hoofd)) as personen, personen:
-        if huidige_versie(personen) < 7:
-            return 0
-        rijen = personen.execute(
-            "SELECT groep_id, naam, startdatum, einddatum, doel FROM periodeplan ORDER BY id").fetchall()
-        if not rijen:
-            return 0
-        with closing(verbind("prestaties", map, hoofd)) as prestaties:
-            with prestaties:
-                for r in rijen:
-                    al = prestaties.execute(
-                        """SELECT 1 FROM doel WHERE groep_id IS ? AND titel = ? AND startdatum = ? AND datum IS ?""",
-                        (r["groep_id"], r["naam"], r["startdatum"], r["einddatum"])).fetchone()
-                    if not al:
-                        prestaties.execute(
-                            """INSERT INTO doel (groep_id, titel, startdatum, datum, beschrijving)
-                               VALUES (?, ?, ?, ?, ?)""",
-                            (r["groep_id"], r["naam"], r["startdatum"], r["einddatum"], r["doel"]))
-        with personen:
-            personen.execute("DELETE FROM periodeplan")    # zet training.periodeplan_id op NULL
-    print(f"Periodeplannen overgezet naar doelen (prestaties.db): {len(rijen)}")
-    return len(rijen)
 
 
 def init_db(map: Path | None = None, hoofd: str | bytes | None = None) -> Path:
@@ -588,9 +529,6 @@ def init_db(map: Path | None = None, hoofd: str | bytes | None = None) -> Path:
     for database in DATABASES:
         versie = _init_een(database, map, hoofd)
         print(f"{database}.db up-to-date: versie {versie}")
-    _verplaats_absentie(map, hoofd)
-    _groep_trainingstijden_samenvoegen(map, hoofd)
-    _verplaats_periodeplannen(map, hoofd)
     return map
 
 

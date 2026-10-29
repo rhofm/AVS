@@ -274,7 +274,7 @@ class Opslag:
     def onderdeel_opslaan(self, o: Onderdeel) -> Onderdeel:
         """Toevoegen of bijwerken. Bestaat de naam al, dan wordt die rij bijgewerkt.
 
-        windmeting (vanaf migratie prestaties/003) bepaalt of de wind moet
+        windmeting (zie schema_prestaties.sql) bepaalt of de wind moet
         kloppen voor een PR; zonder opgave volgt hij uit de naam.
         """
         with self.prestaties_db:
@@ -1216,7 +1216,7 @@ class Opslag:
         return [r[0] for r in self.personen.execute(
             "SELECT DISTINCT groep_id FROM groep_rooster WHERE rooster_id = ? ORDER BY groep_id", (rooster_id,))]
 
-    # training.periodeplan_id bestaat nog in de database maar wordt niet meer gebruikt (migratie 007).
+    # training.periodeplan_id bestaat nog in de database maar wordt niet meer gebruikt (zie schema_personen.sql).
     _TRAINING_VELDEN = ("groep_id", "datum", "onderwerp", "warming_up", "kern_a",
                         "kern_b", "cooling_down", "notities", "hoofdtraining_id", "starttijd",
                         "rooster_regel_id")   # vaste kolomnamen
@@ -1649,7 +1649,7 @@ class Opslag:
 
     def ploegen(self, datum: date | None = None) -> list[Ploeg]:
         """Alle ploegen (nieuwste wedstrijddag eerst), of alleen die van één dag.
-        Ploegen van vóór migratie 010 zonder datum worden overgeslagen."""
+        Ploegen zonder datum (van vóór personen-versie 10) worden overgeslagen."""
         if datum is None:
             rijen = self.personen.execute(
                 "SELECT * FROM ploeg WHERE datum IS NOT NULL ORDER BY datum DESC, naam").fetchall()

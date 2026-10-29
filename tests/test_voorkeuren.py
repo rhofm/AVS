@@ -1,4 +1,4 @@
-"""Tests voor voorkeuren van atleten (ploeg/voorkeuren.py, migratie personen/011):
+"""Tests voor voorkeuren van atleten (ploeg/voorkeuren.py, tabellen atleet_voorkeur en ploeg_voorkeur):
 vaste voorkeuren per atleet, voorkeuren per ploeg, wat de optimalisatie en de
 controle ermee doen, en de pagina's.
 

@@ -1,26 +1,19 @@
-"""Tests voor src/testen/resultaten.py en de testtabellen in db/queries.py (testen.db, migratie 002).
+"""Tests voor src/testen/resultaten.py en de testtabellen in db/queries.py (testen.db).
 
 Alleen nepgegevens en een vaste testsleutel (de nepgroep uit test_groep_landingspagina).
 
 """
 
-import contextlib
-import io
-import shutil
-import tempfile
 from datetime import date
-from pathlib import Path
 
 import pytest
 from test_groep_landingspagina import opslag, voorbeeldgroep
 
-from atleten import beheer
-from db.queries import Opslag, OpslagFout
+from db.queries import OpslagFout
 from models import Test, Testresultaat
 from testen import resultaten as res
 from testen import sjabloon as sj
 from testen.sjabloon import Onderdeel, Sjabloon, SjabloonFout
-from hulp import TESTSLEUTEL
 
 DAG = date(2026, 10, 20)
 
@@ -243,43 +236,3 @@ def test_verloop_en_beste_werken_met_sjabloontests():
         assert atleet_testen.beste(db, anna, "30m").waarde == 4.1               # lager is beter bij een tijd
         assert atleet_testen.vooruitgang(db, anna, "30m") == 0.2
         assert atleet_testen.laatste_per_test(db, anna)[db.test_op_naam("30m").id].waarde == 4.2
-
-
-def test_migratie_op_bestaande_database():
-    """testen.db op versie 1: oude testen en resultaten blijven staan en de nieuwe kolommen komen erbij."""
-    import db.init_db as init_mod
-    with tempfile.TemporaryDirectory() as tmp:
-        echte_map = init_mod.MIGRATIONS_DIR
-        oud = Path(tmp) / "migraties_zonder_testen"
-        shutil.copytree(echte_map, oud)
-        shutil.rmtree(oud / "testen")
-        data = Path(tmp) / "data"
-        data.mkdir()
-        try:
-            init_mod.MIGRATIONS_DIR = oud
-            with contextlib.redirect_stdout(io.StringIO()):
-                init_mod.init_db(data, hoofd=TESTSLEUTEL)
-        finally:
-            init_mod.MIGRATIONS_DIR = echte_map
-        with Opslag(map=data, hoofd=TESTSLEUTEL) as db:
-            assert db.testen_db.execute("SELECT MAX(versie) FROM schema_version").fetchone()[0] == 1
-            assert "sjabloon" not in [r[1] for r in db.testen_db.execute("PRAGMA table_info(test)")]
-            anna = beheer.nieuwe_atleet(db, "Anna", "Proef", geslacht="V", geboortedatum="2011").master_id
-            t = db.testen_db
-            with t:
-                t.execute("INSERT INTO test (naam, eenheid, lager_is_beter) VALUES ('30m vliegend', 's', 1)")
-                t.execute("INSERT INTO testresultaat (atleet_ref, test_id, datum, waarde) VALUES (?, 1, '2026-09-01', 4.3)",
-                          (db._ref(anna, "testen"),))
-        uitvoer = io.StringIO()
-        with contextlib.redirect_stdout(uitvoer):
-            init_mod.init_db(data, hoofd=TESTSLEUTEL)
-        assert "002_sjablonen.sql" in uitvoer.getvalue()
-        with Opslag(map=data, hoofd=TESTSLEUTEL) as db:
-            assert db.testen_db.execute("SELECT MAX(versie) FROM schema_version").fetchone()[0] == 2
-            (test,) = db.testen()
-            assert (test.naam, test.sjabloon) == ("30m vliegend", None)
-            (oud_resultaat,) = db.testresultaten(anna)
-            assert (oud_resultaat.waarde, oud_resultaat.score, oud_resultaat.delen) == (4.3, None, [])
-            s = Sjabloon("30m vliegend", [Onderdeel("Tijd", "tijd")], True, "30m")
-            r = res.resultaat_vastleggen(db, anna, s, date(2026, 10, 1), ["4,1"])
-            assert r.test_id == test.id and len(db.testresultaten(anna)) == 2

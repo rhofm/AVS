@@ -1,6 +1,6 @@
 """Voorkeuren van atleten voor de ploegopstelling.
 
-Twee niveaus (migratie personen/011):
+Twee niveaus (tabellen atleet_voorkeur en ploeg_voorkeur in personen.db):
 
 - **vast, per atleet** (`atleet_voorkeur`): voor alle ploegen, op de naam van
   het onderdeel zonder specificatie ('800 meter', '80 meter horden',

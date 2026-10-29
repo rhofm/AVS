@@ -1,20 +1,15 @@
-"""Tests voor het tijdschema (chronoloog) van wedstrijden: prestaties-migratie 003,
-models/programma.py, Opslag.programma_* en wedstrijden/chronoloog.py.
+"""Tests voor het tijdschema (chronoloog) van wedstrijden: tabel wedstrijd_programma
+in prestaties.db, models/programma.py, Opslag.programma_* en wedstrijden/chronoloog.py.
 
 Alleen nepgegevens en een vaste testsleutel.
 """
 
-import contextlib
-import io
-import tempfile
 from datetime import date
-from pathlib import Path
 
-from db.init_db import huidige_versie, init_db, verbind
-from db.queries import Opslag, OpslagFout
+from db.queries import OpslagFout
 from models import Atleet, Inschrijving, Onderdeel, ProgrammaOnderdeel, Wedstrijd, lees_categorie
 from wedstrijden import chronoloog
-from hulp import TESTSLEUTEL, opslag, verwacht as _verwacht
+from hulp import opslag, verwacht as _verwacht
 
 ZA = date(2027, 3, 13)
 ZO = date(2027, 3, 14)
@@ -162,27 +157,3 @@ def test_botsingen():
             ("Anna", "10:30", "10:50", 5),          # in groep 1 heeft Anna maar 5 min tot verspringen
             ("Anna", "10:45", "10:50", None), ("Anna", "10:50", "12:00", 10), ("Bas", "11:00", "11:30", 10)]
         assert "maar 5 min ertussen" in krap[0].tekst
-
-
-def test_migratie_op_bestaande_database():
-    """prestaties.db van vóór migratie 003 krijgt de tabel erbij; bestaande wedstrijden blijven."""
-    with tempfile.TemporaryDirectory() as tmp:
-        with contextlib.redirect_stdout(io.StringIO()):
-            init_db(Path(tmp), hoofd=TESTSLEUTEL)
-        # closing(): `with verbind(...)` sluit de verbinding niet; op Windows kan de
-        # tijdelijke map dan niet weg (WinError 32).
-        with contextlib.closing(verbind("prestaties", Path(tmp), TESTSLEUTEL)) as c:
-            c.execute("DROP TABLE wedstrijd_programma")
-            c.execute("DROP TABLE doel_regel")                  # 004 (doelen) kwam later
-            c.execute("DROP TABLE doel")
-            c.execute("DELETE FROM schema_version WHERE versie >= 3")
-            c.execute("INSERT INTO wedstrijd (naam, datum) VALUES ('Oud', '2026-09-01')")
-            c.commit()
-            assert huidige_versie(c) == 2
-        with contextlib.redirect_stdout(io.StringIO()):
-            init_db(Path(tmp), hoofd=TESTSLEUTEL)
-        with Opslag(map=Path(tmp), hoofd=TESTSLEUTEL) as db:
-            assert huidige_versie(db.prestaties_db) == 4      # 003 tijdschema + 004 doelen
-            w = db.wedstrijden()[0]
-            db.programma_opslaan(ProgrammaOnderdeel(w.id, w.datum, "10:00", None, "Verspringen", groep=1, duur=45))
-            assert db.programma(w.id)[0].eindtijd == "10:45"
