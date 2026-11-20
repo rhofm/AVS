@@ -45,7 +45,7 @@
       <tbody>
         {% for r in regels %}
           <tr id="{{ id_prefix }}{{ r.wedstrijd.id }}" class="{{ 'geweest' if r.geweest else '' }}">
-            <td class="nowrap"><strong>{{ r.wedstrijd.datum | datum_kort }}</strong><br>
+            <td class="nowrap"><strong>{{ r.wedstrijd.datum | datum_kort }}{% if r.wedstrijd.einddatum %} – {{ r.wedstrijd.einddatum | datum_kort }}{% endif %}</strong><br>
               <span class="zacht">{{ r.wedstrijd.datum.year }}{% if not r.geweest %} · {{ r.dagen_tot | over_dagen }}{% endif %}</span></td>
             <td>{{ wedstrijdnaam(r.wedstrijd) }}</td>
             <td>{{ r.wedstrijd.locatie or "–" }}</td>
@@ -125,7 +125,7 @@
             <ul class="lijst maand__lijst">
               {% for r in m.regels %}
                 <li id="k-{{ r.wedstrijd.id }}" class="{{ 'geweest' if r.geweest }}">
-                  <time datetime="{{ r.wedstrijd.datum }}">{{ r.wedstrijd.datum | datum_kort }}</time>
+                  <time datetime="{{ r.wedstrijd.datum }}">{{ r.wedstrijd.datum | datum_kort }}{% if r.wedstrijd.einddatum %} – {{ r.wedstrijd.einddatum | datum_kort }}{% endif %}</time>
                   <span><strong>{{ wedstrijdnaam(r.wedstrijd) }}</strong>{% if r.wedstrijd.locatie %} · {{ r.wedstrijd.locatie }}{% endif %}<br>
                     <span class="zacht">{{ onderdelen_cel(r) }}</span></span>
                 </li>

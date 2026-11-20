@@ -77,8 +77,48 @@ def test_template():
         assert "Atleten &amp; onderdelen" in html and "<strong>Anna Voorbeeld</strong>" in html
 
 
+<<<<<<< Updated upstream
 if __name__ == "__main__":
     for naam, f in list(globals().items()):
         if naam.startswith("test_") and callable(f):
             f()
             print("ok", naam)
+=======
+def test_meerdaagse_wedstrijd_staat_op_elke_dag():
+    with opslag() as db:
+        mid = voorbeeld(db)
+        start = VANDAAG + timedelta(days=40)
+        w = planning.plan_wedstrijd(db, "Meerkamp", start, einddatum=start + timedelta(days=2))
+        planning.inschrijven(db, w.id, mid, ["100m"])
+        assert db.wedstrijd(w.id).einddatum == start + timedelta(days=2)
+        p = kalender.wedstrijdplanning(db, mid, peildatum=VANDAAG)
+        dagen = {d.datum: d for m in p.maanden for wk in m.weken for d in wk if d.in_maand}
+        for n in range(3):
+            assert [r.wedstrijd.naam for r in dagen[start + timedelta(days=n)].regels] == ["Meerkamp"]
+        assert "Meerkamp" not in [r.wedstrijd.naam for r in dagen[start + timedelta(days=3)].regels]
+        html = render(p)
+        assert html.count(f'href="#k-{w.id}"') >= 3          # in de kalender, één keer per dag
+
+
+def test_einddatum_telt_niet_als_geweest_tijdens_de_wedstrijd():
+    with opslag() as db:
+        mid = voorbeeld(db)
+        w = planning.plan_wedstrijd(db, "Loopt nog", VANDAAG - timedelta(days=1), einddatum=VANDAAG + timedelta(days=1))
+        planning.inschrijven(db, w.id, mid)
+        r = [r for r in kalender.wedstrijdplanning(db, mid, peildatum=VANDAAG).regels if r.wedstrijd.id == w.id][0]
+        assert not r.geweest and r.dagen_tot == 0
+
+
+def test_lopende_meerdaagse_wedstrijd_op_atleten_en_groepspagina_en_overzicht():
+    from atleten import landingspagina as atleet_pagina
+    from wedstrijden import overzicht
+    with opslag() as db:
+        mid = voorbeeld(db)
+        w = planning.plan_wedstrijd(db, "Loopt nog", VANDAAG - timedelta(days=1), einddatum=VANDAAG + timedelta(days=1))
+        planning.inschrijven(db, w.id, mid)
+        pagina = atleet_pagina.landingspagina(db, mid, peildatum=VANDAAG)
+        assert [p.dagen_tot for p in pagina.wedstrijden if p.wedstrijd.id == w.id] == [0]
+        o = overzicht.wedstrijdenoverzicht(db, VANDAAG)
+        assert w.id in [r.wedstrijd.id for r in o.komend] and w.id not in [r.wedstrijd.id for r in o.afgelopen]
+        assert w.id in [x.id for x in db.wedstrijden(van=VANDAAG)]           # o.a. startpagina
+>>>>>>> Stashed changes

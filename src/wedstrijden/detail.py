@@ -191,7 +191,7 @@ def wedstrijd_detail(db: Opslag, wedstrijd_id: int, peildatum: date | None = Non
     deelnemers.sort(key=lambda d: _sorteer(d.atleet))
 
     return WedstrijdDetail(w, dagen, deelnemers, chronoloog.botsingen(db, wedstrijd_id),
-                           (w.datum - vandaag).days, _uitslagen(db, wedstrijd_id, alle_onderdelen))
+                           w.dagen_tot(vandaag), _uitslagen(db, wedstrijd_id, alle_onderdelen))
 
 
 def _uitslagen(db: Opslag, wedstrijd_id: int, onderdelen: dict[int, Onderdeel]) -> list[UitslagRij]:
@@ -356,10 +356,12 @@ class Gegevens:
     locatie: str = ""
     link: str = ""
     indoor: bool = False
+    einddatum: str = ""                # leeg = eendaags
 
     @classmethod
     def van(cls, w: Wedstrijd) -> Gegevens:
-        return cls(w.naam, w.datum.isoformat(), w.locatie or "", w.bron_url or "", w.indoor)
+        return cls(w.naam, w.datum.isoformat(), w.locatie or "", w.bron_url or "", w.indoor,
+                   w.einddatum.isoformat() if w.einddatum else "")
 
 
 def gegevens_opslaan(db: Opslag, wedstrijd_id: int | None, g: Gegevens) -> Wedstrijd:
@@ -376,6 +378,14 @@ def gegevens_opslaan(db: Opslag, wedstrijd_id: int | None, g: Gegevens) -> Wedst
         datum = date.fromisoformat(g.datum.strip())
     except ValueError:
         raise OpslagFout("Vul een geldige datum in.") from None
+    einddatum = None
+    if g.einddatum.strip():
+        try:
+            einddatum = date.fromisoformat(g.einddatum.strip())
+        except ValueError:
+            raise OpslagFout("Vul een geldige einddatum in, of laat hem leeg.") from None
+        if einddatum < datum:
+            raise OpslagFout("De einddatum ligt voor de begindatum.")
     link = planning.normaliseer_link(g.link)
     if link and not link.lower().startswith(("http://", "https://")):
         raise OpslagFout("De link moet beginnen met https:// (bijv. een pagina op atletiek.nu of Seltec).")
@@ -393,7 +403,7 @@ def gegevens_opslaan(db: Opslag, wedstrijd_id: int | None, g: Gegevens) -> Wedst
     if oud is not None and not link and oud.bron != "handmatig" and db.prestaties_van_wedstrijd(oud.id):
         bron = oud.bron                  # uitslag al geïmporteerd: herkomst blijft kloppen
     w = Wedstrijd(naam=naam, datum=datum, locatie=" ".join(g.locatie.split()) or None, bron=bron,
-                  bron_url=link, indoor=bool(g.indoor), id=wedstrijd_id)
+                  bron_url=link, indoor=bool(g.indoor), id=wedstrijd_id, einddatum=einddatum)
     return db.wedstrijd_opslaan(w)
 
 
@@ -632,7 +642,7 @@ def wedstrijdkeuze(db: Opslag, master_id: str, peildatum: date | None = None) ->
             lijst.append(namen[i.onderdeel_id])
     rijen = []
     for w in db.wedstrijden(van=vandaag):
-        rijen.append(KeuzeWedstrijd(w, (w.datum - vandaag).days, w.id in per_wedstrijd,
+        rijen.append(KeuzeWedstrijd(w, w.dagen_tot(vandaag), w.id in per_wedstrijd,
                                     sorted(per_wedstrijd.get(w.id, []), key=str.lower),
                                     bool(db.programma(w.id))))
     rijen.sort(key=lambda r: (r.wedstrijd.datum, r.wedstrijd.naam.lower()))

@@ -102,18 +102,18 @@ def _regels(db: Opslag, master_ids: list[str], van: date, tot: date | None, vand
     uit = []
     for wid, deelnemers in per_wedstrijd.items():
         w = db.wedstrijd(wid)
-        if w is None or w.datum < van or (tot is not None and w.datum > tot):
+        if w is None or w.laatste_dag < van or (tot is not None and w.datum > tot):
             continue
         deelnames = [Deelname(mid, namen[mid], sorted(o))
                      for mid, o in sorted(deelnemers.items(), key=lambda kv: volgorde[kv[0]])]
-        uit.append(PlanningRegel(w, deelnames, (w.datum - vandaag).days))
+        uit.append(PlanningRegel(w, deelnames, w.dagen_tot(vandaag)))
     return sorted(uit, key=lambda r: (r.wedstrijd.datum, r.wedstrijd.naam))
 
 
 def _maanden(regels: list[PlanningRegel], vandaag: date, min_maanden: int) -> list[KalenderMaand]:
     """Maandkalenders van de eerste wedstrijd (of deze maand) tot de laatste, minimaal min_maanden."""
     begin = min([vandaag.replace(day=1)] + [r.wedstrijd.datum.replace(day=1) for r in regels])
-    eind = max([r.wedstrijd.datum.replace(day=1) for r in regels] + [vandaag.replace(day=1)])
+    eind = max([r.wedstrijd.laatste_dag.replace(day=1) for r in regels] + [vandaag.replace(day=1)])
     jaar, maand = begin.year, begin.month
     aantal = (eind.year - jaar) * 12 + eind.month - maand + 1
     # minimaal min_maanden vanaf deze maand
@@ -122,14 +122,16 @@ def _maanden(regels: list[PlanningRegel], vandaag: date, min_maanden: int) -> li
 
     per_dag: dict[date, list[PlanningRegel]] = {}
     for r in regels:
-        per_dag.setdefault(r.wedstrijd.datum, []).append(r)
+        for dag in r.wedstrijd.dagen():       # een meerdaagse wedstrijd staat op elke dag
+            per_dag.setdefault(dag, []).append(r)
 
     kal = calendar.Calendar(firstweekday=eerste_weekdag())    # zie Instellingen
     uit = []
     for _ in range(aantal):
         weken = [[KalenderDag(d, d.month == maand, d == vandaag, per_dag.get(d, [])) for d in week]
                  for week in kal.monthdatescalendar(jaar, maand)]
-        in_maand = [r for r in regels if (r.wedstrijd.datum.year, r.wedstrijd.datum.month) == (jaar, maand)]
+        eerste, laatste = date(jaar, maand, 1), date(jaar, maand, calendar.monthrange(jaar, maand)[1])
+        in_maand = [r for r in regels if r.wedstrijd.datum <= laatste and r.wedstrijd.laatste_dag >= eerste]
         uit.append(KalenderMaand(jaar, maand, weken, in_maand))
         jaar, maand = (jaar + 1, 1) if maand == 12 else (jaar, maand + 1)
     return uit

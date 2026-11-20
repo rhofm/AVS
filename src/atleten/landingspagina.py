@@ -207,8 +207,8 @@ def _wedstrijden(db: Opslag, master_id: str, vandaag: date) -> list[WedstrijdPla
     uit = []
     for wid, onderdelen in per_wedstrijd.items():
         w = db.wedstrijd(wid)
-        if w is not None and w.datum >= vandaag:
-            uit.append(WedstrijdPlanning(w, sorted(onderdelen), (w.datum - vandaag).days))
+        if w is not None and w.laatste_dag >= vandaag:
+            uit.append(WedstrijdPlanning(w, sorted(onderdelen), w.dagen_tot(vandaag)))
     return sorted(uit, key=lambda p: (p.wedstrijd.datum, p.wedstrijd.naam))
 
 

@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field, replace
-from datetime import date
+from datetime import date, timedelta
 from typing import Iterable, Literal
 
 Bron = Literal["atletieknu", "seltec", "handmatig"]
@@ -94,9 +94,25 @@ class Wedstrijd:
     bron_url: str | None = None     # uitslagpagina van de wedstrijd, nooit van een atleet
     id: int | None = None
     indoor: bool = False            # alle prestaties op deze wedstrijd zijn dan indoor
+    einddatum: date | None = None   # laatste dag van een meerdaagse wedstrijd; None = eendaags
 
     def __post_init__(self) -> None:
         _controleer_bron(self.bron)
+        if self.einddatum is not None and self.einddatum <= self.datum:
+            self.einddatum = None   # eendaags: alleen `datum`
+
+    @property
+    def laatste_dag(self) -> date:
+        return self.einddatum or self.datum
+
+    def dagen_tot(self, vandaag: date) -> int:
+        """Dagen tot de eerste dag; 0 zolang een meerdaagse wedstrijd bezig is; negatief = geweest."""
+        n = (self.datum - vandaag).days
+        return 0 if n < 0 <= (self.laatste_dag - vandaag).days else n
+
+    def dagen(self) -> list[date]:
+        """Alle dagen van de wedstrijd, van `datum` t/m `einddatum`."""
+        return [self.datum + timedelta(days=n) for n in range((self.laatste_dag - self.datum).days + 1)]
 
 
 @dataclass(slots=True)

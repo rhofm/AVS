@@ -720,7 +720,7 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
     def _gegevens_uit_formulier():
         f = request.form
         return wedstrijddetail.Gegevens(f.get("naam", ""), f.get("datum", ""), f.get("locatie", ""),
-                                        f.get("link", ""), f.get("indoor") == "1")
+                                        f.get("link", ""), f.get("indoor") == "1", f.get("einddatum", ""))
 
     @app.get("/wedstrijden/nieuw")
     def wedstrijd_nieuw():

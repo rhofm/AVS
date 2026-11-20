@@ -127,6 +127,9 @@ def _opslaan(db: Opslag, w: Wedstrijd, bron_wedstrijd, regels: list[TijdschemaRe
     verslag = ImportVerslag(w.id, len(programma), sum(p.onderdeel_id is not None for p in programma),
                             los, sum(p.duur is None for p in programma))
     dagen = sorted({p.datum for p in programma})
+    if dagen and dagen[-1] > w.laatste_dag and w.datum in dagen:
+        w.einddatum = dagen[-1]          # tijdschema loopt langer: meerdaagse wedstrijd
+        db.wedstrijd_opslaan(w)
     if w.datum not in dagen:
         verslag.waarschuwingen.append(
             f"Let op: het tijdschema is van {', '.join(d.isoformat() for d in dagen)}, de wedstrijd staat op "

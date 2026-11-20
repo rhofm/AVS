@@ -63,13 +63,14 @@ def bron_uit_link(link: str | None) -> str:
 # Wedstrijden
 # ============================================================
 def plan_wedstrijd(db: Opslag, naam: str, datum: date, locatie: str | None = None,
-                   link: str | None = None, indoor: bool = False) -> Wedstrijd:
+                   link: str | None = None, indoor: bool = False,
+                   einddatum: date | None = None) -> Wedstrijd:
     """Nieuwe geplande wedstrijd, of de bestaande bijwerken als de link al bekend is."""
     if not naam.strip():
         raise OpslagFout("Een wedstrijd heeft een naam nodig.")
     link = normaliseer_link(link)
     w = Wedstrijd(naam=naam.strip(), datum=datum, locatie=locatie, bron=bron_uit_link(link),
-                  bron_url=link, indoor=indoor)
+                  bron_url=link, indoor=indoor, einddatum=einddatum)
     return db.wedstrijd_opslaan(w)   # hergebruikt een wedstrijd met dezelfde bron_url
 
 

@@ -304,7 +304,8 @@ class Opslag:
     @staticmethod
     def _wedstrijd(r) -> Wedstrijd:
         return Wedstrijd(naam=r["naam"], datum=_naar_datum(r["datum"]), locatie=r["locatie"],
-                         bron=r["bron"], bron_url=r["bron_url"], id=r["id"], indoor=bool(r["indoor"]))
+                         bron=r["bron"], bron_url=r["bron_url"], id=r["id"], indoor=bool(r["indoor"]),
+                         einddatum=_naar_datum(r["einddatum"]))
 
     def wedstrijd_opslaan(self, w: Wedstrijd) -> Wedstrijd:
         """Toevoegen of bijwerken. Een wedstrijd met dezelfde bron_url wordt hergebruikt,
@@ -320,15 +321,18 @@ class Opslag:
             if r:
                 w.id = r[0]
         with self.prestaties_db:
-            waarden = (w.naam, _naar_tekst(w.datum), w.locatie, w.bron, w.bron_url, int(w.indoor))
+            waarden = (w.naam, _naar_tekst(w.datum), w.locatie, w.bron, w.bron_url, int(w.indoor),
+                       _naar_tekst(w.einddatum))
             if w.id is None:
                 w.id = self.prestaties_db.execute(
-                    "INSERT INTO wedstrijd (naam, datum, locatie, bron, bron_url, indoor) VALUES (?, ?, ?, ?, ?, ?)",
+                    "INSERT INTO wedstrijd (naam, datum, locatie, bron, bron_url, indoor, einddatum) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?)",
                     waarden,
                 ).lastrowid
             else:
                 self.prestaties_db.execute(
-                    """UPDATE wedstrijd SET naam = ?, datum = ?, locatie = ?, bron = ?, bron_url = ?, indoor = ?
+                    """UPDATE wedstrijd SET naam = ?, datum = ?, locatie = ?, bron = ?, bron_url = ?, indoor = ?,
+                              einddatum = ?
                        WHERE id = ?""",
                     (*waarden, w.id),
                 )
@@ -344,7 +348,7 @@ class Opslag:
     def wedstrijden(self, van: date | None = None, tot: date | None = None) -> list[Wedstrijd]:
         sql, args = "SELECT * FROM wedstrijd WHERE 1 = 1", []
         if van:
-            sql += " AND datum >= ?"
+            sql += " AND COALESCE(einddatum, datum) >= ?"
             args.append(_naar_tekst(van))
         if tot:
             sql += " AND datum <= ?"

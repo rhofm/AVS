@@ -41,14 +41,14 @@ class Wedstrijdenoverzicht:
 def _rij(db: Opslag, w: Wedstrijd, vandaag: date, *, met_prestaties: bool) -> WedstrijdRij:
     deelnemers = len({i.atleet_id for i in db.deelnemers(w.id)})
     prestaties = len(db.prestaties_van_wedstrijd(w.id)) if met_prestaties else 0
-    return WedstrijdRij(w, deelnemers, prestaties, (w.datum - vandaag).days)
+    return WedstrijdRij(w, deelnemers, prestaties, w.dagen_tot(vandaag))
 
 
 def wedstrijdenoverzicht(db: Opslag, peildatum: date | None = None) -> Wedstrijdenoverzicht:
     vandaag = peildatum or date.today()
     komend, afgelopen = [], []
     for w in db.wedstrijden():                          # op datum
-        if w.datum >= vandaag:
+        if w.laatste_dag >= vandaag:
             komend.append(_rij(db, w, vandaag, met_prestaties=False))
         else:
             afgelopen.append(_rij(db, w, vandaag, met_prestaties=True))

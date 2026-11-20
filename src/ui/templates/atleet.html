@@ -149,7 +149,7 @@
             <tbody>
               {% for w in pagina.wedstrijden %}
                 <tr>
-                  <td><strong>{{ w.wedstrijd.datum | datum_kort }}</strong><br><span class="zacht">{{ w.dagen_tot | over_dagen }}</span></td>
+                  <td><strong>{{ w.wedstrijd.datum | datum_kort }}{% if w.wedstrijd.einddatum %} – {{ w.wedstrijd.einddatum | datum_kort }}{% endif %}</strong><br><span class="zacht">{{ w.dagen_tot | over_dagen }}</span></td>
                   <td>
                     <a href="/wedstrijd/{{ w.wedstrijd.id }}">{{ w.wedstrijd.naam }}</a>
                     {% if w.wedstrijd.locatie %}<br><span class="zacht">{{ w.wedstrijd.locatie }}</span>{% endif %}

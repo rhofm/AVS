@@ -46,7 +46,7 @@
           <tbody>
             {% for r in o.komend %}
               <tr id="w-{{ r.wedstrijd.id }}">
-                <td class="nowrap"><strong>{{ r.wedstrijd.datum | datum_kort }}</strong><br>
+                <td class="nowrap"><strong>{{ r.wedstrijd.datum | datum_kort }}{% if r.wedstrijd.einddatum %} – {{ r.wedstrijd.einddatum | datum_kort }}{% endif %}</strong><br>
                   <span class="zacht">{{ r.wedstrijd.datum.year }} · {{ r.dagen_tot | over_dagen }}</span></td>
                 <td>{{ wedstrijdnaam(r.wedstrijd) }}</td>
                 <td>{{ r.wedstrijd.locatie or "–" }}</td>
@@ -81,7 +81,7 @@
             <tbody>
               {% for r in o.afgelopen %}
                 <tr id="w-{{ r.wedstrijd.id }}">
-                  <td class="nowrap"><strong>{{ r.wedstrijd.datum | datum_kort }}</strong><br>
+                  <td class="nowrap"><strong>{{ r.wedstrijd.datum | datum_kort }}{% if r.wedstrijd.einddatum %} – {{ r.wedstrijd.einddatum | datum_kort }}{% endif %}</strong><br>
                     <span class="zacht">{{ r.wedstrijd.datum.year }}</span></td>
                   <td>{{ wedstrijdnaam(r.wedstrijd) }}</td>
                   <td>{{ r.wedstrijd.locatie or "–" }}</td>

@@ -24,7 +24,7 @@
     <div>
       <a class="terug" href="{{ url_for('wedstrijden') }}">&larr; Wedstrijden</a>
       <h1 class="kop kop--pagina">{{ w.naam }}{% if w.indoor %} <span class="kenmerk">indoor</span>{% endif %}</h1>
-      <p class="subkop">{{ w.datum | datum_kort }} {{ w.datum.year }}
+      <p class="subkop">{{ w.datum | datum_kort }}{% if w.einddatum %} – {{ w.einddatum | datum_kort }}{% endif %} {{ (w.einddatum or w.datum).year }}
         {%- if w.locatie %} · {{ w.locatie }}{% endif %}
         · <span class="zacht">{{ "geweest" if d.geweest else d.dagen_tot | over_dagen }}</span></p>
       {% if w.bron_url %}<p class="zacht wedstrijdlink"><a href="{{ w.bron_url }}" target="_blank" rel="noopener">Wedstrijdpagina &#8599;</a></p>{% endif %}
