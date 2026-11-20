@@ -1,6 +1,6 @@
 """Doelen: wat een groep of atleet wil bereiken, meestal bij een bepaalde wedstrijd.
 
-Hoort bij prestaties.db (tabellen doel en doel_regel; migratie prestaties/004).
+Hoort bij prestaties.db (tabellen doel en doel_regel, zie schema_prestaties.sql).
 Atleten heten hier, zoals overal in models/, met hun master_id; het pseudoniem
 blijft binnen db/.
 

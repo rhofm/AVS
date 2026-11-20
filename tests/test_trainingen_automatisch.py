@@ -2,22 +2,18 @@
 (groepen.trainingen.trainingen_aanvullen / trainingen_opruimen) en waar de app dat doet.
 
 Tijdelijke map met versleutelde databases, vaste testsleutel, alleen nepgegevens.
-Werkt met pytest en los: `python tests/test_trainingen_automatisch.py`.
+
 """
 
-import sys
 from datetime import date, timedelta
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+from test_groep_landingspagina import VANDAAG, opslag
 
-from test_groep_landingspagina import TESTSLEUTEL, VANDAAG, opslag  # noqa: E402
-
-from atleten import beheer  # noqa: E402
-from groepen import groep as groepsbeheer  # noqa: E402
-from groepen import trainingen  # noqa: E402
-from models import Absentie, Groep, Training  # noqa: E402
+from atleten import beheer
+from groepen import groep as groepsbeheer
+from groepen import trainingen
+from models import Absentie, Groep, Training
+from hulp import TESTSLEUTEL
 
 D = lambda m, d: date(2026, m, d)   # noqa: E731
 
@@ -134,10 +130,3 @@ def test_app():
         # Wijzigen via de pagina: meteen ingepland, met melding.
         r = c.post(f"/groep/{nieuw.id}/trainingsdagen", data={"tijd-zaterdag": "09:30"})
         assert db.trainingen(nieuw.id) and "ingepland" in c.get(r.headers["Location"]).get_data(as_text=True)
-
-
-if __name__ == "__main__":
-    for naam, f in list(globals().items()):
-        if naam.startswith("test_") and callable(f):
-            f()
-            print("ok", naam)

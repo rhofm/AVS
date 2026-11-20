@@ -32,6 +32,14 @@ python build.py           # de .exe bouwen: tests, bouwen, controle, zelftest ->
 
 Het plan voor de .exe staat in [Exe_bouwplan](docs/Exe_bouwplan.md).
 
+### Bijwerken van een oude installatie (migraties samengevoegd, oktober 2026)
+De oude databasemigraties zijn samengevoegd in de basisschema's (`src/db/schema_*.sql`); een
+nieuwe installatie maakt de databases meteen in de nieuwste vorm. Deze AVS kan daardoor geen
+databases van vóór die versie meer bijwerken. Heeft iemand AVS lang niet gebruikt en meldt AVS
+"... kan alleen databases vanaf versie ... bijwerken": start dan eerst één keer de vorige
+versie van AVS (die werkt de databases bij), sluit die af en start daarna de nieuwe. De gegevens
+worden in de tussentijd niet aangeraakt.
+
 
 
 

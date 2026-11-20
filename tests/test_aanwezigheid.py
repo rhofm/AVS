@@ -1,20 +1,14 @@
 """Tests voor src/atleten/aanwezigheid.py en het template ui/templates/aanwezigheid.html.
 
-Alleen nepgegevens en een vaste testsleutel. Werkt met pytest en los:
-`python tests/test_aanwezigheid.py`.
+Alleen nepgegevens en een vaste testsleutel.
 """
 
-import sys
 from datetime import date, timedelta
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+from test_landingspagina import TEMPLATES, VANDAAG, opslag, voorbeeld
 
-from test_landingspagina import TEMPLATES, VANDAAG, opslag, voorbeeld  # noqa: E402
-
-from atleten import aanwezigheid, landingspagina  # noqa: E402
-from models import Absentie, Training  # noqa: E402
+from atleten import aanwezigheid, landingspagina
+from models import Absentie, Training
 
 
 def _met_trainingen(db):
@@ -88,10 +82,3 @@ def test_template():
         assert 'id="weergave-lijst" value="lijst" checked' in html
         html = render(aanwezigheid.aanwezigheid(db, mid, peildatum=VANDAAG), weergave="kalender")
         assert 'id="weergave-kalender" value="kalender" checked' in html
-
-
-if __name__ == "__main__":
-    for naam, f in list(globals().items()):
-        if naam.startswith("test_") and callable(f):
-            f()
-            print("ok", naam)

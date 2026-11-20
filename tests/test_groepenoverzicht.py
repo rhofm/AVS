@@ -1,20 +1,15 @@
 """Tests voor het groepenoverzicht (groepen.groepenoverzicht, pagina /groepen):
 zoeken op naam, seizoen, trainingsdag en aantal atleten, filters en sorteersleutels.
 
-Alleen nepgegevens en een vaste testsleutel. Werkt met pytest en los:
-`python tests/test_groepenoverzicht.py`.
+Alleen nepgegevens en een vaste testsleutel.
 """
 
-import sys
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+from test_groep_landingspagina import VANDAAG, opslag
 
-from test_groep_landingspagina import TESTSLEUTEL, VANDAAG, opslag  # noqa: E402
-
-from groepen.groepenoverzicht import GEEN_SEIZOEN, groepenoverzicht  # noqa: E402
-from models import Atleet, Groep  # noqa: E402
+from groepen.groepenoverzicht import GEEN_SEIZOEN, groepenoverzicht
+from models import Atleet, Groep
+from hulp import app_client
 
 
 def _groepen(db):
@@ -67,12 +62,9 @@ def test_sorteersleutels():
 
 
 def test_pagina():
-    from ui.app import maak_app
     with opslag() as (db, tmp):
         _groepen(db)
-        app = maak_app(map=tmp, hoofd=TESTSLEUTEL)
-        app.config["TESTING"] = True
-        c = app.test_client()
+        c = app_client(tmp)
         html = c.get("/groepen").get_data(as_text=True)
         assert 'class="tabel sorteerbaar"' in html and "filter.js" in html and "sorteer.js" in html
         assert html.count('<button type="button" class="sorteer">') == 4
@@ -86,10 +78,3 @@ def test_pagina():
         assert "Sprint Zoë" in html and "Werpgroep" not in html
         html = c.get("/groepen?q=bestaatniet").get_data(as_text=True)
         assert "0 groepen" in html and "Geen groepen gevonden" in html
-
-
-if __name__ == "__main__":
-    for naam, fn in list(globals().items()):
-        if naam.startswith("test_") and callable(fn):
-            fn()
-            print("ok ", naam)

@@ -2,35 +2,24 @@
 
 Gebruikt de nagebouwde, geanonimiseerde profielpagina tests/fixtures/atletieknu_profiel.html
 (nep-id 999999); er wordt nooit naar de echte site gegaan. Vaste testsleutel, alleen nepgegevens.
-Werkt met pytest en los: `python tests/test_prs_importeren.py`.
+
 """
 
-import sys
 from dataclasses import replace
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+from test_app import client
+from test_landingspagina import opslag, voorbeeld
 
-from test_app import TESTSLEUTEL, client, tekst  # noqa: E402
-from test_landingspagina import opslag, voorbeeld  # noqa: E402
-
-from atleten.prs_importeren import GeenNummer, PRImport, prs_importeren  # noqa: E402
-from db.queries import Opslag, OpslagFout  # noqa: E402
-from importers.base import ImportFout  # noqa: E402
+from atleten.prs_importeren import GeenNummer, PRImport, prs_importeren
+from db.queries import Opslag, OpslagFout
+from importers.base import ImportFout
+from hulp import TESTSLEUTEL, tekst, verwacht as _verwacht
 
 PROFIEL = (Path(__file__).parent / "fixtures" / "atletieknu_profiel.html").read_text(encoding="utf-8")
 NUMMER = "999999"
 WEINIG = (Path(__file__).parent / "fixtures" / "atletieknu_profiel_weinig.html").read_text(encoding="utf-8")
 WEINIG_NUMMER = "999998"
-
-
-def _verwacht(fout, fn):
-    try:
-        fn()
-    except fout as e:
-        return e
-    raise AssertionError(f"{fout.__name__} verwacht")
 
 
 def _met_nummer(db, mid, nummer=NUMMER):
@@ -134,11 +123,3 @@ def test_knop_op_atletenpagina():
 
         assert c.post("/atleet/" + "0" * 32 + "/prs/importeren").status_code == 404
         assert c.get(f"/atleet/{mid}/prs/importeren").status_code in (404, 405)
-
-
-if __name__ == "__main__":
-    tests = [(n, f) for n, f in globals().items() if n.startswith("test_") and callable(f)]
-    for naam, fn in tests:
-        fn()
-        print(f"ok  {naam}")
-    print(f"{len(tests)} tests geslaagd")

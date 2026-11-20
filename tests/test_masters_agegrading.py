@@ -3,24 +3,19 @@
 De voorbeelden (prestatie, leeftijdsklasse -> punten) komen uit de spreadsheet 'Mastersploeg 2023'
 (blad mannenploeg/vrouwenploeg, voorbeeldregels): met dezelfde puntenconstanten als de spreadsheet moet AVS
 op exact dezelfde punten uitkomen. Alleen nepgegevens.
-Werkt met pytest en los: `python tests/test_masters_agegrading.py`.
+
 """
 
-import sys
 from datetime import date
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+import pytest
 
-import pytest  # noqa: E402
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+from test_ploegen import DAG, JAAR, opslag
 
-from test_ploegen import DAG, JAAR, opslag  # noqa: E402
-
-from atleten import beheer  # noqa: E402
-from models import Onderdeel, Prestatie  # noqa: E402
-from ploeg import punten, regels, vergelijk  # noqa: E402
+from atleten import beheer
+from models import Onderdeel, Prestatie
+from ploeg import punten, regels, vergelijk
 
 # (geslacht, onderdeel, leeftijdsklasse, prestatie in s of m, punten in de spreadsheet)
 VOORBEELDEN = [
@@ -122,7 +117,3 @@ def test_regelbestand_gebruikt_de_tabel():
     rs = regels.laad("masters_2026-2027")
     assert rs.leeftijdsfactoren == "masters_agegrading"
     assert not punten.leeftijdsfactoren(rs.leeftijdsfactoren).leeg
-
-
-if __name__ == "__main__":
-    raise SystemExit(pytest.main([__file__, "-q"]))

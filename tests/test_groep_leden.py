@@ -1,21 +1,17 @@
 """Tests voor src/groepen/groep.py (atleten van een groep wijzigen) en de route /groep/<id>/leden.
 
 Gebruikt de nepgroep uit test_groep_landingspagina (alleen nepgegevens, testsleutel).
-Werkt met pytest en los: `python tests/test_groep_leden.py`.
+
 """
 
-import sys
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+from test_groep_landingspagina import VANDAAG, opslag, voorbeeldgroep
 
-from test_groep_landingspagina import TESTSLEUTEL, VANDAAG, opslag, voorbeeldgroep  # noqa: E402
-
-from atleten import beheer  # noqa: E402
-from db.queries import OpslagFout  # noqa: E402
-from groepen import groep as groepsbeheer  # noqa: E402
-from groepen.groepenoverzicht import groepenoverzicht  # noqa: E402
+from atleten import beheer
+from db.queries import OpslagFout
+from groepen import groep as groepsbeheer
+from groepen.groepenoverzicht import groepenoverzicht
+from hulp import TESTSLEUTEL
 
 
 def test_formulier():
@@ -268,10 +264,3 @@ def test_routes():
         assert r.status_code == 400 and "Geef de groep een naam" in r.get_data(as_text=True)
         assert c.get("/groep/9999/leden").status_code == 404
         assert c.post("/groep/9999/leden", data={}).status_code == 404
-
-
-if __name__ == "__main__":
-    for naam, f in list(globals().items()):
-        if naam.startswith("test_") and callable(f):
-            f()
-            print("ok", naam)

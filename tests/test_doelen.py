@@ -7,24 +7,28 @@
     formulier, aanvullen uit inschrijvingen;
   * blokken op de groeps-, atleet- en wedstrijdpagina en de pagina's zelf.
 
-Alleen nepgegevens en een testsleutel. Werkt met pytest en los: `python tests/test_doelen.py`.
+Alleen nepgegevens en een testsleutel.
 """
 
-import sys
 from datetime import date, timedelta
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+import pytest
 
-from test_groep_landingspagina import TESTSLEUTEL, VANDAAG, opslag  # noqa: E402
+from test_groep_landingspagina import VANDAAG, opslag
 
-from db.queries import OpslagFout  # noqa: E402
-from groepen import doelen as doelbeheer  # noqa: E402
-from models import (Atleet, Doel, DoelRegel, Groep, Inschrijving, LeerdoelScore, Prestatie,  # noqa: E402
+from db.queries import OpslagFout
+from groepen import doelen as doelbeheer
+from models import (Atleet, Doel, DoelRegel, Groep, Inschrijving, LeerdoelScore, Prestatie,
                     Wedstrijd)
+from hulp import app_client, vaste_vandaag
 
 WEDSTRIJDDAG = VANDAAG + timedelta(days=8)              # za 24 okt 2026
+
+
+@pytest.fixture(autouse=True)
+def _vandaag_is_vandaag(monkeypatch):
+    """De tests rekenen met VANDAAG (vr 16 okt 2026); laat de code dat ook doen."""
+    vaste_vandaag(monkeypatch, VANDAAG)
 
 
 def _fout(f, *, soort=OpslagFout):
@@ -77,7 +81,7 @@ def test_opslag():
             DoelRegel("prestatie", ids["anna"], ids["100m"], streefwaarde=12.8),
             DoelRegel("vrij", omschrijving="Ploeg haalt 18 000 punten")]))
         terug = db.doel(d.id)
-        assert terug.startdatum == date.today() and terug.datum is None
+        assert terug.startdatum == VANDAAG and terug.datum is None   # standaard: vandaag
         assert [(r.soort, r.atleet_id, r.streefwaarde) for r in terug.regels] == [
             ("prestatie", ids["anna"], 12.8), ("vrij", None, None)]
         # In prestaties.db staat geen master_id, alleen het pseudoniem.
@@ -299,13 +303,10 @@ def test_blokken():
 
 
 def test_routes():
-    from ui.app import maak_app
     with opslag() as (db, tmp):
         ids = _basis(db)
         db.inschrijving_opslaan(Inschrijving(ids["anna"], ids["w"], ids["100m"]))
-        app = maak_app(map=tmp, hoofd=TESTSLEUTEL)
-        app.config["TESTING"] = True
-        c = app.test_client()
+        c = app_client(tmp)
         gid = ids["groep"]
         html = c.get(f"/groep/{gid}").get_data(as_text=True)
         assert f'href="/groep/{gid}/doelen"' in html and "Geen komende doelen" in html
@@ -348,10 +349,3 @@ def test_routes():
                     "/atleet/" + "0" * 32 + "/doel/nieuw"):
             assert c.get(pad).status_code == 404, pad
         assert c.post("/doel/9999/verwijderen").status_code == 404
-
-
-if __name__ == "__main__":
-    for naam, f in list(globals().items()):
-        if naam.startswith("test_") and callable(f):
-            f()
-            print("ok", naam)

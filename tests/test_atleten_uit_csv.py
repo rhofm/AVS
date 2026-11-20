@@ -2,37 +2,20 @@
 
 Gebruikt de geanonimiseerde profielpagina uit tests/fixtures/ en een tijdelijke map met
 een vaste testsleutel: raakt atletiek.nu, de sleutelkluis en data/ nooit aan.
-Werkt met pytest en ook los: `python tests/test_atleten_uit_csv.py`.
 """
 
-import contextlib
-import io
-import sys
 import tempfile
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-
-from atleten import beheer  # noqa: E402
-from db.init_db import init_db  # noqa: E402
-from db.queries import Opslag  # noqa: E402
-from groepen.atleten_uit_csv import (  # noqa: E402
+from atleten import beheer
+from groepen.atleten_uit_csv import (
     BevestigingNodig, lees_csv, lees_datum, lees_licentienummer, importeer_regels, maak_bevestig, schrijf_mislukt,
     splits_naam, veld_van_kop,
 )
-from importers.base import ImportFout  # noqa: E402
+from importers.base import ImportFout
+from hulp import opslag
 
-TESTSLEUTEL = "33" * 32
 PROFIEL = (Path(__file__).parent / "fixtures" / "atletieknu_profiel.html").read_text(encoding="utf-8")
-
-
-@contextlib.contextmanager
-def opslag():
-    with tempfile.TemporaryDirectory() as tmp:
-        with contextlib.redirect_stdout(io.StringIO()):
-            init_db(Path(tmp), hoofd=TESTSLEUTEL)
-        with Opslag(map=Path(tmp), hoofd=TESTSLEUTEL) as db:
-            yield db
 
 
 def stil(_):
@@ -217,10 +200,3 @@ def test_licentie_van_een_ander_wordt_niet_geimporteerd():
         db.atleet_opslaan(bas)
         v = importeer_regels(db, lees.regels, haal_html=lambda _: PROFIEL, log=stil)
         assert "555555" in v.mislukt[0][1]
-
-
-if __name__ == "__main__":
-    for naam, fn in list(globals().items()):
-        if naam.startswith("test_"):
-            fn()
-            print("ok", naam)

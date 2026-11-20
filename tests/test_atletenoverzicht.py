@@ -1,22 +1,17 @@
 """Tests voor src/atleten/overzicht.py en de pagina /atleten (zoeken, filteren, sorteren).
 
-Alleen nepgegevens en een vaste testsleutel. Werkt met pytest en los:
-`python tests/test_atletenoverzicht.py`.
+Alleen nepgegevens en een vaste testsleutel.
 """
 
 import re
-import sys
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+from test_app import client
+from test_landingspagina import VANDAAG, opslag, voorbeeld
 
-from test_app import TESTSLEUTEL, client, tekst  # noqa: E402
-from test_landingspagina import VANDAAG, opslag, voorbeeld  # noqa: E402
-
-from atleten import beheer, overzicht  # noqa: E402
-from db.queries import Opslag  # noqa: E402
-from models import Groep  # noqa: E402
+from atleten import beheer, overzicht
+from db.queries import Opslag
+from models import Groep
+from hulp import TESTSLEUTEL, tekst
 
 
 def _vul(db):
@@ -94,10 +89,3 @@ def test_pagina():
         r = tekst(c.get("/atleten?q=niemand"))
         assert re.search(r'<p class="leeg" data-filter-leeg>Geen atleten gevonden', r)
         assert c.get("/atleten?groep=abc").status_code == 200
-
-
-if __name__ == "__main__":
-    for naam, f in list(globals().items()):
-        if naam.startswith("test_") and callable(f):
-            f()
-            print("ok", naam)

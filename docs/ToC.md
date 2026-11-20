@@ -62,19 +62,16 @@ AVS/
 │   ├── zelftest.py               ✅ `--zelftest`: checks that a build is complete (modules, SQL, templates, keyring, ...)
 │   │
 │   ├── db/
-│   │   ├── init_db.py            ✅ keys, verbind(), create + migrate the 8 databases, recovery key, data folder
+│   │   ├── init_db.py            ✅ keys, verbind(), create + migrate the 8 databases (basisversie, version checks),
+│   │   │                            recovery key, data folder
 │   │   ├── queries.py            ✅ class Opslag: all SQL, models in → models out
-│   │   ├── schema_<database>.sql ✅ v1 (frozen) for personen, prestaties, testen, trainingsschema, absentie,
-│   │   │                            leerlijnen, leerdoelscores, notities
+│   │   ├── schema_<database>.sql ✅ baseline (frozen) for personen (v11), prestaties (v4), testen (v2),
+│   │   │                            trainingsschema (v2), absentie, leerlijnen, leerdoelscores, notities (v1);
+│   │   │                            the old migrations were squashed into these in October 2026
 │   │   ├── schema.sql            ⚠️ old single-database schema, no longer used
-│   │   └── migrations/
-│   │       ├── personen/         002 absentie to own database · 004 groep_trainingstijden · 005 training parts and variants ·
-│   │       │                     006 several trainings per day · 007 periodisering (+ old periodeplan → doelen) ·
-│   │       │                     008 rooster · 009 AU licence number · 010 ploeg_opstelling · 011 preferences
-│   │       │                     (there is no 003: two clashing 003s were replaced; init_db moves their data)
-│   │       ├── testen/           002 sjablonen (test.sjabloon, testresultaat.score, testresultaat_deel)
-│   │       ├── prestaties/       002 PR only wind-legal · 003 wedstrijd_programma (timetable) · 004 doelen
-│   │       └── trainingsschema/  002 trainingskeuze (which training on a day with several)
+│   │   └── migrations/           empty for now (only .gitkeep); new ones go in migrations/<database>/ and are
+│   │                                numbered after the baseline: personen 012+, prestaties 005+, testen 003+,
+│   │                                trainingsschema 003+, the others 002+
 │   │
 │   ├── models/                   ✅ dataclasses, no SQL
 │   │   ├── atleet.py · prestatie.py · groep.py · leerlijn.py · leerdoel.py · notitie.py
@@ -150,11 +147,13 @@ AVS/
 │       ├── templates/            ~60 pages
 │       └── static/               avs.css, filter.js, sorteer.js, levend.js
 │
-└── tests/                        fake data only; run with `python -m pytest` (74 test files)
+└── tests/                        fake data only; run with `python -m pytest` (75 test files)
     ├── test_<feature>.py         one file per feature (models, queries, atleten, groepen, wedstrijden, importers,
     │                             ploegen, regels, punten, rooster, periodisering, doelen, build, zelftest, ...)
     ├── test_masters_agegrading.py  age grading: factors, rounding, 24 example lines of the AU spreadsheet
-    ├── test_testen_*.py          formula engine, templates, results (incl. migration), editor and pages
+    ├── test_testen_*.py          formula engine, templates, results, editor and pages
+    ├── test_basisschema.py       the baseline schemas are frozen: compared with fixtures/basisschema.json
+    ├── test_sql_bestanden.py     installation checks: missing SQL files, migration numbers, too old / too new databases
     ├── test_groep_leerdoelen_scoren.py   scoring a whole group on a leerdoel
     ├── test_groep_testen_invullen.py     entering a test for a whole group
     ├── test_opstelling.py        📝 placeholder

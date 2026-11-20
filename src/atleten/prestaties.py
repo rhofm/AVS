@@ -72,7 +72,7 @@ def handmatig_toevoegen(db: Opslag, master_id: str, onderdeel: str | int, datum:
     if isinstance(waarde, str):
         waarde = lees_waarde(waarde, o.eenheid)
 
-    # Zelfde regel als de view `pr` (migratie prestaties/003): alleen windlegaal.
+    # Zelfde regel als de view `pr` (schema_prestaties.sql): alleen windlegaal.
     historie = pr_historie(db, master_id, o.id, alleen_windlegaal=True)
     oud_pr = historie[-1].waarde if historie else None
     p = Prestatie(o.naam, datum, waarde, atleet_id=master_id, onderdeel_id=o.id,

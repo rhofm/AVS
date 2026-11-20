@@ -1,6 +1,6 @@
 """Periodisering van een groep: megacyclus (fasen over het jaar) en mesocyclus (blok van een paar weken).
 
-Hoort bij personen.db (tabellen groep_fase, mesocyclus, mesocyclus_week; migratie 007).
+Hoort bij personen.db (tabellen groep_fase, mesocyclus, mesocyclus_week, zie schema_personen.sql).
 Geen persoonsgegevens.
 
 Eén regel voor allebei: een rij heeft een startdatum en geldt tot de volgende

@@ -1,23 +1,19 @@
 """Tests voor de testsjabloon-editor (testen/editor.py) en de pagina's/routes voor testsjablonen en testresultaten.
 
 Alleen nepgegevens en een vaste testsleutel (de nepgroep uit test_groep_landingspagina).
-Werkt met pytest en los: `python tests/test_testen_paginas.py`.
+
 """
 
 import re
-import sys
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+import pytest
+from test_groep_landingspagina import opslag, voorbeeldgroep
 
-import pytest  # noqa: E402
-from test_groep_landingspagina import TESTSLEUTEL, opslag, voorbeeldgroep  # noqa: E402
-
-from groepen import overzichten  # noqa: E402
-from testen import editor  # noqa: E402
-from testen import sjabloon as sj  # noqa: E402
-from testen.sjabloon import SjabloonFout  # noqa: E402
+from groepen import overzichten
+from testen import editor
+from testen import sjabloon as sj
+from testen.sjabloon import SjabloonFout
+from hulp import app_client
 
 
 def form(naam="Sprongkracht", rijen=(), totaal=None, totaal_getoond=None, **extra):
@@ -81,13 +77,6 @@ def test_editor_naar_sjabloon():
 
 
 # ---------------- routes ----------------
-def maak_client(tmp):
-    from ui.app import maak_app
-    app = maak_app(map=tmp, hoofd=TESTSLEUTEL)
-    app.config["TESTING"] = True
-    return app.test_client()
-
-
 def links_werken(c, html):
     for link in sorted(set(re.findall(r'href="(/(?:groep|atleet|testen)/[^"]*)"', html))):
         assert c.get(link).status_code == 200, link
@@ -95,7 +84,7 @@ def links_werken(c, html):
 
 def test_sjablonenlijst_en_download():
     with opslag() as (db, tmp):
-        c = maak_client(tmp)
+        c = app_client(tmp)
         r = c.get("/testen/sjablonen")
         html = r.get_data(as_text=True)
         assert r.status_code == 200 and "30 m vliegend" in html and "Verspringen vanuit stand" in html
@@ -110,7 +99,7 @@ def test_sjablonenlijst_en_download():
 def test_nieuw_sjabloon_via_formulier_en_naar_atleet():
     with opslag() as (db, tmp):
         anna = voorbeeldgroep(db)["anna"]
-        c = maak_client(tmp)
+        c = app_client(tmp)
         html = c.get(f"/testen/sjablonen/nieuw?atleet={anna}").get_data(as_text=True)
         assert 'name="onderdeel-naam-0"' in html and f'value="{anna}"' in html
         # Rij erbij (knop), blijft op het formulier.
@@ -143,7 +132,7 @@ def test_resultaat_invoeren_tonen_en_verwijderen():
     with opslag() as (db, tmp):
         ids = voorbeeldgroep(db)
         anna = ids["anna"]
-        c = maak_client(tmp)
+        c = app_client(tmp)
         d = form("Sprongkracht", [("Hoog", "lengte", "C1 * L", ["100"]), ("Sprint", "tijd", "C1 / T", ["150"])],
                  actie="opslaan")
         c.post("/testen/sjablonen/nieuw", data=d)
@@ -187,7 +176,7 @@ def test_resultaat_invoeren_tonen_en_verwijderen():
 
 def test_sjabloon_bewerken_en_verwijderen():
     with opslag() as (db, tmp):
-        c = maak_client(tmp)
+        c = app_client(tmp)
         # Een meegeleverd sjabloon bewerken geeft een eigen versie onder dezelfde bestandsnaam.
         d = form("30 m vliegend", [("Tijd", "tijd", "", [])], actie="opslaan")
         r = c.post("/testen/sjablonen/30m_vliegend", data=d)
@@ -209,14 +198,10 @@ def test_sjabloon_bewerken_en_verwijderen():
 def test_sjabloon_met_resultaten_vergrendeld():
     with opslag() as (db, tmp):
         anna = voorbeeldgroep(db)["anna"]
-        c = maak_client(tmp)
+        c = app_client(tmp)
         c.post("/testen/sjablonen/nieuw", data=form("Twee", [("a", "tijd", "C1 / T", ["10"]), ("b", "lengte", "", [])], actie="opslaan"))
         c.post(f"/atleet/{anna}/testen/nieuw", data={"sjabloon": "twee", "datum": "2026-10-20", "waarde-0": "5", "waarde-1": "2"})
         r = c.post("/testen/sjablonen/twee", data=form("Twee", [("a", "tijd", "C1 / T", ["10"])], actie="opslaan"))   # onderdeel eraf
         assert r.status_code == 400 and "aantal onderdelen" in r.get_data(as_text=True)
         r = c.post("/testen/sjablonen/twee", data=form("Twee", [("a2", "tijd", "C1 / T", ["20"]), ("b", "lengte", "", [])], actie="opslaan"))
         assert r.status_code == 302                                     # namen en formules wel
-
-
-if __name__ == "__main__":
-    raise SystemExit(pytest.main([__file__, "-q"]))

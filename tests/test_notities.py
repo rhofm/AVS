@@ -1,29 +1,16 @@
 """Tests voor src/atleten/notities.py en de notitiepagina's.
 
-Alleen nepgegevens en een vaste testsleutel. Werkt met pytest en los:
-`python tests/test_notities.py`.
+Alleen nepgegevens en een vaste testsleutel.
 """
 
-import sys
 from datetime import date, timedelta
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+from test_app import client
+from test_landingspagina import VANDAAG, opslag, voorbeeld
 
-from test_app import TESTSLEUTEL, client, tekst  # noqa: E402
-from test_landingspagina import VANDAAG, opslag, voorbeeld  # noqa: E402
-
-from atleten import beheer, notities  # noqa: E402
-from db.queries import Opslag, OpslagFout  # noqa: E402
-
-
-def _verwacht(fout, fn):
-    try:
-        fn()
-    except fout:
-        return
-    raise AssertionError(f"{fout.__name__} verwacht")
+from atleten import beheer, notities
+from db.queries import Opslag, OpslagFout
+from hulp import TESTSLEUTEL, tekst, verwacht as _verwacht
 
 
 def test_beheer():
@@ -92,10 +79,3 @@ def test_paginas():
         assert "Notitie van 03-10-2026 verwijderd." in tekst(r)
         assert c.get(f"/atleet/{mid}/notities/{nid}").status_code == 404
         assert c.get("/atleet/" + "0" * 32 + "/notities").status_code == 404
-
-
-if __name__ == "__main__":
-    for naam, f in list(globals().items()):
-        if naam.startswith("test_") and callable(f):
-            f()
-            print("ok", naam)

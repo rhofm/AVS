@@ -1,48 +1,22 @@
-"""Tests voor de trainingstijden van groepen (tabel groep_trainingstijden, personen-migratie 004).
+"""Tests voor de trainingstijden van groepen (tabel groep_trainingstijden in personen.db).
 
 Eén rij per groep: groep_id + per weekdag een begintijd 'HH:MM' of leeg (= geen
 training). Leden staan in groep_lid (lang formaat); een atleet kan in meerdere
-groepen zitten. Ook: het overzetten van de twee oude varianten (allebei ooit
-migratie 003) en de controle op dubbele migratienummers.
+groepen zitten. Ook: de controle op dubbele migratienummers.
 
-Alleen nepgegevens en een vaste testsleutel. Werkt met pytest en los:
-`python tests/test_groep_starttijden.py`.
+Alleen nepgegevens en een vaste testsleutel.
 """
 
-import contextlib
-import io
-import sys
 import tempfile
 from datetime import date
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-
-from atleten import trainingsschema as schema_pagina  # noqa: E402
-from db import init_db as init_module  # noqa: E402
-from db.init_db import _migraties, DB_DIR, huidige_versie, init_db, verbind  # noqa: E402
-from db.queries import Opslag, OpslagFout  # noqa: E402
-from groepen import groep as groepsbeheer  # noqa: E402
-from models import Atleet, Groep, Trainingsschema, normaliseer_tijd  # noqa: E402
-
-TESTSLEUTEL = "44" * 32
-
-
-@contextlib.contextmanager
-def opslag():
-    with tempfile.TemporaryDirectory() as tmp:
-        with contextlib.redirect_stdout(io.StringIO()):
-            init_db(Path(tmp), hoofd=TESTSLEUTEL)
-        with Opslag(map=Path(tmp), hoofd=TESTSLEUTEL) as db:
-            yield db
-
-
-def _verwacht(fout, fn) -> None:
-    try:
-        fn()
-    except fout:
-        return
-    raise AssertionError(f"{fout.__name__} verwacht")
+from atleten import trainingsschema as schema_pagina
+from db import init_db as init_module
+from db.queries import OpslagFout
+from groepen import groep as groepsbeheer
+from models import Atleet, Trainingsschema, normaliseer_tijd
+from hulp import opslag, verwacht as _verwacht
 
 
 def _basis(db):
@@ -127,55 +101,6 @@ def test_rooster_en_schemapagina():
         assert per_dag["donderdag"] == [] and per_dag["maandag"] == []
 
 
-def _oude_personen_db(map_: Path, extra_sql: str) -> None:
-    """personen.db zoals hij na een van de oude migraties 003 kon zijn (versie 3)."""
-    with contextlib.closing(verbind("personen", map_, TESTSLEUTEL)) as c:   # sluiten: anders vergrendeld op Windows
-        c.executescript((DB_DIR / "schema_personen.sql").read_text(encoding="utf-8"))
-        c.executescript((DB_DIR / "migrations" / "personen" / "002_absentie_naar_eigen_database.sql")
-                        .read_text(encoding="utf-8"))
-        c.execute("INSERT INTO groep (id, naam) VALUES (1, 'Sprint'), (2, 'Werpers')")
-        c.execute("INSERT INTO schema_version (versie) VALUES (2), (3)")
-        c.commit()
-        c.executescript(extra_sql)
-
-
-def test_oude_variant_kolommen_op_groep():
-    with tempfile.TemporaryDirectory() as tmp:
-        map_ = Path(tmp)
-        dagen = ("maandag", "dinsdag", "woensdag", "donderdag", "vrijdag", "zaterdag", "zondag")
-        _oude_personen_db(map_, "".join(f"ALTER TABLE groep ADD COLUMN {d} TEXT;" for d in dagen)
-                          + "UPDATE groep SET dinsdag = '18:30', donderdag = '18:30' WHERE id = 1;")
-        uit = io.StringIO()
-        with contextlib.redirect_stdout(uit):
-            init_db(map_, hoofd=TESTSLEUTEL)
-            init_db(map_, hoofd=TESTSLEUTEL)                     # tweede keer: niets meer te doen
-        assert uit.getvalue().count("overgezet") == 1
-        with Opslag(map=map_, hoofd=TESTSLEUTEL) as db:
-            assert huidige_versie(db.personen) == max(n for n, _ in _migraties("personen"))   # alle migraties toegepast
-            assert db.groep(1).trainingsdagen == {"dinsdag": "18:30", "donderdag": "18:30"}
-            assert db.groep(2).trainingsdagen == {}
-            kolommen = {r[1] for r in db.personen.execute("PRAGMA table_info(groep)")}
-            assert not kolommen & set(dagen)                     # oude kolommen weg
-
-
-def test_oude_variant_tabel_groep_trainingsdag():
-    with tempfile.TemporaryDirectory() as tmp:
-        map_ = Path(tmp)
-        _oude_personen_db(map_, """
-            CREATE TABLE groep_trainingsdag (groep_id INTEGER NOT NULL REFERENCES groep(id) ON DELETE CASCADE,
-                dag TEXT NOT NULL, starttijd TEXT, PRIMARY KEY (groep_id, dag));
-            INSERT INTO groep_trainingsdag VALUES (2, 'maandag', '19:00'), (2, 'woensdag', '19:00'),
-                                                  (2, 'zaterdag', NULL);""")
-        uit = io.StringIO()
-        with contextlib.redirect_stdout(uit):
-            init_db(map_, hoofd=TESTSLEUTEL)
-        assert "1 trainingsdag(en) zonder begintijd" in uit.getvalue()     # zaterdag had geen tijd
-        with Opslag(map=map_, hoofd=TESTSLEUTEL) as db:
-            assert db.groep(2).trainingsdagen == {"maandag": "19:00", "woensdag": "19:00"}
-            assert db.personen.execute(
-                "SELECT count(*) FROM sqlite_master WHERE name = 'groep_trainingsdag'").fetchone()[0] == 0
-
-
 def test_dubbele_migratienummers_worden_geweigerd():
     with tempfile.TemporaryDirectory() as tmp:
         map_dir = Path(tmp) / "personen"
@@ -188,11 +113,3 @@ def test_dubbele_migratienummers_worden_geweigerd():
             _verwacht(RuntimeError, lambda: init_module._migraties("personen"))
         finally:
             init_module.MIGRATIONS_DIR = oud
-
-
-if __name__ == "__main__":
-    tests = [(n, f) for n, f in globals().items() if n.startswith("test_") and callable(f)]
-    for naam, fn in tests:
-        fn()
-        print(f"ok  {naam}")
-    print(f"{len(tests)} tests geslaagd")

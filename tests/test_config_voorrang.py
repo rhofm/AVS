@@ -14,9 +14,7 @@ from pathlib import Path
 
 import pytest
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-
-from ploeg import config, punten, regels  # noqa: E402
+from ploeg import config, punten, regels
 
 REPO_CONFIG = Path(__file__).resolve().parents[1] / "config"
 EIGEN_PUNTEN = "tabellen:\n  t:\n    alle:\n      100m: {formule: au_loop, A: 1000, B: 0}\n"

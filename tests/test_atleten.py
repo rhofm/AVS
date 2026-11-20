@@ -1,47 +1,28 @@
 """Tests voor src/atleten/, met echte (versleutelde) databases in een tijdelijke map.
 
 Gebruikt een vaste testsleutel: raakt de sleutelkluis en data/ nooit aan.
-Alleen nepgegevens. Werkt met pytest en ook los: `python tests/test_atleten.py`.
+Alleen nepgegevens.
 """
 
 import contextlib
-import io
-import sys
-import tempfile
 from datetime import date
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-
-from atleten import beheer, koppelen, prestaties, profiel, testen  # noqa: E402
-from db.init_db import init_db  # noqa: E402
-from db.queries import Opslag, OpslagFout  # noqa: E402
-from models import (  # noqa: E402
+from atleten import beheer, koppelen, prestaties, profiel, testen
+from db.queries import OpslagFout
+from models import (
     Groep, Inschrijving, Leerlijn, LeerlijnStap, LeerlijnVoortgang, Onderdeel, Prestatie, Test, Wedstrijd,
 )
-
-TESTSLEUTEL = "22" * 32
+from hulp import lege_opslag, verwacht as _verwacht
 
 
 @contextlib.contextmanager
 def opslag():
-    with tempfile.TemporaryDirectory() as tmp:
-        with contextlib.redirect_stdout(io.StringIO()):
-            init_db(Path(tmp), hoofd=TESTSLEUTEL)
-        with Opslag(map=Path(tmp), hoofd=TESTSLEUTEL) as db:
-            db.onderdeel_opslaan(Onderdeel("100m", "tijd", True, "sprint"))
-            db.onderdeel_opslaan(Onderdeel("800m", "tijd", True, "midden"))
-            db.onderdeel_opslaan(Onderdeel("60m", "tijd", True, "sprint"))
-            db.onderdeel_opslaan(Onderdeel("Verspringen", "afstand", False, "springen"))
-            yield db
-
-
-def _verwacht(fout, fn):
-    try:
-        fn()
-    except fout as e:
-        return e
-    raise AssertionError(f"{fout.__name__} verwacht")
+    with lege_opslag() as (db, tmp):
+        db.onderdeel_opslaan(Onderdeel("100m", "tijd", True, "sprint"))
+        db.onderdeel_opslaan(Onderdeel("800m", "tijd", True, "midden"))
+        db.onderdeel_opslaan(Onderdeel("60m", "tijd", True, "sprint"))
+        db.onderdeel_opslaan(Onderdeel("Verspringen", "afstand", False, "springen"))
+        yield db
 
 
 # ---------------- beheer ----------------
@@ -203,11 +184,3 @@ def test_profiel():
         assert [g.naam for g in prof.groepen] == ["Junioren C"]
         assert "Anna" not in repr(prof.atleet)
         assert profiel.profiel(db, "f" * 32) is None
-
-
-if __name__ == "__main__":
-    tests = [(n, f) for n, f in globals().items() if n.startswith("test_") and callable(f)]
-    for naam, fn in tests:
-        fn()
-        print(f"ok  {naam}")
-    print(f"{len(tests)} tests geslaagd")

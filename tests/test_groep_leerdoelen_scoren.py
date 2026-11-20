@@ -1,29 +1,17 @@
 """Tests voor src/groepen/leerdoelen_scoren.py en de pagina 'Leerdoelen scoren' van een groep.
 
 Gebruikt de nepgroep uit test_groep_landingspagina (alleen nepgegevens, testsleutel).
-Werkt met pytest en los: `python tests/test_groep_leerdoelen_scoren.py`.
+
 """
 
-import sys
 from datetime import date
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+from test_groep_landingspagina import VANDAAG, opslag, voorbeeldgroep
 
-from test_groep_landingspagina import TESTSLEUTEL, VANDAAG, opslag, voorbeeldgroep  # noqa: E402
-
-from atleten import beheer  # noqa: E402
-from db.queries import OpslagFout  # noqa: E402
-from groepen import leerdoelen_scoren  # noqa: E402
-
-
-def _verwacht(fout, fn):
-    try:
-        fn()
-    except fout:
-        return
-    raise AssertionError(f"{fout.__name__} verwacht")
+from atleten import beheer
+from db.queries import OpslagFout
+from groepen import leerdoelen_scoren
+from hulp import app_client, verwacht as _verwacht
 
 
 def _doel(db, categorie="U14", leerlijn="SPR"):
@@ -89,14 +77,11 @@ def test_fouten_slaan_niets_op():
 
 
 def test_routes():
-    from ui.app import maak_app
     with opslag() as (db, tmp):
         ids = voorbeeldgroep(db)
         gid = ids["groep"]
         doel = _doel(db, "U14")
-        app = maak_app(map=tmp, hoofd=TESTSLEUTEL)
-        app.config["TESTING"] = True
-        c = app.test_client()
+        c = app_client(tmp)
         pad = f"/groep/{gid}/leerdoelen/scoren"
 
         r = c.get(pad)
@@ -127,10 +112,3 @@ def test_routes():
         assert c.post(pad, data={"datum": "2026-10-01"}).status_code == 400
         assert c.post("/groep/9999/leerdoelen/scoren", data={"leerdoel": doel.id}).status_code == 404
         assert db.leerdoelscores(ids["cas"]) == []
-
-
-if __name__ == "__main__":
-    for naam, f in list(globals().items()):
-        if naam.startswith("test_") and callable(f):
-            f()
-            print("ok", naam)

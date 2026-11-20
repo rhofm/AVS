@@ -2,20 +2,15 @@
 kiezen (wedstrijden.detail.wedstrijdkeuze, /atleet/<id>/inschrijven) of een nieuwe maken,
 dan het inschrijfformulier met die atleet al aangevinkt, en terug naar zijn planning.
 
-Alleen nepgegevens en een vaste testsleutel; niets van internet. Werkt met pytest en los:
-`python tests/test_atleet_inschrijven.py`.
+Alleen nepgegevens en een vaste testsleutel; niets van internet.
 """
 
-import sys
 from datetime import date, timedelta
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+from hulp import app_client
+from test_wedstrijdpagina import DAG, opslag
 
-from test_wedstrijdpagina import DAG, _client, opslag  # noqa: E402
-
-from wedstrijden import detail, planning  # noqa: E402
+from wedstrijden import detail, planning
 
 # Uit test_wedstrijdpagina.opslag(): 'Clubkampioenschappen' over 8 dagen met tijdschema;
 # Anna (U16V) staat ingeschreven voor 100m en Verspringen, Bram (U16M) ook, Cees (U12M) niet.
@@ -48,7 +43,7 @@ def test_wedstrijdkeuze():
 def test_knop_en_keuzepagina():
     with opslag() as (db, tmp, ids):
         los, _ = _extra(db)
-        c = _client(tmp)
+        c = app_client(tmp)
         html = c.get(f"/atleet/{ids['cees']}/wedstrijden").get_data(as_text=True)
         assert f'href="/atleet/{ids["cees"]}/inschrijven">+ Inschrijven</a>' in html
         r = c.get(f"/atleet/{ids['cees']}/inschrijven")
@@ -65,7 +60,7 @@ def test_knop_en_keuzepagina():
 
 def test_inschrijven_vanaf_atleet():
     with opslag() as (db, tmp, ids):
-        c = _client(tmp)
+        c = app_client(tmp)
         url = f"/wedstrijd/{ids['w']}/inschrijven?atleet={ids['cees']}"
         html = c.get(url).get_data(as_text=True)
         assert f'name="atleet" value="{ids["cees"]}" id="atl-{ids["cees"]}" checked' in html     # al aangevinkt
@@ -86,7 +81,7 @@ def test_inschrijven_vanaf_atleet():
 
 def test_nieuwe_wedstrijd_vanaf_atleet():
     with opslag() as (db, tmp, ids):
-        c = _client(tmp)
+        c = app_client(tmp)
         html = c.get(f"/wedstrijden/nieuw?atleet={ids['cees']}").get_data(as_text=True)
         assert html.count(f'name="van_atleet" value="{ids["cees"]}"') == 2            # in beide formulieren
         assert "Inschrijven Cees Nep" in html and "Daarna schrijf je Cees in." in html
@@ -100,10 +95,3 @@ def test_nieuwe_wedstrijd_vanaf_atleet():
         # Fout in het formulier: de atleet blijft onthouden.
         r = c.post("/wedstrijden/nieuw", data={"soort": "hand", "van_atleet": ids["cees"], "naam": "X", "datum": ""})
         assert r.status_code == 400 and f'name="van_atleet" value="{ids["cees"]}"' in r.get_data(as_text=True)
-
-
-if __name__ == "__main__":
-    for naam, fn in list(globals().items()):
-        if naam.startswith("test_") and callable(fn):
-            fn()
-            print("ok ", naam)

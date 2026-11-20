@@ -1,27 +1,15 @@
 """Tests voor de importeerpagina (src/ui/importeren.py en de routes /importeren...).
 
 Tijdelijke map met versleutelde databases, vaste testsleutel, alleen nepgegevens.
-Werkt met pytest en los: `python tests/test_importeren.py`.
+
 """
 
 import re
-import sys
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+from test_startpagina import opslag
 
-from test_startpagina import opslag  # noqa: E402
-from test_landingspagina import TESTSLEUTEL  # noqa: E402
-
-from ui import importeren  # noqa: E402
-from ui.app import maak_app  # noqa: E402
-
-
-def _client(tmp: Path):
-    app = maak_app(map=tmp, hoofd=TESTSLEUTEL)
-    app.config["TESTING"] = True
-    return app.test_client()
+from ui import importeren
+from hulp import app_client
 
 
 def test_keuzes():
@@ -35,7 +23,7 @@ def test_keuzes():
 
 def test_importeerpagina():
     with opslag() as (_, tmp):
-        c = _client(tmp)
+        c = app_client(tmp)
         r = c.get("/importeren")
         html = r.get_data(as_text=True)
         assert r.status_code == 200
@@ -54,7 +42,7 @@ def test_importeerpagina():
 
 def test_importpaginas_werken_en_gaan_terug_naar_importeren():
     with opslag() as (_, tmp):
-        c = _client(tmp)
+        c = app_client(tmp)
         r = c.get("/importeren/groep")
         html = r.get_data(as_text=True)
         assert r.status_code == 200
@@ -66,7 +54,7 @@ def test_importpaginas_werken_en_gaan_terug_naar_importeren():
 
 def test_atleet_en_wedstrijd_sturen_door_naar_formulieren():
     with opslag() as (_, tmp):
-        c = _client(tmp)
+        c = app_client(tmp)
         for soort, doel, kop in (("atleet", "/atleten/nieuw", "Nieuwe atleet"),
                                  ("wedstrijd", "/wedstrijden/nieuw", "Nieuwe wedstrijd")):
             r = c.get(f"/importeren/{soort}")
@@ -76,13 +64,6 @@ def test_atleet_en_wedstrijd_sturen_door_naar_formulieren():
 
 def test_startpagina_knop_gaat_naar_importeren():
     with opslag() as (_, tmp):
-        c = _client(tmp)
+        c = app_client(tmp)
         assert 'href="/importeren"' in c.get("/").get_data(as_text=True)
         assert "Deze pagina komt nog" not in c.get("/importeren").get_data(as_text=True)
-
-
-if __name__ == "__main__":
-    for naam, f in list(globals().items()):
-        if naam.startswith("test_") and callable(f):
-            f()
-            print("ok", naam)

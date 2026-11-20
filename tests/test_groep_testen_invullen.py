@@ -1,24 +1,20 @@
 """Tests voor groepen/testen_invullen.py en de pagina 'Testresultaten invullen' van een groep.
 
 Alleen nepgegevens en een vaste testsleutel (de nepgroep uit test_groep_landingspagina).
-Werkt met pytest en los: `python tests/test_groep_testen_invullen.py`.
+
 """
 
-import sys
 from datetime import date
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+import pytest
+from test_groep_landingspagina import opslag, voorbeeldgroep
+from test_testen_paginas import form
+from hulp import app_client
 
-import pytest  # noqa: E402
-from test_groep_landingspagina import TESTSLEUTEL, opslag, voorbeeldgroep  # noqa: E402
-from test_testen_paginas import form, maak_client  # noqa: E402
-
-from groepen import testen_invullen as ti  # noqa: E402
-from testen import resultaten as res  # noqa: E402
-from testen import sjabloon as sj  # noqa: E402
-from testen.sjabloon import Onderdeel, Sjabloon  # noqa: E402
+from groepen import testen_invullen as ti
+from testen import resultaten as res
+from testen import sjabloon as sj
+from testen.sjabloon import Onderdeel, Sjabloon
 
 DAG = date(2026, 10, 20)
 
@@ -79,7 +75,7 @@ def test_routes():
     with opslag() as (db, tmp):
         ids = voorbeeldgroep(db)
         gid = ids["groep"]
-        c = maak_client(tmp)
+        c = app_client(tmp)
         html = c.get(f"/groep/{gid}/testen").get_data(as_text=True)
         assert f"/groep/{gid}/testen/invullen" in html
         r = c.get(f"/groep/{gid}/testen/invullen")
@@ -114,7 +110,3 @@ def test_routes():
         assert r.status_code == 200 and "2 resultaten" in html and "87,5" in html
         assert len(db.testresultaten(ids["bram"])) == 1 and len(db.testresultaten(ids["cas"])) == 1
         assert "Hoog" in c.get(f"/groep/{gid}/testen").get_data(as_text=True)
-
-
-if __name__ == "__main__":
-    raise SystemExit(pytest.main([__file__, "-q"]))

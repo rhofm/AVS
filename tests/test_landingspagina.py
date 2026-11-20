@@ -1,38 +1,29 @@
 """Tests voor src/atleten/landingspagina.py en het template ui/templates/atleet.html.
 
 Echte (versleutelde) databases in een tijdelijke map, vaste testsleutel,
-alleen nepgegevens. Werkt met pytest en los: `python tests/test_landingspagina.py`.
+alleen nepgegevens.
 """
 
 import contextlib
-import io
-import sys
-import tempfile
 from datetime import date, timedelta
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+from atleten import beheer, landingspagina, prestaties
+from db.queries import Opslag
+from models import Absentie, Groep, Notitie, Onderdeel, Test, Testresultaat, Training, Trainingsschema
+from wedstrijden import planning
+from hulp import lege_opslag
 
-from atleten import beheer, landingspagina, prestaties  # noqa: E402
-from db.init_db import init_db  # noqa: E402
-from db.queries import Opslag  # noqa: E402
-from models import Absentie, Groep, Notitie, Onderdeel, Test, Testresultaat, Training, Trainingsschema  # noqa: E402
-from wedstrijden import planning  # noqa: E402
-
-TESTSLEUTEL = "44" * 32
 VANDAAG = date(2026, 10, 16)   # een vrijdag
 TEMPLATES = Path(__file__).resolve().parents[1] / "src" / "ui" / "templates"
 
 
 @contextlib.contextmanager
 def opslag():
-    with tempfile.TemporaryDirectory() as tmp:
-        with contextlib.redirect_stdout(io.StringIO()):
-            init_db(Path(tmp), hoofd=TESTSLEUTEL)
-        with Opslag(map=Path(tmp), hoofd=TESTSLEUTEL) as db:
-            db.onderdeel_opslaan(Onderdeel("100m", "tijd", True, "sprint"))
-            db.onderdeel_opslaan(Onderdeel("Verspringen", "afstand", False, "springen"))
-            yield db
+    with lege_opslag() as (db, tmp):
+        db.onderdeel_opslaan(Onderdeel("100m", "tijd", True, "sprint"))
+        db.onderdeel_opslaan(Onderdeel("Verspringen", "afstand", False, "springen"))
+        yield db
 
 
 def voorbeeld(db: Opslag) -> str:
@@ -146,10 +137,3 @@ def test_template():
         leeg = beheer.nieuwe_atleet(db, "Bas", "Leeg")
         html = render(landingspagina.landingspagina(db, leeg.master_id, peildatum=VANDAAG))
         assert "Nog geen notities" in html and "Niet ingeschreven" in html
-
-
-if __name__ == "__main__":
-    for naam, f in list(globals().items()):
-        if naam.startswith("test_") and callable(f):
-            f()
-            print("ok", naam)

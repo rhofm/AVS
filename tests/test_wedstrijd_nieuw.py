@@ -5,51 +5,32 @@ wedstrijden.detail.gegevens_opslaan en de routes /wedstrijden/nieuw,
 
 Er wordt niets van internet gehaald: de importer leest een opgeslagen, geanonimiseerde
 pagina (fixtures/atletieknu_tijdschema/meerkamp.html: 'Testmeerkamp 2026', Proefdorp,
-29 en 30 augustus 2026, 15 regels). Werkt met pytest en los:
-`python tests/test_wedstrijd_nieuw.py`.
+29 en 30 augustus 2026, 15 regels).
 """
 
 import contextlib
-import io
-import sys
-import tempfile
 from datetime import date
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+from test_tijdschema_import import MEERKAMP, NepImporter
 
-from test_landingspagina import TESTSLEUTEL  # noqa: E402
-from test_tijdschema_import import MEERKAMP, NepImporter  # noqa: E402
-
-from atleten import beheer  # noqa: E402
-from db.init_db import init_db  # noqa: E402
-from db.queries import Opslag, OpslagFout  # noqa: E402
-from models import Onderdeel  # noqa: E402
-from wedstrijden import detail, planning, tijdschema_import  # noqa: E402
-from wedstrijden.detail import Gegevens  # noqa: E402
+from atleten import beheer
+from db.queries import OpslagFout
+from models import Onderdeel
+from wedstrijden import detail, planning, tijdschema_import
+from wedstrijden.detail import Gegevens
+from hulp import app_client, lege_opslag, verwacht as _verwacht
 
 LINK = "https://www.atletiek.nu/wedstrijd/main/45678/"
 GENORMALISEERD = "https://www.atletiek.nu/wedstrijd/uitslagen/45678/"
 BROWSERCONTROLE = "<html><body>Checking your browser</body></html>"
 
 
-def _verwacht(fout, fn) -> None:
-    try:
-        fn()
-    except fout:
-        return
-    raise AssertionError(f"{fout.__name__} verwacht")
-
-
 @contextlib.contextmanager
 def opslag():
-    with tempfile.TemporaryDirectory() as tmp:
-        with contextlib.redirect_stdout(io.StringIO()):
-            init_db(Path(tmp), hoofd=TESTSLEUTEL)
-        with Opslag(map=Path(tmp), hoofd=TESTSLEUTEL) as db:
-            db.onderdeel_opslaan(Onderdeel("100m", "tijd", True, "sprint"))
-            yield db, Path(tmp)
+    with lege_opslag() as (db, tmp):
+        db.onderdeel_opslaan(Onderdeel("100m", "tijd", True, "sprint"))
+        yield db, Path(tmp)
 
 
 @contextlib.contextmanager
@@ -64,13 +45,6 @@ def nep_site(inhoud: str | None = None):
         yield
     finally:
         tijdschema_import._ophalen = echt
-
-
-def _client(tmp):
-    from ui.app import maak_app
-    app = maak_app(map=tmp, hoofd=TESTSLEUTEL)
-    app.config["TESTING"] = True
-    return app.test_client()
 
 
 # ---------------------------------------------------------------- van een link
@@ -124,7 +98,7 @@ def test_gegevens_opslaan():
 
 def test_nieuw_pagina():
     with opslag() as (db, tmp):
-        c = _client(tmp)
+        c = app_client(tmp)
         html = c.get("/wedstrijden/nieuw").get_data(as_text=True)
         assert "Deze pagina komt nog" not in html
         assert 'name="soort" value="link"' in html and 'name="soort" value="hand"' in html
@@ -133,7 +107,7 @@ def test_nieuw_pagina():
 
 def test_nieuw_van_link_route():
     with opslag() as (db, tmp):
-        c = _client(tmp)
+        c = app_client(tmp)
         with nep_site():
             r = c.post("/wedstrijden/nieuw", data={"soort": "link", "link": LINK, "indoor": "1"})
         assert r.status_code == 302
@@ -155,7 +129,7 @@ def test_nieuw_van_link_route():
 
 def test_nieuw_met_de_hand_route():
     with opslag() as (db, tmp):
-        c = _client(tmp)
+        c = app_client(tmp)
         r = c.post("/wedstrijden/nieuw", data={"soort": "hand", "naam": "Clubkampioenschappen",
                                                "datum": "2027-05-15", "locatie": "Nijmegen", "link": ""})
         assert r.status_code == 302 and "/inschrijven" in r.headers["Location"]
@@ -170,7 +144,7 @@ def test_nieuw_met_de_hand_route():
 def test_bewerken_route():
     with opslag() as (db, tmp):
         w = planning.plan_wedstrijd(db, "Clubkampioenschappen", date(2027, 5, 15), "Nijmegen")
-        c = _client(tmp)
+        c = app_client(tmp)
         html = c.get(f"/wedstrijd/{w.id}").get_data(as_text=True)
         assert f'href="/wedstrijd/{w.id}/bewerken">Gegevens wijzigen</a>' in html
         assert "Tijdschema bijwerken" not in html                       # geen link: veld om er een te plakken
@@ -197,7 +171,7 @@ def test_bewerken_route():
 def test_tijdschema_knop():
     with opslag() as (db, tmp):
         w = planning.plan_wedstrijd(db, "Testmeerkamp", date(2026, 8, 29), link=LINK)
-        c = _client(tmp)
+        c = app_client(tmp)
         html = c.get(f"/wedstrijd/{w.id}").get_data(as_text=True)
         assert ">Tijdschema importeren</button>" in html                 # bovenaan, met de bewaarde link
         with nep_site():
@@ -224,14 +198,7 @@ def test_inschrijven_na_nieuw():
     with opslag() as (db, tmp):
         anna = beheer.nieuwe_atleet(db, "Anna", "Voorbeeld", geslacht="V", geboortedatum="2008").master_id
         n = tijdschema_import.wedstrijd_uit_link(db, LINK, importer=NepImporter(MEERKAMP))
-        c = _client(tmp)
+        c = app_client(tmp)
         r = c.post(f"/wedstrijd/{n.wedstrijd.id}/inschrijven", data={"atleet": [anna], "onderdeel": []})
         assert r.status_code == 302
         assert "Anna Voorbeeld" in c.get(f"/wedstrijd/{n.wedstrijd.id}").get_data(as_text=True)
-
-
-if __name__ == "__main__":
-    for naam, fn in list(globals().items()):
-        if naam.startswith("test_") and callable(fn):
-            fn()
-            print("ok ", naam)

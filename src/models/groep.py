@@ -42,7 +42,7 @@ class Groep:
     # De tijden horen bij de groep, niet bij de atleet. Opslaan via
     # Opslag.groep_trainingsdagen_opslaan() (los van groep_opslaan()).
     trainingsdagen: dict[str, str] = field(default_factory=dict)
-    # Extra begintijden op dezelfde dag (tabel groep_extra_trainingstijd, migratie 006):
+    # Extra begintijden op dezelfde dag (tabel groep_extra_trainingstijd):
     # {'zaterdag': ['10:30']}. Alleen op dagen die ook in trainingsdagen staan.
     # Opslaan via Opslag.groep_extra_tijden_opslaan().
     extra_tijden: dict[str, list[str]] = field(default_factory=dict)
@@ -83,7 +83,7 @@ TRAININGSONDERDELEN: tuple[tuple[str, str], ...] = (
 
 @dataclass(slots=True)
 class Training:
-    """Eén training van een groep (tabel training in personen.db, migratie 005).
+    """Eén training van een groep (tabel training in personen.db).
 
     De tekstvelden zijn meerregelig en mogen markdown bevatten (**vet**, *schuin*,
     '- ' lijstjes, '# ' kopjes). Leeg/None = niet ingevuld.
@@ -103,10 +103,10 @@ class Training:
     cooling_down: str | None = None
     hoofdtraining_id: int | None = None
     atleten: list[str] = field(default_factory=list)   # master_ids; alleen bij een afwijkende training
-    # Begintijd van deze training ('HH:MM', migratie 006). None = de vaste begintijd van die dag;
+    # Begintijd van deze training ('HH:MM'). None = de vaste begintijd van die dag;
     # nodig als een groep meerdere trainingen op één dag heeft. Zie effectieve_starttijd().
     starttijd: str | None = None
-    # Uit welke roosterregel de inhoud komt (migratie 008). None = niet (of niet meer) uit het rooster.
+    # Uit welke roosterregel de inhoud komt. None = niet (of niet meer) uit het rooster.
     rooster_regel_id: int | None = None
 
     def __post_init__(self) -> None:

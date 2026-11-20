@@ -2,29 +2,25 @@
 komende en afgelopen wedstrijden, aantallen, het vinkje 'Afgelopen wedstrijden'
 en de knop '+ Nieuwe wedstrijd'.
 
-Alleen nepgegevens en een vaste testsleutel. Werkt met pytest en los:
-`python tests/test_wedstrijdenoverzicht.py`.
+Alleen nepgegevens en een vaste testsleutel.
 """
 
 import contextlib
 import io
 import re
-import sys
 import tempfile
 from datetime import date, timedelta
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+from test_landingspagina import VANDAAG, opslag, voorbeeld
 
-from test_landingspagina import TESTSLEUTEL, VANDAAG, opslag, voorbeeld  # noqa: E402
-
-from atleten import beheer  # noqa: E402
-from db.init_db import init_db  # noqa: E402
-from db.queries import Opslag  # noqa: E402
-from models import Onderdeel  # noqa: E402
-from wedstrijden import planning  # noqa: E402
-from wedstrijden.overzicht import wedstrijdenoverzicht  # noqa: E402
+from atleten import beheer
+from db.init_db import init_db
+from db.queries import Opslag
+from models import Onderdeel
+from wedstrijden import planning
+from wedstrijden.overzicht import wedstrijdenoverzicht
+from hulp import TESTSLEUTEL
 
 
 def test_komend_en_afgelopen():
@@ -132,10 +128,3 @@ def test_pagina_leeg():
         html = c.get("/wedstrijden").get_data(as_text=True)
         assert "0 komende wedstrijden" in html and "Geen komende wedstrijden gepland" in html
         assert "Nog geen afgelopen wedstrijden" in html and "(0)" in html
-
-
-if __name__ == "__main__":
-    for naam, fn in list(globals().items()):
-        if naam.startswith("test_") and callable(fn):
-            fn()
-            print("ok ", naam)

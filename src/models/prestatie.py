@@ -31,9 +31,9 @@ def heeft_windmeting(naam: str) -> bool:
     """Wordt bij dit onderdeel de wind gemeten?
 
     Ja voor sprints en horden t/m 200 m, verspringen en hinkstapspringen.
-    Nee voor estafettes en al het andere. Dezelfde regel staat in SQL in
-    db/migrations/prestaties/002_pr_alleen_windlegaal.sql; houd ze gelijk
-    (tests/test_queries.py controleert dat).
+    Nee voor estafettes en al het andere. Een Onderdeel zonder opgave krijgt
+    hiermee zijn windmeting, waar de view `pr` (schema_prestaties.sql) op
+    filtert (tests/test_queries.py controleert dat).
     """
     n = naam.strip().lower()
     if "verspringen" in n or "hinkstap" in n:

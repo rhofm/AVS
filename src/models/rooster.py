@@ -1,6 +1,6 @@
 """Rooster: geplande trainingsinhoud per week, als sjabloon dat een groep vanaf een datum volgt.
 
-Hoort bij personen.db (tabellen rooster, rooster_regel, groep_rooster; migratie 008).
+Hoort bij personen.db (tabellen rooster, rooster_regel, groep_rooster, zie schema_personen.sql).
 Geen persoonsgegevens.
 
     r = Rooster("Najaar U16", 4, regels=[RoosterRegel(1, "dinsdag", onderwerp="Starts"), ...])

@@ -7,18 +7,14 @@ Werkt met pytest.
 
 import contextlib
 import io
-import sys
 from pathlib import Path
 
 import pytest
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-
-from db import init_db as db_init  # noqa: E402
-from db.init_db import SleutelFout, herstel, init_db  # noqa: E402
-from db.queries import Opslag  # noqa: E402
-from ui.app import maak_app, start  # noqa: E402
+from db import init_db as db_init
+from db.init_db import SleutelFout, herstel, init_db
+from db.queries import Opslag
+from ui.app import maak_app, start
 
 SLEUTEL = "5a" * 32               # de 'opgeschreven' herstelsleutel van de databases
 ANDERE = "a5" * 32                # een sleutel die er niet bij past

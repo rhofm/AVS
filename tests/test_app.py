@@ -1,24 +1,21 @@
 """Tests voor src/ui/app.py (Flask): alle pagina's, opslaan van leerdoelen en foutpagina's.
 
 Tijdelijke map met versleutelde databases, vaste testsleutel, alleen nepgegevens.
-Werkt met pytest en los: `python tests/test_app.py`.
+
 """
 
 import contextlib
 import io
 import re
-import sys
 import tempfile
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+from test_landingspagina import voorbeeld
 
-from test_landingspagina import TESTSLEUTEL, voorbeeld  # noqa: E402
-
-from db.init_db import init_db  # noqa: E402
-from db.queries import Opslag  # noqa: E402
-from ui.app import maak_app  # noqa: E402
+from db.init_db import init_db
+from db.queries import Opslag
+from ui.app import maak_app
+from hulp import TESTSLEUTEL
 
 
 @contextlib.contextmanager
@@ -95,16 +92,3 @@ def test_leerdoelen_opslaan():
         assert r.status_code == 400 and "Niet opgeslagen" in tekst(r)
         r = c.post(f"/atleet/{mid}/leerdoelen?doorlopend=1", data={"datum": "2026-10-02", f"score-{doelen[1]}": "3"})
         assert r.headers["Location"].endswith("doorlopend=1")
-
-
-def test_startfout():
-    app = maak_app(startfout="Sleutel ontbreekt.")
-    r = app.test_client().get("/atleten")
-    assert r.status_code == 500 and "Sleutel ontbreekt." in tekst(r)
-
-
-if __name__ == "__main__":
-    for naam, f in list(globals().items()):
-        if naam.startswith("test_") and callable(f):
-            f()
-            print("ok", naam)

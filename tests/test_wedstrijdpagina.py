@@ -2,70 +2,50 @@
 tijdschema met deelnemers, onderdelen zonder atleten achter een vinkje,
 inschrijven (ook vanuit een regel van het tijdschema), afmelden en de import.
 
-Alleen nepgegevens en een vaste testsleutel; niets van internet. Werkt met
-pytest en los: `python tests/test_wedstrijdpagina.py`.
+Alleen nepgegevens en een vaste testsleutel; niets van internet.
 """
 
 import contextlib
-import io
 import re
-import sys
-import tempfile
 from datetime import date, timedelta
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-
-from test_landingspagina import TESTSLEUTEL  # noqa: E402
-
-from atleten import beheer  # noqa: E402
-from db.init_db import init_db  # noqa: E402
-from db.queries import Opslag, OpslagFout  # noqa: E402
-from models import Onderdeel, ProgrammaOnderdeel  # noqa: E402
-from wedstrijden import detail, planning  # noqa: E402
+from atleten import beheer
+from db.queries import OpslagFout
+from models import Onderdeel, ProgrammaOnderdeel
+from wedstrijden import detail, planning
+from hulp import app_client, lege_opslag, verwacht as _verwacht
 
 FIXTURE = Path(__file__).resolve().parent / "fixtures" / "atletieknu_tijdschema" / "meerkamp.html"
 DAG = date.today() + timedelta(days=8)
 
 
-def _verwacht(fout, fn) -> None:
-    try:
-        fn()
-    except fout:
-        return
-    raise AssertionError(f"{fout.__name__} verwacht")
-
-
 @contextlib.contextmanager
 def opslag():
     """(Opslag, map, ids) met een wedstrijd, een tijdschema en drie nep-atleten."""
-    with tempfile.TemporaryDirectory() as tmp:
-        with contextlib.redirect_stdout(io.StringIO()):
-            init_db(Path(tmp), hoofd=TESTSLEUTEL)
-        with Opslag(map=Path(tmp), hoofd=TESTSLEUTEL) as db:
-            honderd = db.onderdeel_opslaan(Onderdeel("100m", "tijd", True, "sprint"))
-            ver = db.onderdeel_opslaan(Onderdeel("Verspringen", "afstand", False, "springen"))
-            kogel = db.onderdeel_opslaan(Onderdeel("Kogelstoten", "afstand", False, "werpen"))
-            jaar = DAG.year - 15                                         # U16 op de wedstrijddag
-            anna = beheer.nieuwe_atleet(db, "Anna", "Voorbeeld", geslacht="V", geboortedatum=f"{jaar}-03-14").master_id
-            bram = beheer.nieuwe_atleet(db, "Bram", "Test", geslacht="M", geboortedatum=f"{jaar}-05-01").master_id
-            cees = beheer.nieuwe_atleet(db, "Cees", "Nep", geslacht="M", geboortedatum=f"{DAG.year - 11}").master_id  # U12
-            w = planning.plan_wedstrijd(db, "Clubkampioenschappen", DAG, "Sportpark",
-                                        link="https://www.atletiek.nu/wedstrijd/main/45678/")
-            regels = [
-                ProgrammaOnderdeel(w.id, DAG, "10:00", honderd.id, categorie="Meisjes U16", ronde="serie", duur=30),
-                ProgrammaOnderdeel(w.id, DAG, "10:15", ver.id, categorie="MU16", groep=1, duur=45),
-                ProgrammaOnderdeel(w.id, DAG, "10:30", honderd.id, categorie="Jongens U16", duur=30),
-                ProgrammaOnderdeel(w.id, DAG, "11:00", kogel.id, categorie="Jongens U12"),
-                ProgrammaOnderdeel(w.id, DAG, "11:30", onderdeel_tekst="Hoogspringen", categorie="U14"),
-            ]
-            db.programma_vervangen(w.id, regels)
-            planning.inschrijven(db, w.id, anna, ["100m", "Verspringen"])     # 100m 10:00 en ver 10:15: botsing
-            planning.inschrijven(db, w.id, bram, ["100m", "Verspringen"])     # ver is alleen voor meisjes
-            ids = dict(w=w.id, anna=anna, bram=bram, cees=cees, honderd=honderd.id, ver=ver.id, kogel=kogel.id,
-                       regels=[r.id for r in regels])
-            yield db, Path(tmp), ids
+    with lege_opslag() as (db, tmp):
+        honderd = db.onderdeel_opslaan(Onderdeel("100m", "tijd", True, "sprint"))
+        ver = db.onderdeel_opslaan(Onderdeel("Verspringen", "afstand", False, "springen"))
+        kogel = db.onderdeel_opslaan(Onderdeel("Kogelstoten", "afstand", False, "werpen"))
+        jaar = DAG.year - 15                                         # U16 op de wedstrijddag
+        anna = beheer.nieuwe_atleet(db, "Anna", "Voorbeeld", geslacht="V", geboortedatum=f"{jaar}-03-14").master_id
+        bram = beheer.nieuwe_atleet(db, "Bram", "Test", geslacht="M", geboortedatum=f"{jaar}-05-01").master_id
+        cees = beheer.nieuwe_atleet(db, "Cees", "Nep", geslacht="M", geboortedatum=f"{DAG.year - 11}").master_id  # U12
+        w = planning.plan_wedstrijd(db, "Clubkampioenschappen", DAG, "Sportpark",
+                                    link="https://www.atletiek.nu/wedstrijd/main/45678/")
+        regels = [
+            ProgrammaOnderdeel(w.id, DAG, "10:00", honderd.id, categorie="Meisjes U16", ronde="serie", duur=30),
+            ProgrammaOnderdeel(w.id, DAG, "10:15", ver.id, categorie="MU16", groep=1, duur=45),
+            ProgrammaOnderdeel(w.id, DAG, "10:30", honderd.id, categorie="Jongens U16", duur=30),
+            ProgrammaOnderdeel(w.id, DAG, "11:00", kogel.id, categorie="Jongens U12"),
+            ProgrammaOnderdeel(w.id, DAG, "11:30", onderdeel_tekst="Hoogspringen", categorie="U14"),
+        ]
+        db.programma_vervangen(w.id, regels)
+        planning.inschrijven(db, w.id, anna, ["100m", "Verspringen"])     # 100m 10:00 en ver 10:15: botsing
+        planning.inschrijven(db, w.id, bram, ["100m", "Verspringen"])     # ver is alleen voor meisjes
+        ids = dict(w=w.id, anna=anna, bram=bram, cees=cees, honderd=honderd.id, ver=ver.id, kogel=kogel.id,
+                   regels=[r.id for r in regels])
+        yield db, Path(tmp), ids
 
 
 def test_detail():
@@ -123,16 +103,9 @@ def test_afmelden():
         assert "Bram" not in {p.atleet.voornaam for p in detail.wedstrijd_detail(db, ids["w"]).deelnemers}
 
 
-def _client(tmp):
-    from ui.app import maak_app
-    app = maak_app(map=tmp, hoofd=TESTSLEUTEL)
-    app.config["TESTING"] = True
-    return app.test_client()
-
-
 def test_pagina():
     with opslag() as (db, tmp, ids):
-        c = _client(tmp)
+        c = app_client(tmp)
         r = c.get(f"/wedstrijd/{ids['w']}")
         html = r.get_data(as_text=True)
         assert r.status_code == 200 and "Clubkampioenschappen" in html and "Sportpark" in html
@@ -159,14 +132,14 @@ def test_pagina():
 def test_pagina_zonder_tijdschema():
     with opslag() as (db, tmp, ids):
         w = planning.plan_wedstrijd(db, "Losse wedstrijd", DAG)
-        html = _client(tmp).get(f"/wedstrijd/{w.id}").get_data(as_text=True)
+        html = app_client(tmp).get(f"/wedstrijd/{w.id}").get_data(as_text=True)
         assert "Nog geen tijdschema" in html and 'name="link"' in html and 'id="toon-alle"' not in html
         assert "Nog niemand ingeschreven" in html
 
 
 def test_inschrijven_route():
     with opslag() as (db, tmp, ids):
-        c = _client(tmp)
+        c = app_client(tmp)
         regel = ids["regels"][3]
         html = c.get(f"/wedstrijd/{ids['w']}/inschrijven?regel={regel}").get_data(as_text=True)
         assert f'name="onderdeel" value="{ids["kogel"]}" checked' in html
@@ -187,7 +160,7 @@ def test_inschrijven_route():
 
 def test_afmelden_route():
     with opslag() as (db, tmp, ids):
-        c = _client(tmp)
+        c = app_client(tmp)
         r = c.post(f"/wedstrijd/{ids['w']}/afmelden", data={"atleet": ids["anna"], "onderdeel": ids["ver"]})
         assert r.status_code == 302
         html = c.get(f"/wedstrijd/{ids['w']}").get_data(as_text=True)
@@ -200,7 +173,7 @@ def test_afmelden_route():
 
 def test_import_route():
     with opslag() as (db, tmp, ids):
-        c = _client(tmp)
+        c = app_client(tmp)
         # Een opgeslagen pagina werkt als 'link' (niets van internet).
         r = c.post(f"/wedstrijd/{ids['w']}/tijdschema", data={"link": str(FIXTURE)})
         assert r.status_code == 302
@@ -216,7 +189,7 @@ def test_links_vanaf_atleet_en_groep():
     from models import Groep
     with opslag() as (db, tmp, ids):
         g = db.groep_opslaan(Groep("U16 sprint", None, [ids["anna"], ids["bram"]]))
-        c = _client(tmp)
+        c = app_client(tmp)
         intern = f'href="/wedstrijd/{ids["w"]}"'
         for pad in (f"/atleet/{ids['anna']}", f"/atleet/{ids['anna']}/wedstrijden",
                     f"/atleet/{ids['anna']}/wedstrijden?weergave=kalender",
@@ -227,10 +200,3 @@ def test_links_vanaf_atleet_en_groep():
         assert c.get(f"/wedstrijd/{ids['w']}").status_code == 200
         # Op de wedstrijdpagina zelf staat de link naar de site nog wel.
         assert "atletiek.nu/wedstrijd/uitslagen/45678" in c.get(f"/wedstrijd/{ids['w']}").get_data(as_text=True)
-
-
-if __name__ == "__main__":
-    for naam, fn in list(globals().items()):
-        if naam.startswith("test_") and callable(fn):
-            fn()
-            print("ok ", naam)

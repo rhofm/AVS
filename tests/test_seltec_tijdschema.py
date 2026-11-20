@@ -2,42 +2,28 @@
 src/importers/seltec_tijdschema.py, en de Seltec-kant van src/wedstrijden/tijdschema_import.py.
 
 Tegen opgeslagen, geanonimiseerde pagina's in fixtures/seltec_tijdschema/ (zie de README daar);
-er wordt niets van internet gehaald. Werkt met pytest en los: `python tests/test_seltec_tijdschema.py`.
+er wordt niets van internet gehaald.
 """
 
-import contextlib
-import io
 import shutil
-import sys
 import tempfile
 from datetime import date
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-
-from db.init_db import init_db  # noqa: E402
-from db.queries import Opslag, OpslagFout  # noqa: E402
-from importers import detect, seltec  # noqa: E402
-from importers.base import ImportFout  # noqa: E402
-from importers.seltec_tijdschema import (SeltecTijdschemaImporter, categorieen, laad_tijdschema,  # noqa: E402
+from db.queries import OpslagFout
+from importers import detect, seltec
+from importers.base import ImportFout
+from importers.seltec_tijdschema import (SeltecTijdschemaImporter, categorieen, laad_tijdschema,
                                          seltec_categorie)
-from models import Atleet, Inschrijving, Onderdeel, ProgrammaOnderdeel, lees_categorie  # noqa: E402
-from wedstrijden import chronoloog, planning  # noqa: E402
-from wedstrijden.tijdschema_import import site_van, tijdschema_importeren  # noqa: E402
+from models import Atleet, Inschrijving, Onderdeel, ProgrammaOnderdeel, lees_categorie
+from wedstrijden import chronoloog, planning
+from wedstrijden.tijdschema_import import site_van, tijdschema_importeren
+from hulp import opslag, verwacht as _verwacht
 
 MAP = Path(__file__).resolve().parent / "fixtures" / "seltec_tijdschema"
 NK1, NK2, CLUB = MAP / "nk_dag1.html", MAP / "nk_dag2.html", MAP / "club.html"
 ATLETIEKNU = Path(__file__).resolve().parent / "fixtures" / "atletieknu_tijdschema" / "teams.html"
 BASIS = "https://uitslagen.atletiek.nl/Competitions/Details/"
-TESTSLEUTEL = "55" * 32
-
-
-def _verwacht(fout, fn) -> None:
-    try:
-        fn()
-    except fout:
-        return
-    raise AssertionError(f"{fout.__name__} verwacht")
 
 
 def _tekst(pad: Path) -> str:
@@ -166,14 +152,6 @@ def test_links_en_bestanden():
 
 # ---------------------------------------------------------------- in de database
 
-@contextlib.contextmanager
-def opslag():
-    with tempfile.TemporaryDirectory() as tmp:
-        with contextlib.redirect_stdout(io.StringIO()):
-            init_db(Path(tmp), hoofd=TESTSLEUTEL)
-        with Opslag(map=Path(tmp), hoofd=TESTSLEUTEL) as db:
-            yield db
-
 
 def test_importeren_in_database():
     with opslag() as db:
@@ -206,11 +184,3 @@ def test_importeren_in_database():
 
         # Ook met een opgeslagen bestand, zonder importer: de site volgt uit de inhoud.
         assert tijdschema_importeren(db, w.id, str(CLUB)).aantal == 8 and len(db.programma(w.id)) == 8
-
-
-if __name__ == "__main__":
-    tests = [(n, f) for n, f in globals().items() if n.startswith("test_") and callable(f)]
-    for naam, fn in tests:
-        fn()
-        print(f"ok  {naam}")
-    print(f"{len(tests)} tests geslaagd")

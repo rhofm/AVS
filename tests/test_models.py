@@ -1,16 +1,12 @@
 """Tests voor de dataclasses in src/models/.
 
-Werkt met pytest (`pytest tests/test_models.py`) en ook zonder:
-`python tests/test_models.py`. Alleen nepgegevens.
+Alleen nepgegevens.
 """
 
-import sys
 from datetime import date
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-
-from models import (  # noqa: E402
+from hulp import verwacht
+from models import (
     Notitie,
     DAGEN, Trainingsschema,
     Absentie, Atleet, Groep, Leerlijn, LeerlijnStap, LeerlijnVoortgang,
@@ -18,14 +14,6 @@ from models import (  # noqa: E402
 )
 
 NEP_ID = "a" * 32
-
-
-def _verwacht_fout(fn) -> None:
-    try:
-        fn()
-    except ValueError:
-        return
-    raise AssertionError("ValueError verwacht")
 
 
 def test_atleet_repr_bevat_geen_persoonsgegevens():
@@ -56,9 +44,9 @@ def test_atleet_leeftijd():
 
 
 def test_atleet_controles():
-    _verwacht_fout(lambda: Atleet("A", "B", geslacht="Q"))
-    _verwacht_fout(lambda: Atleet("A", "B", master_id="kort"))
-    _verwacht_fout(lambda: Atleet("A", "B", geboortedatum="01-05-2010"))
+    verwacht(ValueError, lambda: Atleet("A", "B", geslacht="Q"))
+    verwacht(ValueError, lambda: Atleet("A", "B", master_id="kort"))
+    verwacht(ValueError, lambda: Atleet("A", "B", geboortedatum="01-05-2010"))
 
 
 def test_onderdeel_beter_en_beste():
@@ -69,7 +57,7 @@ def test_onderdeel_beter_en_beste():
     assert sprint.beste([13.2, 12.9, 13.0]) == 12.9
     assert ver.beste([4.5, 4.8]) == 4.8
     assert sprint.beste([]) is None
-    _verwacht_fout(lambda: Onderdeel("x", "kilo", True))
+    verwacht(ValueError, lambda: Onderdeel("x", "kilo", True))
 
 
 def test_windmeting_en_windlegaal():
@@ -98,7 +86,7 @@ def test_prestatie_koppelen_wist_brongegevens():
     assert k.bron_naam is None and k.bron_atletieknu_id is None
     assert p.bron_naam == "Anna Voorbeeld"  # origineel ongewijzigd
     assert Prestatie("100m", date(2026, 6, 1), 12.9, ronde=None).ronde == ""
-    _verwacht_fout(lambda: Prestatie("100m", date(2026, 6, 1), 12.9, bron="website"))
+    verwacht(ValueError, lambda: Prestatie("100m", date(2026, 6, 1), 12.9, bron="website"))
 
 
 def test_groep_leden():
@@ -113,7 +101,7 @@ def test_groep_leden():
 
 def test_absentie():
     assert Absentie(1, NEP_ID, "aanwezig").aanwezig
-    _verwacht_fout(lambda: Absentie(1, NEP_ID, "ziek"))
+    verwacht(ValueError, lambda: Absentie(1, NEP_ID, "ziek"))
 
 
 def test_leerlijn():
@@ -157,11 +145,3 @@ def test_notitie():
         except ValueError:
             continue
         raise AssertionError("ValueError verwacht")
-
-
-if __name__ == "__main__":
-    tests = [(n, f) for n, f in globals().items() if n.startswith("test_") and callable(f)]
-    for naam, fn in tests:
-        fn()
-        print(f"ok  {naam}")
-    print(f"{len(tests)} tests geslaagd")

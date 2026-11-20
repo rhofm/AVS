@@ -1,30 +1,18 @@
 """Tests voor src/leerlijnen/voortgang.py en het template ui/templates/leerdoelen.html.
 
 Alleen nepgegevens en een vaste testsleutel. Gebruikt de echte catalogus uit
-schema_leerlijnen.sql. Werkt met pytest en los: `python tests/test_leerdoelen_voortgang.py`.
+schema_leerlijnen.sql.
 """
 
-import sys
 from datetime import date
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+from test_landingspagina import TEMPLATES, VANDAAG, opslag, voorbeeld
 
-from test_landingspagina import TEMPLATES, VANDAAG, opslag, voorbeeld  # noqa: E402
-
-from atleten import beheer, landingspagina  # noqa: E402
-from db.queries import OpslagFout  # noqa: E402
-from leerlijnen import voortgang  # noqa: E402
-from models import LeerdoelScore  # noqa: E402
-
-
-def _verwacht(fout, fn):
-    try:
-        fn()
-    except fout:
-        return
-    raise AssertionError(f"{fout.__name__} verwacht")
+from atleten import beheer, landingspagina
+from db.queries import OpslagFout
+from leerlijnen import voortgang
+from models import LeerdoelScore
+from hulp import verwacht as _verwacht
 
 
 def test_categorie():
@@ -96,10 +84,3 @@ def test_template():
         assert html.count('class="aan"') >= 4 + 15          # 4 blokjes + de schaal (1+2+3+4+5)
         html = render(lp, modus="bewerken", melding="1 score opgeslagen")
         assert 'id="modus-bewerken" value="bewerken" checked' in html and "1 score opgeslagen" in html
-
-
-if __name__ == "__main__":
-    for naam, f in list(globals().items()):
-        if naam.startswith("test_") and callable(f):
-            f()
-            print("ok", naam)

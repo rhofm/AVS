@@ -196,10 +196,14 @@ the page never contains the key.
 
 The SQL files are read from `init_db.SQL_DIR` (`src/db/` from source,
 `sys._MEIPASS/db` in the `.exe`), never via the working directory. `init_db()`
-first runs `controleer_sql_bestanden()` and refuses databases newer than the
-newest known migration (`_controleer_versies()`); both raise `InstallatieFout`
-before anything is touched. A new database needs its `schema_<naam>.sql` in
-`src/db/`; the build includes `schema_*.sql` and `migrations/`.
+first runs `controleer_sql_bestanden()` (every schema has exactly one version
+line, no empty, duplicate or too-low migration numbers) and then
+`_controleer_versies()`, which refuses databases newer than `nieuwste_versie()`
+and databases older than `basisversie()` (see Rules: those can only be brought
+up to date by the previous AVS release); both raise `InstallatieFout` before
+anything is touched. A new database needs its `schema_<naam>.sql` in `src/db/`;
+the build includes `schema_*.sql` and `migrations/` (keep the folder, even when
+it only holds `.gitkeep`).
 
 ### Keys and IDs
 
@@ -246,9 +250,11 @@ before anything is touched. A new database needs its `schema_<naam>.sql` in
   `Trainingsschema.traint_mee(training, groep)` (not `traint_op`) wherever
   "is this athlete expected at this training" matters: pre-filling attendance,
   expected counts, 'niet ingevuld'. The attendance form still lists all members.
-- Every migration number must be unique per database. `init_db.py` refuses to
-  start when two files share a number (this happened once after merging two
-  branches that both added a `003`).
+- Every migration number must be unique per database and higher than that
+  database's baseline (`basisversie()`). `init_db.py` refuses to start when two
+  files share a number (this happened once after merging two branches that both
+  added a `003`) or when a number is at or below the baseline (such a migration
+  would never run anywhere, e.g. one from an old branch: renumber it).
 - Training texts (`warming_up`, `kern_a`, `kern_b`, `cooling_down`,
   `notities`) are multi-line and may contain a small markdown subset; render
   them only with the `markdown` Jinja filter (`ui/markdown.py`), which escapes
@@ -297,11 +303,12 @@ before anything is touched. A new database needs its `schema_<naam>.sql` in
   empty); `wedstrijd_verwijderen` copies the meet date into goals that had no
   own date. Free text in goals follows the notes rule: factual, no other
   athletes' names, no diagnoses.
-- The old `periodeplan` table was replaced (migration personen/007):
-  `init_db` copies its rows to `doel` in `prestaties.db` and empties it. The
-  table and `training.periodeplan_id` stay because SQLite refuses inserts into
-  `training` once the parent table of its foreign key is gone; never drop it
-  without rebuilding `training`, and never write to either.
+- The old `periodeplan` table was replaced by the periodisering and by `doel`
+  in `prestaties.db`; it is always empty. The table and
+  `training.periodeplan_id` stay (also in the baseline schema) because SQLite
+  refuses inserts into `training` once the parent table of its foreign key is
+  gone; never drop it without a migration that rebuilds `training`, and never
+  write to either.
 - Absence stores every status explicitly, `aanwezig` included: no row means
   "not filled in yet". `blessure` is health data — keep `reden` short and
   factual, never a diagnosis.
@@ -313,12 +320,26 @@ before anything is touched. A new database needs its `schema_<naam>.sql` in
   set. Never use the plain `sqlite3` module on these files.
 - Tests pass an explicit test key (`hoofd=` in `verbind()` / `init_db()`) and a
   temporary folder; they never touch the real keyring or `data/`.
-- Each `schema_<database>.sql` is **version 1 and frozen**. Every later schema
-  change goes in a new migration for that database:
-  `src/db/migrations/<database>/NNN_beschrijving.sql` (e.g.
-  `migrations/testen/002_add_testlocatie.sql`). Migrations are applied in
-  number order and recorded in that database's `schema_version`. Never edit an
-  applied migration and never drop or wipe an existing database.
+- Each `schema_<database>.sql` is the **baseline and frozen**. In October 2026
+  the old migrations were squashed into it: a new database starts at the
+  version in the schema's last line, `INSERT INTO schema_version (versie)
+  VALUES (n);` (`init_db.basisversie()`): personen 11, prestaties 4, testen 2,
+  trainingsschema 2, the rest 1. Column order in the baselines matches a
+  migrated database (added columns at the end); keep it.
+  `tests/test_basisschema.py` compares the baselines with
+  `tests/fixtures/basisschema.json` and fails on any change.
+- Every later schema change goes in a new migration for that database:
+  `src/db/migrations/<database>/NNN_beschrijving.sql`, numbered after the
+  baseline (e.g. `migrations/personen/012_...`, `migrations/prestaties/005_...`,
+  `migrations/testen/003_add_testlocatie.sql`). Migrations are applied in number
+  order and recorded in that database's `schema_version`. Never edit an applied
+  migration and never drop or wipe an existing database.
+- A database older than its baseline (from before the squash) is refused with
+  an `InstallatieFout` telling the user to start the previous AVS release once
+  first; this AVS no longer has the migrations to update it. Don't squash again
+  without the same steps: bring every real database up to date first, generate
+  the new baselines from a migrated database (never by hand), raise the
+  baseline versions, and regenerate the fixture from the old path.
 - Use parameterised queries (`?`), never string formatting.
 - Conventions in the schemas:
   - Dates are ISO text, `'YYYY-MM-DD'` (birth date may be just `'YYYY'`).
@@ -448,7 +469,7 @@ before anything is touched. A new database needs its `schema_<naam>.sql` in
   a distance down, to 0.01 (so use it, never multiply by hand). Relays have no
   factor. Never invent factors; a new table = edit the file from the AU source and
   check against the sheet's example lines (`tests/test_masters_agegrading.py`).
-- Athlete preferences (`ploeg/voorkeuren.py`, migration personen/011): standing
+- Athlete preferences (`ploeg/voorkeuren.py`, tables in `personen.db`): standing
   per athlete in `atleet_voorkeur` (event name without specification, matched
   with `normaliseer`) and per ploeg in `ploeg_voorkeur` (programme key; wins over
   the standing one, `neutraal` switches it off). `wil_niet`/`moet` are hard in the
@@ -472,6 +493,11 @@ feature/<naam>  →  dev  →  staging  →  main
 
 - Keep the UI simple for non-technical users; put the complexity in the back end.
 - Write tests for new logic (`tests/`); importers and team selection especially.
+- Tests that use fixed dates (e.g. `VANDAAG` in `tests/test_groep_landingspagina.py`)
+  while the code under test falls back to `date.today()` must freeze it with
+  `hulp.vaste_vandaag(monkeypatch, dag)` (an autouse fixture per module, as in
+  `test_doelen.py` and `test_rooster.py`); otherwise they break once the real
+  date passes the fixed one, and `build.py` refuses to build.
 - When a design decision is still open (e.g. the UI framework), propose an
   option and ask rather than silently picking one. Decided: pytest as test
   runner, plain `pyproject.toml` dependencies installed with pip into the conda

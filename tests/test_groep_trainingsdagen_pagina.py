@@ -2,20 +2,17 @@
 groepen.groep.trainingsdagen_opslaan() en de gedeelde dag/tijd-keuze (_tijdkeuze.html).
 
 Gebruikt de nepgroep uit test_groep_landingspagina (alleen nepgegevens, testsleutel).
-Werkt met pytest en los: `python tests/test_groep_trainingsdagen_pagina.py`.
+
 """
 
 import re
-import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+from test_groep_landingspagina import opslag, voorbeeldgroep
 
-from test_groep_landingspagina import TESTSLEUTEL, opslag, voorbeeldgroep  # noqa: E402
-
-from db.queries import OpslagFout  # noqa: E402
-from groepen import groep as groepsbeheer  # noqa: E402
+from db.queries import OpslagFout
+from groepen import groep as groepsbeheer
+from hulp import TESTSLEUTEL
 
 UI = Path(__file__).resolve().parents[1] / "src" / "ui"
 
@@ -106,10 +103,3 @@ def test_geen_botsende_klassen():
     css = (UI / "static" / "avs.css").read_text(encoding="utf-8")
     assert re.search(r"\.dagkeuze__dag input \{[^}]*position: absolute", css)        # athlete-pagina: zo bedoeld
     assert not re.search(r"\.tijdkeuze__dag input(\[type=\"time\"\])? \{[^}]*position: absolute", css)
-
-
-if __name__ == "__main__":
-    for naam, f in list(globals().items()):
-        if naam.startswith("test_") and callable(f):
-            f()
-            print("ok", naam)

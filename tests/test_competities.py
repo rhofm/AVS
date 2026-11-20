@@ -5,27 +5,16 @@ materiaal van de eigen categorie (U16 als U18), masters per leeftijdsklasse.
 
 Verwachte programma's uit de Wedstrijdbepalingen Competitie 2026-2027
 (bepalingen 30, 40, 50, 52, 60, 62). Alleen nep-atleten.
-Werkt met pytest en los: `python tests/test_competities.py`.
+
 """
 
-import contextlib
-import io
-import sys
-import tempfile
 from datetime import date
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-
-from test_landingspagina import TESTSLEUTEL  # noqa: E402
-
-from atleten import beheer  # noqa: E402
-from db.init_db import init_db  # noqa: E402
-from db.queries import Opslag  # noqa: E402
-from models import Inzet, Onderdeel, PloegLid, Prestatie  # noqa: E402
-from ploeg import regels, vergelijk  # noqa: E402
-from ploeg.regels import masters_code  # noqa: E402
+from atleten import beheer
+from models import Inzet, Onderdeel, PloegLid, Prestatie
+from ploeg import regels, vergelijk
+from ploeg.regels import masters_code
+from hulp import lege_opslag
 
 E1, E2, E3 = (f"senioren_{d}_divisie_2026-2027" for d in ("1e", "2e", "3e"))
 NK, U18U20, MASTERS = "nk_teams_2026-2027", "u18_u20_2026-2027", "masters_2026-2027"
@@ -184,34 +173,23 @@ def _fout_ploegsleutel():
 # ------------------------------------------------------------
 def test_matrix_senioren_en_masters():
     dag = date(2027, 6, 5)
-    with tempfile.TemporaryDirectory() as tmp:
-        with contextlib.redirect_stdout(io.StringIO()):
-            init_db(Path(tmp), hoofd=TESTSLEUTEL)
-        with Opslag(map=Path(tmp), hoofd=TESTSLEUTEL) as db:
-            vrouw = beheer.nieuwe_atleet(db, "Vera", "Proef", geslacht="V", geboortedatum="1979-03-01")   # 48: V45
-            man = beheer.nieuwe_atleet(db, "Mark", "Proef", geslacht="M", geboortedatum="2000-01-01")
-            o = {n: db.onderdeel_opslaan(Onderdeel(n, e, e == "tijd")) for n, e in (
-                ("100 meter", "tijd"), ("Kogelstoten 4kg", "afstand"), ("Kogelstoten 7,26kg", "afstand"))}
-            for a, n, w in ((vrouw, "100 meter", 13.5), (man, "100 meter", 11.2), (vrouw, "Kogelstoten 4kg", 11.0),
-                            (man, "Kogelstoten 7,26kg", 13.0)):
-                db.prestatie_opslaan(Prestatie(n, date(2027, 5, 1), w, atleet_id=a.master_id,
-                                               onderdeel_id=o[n].id, wind=0.0))
-            rs = regels.laad(E3)
-            m = vergelijk.matrix(db, rs, "SEN", "wedstrijd_1", dag, [vrouw, man])
-            assert m.cel(vrouw.master_id, "100m-V").punten == int(30672.0 / 13.5 - 1682.5)
-            assert m.cel(man.master_id, "100m-M").punten == int(29550.0 / 11.2 - 1881.5)
-            assert m.cel(man.master_id, "100m-V").nvt and not m.cel(vrouw.master_id, "100m-V").nvt
-            assert m.cel(vrouw.master_id, "kogelstoten-V").waarde == 11.0
-            assert m.cel(man.master_id, "kogelstoten-M").waarde == 13.0
+    with lege_opslag() as (db, tmp):
+        vrouw = beheer.nieuwe_atleet(db, "Vera", "Proef", geslacht="V", geboortedatum="1979-03-01")   # 48: V45
+        man = beheer.nieuwe_atleet(db, "Mark", "Proef", geslacht="M", geboortedatum="2000-01-01")
+        o = {n: db.onderdeel_opslaan(Onderdeel(n, e, e == "tijd")) for n, e in (
+            ("100 meter", "tijd"), ("Kogelstoten 4kg", "afstand"), ("Kogelstoten 7,26kg", "afstand"))}
+        for a, n, w in ((vrouw, "100 meter", 13.5), (man, "100 meter", 11.2), (vrouw, "Kogelstoten 4kg", 11.0),
+                        (man, "Kogelstoten 7,26kg", 13.0)):
+            db.prestatie_opslaan(Prestatie(n, date(2027, 5, 1), w, atleet_id=a.master_id,
+                                           onderdeel_id=o[n].id, wind=0.0))
+        rs = regels.laad(E3)
+        m = vergelijk.matrix(db, rs, "SEN", "wedstrijd_1", dag, [vrouw, man])
+        assert m.cel(vrouw.master_id, "100m-V").punten == int(30672.0 / 13.5 - 1682.5)
+        assert m.cel(man.master_id, "100m-M").punten == int(29550.0 / 11.2 - 1881.5)
+        assert m.cel(man.master_id, "100m-V").nvt and not m.cel(vrouw.master_id, "100m-V").nvt
+        assert m.cel(vrouw.master_id, "kogelstoten-V").waarde == 11.0
+        assert m.cel(man.master_id, "kogelstoten-M").waarde == 13.0
 
-            ms = vergelijk.matrix(db, regels.laad(MASTERS), "MAS-V", "wedstrijd_1", dag, [vrouw])
-            assert ms.rij(vrouw.master_id).categorie == "V45" and ms.rij(vrouw.master_id).toegestaan
-            assert ms.cel(vrouw.master_id, "kogelstoten").waarde == 11.0                     # V45: 4 kg
-
-
-if __name__ == "__main__":
-    tests = [(n, f) for n, f in globals().items() if n.startswith("test_") and callable(f)]
-    for naam, fn in tests:
-        fn()
-        print(f"ok  {naam}")
-    print(f"{len(tests)} tests geslaagd")
+        ms = vergelijk.matrix(db, regels.laad(MASTERS), "MAS-V", "wedstrijd_1", dag, [vrouw])
+        assert ms.rij(vrouw.master_id).categorie == "V45" and ms.rij(vrouw.master_id).toegestaan
+        assert ms.cel(vrouw.master_id, "kogelstoten").waarde == 11.0                     # V45: 4 kg

@@ -1,28 +1,15 @@
 """Tests voor src/atleten/trainingsschema.py en de pagina /atleet/<id>/trainingsschema.
 
-Alleen nepgegevens en een vaste testsleutel. Werkt met pytest en los:
-`python tests/test_trainingsschema_pagina.py`.
+Alleen nepgegevens en een vaste testsleutel.
 """
 
-import sys
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+from test_app import client
+from test_landingspagina import VANDAAG, opslag, voorbeeld
 
-from test_app import TESTSLEUTEL, client, tekst  # noqa: E402
-from test_landingspagina import VANDAAG, opslag, voorbeeld  # noqa: E402
-
-from atleten import trainingsschema  # noqa: E402
-from db.queries import Opslag, OpslagFout  # noqa: E402
-
-
-def _verwacht(fout, fn):
-    try:
-        fn()
-    except fout:
-        return
-    raise AssertionError(f"{fout.__name__} verwacht")
+from atleten import trainingsschema
+from db.queries import Opslag, OpslagFout
+from hulp import TESTSLEUTEL, tekst, verwacht as _verwacht
 
 
 def test_formulier_en_opslaan():
@@ -65,10 +52,3 @@ def test_pagina():
         r = c.post(f"/atleet/{mid}/trainingsschema", data={"dag": ["blauwdag"]})
         assert r.status_code == 400 and "Niet opgeslagen" in tekst(r)
         assert c.get("/atleet/" + "0" * 32 + "/trainingsschema").status_code == 404
-
-
-if __name__ == "__main__":
-    for naam, f in list(globals().items()):
-        if naam.startswith("test_") and callable(f):
-            f()
-            print("ok", naam)

@@ -1,44 +1,18 @@
-"""Tests voor het tijdschema (chronoloog) van wedstrijden: prestaties-migratie 003,
-models/programma.py, Opslag.programma_* en wedstrijden/chronoloog.py.
+"""Tests voor het tijdschema (chronoloog) van wedstrijden: tabel wedstrijd_programma
+in prestaties.db, models/programma.py, Opslag.programma_* en wedstrijden/chronoloog.py.
 
-Alleen nepgegevens en een vaste testsleutel. Werkt met pytest en los:
-`python tests/test_chronoloog.py`.
+Alleen nepgegevens en een vaste testsleutel.
 """
 
-import contextlib
-import io
-import sys
-import tempfile
 from datetime import date
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+from db.queries import OpslagFout
+from models import Atleet, Inschrijving, Onderdeel, ProgrammaOnderdeel, Wedstrijd, lees_categorie
+from wedstrijden import chronoloog
+from hulp import opslag, verwacht as _verwacht
 
-from db.init_db import DB_DIR, huidige_versie, init_db, verbind  # noqa: E402
-from db.queries import Opslag, OpslagFout  # noqa: E402
-from models import Atleet, Inschrijving, Onderdeel, ProgrammaOnderdeel, Wedstrijd, lees_categorie  # noqa: E402
-from wedstrijden import chronoloog  # noqa: E402
-
-TESTSLEUTEL = "66" * 32
 ZA = date(2027, 3, 13)
 ZO = date(2027, 3, 14)
-
-
-@contextlib.contextmanager
-def opslag():
-    with tempfile.TemporaryDirectory() as tmp:
-        with contextlib.redirect_stdout(io.StringIO()):
-            init_db(Path(tmp), hoofd=TESTSLEUTEL)
-        with Opslag(map=Path(tmp), hoofd=TESTSLEUTEL) as db:
-            yield db
-
-
-def _verwacht(fout, fn) -> None:
-    try:
-        fn()
-    except fout:
-        return
-    raise AssertionError(f"{fout.__name__} verwacht")
 
 
 def P(w, dag, tijd, onderdeel=None, tekst=None, **kw):
@@ -183,35 +157,3 @@ def test_botsingen():
             ("Anna", "10:30", "10:50", 5),          # in groep 1 heeft Anna maar 5 min tot verspringen
             ("Anna", "10:45", "10:50", None), ("Anna", "10:50", "12:00", 10), ("Bas", "11:00", "11:30", 10)]
         assert "maar 5 min ertussen" in krap[0].tekst
-
-
-def test_migratie_op_bestaande_database():
-    """prestaties.db van vóór migratie 003 krijgt de tabel erbij; bestaande wedstrijden blijven."""
-    with tempfile.TemporaryDirectory() as tmp:
-        with contextlib.redirect_stdout(io.StringIO()):
-            init_db(Path(tmp), hoofd=TESTSLEUTEL)
-        # closing(): `with verbind(...)` sluit de verbinding niet; op Windows kan de
-        # tijdelijke map dan niet weg (WinError 32).
-        with contextlib.closing(verbind("prestaties", Path(tmp), TESTSLEUTEL)) as c:
-            c.execute("DROP TABLE wedstrijd_programma")
-            c.execute("DROP TABLE doel_regel")                  # 004 (doelen) kwam later
-            c.execute("DROP TABLE doel")
-            c.execute("DELETE FROM schema_version WHERE versie >= 3")
-            c.execute("INSERT INTO wedstrijd (naam, datum) VALUES ('Oud', '2026-09-01')")
-            c.commit()
-            assert huidige_versie(c) == 2
-        with contextlib.redirect_stdout(io.StringIO()):
-            init_db(Path(tmp), hoofd=TESTSLEUTEL)
-        with Opslag(map=Path(tmp), hoofd=TESTSLEUTEL) as db:
-            assert huidige_versie(db.prestaties_db) == 4      # 003 tijdschema + 004 doelen
-            w = db.wedstrijden()[0]
-            db.programma_opslaan(ProgrammaOnderdeel(w.id, w.datum, "10:00", None, "Verspringen", groep=1, duur=45))
-            assert db.programma(w.id)[0].eindtijd == "10:45"
-
-
-if __name__ == "__main__":
-    tests = [(n, f) for n, f in globals().items() if n.startswith("test_") and callable(f)]
-    for naam, fn in tests:
-        fn()
-        print(f"ok  {naam}")
-    print(f"{len(tests)} tests geslaagd")

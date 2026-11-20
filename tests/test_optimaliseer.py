@@ -2,27 +2,21 @@
 ploeg/strategieen/. Een kleine matrix wordt ook met brute kracht doorgerekend om
 te zien dat de solver echt het beste vindt.
 
-Alleen nepgegevens. Werkt met pytest en los: `python tests/test_optimaliseer.py`.
+Alleen nepgegevens.
 """
 
 import itertools
 import random
-import sys
 from datetime import date
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+from test_ploegen import BESTAND, opslag
 
-from test_landingspagina import TESTSLEUTEL  # noqa: E402
-from test_ploegen import BESTAND, opslag  # noqa: E402
-
-from db.queries import Opslag  # noqa: E402
-from models import Atleet, Inzet, Ploeg, PloegLid  # noqa: E402
-from ploeg import opstelling, paginas, regels, strategieen  # noqa: E402
-from ploeg.optimaliseer import OptimalisatieFout, optimaliseer  # noqa: E402
-from ploeg.vergelijk import Cel, Matrix, Rij  # noqa: E402
-from ui.app import maak_app  # noqa: E402
+from db.queries import Opslag
+from models import Atleet, Inzet, Ploeg, PloegLid
+from ploeg import opstelling, paginas, regels, strategieen
+from ploeg.optimaliseer import OptimalisatieFout, optimaliseer
+from ploeg.vergelijk import Cel, Matrix, Rij
+from hulp import TESTSLEUTEL, app_client
 
 DAG = date(2027, 5, 15)
 RS = regels.laad(BESTAND)
@@ -172,9 +166,7 @@ def test_optimaliseren_via_de_pagina():
     with opslag() as (db, tmp, ids):
         p = db.ploeg_opslaan(Ploeg("U16 A", BESTAND, "U16-V", "wedstrijd_1", DAG, competitie="U14/U16-competitie"))
         db.sluit()
-        app = maak_app(map=tmp, hoofd=TESTSLEUTEL)
-        app.config["TESTING"] = True
-        c = app.test_client()
+        c = app_client(tmp)
         html = c.get(f"/ploeg/{p.id}").get_data(as_text=True)
         assert "Opstelling laten maken" in html and 'value="minimaal_twee"' in html
         r = c.post(f"/ploeg/{p.id}/optimaliseren", data={"strategie": "max_punten"})
@@ -198,11 +190,3 @@ def test_alleen_aangevinkte_deelnemers():
         assert o.na >= o.voor
         o = paginas.optimaliseren(db, p.id, "max_punten", alleen_aangevinkt=False)
         assert {i.atleet_id for i in db.ploeg_inzet(p.id)} >= {ids["anna"], ids["bo"]}
-
-
-if __name__ == "__main__":
-    tests = [(n, f) for n, f in globals().items() if n.startswith("test_") and callable(f)]
-    for naam, fn in tests:
-        fn()
-        print(f"ok  {naam}")
-    print(f"{len(tests)} tests geslaagd")

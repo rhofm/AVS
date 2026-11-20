@@ -1,27 +1,21 @@
 """Tests voor src/groepen/landingspagina.py, de templates groep.html/groepen.html en de routes.
 
 Echte (versleutelde) databases in een tijdelijke map, vaste testsleutel,
-alleen nepgegevens. Werkt met pytest en los: `python tests/test_groep_landingspagina.py`.
+alleen nepgegevens.
 """
 
 import contextlib
-import io
 import re
-import sys
-import tempfile
 from datetime import date, timedelta
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+from atleten import beheer
+from db.queries import Opslag
+from groepen import landingspagina
+from models import Absentie, Fase, Groep, LeerdoelScore, Mesocyclus, Onderdeel, Training, Trainingsschema
+from wedstrijden import planning
+from hulp import app_client, lege_opslag
 
-from atleten import beheer  # noqa: E402
-from db.init_db import init_db  # noqa: E402
-from db.queries import Opslag  # noqa: E402
-from groepen import landingspagina  # noqa: E402
-from models import Absentie, Fase, Groep, LeerdoelScore, Mesocyclus, Onderdeel, Training, Trainingsschema  # noqa: E402
-from wedstrijden import planning  # noqa: E402
-
-TESTSLEUTEL = "55" * 32
 VANDAAG = date(2026, 10, 16)                       # een vrijdag
 MAANDAG = VANDAAG - timedelta(days=VANDAAG.weekday())
 TEMPLATES = Path(__file__).resolve().parents[1] / "src" / "ui" / "templates"
@@ -29,13 +23,10 @@ TEMPLATES = Path(__file__).resolve().parents[1] / "src" / "ui" / "templates"
 
 @contextlib.contextmanager
 def opslag():
-    with tempfile.TemporaryDirectory() as tmp:
-        with contextlib.redirect_stdout(io.StringIO()):
-            init_db(Path(tmp), hoofd=TESTSLEUTEL)
-        with Opslag(map=Path(tmp), hoofd=TESTSLEUTEL) as db:
-            db.onderdeel_opslaan(Onderdeel("100m", "tijd", True, "sprint"))
-            db.onderdeel_opslaan(Onderdeel("Verspringen", "afstand", False, "springen"))
-            yield db, Path(tmp)
+    with lege_opslag() as (db, tmp):
+        db.onderdeel_opslaan(Onderdeel("100m", "tijd", True, "sprint"))
+        db.onderdeel_opslaan(Onderdeel("Verspringen", "afstand", False, "springen"))
+        yield db, Path(tmp)
 
 
 def voorbeeldgroep(db: Opslag) -> dict:
@@ -186,12 +177,9 @@ def test_template():
 
 
 def test_routes():
-    from ui.app import maak_app
     with opslag() as (db, tmp):
         ids = voorbeeldgroep(db)
-        app = maak_app(map=tmp, hoofd=TESTSLEUTEL)
-        app.config["TESTING"] = True
-        c = app.test_client()
+        c = app_client(tmp)
         r = c.get("/groepen")
         assert r.status_code == 200 and f'href="/groep/{ids["groep"]}"' in r.get_data(as_text=True)
         r = c.get(f"/groep/{ids['groep']}")
@@ -206,10 +194,3 @@ def test_routes():
         # De groepsnamen op de atletenlijst en de atleetpagina linken naar de groep.
         assert f'href="/groep/{ids["groep"]}"' in c.get("/atleten").get_data(as_text=True)
         assert f'href="/groep/{ids["werp"]}"' in c.get(f"/atleet/{ids['cas']}").get_data(as_text=True)
-
-
-if __name__ == "__main__":
-    for naam, f in list(globals().items()):
-        if naam.startswith("test_") and callable(f):
-            f()
-            print("ok", naam)

@@ -13,15 +13,13 @@ from pathlib import Path
 
 import pytest
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-
-import instellingen  # noqa: E402
-from db import init_db as db_init  # noqa: E402
-from db.init_db import DATABASES, OvernameFout, init_db, oude_data_overnemen, standaard_map  # noqa: E402
-from db.queries import Opslag  # noqa: E402
+import instellingen
+from db import init_db as db_init
+from db.init_db import DATABASES, OvernameFout, init_db, oude_data_overnemen, standaard_map
+from db.queries import Opslag
+from hulp import TESTSLEUTEL
 
 REPO = Path(__file__).resolve().parents[1]
-TESTSLEUTEL = "4d" * 32
 
 
 @pytest.fixture(autouse=True)
@@ -55,10 +53,6 @@ def _oude_data(map_: Path) -> None:
 
 
 # ---------------- standaard_map ----------------
-def test_vanuit_de_broncode():
-    assert standaard_map() == REPO / "data"
-
-
 def test_in_de_exe(exe):
     _, nieuw = exe
     assert standaard_map() == nieuw

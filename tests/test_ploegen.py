@@ -1,78 +1,61 @@
-"""Tests voor ploegen (stap 3): migratie personen/010, Opslag.ploeg*, de matrix
+"""Tests voor ploegen (stap 3): tabellen ploeg/ploeg_lid/ploeg_opstelling, Opslag.ploeg*, de matrix
 (ploeg/vergelijk.py), punten en controle van een opstelling (ploeg/opstelling.py)
 en de pagina's /ploegen, /ploegen/nieuw, /ploeg/<id>.
 
-Alleen nep-atleten en een vaste testsleutel. Werkt met pytest en los:
-`python tests/test_ploegen.py`.
+Alleen nep-atleten en een vaste testsleutel.
 """
 
 import contextlib
 import io
-import sys
 import tempfile
 from datetime import date
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-
-from test_landingspagina import TESTSLEUTEL  # noqa: E402
-
-from atleten import beheer  # noqa: E402
-from db.init_db import huidige_versie, init_db, verbind  # noqa: E402
-from db.queries import Opslag, OpslagFout  # noqa: E402
-from models import Inzet, Onderdeel, Ploeg, PloegLid, Prestatie, Wedstrijd  # noqa: E402
-from ploeg import opstelling, regels, vergelijk  # noqa: E402
-from ploeg.paginas import programma_label  # noqa: E402
-from ui.app import maak_app  # noqa: E402
+from atleten import beheer
+from db.init_db import init_db, verbind
+from db.queries import Opslag, OpslagFout
+from models import Inzet, Onderdeel, Ploeg, PloegLid, Prestatie, Wedstrijd
+from ploeg import opstelling, regels, vergelijk
+from ploeg.paginas import programma_label
+from ui.app import maak_app
+from hulp import TESTSLEUTEL, lege_opslag, verwacht as _verwacht
 
 DAG = date(2027, 5, 15)            # wedstrijddag (zaterdag)
 JAAR = DAG.year
 BESTAND = "u14_u16_2026-2027"
 
 
-def _verwacht(fout, fn) -> None:
-    try:
-        fn()
-    except fout:
-        return
-    raise AssertionError(f"{fout.__name__} verwacht")
-
-
 @contextlib.contextmanager
 def opslag():
     """(Opslag, map, ids). Atleten op de wedstrijddag: anna U16-V, bo U16-V, cato U14-V, dirk U16-M."""
-    with tempfile.TemporaryDirectory() as tmp:
-        with contextlib.redirect_stdout(io.StringIO()):
-            init_db(Path(tmp), hoofd=TESTSLEUTEL)
-        with Opslag(map=Path(tmp), hoofd=TESTSLEUTEL) as db:
-            ids = {
-                "anna": beheer.nieuwe_atleet(db, "Anna", "Proef", geslacht="V", geboortedatum=f"{JAAR - 15}-03-01"),
-                "bo": beheer.nieuwe_atleet(db, "Bo", "Proef", geslacht="V", geboortedatum=f"{JAAR - 14}-06-01"),
-                "cato": beheer.nieuwe_atleet(db, "Cato", "Proef", geslacht="V", geboortedatum=f"{JAAR - 13}"),
-                "dirk": beheer.nieuwe_atleet(db, "Dirk", "Proef", geslacht="M", geboortedatum=f"{JAAR - 15}"),
-            }
-            ids = {k: a.master_id for k, a in ids.items()}
-            o = {n: db.onderdeel_opslaan(Onderdeel(n, e, e == "tijd")) for n, e in (
-                ("80 meter", "tijd"), ("80 meter Handtijd", "tijd"), ("800 meter", "tijd"),
-                ("80 meter horden 76,2cm", "tijd"), ("Verspringen", "afstand"), ("Hoogspringen", "hoogte"),
-                ("Kogelstoten 3kg", "afstand"), ("Kogelstoten 2kg", "afstand"), ("Discuswerpen 1kg", "afstand"))}
+    with lege_opslag() as (db, tmp):
+        ids = {
+            "anna": beheer.nieuwe_atleet(db, "Anna", "Proef", geslacht="V", geboortedatum=f"{JAAR - 15}-03-01"),
+            "bo": beheer.nieuwe_atleet(db, "Bo", "Proef", geslacht="V", geboortedatum=f"{JAAR - 14}-06-01"),
+            "cato": beheer.nieuwe_atleet(db, "Cato", "Proef", geslacht="V", geboortedatum=f"{JAAR - 13}"),
+            "dirk": beheer.nieuwe_atleet(db, "Dirk", "Proef", geslacht="M", geboortedatum=f"{JAAR - 15}"),
+        }
+        ids = {k: a.master_id for k, a in ids.items()}
+        o = {n: db.onderdeel_opslaan(Onderdeel(n, e, e == "tijd")) for n, e in (
+            ("80 meter", "tijd"), ("80 meter Handtijd", "tijd"), ("800 meter", "tijd"),
+            ("80 meter horden 76,2cm", "tijd"), ("Verspringen", "afstand"), ("Hoogspringen", "hoogte"),
+            ("Kogelstoten 3kg", "afstand"), ("Kogelstoten 2kg", "afstand"), ("Discuswerpen 1kg", "afstand"))}
 
-            def pr(wie, onderdeel, waarde, datum, wind=None):
-                db.prestatie_opslaan(Prestatie(onderdeel, datum, waarde, atleet_id=ids[wie],
-                                               onderdeel_id=o[onderdeel].id, wind=wind))
+        def pr(wie, onderdeel, waarde, datum, wind=None):
+            db.prestatie_opslaan(Prestatie(onderdeel, datum, waarde, atleet_id=ids[wie],
+                                           onderdeel_id=o[onderdeel].id, wind=wind))
 
-            pr("anna", "80 meter", 10.60, date(JAAR, 4, 20), wind=1.0)
-            pr("anna", "80 meter", 10.20, date(JAAR, 4, 21), wind=3.1)       # te veel rugwind: telt niet
-            pr("anna", "80 meter", 10.10, date(JAAR - 3, 6, 1), wind=0.0)    # te oud voor 'seizoen', wel PR
-            pr("anna", "Verspringen", 5.10, date(JAAR - 1, 7, 1), wind=0.5)
-            pr("bo", "80 meter", 10.90, date(JAAR, 4, 20), wind=0.0)
-            pr("bo", "80 meter horden 76,2cm", 12.80, date(JAAR, 4, 20), wind=1.5)
-            pr("cato", "80 meter Handtijd", 10.80, date(JAAR, 4, 20))        # handtijd: +0,24
-            pr("cato", "Kogelstoten 2kg", 9.80, date(JAAR, 4, 20))           # U14-materiaal: hint
-            pr("bo", "Kogelstoten 3kg", 10.50, date(JAAR, 5, 20))            # na de wedstrijddag: telt niet
-            pr("anna", "Kogelstoten 3kg", 9.00, date(JAAR, 4, 1))
-            yield db, Path(tmp), ids
+        pr("anna", "80 meter", 10.60, date(JAAR, 4, 20), wind=1.0)
+        pr("anna", "80 meter", 10.20, date(JAAR, 4, 21), wind=3.1)       # te veel rugwind: telt niet
+        pr("anna", "80 meter", 10.10, date(JAAR - 3, 6, 1), wind=0.0)    # te oud voor 'seizoen', wel PR
+        pr("anna", "Verspringen", 5.10, date(JAAR - 1, 7, 1), wind=0.5)
+        pr("bo", "80 meter", 10.90, date(JAAR, 4, 20), wind=0.0)
+        pr("bo", "80 meter horden 76,2cm", 12.80, date(JAAR, 4, 20), wind=1.5)
+        pr("cato", "80 meter Handtijd", 10.80, date(JAAR, 4, 20))        # handtijd: +0,24
+        pr("cato", "Kogelstoten 2kg", 9.80, date(JAAR, 4, 20))           # U14-materiaal: hint
+        pr("bo", "Kogelstoten 3kg", 10.50, date(JAAR, 5, 20))            # na de wedstrijddag: telt niet
+        pr("anna", "Kogelstoten 3kg", 9.00, date(JAAR, 4, 1))
+        yield db, Path(tmp), ids
 
 
 def _ploeg(db, naam="U16 meisjes A", **kw) -> Ploeg:
@@ -88,38 +71,15 @@ def _matrix(db, ids, basis="seizoen"):
 # ------------------------------------------------------------
 # Database
 # ------------------------------------------------------------
-def test_migratie_010_op_bestaande_database():
-    """Een personen.db van vóór 010 met de oude ploeg_opstelling: leden blijven als ploeg_lid."""
+def test_ploeg_zonder_datum_wordt_overgeslagen():
+    """ploeg.datum mag leeg zijn (zo stond het in oudere databases); het overzicht slaat die over."""
     with tempfile.TemporaryDirectory() as tmp:
         with contextlib.redirect_stdout(io.StringIO()):
             init_db(Path(tmp), hoofd=TESTSLEUTEL)
-        with contextlib.closing(verbind("personen", Path(tmp), TESTSLEUTEL)) as c:
-            c.executescript("""
-                DROP TABLE ploeg_opstelling; DROP TABLE ploeg_lid; DROP INDEX idx_ploeg_datum;
-                CREATE TABLE ploeg_opstelling (ploeg_id INTEGER NOT NULL REFERENCES ploeg(id) ON DELETE CASCADE,
-                    atleet_id TEXT NOT NULL REFERENCES atleet(master_id) ON DELETE CASCADE,
-                    onderdeel_id INTEGER NOT NULL, reserve INTEGER NOT NULL DEFAULT 0,
-                    PRIMARY KEY (ploeg_id, atleet_id, onderdeel_id));
-                ALTER TABLE ploeg DROP COLUMN categorie; ALTER TABLE ploeg DROP COLUMN programma;
-                ALTER TABLE ploeg DROP COLUMN datum; ALTER TABLE ploeg DROP COLUMN prestatiebasis;
-            """)
-            c.execute("DELETE FROM schema_version WHERE versie >= 10")
-            c.execute("INSERT INTO atleet (master_id, voornaam, achternaam) VALUES (?, 'X', 'Y'), (?, 'Z', 'W')",
-                      ("a" * 32, "b" * 32))
-            c.execute("INSERT INTO ploeg (id, naam) VALUES (1, 'Oud')")
-            c.executemany("INSERT INTO ploeg_opstelling VALUES (1, ?, ?, ?)",
-                          [("a" * 32, 1, 0), ("a" * 32, 2, 0), ("b" * 32, 3, 1)])
-            c.commit()
-        with contextlib.redirect_stdout(io.StringIO()):
-            init_db(Path(tmp), hoofd=TESTSLEUTEL)
-        with contextlib.closing(verbind("personen", Path(tmp), TESTSLEUTEL)) as c:
-            assert huidige_versie(c) >= 10
-            leden = {r["atleet_id"]: r["rol"] for r in c.execute("SELECT * FROM ploeg_lid")}
-            assert leden == {"a" * 32: "deelnemer", "b" * 32: "reserve"}
-            kolommen = {r[1] for r in c.execute("PRAGMA table_info(ploeg_opstelling)")}
-            assert {"onderdeel", "groep", "vast"} <= kolommen and "onderdeel_id" not in kolommen
+        with contextlib.closing(verbind("personen", Path(tmp), TESTSLEUTEL)) as c, c:
+            c.execute("INSERT INTO ploeg (id, naam) VALUES (1, 'Zonder datum')")
         with Opslag(map=Path(tmp), hoofd=TESTSLEUTEL) as db:
-            assert db.ploegen() == []                        # oude ploeg zonder datum wordt overgeslagen
+            assert db.ploegen() == []
 
 
 def test_ploeg_opslaan_en_lezen():
@@ -309,11 +269,3 @@ def test_paginas_nieuwe_ploeg_opstellen_en_verwijderen():
         assert c.post(f"{pad}/verwijderen").status_code == 302
         assert c.get(pad).status_code == 404
         assert "Nog geen ploegen" in tekst(c.get("/ploegen"))
-
-
-if __name__ == "__main__":
-    tests = [(n, f) for n, f in globals().items() if n.startswith("test_") and callable(f)]
-    for naam, fn in tests:
-        fn()
-        print(f"ok  {naam}")
-    print(f"{len(tests)} tests geslaagd")

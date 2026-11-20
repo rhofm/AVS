@@ -14,8 +14,8 @@ import pytest
 SRC = Path(__file__).resolve().parents[1] / "src"
 sys.path.insert(0, str(SRC))
 
-import zelftest  # noqa: E402
-from db import init_db as db_init  # noqa: E402
+import zelftest
+from db import init_db as db_init
 
 
 def _main_module():

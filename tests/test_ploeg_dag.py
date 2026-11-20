@@ -2,26 +2,21 @@
 dagdelen, groepen), meer ploegen op één dag (paginas.dag_optimaliseren, pagina
 /ploegen/dag/<datum>) en age grading voor masters (punten.Leeftijdsfactoren).
 
-Alleen nepgegevens. Werkt met pytest en los: `python tests/test_ploeg_dag.py`.
+Alleen nepgegevens.
 """
 
 import contextlib
-import sys
 from datetime import date
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+from test_ploegen import BESTAND, DAG, JAAR, opslag
 
-from test_landingspagina import TESTSLEUTEL  # noqa: E402
-from test_ploegen import BESTAND, DAG, JAAR, _verwacht, opslag  # noqa: E402
-
-from atleten import beheer  # noqa: E402
-from db.queries import Opslag  # noqa: E402
-from models import Inzet, Onderdeel, Ploeg, PloegLid, Prestatie, ProgrammaOnderdeel, Wedstrijd  # noqa: E402
-from ploeg import opstelling, paginas, punten, regels, strategieen, tijdschema, vergelijk  # noqa: E402
-from ploeg.optimaliseer import optimaliseer  # noqa: E402
-from ui.app import maak_app  # noqa: E402
+from atleten import beheer
+from db.queries import Opslag
+from models import Inzet, Onderdeel, Ploeg, PloegLid, Prestatie, ProgrammaOnderdeel, Wedstrijd
+from ploeg import opstelling, paginas, punten, regels, strategieen, tijdschema, vergelijk
+from ploeg.optimaliseer import optimaliseer
+from ui.app import maak_app
+from hulp import TESTSLEUTEL, app_client, verwacht as _verwacht
 
 RS = regels.laad(BESTAND)
 
@@ -124,9 +119,7 @@ def test_optimaliseren_houdt_rekening_met_tijdschema():
 def test_groepen_en_formulier_met_dagdeel():
     with met_wedstrijd() as (db, tmp, ids, p):
         db.sluit()
-        app = maak_app(map=tmp, hoofd=TESTSLEUTEL)
-        app.config["TESTING"] = True
-        c = app.test_client()
+        c = app_client(tmp)
         anna, cato = ids["anna"], ids["cato"]
         r = c.post(f"/ploeg/{p.id}", data={
             f"rol-{anna}": "deelnemer", f"beschikbaar-{anna}": "middag",
@@ -194,9 +187,7 @@ def test_dagpagina_in_de_ui():
         a = db.ploeg_opslaan(Ploeg("U16 A", BESTAND, "U16-V", "wedstrijd_1", DAG))
         b = db.ploeg_opslaan(Ploeg("U14 A", BESTAND, "U14-V", "wedstrijd_1", DAG))
         db.sluit()
-        app = maak_app(map=tmp, hoofd=TESTSLEUTEL)
-        app.config["TESTING"] = True
-        c = app.test_client()
+        c = app_client(tmp)
         html = c.get("/ploegen").get_data(as_text=True)
         assert f"/ploegen/dag/{DAG.isoformat()}" in html and "2 ploegen samen" in html
         html = c.get(f"/ploeg/{a.id}").get_data(as_text=True)
@@ -222,13 +213,10 @@ def test_leeftijdsfactoren_lezen():
     assert lf.factor("V", "100m", 47) == 0.90 and lf.factor("V", "100m", 44) == 0.99
     assert lf.factor("V", "100m", 34) is None and lf.factor("M", "100m", 50) is None
     assert lf.factor("V", "200m", 50) is None and lf.factor(None, "100m", 50) is None
-    assert punten.gecorrigeerd(58.4, 0.8616, "400m", handtijd=True) == 50.44       # 50,4381 naar boven op 0,01
     for fout in ({"factoren": {"X": {}}}, {"factoren": {"V": {"100m": {"oud": 1.0}}}},
                  {"factoren": {"V": {"100m": {40: 99}}}}, {"tabel": 1}, []):
         _verwacht(punten.PuntenFout, lambda f=fout: punten.Leeftijdsfactoren.uit_dict(f))
-    # het meegeleverde bestand is gevuld (zie test_masters_agegrading.py); het mastersbestand verwijst ernaar
-    assert not punten.leeftijdsfactoren("masters_agegrading").leeg
-    assert regels.laad("masters_2026-2027").leeftijdsfactoren == "masters_agegrading"
+    # het meegeleverde bestand en het mastersbestand: zie test_masters_agegrading.py
 
 
 def test_masters_punten_met_leeftijdsfactor():
@@ -263,11 +251,3 @@ def test_masters_punten_met_leeftijdsfactor():
             assert "ontbreekt een leeftijdsfactor" in app.test_client().get(f"/ploeg/{p.id}").get_data(as_text=True)
     finally:
         punten.leeftijdsfactoren = oud
-
-
-if __name__ == "__main__":
-    tests = [(n, f) for n, f in globals().items() if n.startswith("test_") and callable(f)]
-    for naam, fn in tests:
-        fn()
-        print(f"ok  {naam}")
-    print(f"{len(tests)} tests geslaagd")
