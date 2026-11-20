@@ -156,6 +156,7 @@ class Inschrijving:
     atleet_id: str
     wedstrijd_id: int
     onderdeel_id: int | None = None
+    groep: str | None = None        # door de trainer gekozen groep in het tijdschema (ProgrammaOnderdeel.groep_sleutel)
 
 
 @dataclass(slots=True, frozen=True)

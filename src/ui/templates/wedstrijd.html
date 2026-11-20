@@ -220,6 +220,20 @@
                             <button type="submit" class="kruisje" title="{{ p.atleet.naam }} afmelden voor {{ o.naam }}"
                                     aria-label="{{ p.atleet.naam }} afmelden voor {{ o.naam }}">&times;</button>
                           </form>
+                          {% set opties = d.groepsopties.get(o.id, []) %}
+                          {% set gekozen_groep = p.groep_van.get(o.id) %}
+                          {% if opties | length > 1 or gekozen_groep or (opties and o.naam in p.niet_in_tijdschema) %}
+                            <form method="post" action="{{ url_for('wedstrijd_groep', wedstrijd_id=w.id) }}" class="groepkeuze">
+                              <input type="hidden" name="atleet" value="{{ p.atleet.master_id }}">
+                              <input type="hidden" name="onderdeel" value="{{ o.id }}">
+                              <label class="verborgen" for="groep-{{ p.atleet.master_id }}-{{ o.id }}">Groep van {{ p.atleet.naam }} bij {{ o.naam }}</label>
+                              <select id="groep-{{ p.atleet.master_id }}-{{ o.id }}" name="groep" onchange="this.form.submit()">
+                                <option value="">Groep: automatisch</option>
+                                {% for sleutel, tekst in opties %}<option value="{{ sleutel }}"{% if sleutel == gekozen_groep %} selected{% endif %}>{{ tekst }}</option>{% endfor %}
+                              </select>
+                              <noscript><button class="knop knop--klein" type="submit">Opslaan</button></noscript>
+                            </form>
+                          {% endif %}
                         </li>
                       {% endfor %}
                     </ul>

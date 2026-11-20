@@ -67,6 +67,25 @@
       {% endif %}
     </section>
 
+    {% if f.groep_onderdelen %}
+      <section class="blok" aria-labelledby="kop-groepen">
+        <h2 class="kop" id="kop-groepen">Groep <span class="zacht">(optioneel)</span></h2>
+        <p class="zacht">Het tijdschema verdeelt deze onderdelen in groepen, bijvoorbeeld mannen en vrouwen apart of groep 1 en 2.
+          De gekozen groep geldt voor alle atleten die je hieronder aanvinkt en gaat voor op hun categorie.
+          Laat je &lsquo;automatisch&rsquo; staan, dan beslist de categorie.</p>
+        <div class="velden">
+          {% for o, opties in f.groep_onderdelen %}
+            <label class="veld"><span>{{ o.naam }}</span>
+              <select name="groep-{{ o.id }}">
+                <option value="">automatisch</option>
+                {% for sleutel, tekst in opties %}<option value="{{ sleutel }}"{% if f.groep_keuze.get(o.id) == sleutel %} selected{% endif %}>{{ tekst }}</option>{% endfor %}
+              </select>
+            </label>
+          {% endfor %}
+        </div>
+      </section>
+    {% endif %}
+
     <section class="blok" aria-labelledby="kop-atleten">
       <div class="blok__kop">
         <h2 class="kop" id="kop-atleten">Atleten</h2>

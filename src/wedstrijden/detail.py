@@ -24,7 +24,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
 from datetime import date
-from typing import Iterable
+from typing import Iterable, Mapping
 
 from atleten.landingspagina import categorie_code, leeftijdscategorie
 from db.queries import Opslag, OpslagFout
@@ -80,6 +80,7 @@ class Deelnemer:
     categorie: str | None                     # 'U16V' op de wedstrijddag; None = onbekend
     onderdelen: list[Onderdeel]               # ingeschreven onderdelen; [] = onderdelen volgen nog
     niet_in_tijdschema: list[str] = field(default_factory=list)   # onderdeelnamen zonder passende regel
+    groep_van: dict[int, str] = field(default_factory=dict)       # onderdeel_id -> zelf gekozen groep
 
     @property
     def volgt_nog(self) -> bool:
@@ -108,6 +109,7 @@ class WedstrijdDetail:
     botsingen: list[chronoloog.Botsing]
     dagen_tot: int                            # 0 = vandaag, negatief = geweest
     uitslagen: list[UitslagRij] = field(default_factory=list)   # op achternaam, dan onderdeel
+    groepsopties: dict[int, list[tuple[str, str]]] = field(default_factory=dict)   # onderdeel_id -> [(sleutel, tekst)]
 
     @property
     def uitslag_mogelijk(self) -> bool:
@@ -150,6 +152,19 @@ class WedstrijdDetail:
         return [d for d in self.deelnemers if d.volgt_nog or d.niet_in_tijdschema]
 
 
+def groepsopties(regels: list[ProgrammaOnderdeel]) -> dict[int, list[tuple[str, str]]]:
+    """Per onderdeel de groepen uit het tijdschema waaruit je kunt kiezen: (sleutel, tekst), in tijdschemavolgorde.
+
+    Een groep is een combinatie van categorie en groepsnummer ('Mannen · groep 2', 'Vrouwen', 'Groep 1').
+    Rondes (serie, finale) van dezelfde groep tellen als één.
+    """
+    uit: dict[int, dict[str, str]] = {}
+    for r in regels:
+        if r.onderdeel_id is not None:
+            uit.setdefault(r.onderdeel_id, {}).setdefault(r.groep_sleutel, r.groep_tekst)
+    return {o: list(groepen.items()) for o, groepen in uit.items()}
+
+
 def _sorteer(a: Atleet) -> tuple[str, str, str]:
     """Op achternaam of voornaam, zoals in Instellingen gekozen."""
     return naam_sleutel(a)
@@ -176,10 +191,13 @@ def wedstrijd_detail(db: Opslag, wedstrijd_id: int, peildatum: date | None = Non
 
     alle_onderdelen = {o.id: o for o in db.onderdelen()}
     per_atleet: dict[str, list[Onderdeel]] = {}
+    gekozen_groep: dict[str, dict[int, str]] = {}
     for i in db.deelnemers(wedstrijd_id):
         lijst = per_atleet.setdefault(i.atleet_id, [])
         if i.onderdeel_id is not None and i.onderdeel_id in alle_onderdelen:
             lijst.append(alle_onderdelen[i.onderdeel_id])
+            if i.groep is not None:
+                gekozen_groep.setdefault(i.atleet_id, {})[i.onderdeel_id] = i.groep
     deelnemers = []
     for mid, onderdelen in per_atleet.items():
         a = db.atleet(mid)
@@ -187,11 +205,12 @@ def wedstrijd_detail(db: Opslag, wedstrijd_id: int, peildatum: date | None = Non
             continue
         onderdelen.sort(key=lambda o: o.naam.lower())
         los = [o.naam for o in onderdelen if o.id not in gedekt.get(mid, set())]
-        deelnemers.append(Deelnemer(a, _code(a, w.datum), onderdelen, los))
+        deelnemers.append(Deelnemer(a, _code(a, w.datum), onderdelen, los, gekozen_groep.get(mid, {})))
     deelnemers.sort(key=lambda d: _sorteer(d.atleet))
 
     return WedstrijdDetail(w, dagen, deelnemers, chronoloog.botsingen(db, wedstrijd_id),
-                           w.dagen_tot(vandaag), _uitslagen(db, wedstrijd_id, alle_onderdelen))
+                           w.dagen_tot(vandaag), _uitslagen(db, wedstrijd_id, alle_onderdelen),
+                           groepsopties(db.programma(wedstrijd_id)))
 
 
 def _uitslagen(db: Opslag, wedstrijd_id: int, onderdelen: dict[int, Onderdeel]) -> list[UitslagRij]:
@@ -237,6 +256,14 @@ class InschrijfFormulier:
     gekozen_onderdelen: set[int]
     kandidaten: list[Kandidaat]               # actieve atleten (en wie al meegaat), op achternaam
     gekozen: set[str] = field(default_factory=set)   # aangevinkte atleten (na een fout opnieuw tonen)
+    groepsopties: dict[int, list[tuple[str, str]]] = field(default_factory=dict)   # onderdeel_id -> [(sleutel, tekst)]
+    groep_keuze: dict[int, str] = field(default_factory=dict)    # onderdeel_id -> voorgekozen groep
+
+    @property
+    def groep_onderdelen(self) -> list[tuple[Onderdeel, list[tuple[str, str]]]]:
+        """Onderdelen waarvoor een groep te kiezen valt: het tijdschema heeft er meer dan één, of er is er één voorgekozen."""
+        return [(o, self.groepsopties[o.id]) for o in self.onderdelen
+                if o.id in self.groepsopties and (len(self.groepsopties[o.id]) > 1 or o.id in self.groep_keuze)]
 
     @property
     def overige_gekozen(self) -> bool:
@@ -293,13 +320,27 @@ def inschrijfformulier(db: Opslag, wedstrijd_id: int, regel_id: int | None = Non
         kandidaten.append(Kandidaat(a, categorie_code(cat, a.geslacht), past,
                                     sorted(per_atleet.get(a.master_id, []), key=str.lower),
                                     a.master_id in per_atleet))
-    return InschrijfFormulier(w, regel, eerst, rest, gekozen_onderdelen, kandidaten, set(gekozen))
+    keuze = {regel.onderdeel_id: regel.groep_sleutel} if regel is not None and regel.onderdeel_id is not None else {}
+    return InschrijfFormulier(w, regel, eerst, rest, gekozen_onderdelen, kandidaten, set(gekozen),
+                              groepsopties(db.programma(wedstrijd_id)), keuze)
+
+
+def _gekozen_groep(opties: dict[int, list[tuple[str, str]]], onderdeel_id: int, groep: str) -> str | None:
+    """'' = automatisch (None); anders moet de groep in het tijdschema van dit onderdeel staan."""
+    if not groep:
+        return None
+    if groep not in [s for s, _ in opties.get(onderdeel_id, [])]:
+        raise OpslagFout("Deze groep staat niet (meer) in het tijdschema van dit onderdeel.")
+    return groep
 
 
 def inschrijven_uit_formulier(db: Opslag, wedstrijd_id: int, master_ids: Iterable[str],
-                              onderdeel_ids: Iterable[int | str]) -> int:
+                              onderdeel_ids: Iterable[int | str],
+                              groepen: Mapping[int, str] | None = None) -> int:
     """Schrijf de gekozen atleten in voor de gekozen onderdelen (geen onderdelen = 'volgen nog').
 
+    groepen: onderdeel_id -> groep uit het tijdschema (`ProgrammaOnderdeel.groep_sleutel`); die geldt
+    voor alle gekozen atleten en gaat voor op hun categorie. Leeg of ontbrekend = automatisch.
     Eerst alles controleren, dan pas opslaan. Geeft het aantal atleten.
     """
     if db.wedstrijd(wedstrijd_id) is None:
@@ -319,9 +360,32 @@ def inschrijven_uit_formulier(db: Opslag, wedstrijd_id: int, master_ids: Iterabl
         if db.onderdeel(oid) is None:
             raise OpslagFout("Onbekend onderdeel gekozen.")
         onderdelen.append(oid)
+    opties = groepsopties(db.programma(wedstrijd_id))
+    keuzes = {oid: g for oid in onderdelen if (g := _gekozen_groep(opties, oid, (groepen or {}).get(oid, ""))) is not None}
     for m in ids:
         planning.inschrijven(db, wedstrijd_id, m, onderdelen)
+        for oid, g in keuzes.items():
+            db.inschrijving_groep_zetten(m, wedstrijd_id, oid, g)
     return len(ids)
+
+
+def groep_kiezen(db: Opslag, wedstrijd_id: int, master_id: str, onderdeel_id: int, groep: str) -> str:
+    """Zet de groep van een ingeschreven atleet bij één onderdeel ('' = weer automatisch). Geeft de melding."""
+    a = db.atleet(master_id)
+    if a is None or db.wedstrijd(wedstrijd_id) is None:
+        raise OpslagFout("Deze atleet of wedstrijd bestaat niet (meer).")
+    o = db.onderdeel(onderdeel_id)
+    if o is None:
+        raise OpslagFout("Onbekend onderdeel.")
+    if not any(i.wedstrijd_id == wedstrijd_id and i.onderdeel_id == onderdeel_id for i in db.inschrijvingen(master_id)):
+        raise OpslagFout(f"{a.naam} is niet ingeschreven voor {o.naam}.")
+    gekozen = _gekozen_groep(groepsopties(db.programma(wedstrijd_id)), onderdeel_id, groep)
+    db.inschrijving_groep_zetten(master_id, wedstrijd_id, onderdeel_id, gekozen)
+    if gekozen is None:
+        return f"{a.naam}: groep bij {o.naam} weer automatisch."
+    tekst = next(t for s, t in groepsopties(db.programma(wedstrijd_id))[onderdeel_id] if s == gekozen)
+    return f"{a.naam} staat bij {o.naam} in de groep: {tekst}."
+
 
 
 def afmelden(db: Opslag, wedstrijd_id: int, master_id: str, onderdeel_id: int | None = None) -> str:

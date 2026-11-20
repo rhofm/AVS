@@ -959,8 +959,9 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
     def wedstrijd_inschrijven_opslaan(wedstrijd_id: int):
         regel_id = _regel_id(request.form.get("regel"))
         atleten, onderdelen = request.form.getlist("atleet"), request.form.getlist("onderdeel")
+        groepen = {int(k[6:]): v for k, v in request.form.items() if k.startswith("groep-") and k[6:].isdigit()}
         try:
-            aantal = wedstrijddetail.inschrijven_uit_formulier(db(), wedstrijd_id, atleten, onderdelen)
+            aantal = wedstrijddetail.inschrijven_uit_formulier(db(), wedstrijd_id, atleten, onderdelen, groepen)
         except OpslagFout as e:
             if db().wedstrijd(wedstrijd_id) is None:
                 abort(404)
@@ -975,6 +976,20 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
             return redirect(url_for("atleet_wedstrijden", master_id=van_atleet.master_id) + f"#w-{wedstrijd_id}")
         anker = f"#regel-{regel_id}" if regel_id else "#kop-deelnemers"
         return redirect(url_for("wedstrijd", wedstrijd_id=wedstrijd_id) + anker)
+
+    @app.post("/wedstrijd/<int:wedstrijd_id>/groep")
+    def wedstrijd_groep(wedstrijd_id: int):
+        onderdeel = request.form.get("onderdeel", "")
+        try:
+            tekst = wedstrijddetail.groep_kiezen(db(), wedstrijd_id, request.form.get("atleet", ""),
+                                                 int(onderdeel) if onderdeel.isdigit() else -1,
+                                                 request.form.get("groep", ""))
+        except OpslagFout as e:
+            if db().wedstrijd(wedstrijd_id) is None:
+                abort(404)
+            return _wedstrijdpagina(wedstrijd_id, fout=str(e), status=400)
+        flash(tekst)
+        return redirect(url_for("wedstrijd", wedstrijd_id=wedstrijd_id) + "#kop-deelnemers")
 
     @app.post("/wedstrijd/<int:wedstrijd_id>/afmelden")
     def wedstrijd_afmelden(wedstrijd_id: int):

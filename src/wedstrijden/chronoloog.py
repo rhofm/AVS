@@ -23,6 +23,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import date
 from itertools import combinations
+from typing import Mapping
 
 from atleten.landingspagina import leeftijdscategorie
 from db.queries import Opslag, OpslagFout
@@ -85,11 +86,18 @@ def _categorie(atleet: Atleet, w: Wedstrijd) -> str | None:
     return leeftijdscategorie(atleet, w.datum)
 
 
-def _schema(regels: list[ProgrammaOnderdeel], onderdelen: set[int], categorie: str | None,
-            geslacht: str | None) -> list[SchemaRegel]:
+def _schema(regels: list[ProgrammaOnderdeel], onderdelen: set[int] | Mapping[int, str | None],
+            categorie: str | None, geslacht: str | None) -> list[SchemaRegel]:
+    """onderdelen: ids van de ingeschreven onderdelen, of id -> door de trainer gekozen groep
+    (`ProgrammaOnderdeel.groep_sleutel`, None = automatisch op categorie)."""
+    keuzes = dict(onderdelen) if isinstance(onderdelen, Mapping) else dict.fromkeys(onderdelen)
     gekozen = []
     for r in regels:
-        if r.onderdeel_id is None or r.onderdeel_id not in onderdelen:
+        if r.onderdeel_id is None or r.onderdeel_id not in keuzes:
+            continue
+        if keuzes[r.onderdeel_id] is not None:             # groep zelf gekozen: gaat voor op de categorie
+            if r.groep_sleutel == keuzes[r.onderdeel_id]:
+                gekozen.append((r, True))
             continue
         past = past_bij(r, categorie, geslacht)
         if past is False:
@@ -118,7 +126,7 @@ def persoonlijk_schema(db: Opslag, wedstrijd_id: int, master_id: str) -> list[Sc
     a = db.atleet(master_id)
     if a is None:
         raise OpslagFout(f"Atleet {master_id} bestaat niet.")
-    onderdelen = {i.onderdeel_id for i in db.inschrijvingen(master_id)
+    onderdelen = {i.onderdeel_id: i.groep for i in db.inschrijvingen(master_id)
                   if i.wedstrijd_id == wedstrijd_id and i.onderdeel_id is not None}
     return _schema(db.programma(wedstrijd_id), onderdelen, _categorie(a, w), a.geslacht)
 
@@ -140,10 +148,10 @@ def overzicht(db: Opslag, wedstrijd_id: int) -> list[OverzichtRegel]:
         raise OpslagFout(f"Wedstrijd {wedstrijd_id} bestaat niet.")
     regels = db.programma(wedstrijd_id)
     uit = {r.id: OverzichtRegel(r) for r in regels}
-    per_atleet: dict[str, set[int]] = {}
+    per_atleet: dict[str, dict[int, str | None]] = {}
     for i in db.deelnemers(wedstrijd_id):
         if i.onderdeel_id is not None:
-            per_atleet.setdefault(i.atleet_id, set()).add(i.onderdeel_id)
+            per_atleet.setdefault(i.atleet_id, {})[i.onderdeel_id] = i.groep
     sorteer = naam_sleutel                                             # achternaam of voornaam (Instellingen)
     for mid, onderdelen in per_atleet.items():
         a = db.atleet(mid)
@@ -187,10 +195,10 @@ def botsingen(db: Opslag, wedstrijd_id: int, min_pauze: int = 0) -> list[Botsing
     if w is None:
         raise OpslagFout(f"Wedstrijd {wedstrijd_id} bestaat niet.")
     regels = db.programma(wedstrijd_id)
-    per_atleet: dict[str, set[int]] = {}
+    per_atleet: dict[str, dict[int, str | None]] = {}
     for i in db.deelnemers(wedstrijd_id):
         if i.onderdeel_id is not None:
-            per_atleet.setdefault(i.atleet_id, set()).add(i.onderdeel_id)
+            per_atleet.setdefault(i.atleet_id, {})[i.onderdeel_id] = i.groep
     uit = []
     for mid, onderdelen in per_atleet.items():
         a = db.atleet(mid)

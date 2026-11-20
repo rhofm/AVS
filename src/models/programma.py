@@ -73,6 +73,23 @@ class ProgrammaOnderdeel:
             return ander.overlapt(self)
         return self.einde is not None and self.einde > ander.begin
 
+    # ---------- groep ----------
+    @property
+    def groep_sleutel(self) -> str:
+        """Wat bij een inschrijving wordt bewaard als de trainer een groep kiest: 'Mannen|2', 'Vrouwen|', '|1'.
+
+        Categorie + groepsnummer van de regel, dus ook na het opnieuw importeren van het tijdschema
+        nog te vinden (regel-id's veranderen dan wel).
+        """
+        return f"{self.categorie or ''}|{self.groep or ''}"
+
+    @property
+    def groep_tekst(self) -> str:
+        """Voor een keuzelijst: 'Mannen · groep 2', 'Vrouwen', 'Groep 1', 'Alle'."""
+        delen = [self.categorie, f"groep {self.groep}" if self.groep else None]
+        tekst = " · ".join(d for d in delen if d)
+        return tekst[:1].upper() + tekst[1:] if tekst else "Alle"
+
     # ---------- tekst ----------
     @property
     def naam(self) -> str:

@@ -473,9 +473,19 @@ class Opslag:
             ).fetchone()
             if not bestaat:
                 self.prestaties_db.execute(
-                    "INSERT INTO inschrijving (atleet_ref, wedstrijd_id, onderdeel_id) VALUES (?, ?, ?)",
-                    (ref, i.wedstrijd_id, i.onderdeel_id),
+                    "INSERT INTO inschrijving (atleet_ref, wedstrijd_id, onderdeel_id, tijdschema_groep) "
+                    "VALUES (?, ?, ?, ?)",
+                    (ref, i.wedstrijd_id, i.onderdeel_id, i.groep),
                 )
+
+    def inschrijving_groep_zetten(self, atleet_id: str, wedstrijd_id: int, onderdeel_id: int,
+                                  groep: str | None) -> None:
+        """De groep van een bestaande inschrijving instellen; None = weer automatisch (op categorie)."""
+        with self.prestaties_db:
+            self.prestaties_db.execute(
+                "UPDATE inschrijving SET tijdschema_groep = ? "
+                "WHERE atleet_ref = ? AND wedstrijd_id = ? AND onderdeel_id = ?",
+                (groep, self._ref(atleet_id, "prestaties"), wedstrijd_id, onderdeel_id))
 
     def inschrijving_verwijderen(self, i: Inschrijving) -> None:
         """Afmelden. Met onderdeel_id=None verdwijnen ALLE inschrijvingen van deze atleet voor deze wedstrijd."""
@@ -493,11 +503,12 @@ class Opslag:
         """Alle inschrijvingen voor één wedstrijd (atleten die niet meer bestaan worden overgeslagen)."""
         uit = []
         for r in self.prestaties_db.execute(
-            "SELECT atleet_ref, onderdeel_id FROM inschrijving WHERE wedstrijd_id = ?", (wedstrijd_id,)
+            "SELECT atleet_ref, onderdeel_id, tijdschema_groep FROM inschrijving WHERE wedstrijd_id = ?",
+            (wedstrijd_id,)
         ):
             master_id = self._master_id(r["atleet_ref"], "prestaties")
             if master_id is not None:
-                uit.append(Inschrijving(master_id, wedstrijd_id, r["onderdeel_id"]))
+                uit.append(Inschrijving(master_id, wedstrijd_id, r["onderdeel_id"], r["tijdschema_groep"]))
         return uit
 
     def wedstrijd_verwijderen(self, wedstrijd_id: int) -> None:
@@ -700,12 +711,12 @@ class Opslag:
 
     def inschrijvingen(self, master_id: str) -> list[Inschrijving]:
         rijen = self.prestaties_db.execute(
-            """SELECT i.wedstrijd_id, i.onderdeel_id FROM inschrijving i
+            """SELECT i.wedstrijd_id, i.onderdeel_id, i.tijdschema_groep FROM inschrijving i
                JOIN wedstrijd w ON w.id = i.wedstrijd_id
                WHERE i.atleet_ref = ? ORDER BY w.datum""",
             (self._ref(master_id, "prestaties"),),
         )
-        return [Inschrijving(master_id, r["wedstrijd_id"], r["onderdeel_id"]) for r in rijen]
+        return [Inschrijving(master_id, r["wedstrijd_id"], r["onderdeel_id"], r["tijdschema_groep"]) for r in rijen]
 
     # ============================================================
     # Testen (testen.db)
