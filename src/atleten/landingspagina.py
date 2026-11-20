@@ -145,6 +145,9 @@ def categorie_code(categorie: str | None, geslacht: str | None) -> str | None:
     ('Masters 40', 'V') -> 'V40' (zoals de masterscategorieën heten), ('Masters 40', None) -> 'Masters 40'.
 
     Bij geslacht X of onbekend alleen de categorie ('U16', 'Senior').
+
+    Alleen om te tonen (en groeperen op het scherm). De sleutel in de regelbestanden van de
+    ploegen ('U16-V', 'SEN-M') is ploeg.regels.ploegcategorie.
     """
     if categorie is None:
         return None

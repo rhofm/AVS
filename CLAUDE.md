@@ -434,7 +434,7 @@ it only holds `.gitkeep`).
   Event keys in rule files are the keys of the scoring table (`80mH`,
   `kogelstoten`, `4x80m`), or carry `punten:` when they differ (senior events
   `100m-V` / `100m-M` with `geslacht:` in the mixed ploeg `SEN`); categories are
-  codes like `U14-V`, `U16-M`, `SEN-V` (`categorie_code()`), or masters classes
+  codes like `U14-V`, `U16-M`, `SEN-V` (`ploeg.regels.ploegcategorie()`), or masters classes
   `V45` in a file with `leeftijdsklassen: masters` (`masters_code()`, age on the
   meet day; `V35+` in `toegestaan`/`specificatie` means "from V35"). Rule files
   exist for U14/U16, U18/U20, masters, NK Teams and senioren 1e/2e/3e divisie

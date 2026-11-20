@@ -40,7 +40,7 @@ from atleten.prestaties import toon_waarde
 from db.queries import Opslag
 from models import PRESTATIEBASIS, Atleet, Onderdeel, Prestatie
 from ploeg import punten as _punten
-from ploeg.regels import Programmaregel, Regelset, categorie_code, masters_code
+from ploeg.regels import Programmaregel, Regelset, masters_code, ploegcategorie
 from ploeg.voorspeller import Beentijd, beentijd, voorspel
 
 _SPEC = re.compile(r"^[\d.]+(kg|g|cm)$")          # rest na de naam: '3kg', '76.2cm', '600g'
@@ -127,7 +127,7 @@ def categorie_op(atleet: Atleet, peildatum: date, regelset: Regelset | None = No
     (leeftijdsklassen: masters) de klasse op leeftijd: 'V45'. None zonder geboortedatum of geslacht."""
     if regelset is not None and regelset.leeftijdsklassen == "masters":
         return masters_code(atleet.geslacht, atleet.leeftijd_op(peildatum))
-    return categorie_code(leeftijdscategorie(atleet, peildatum), atleet.geslacht)
+    return ploegcategorie(leeftijdscategorie(atleet, peildatum), atleet.geslacht)
 
 
 def in_periode(d: date, peildatum: date, basis: str) -> bool:
