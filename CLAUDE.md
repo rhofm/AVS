@@ -123,8 +123,14 @@ and every `HARTSLAG` s, `navigator.sendBeacon('/weg')` on `pagehide`. The
 throttle background tabs to once a minute), or when no page came within
 `EERSTE_PAGINA` s; a jump in its own clock means the computer slept, which
 never stops AVS. It stops via `server.shutdown()` in another thread, so never in
-the middle of a request. `/weg` and `/afsluiten` only accept requests from AVS
-itself (`_van_deze_app`). Request logging is off (`_StilleHandler`: URLs contain
+the middle of a request.
+**Only AVS itself** (`controleer_herkomst`, the first `before_request` in
+`ui/app.py`): every request must have Host `127.0.0.1` or `localhost`
+(`EIGEN_HOSTS`, any port; else 400, against DNS rebinding), and every request
+that is not GET/HEAD/OPTIONS must come from an AVS page (`_van_deze_app`:
+`Sec-Fetch-Site` first, else Origin/Referer; else 403, against CSRF). This is
+central, so new routes need no check of their own; a refused request never
+counts as a sign of life. Request logging is off (`_StilleHandler`: URLs contain
 athlete ids). Without a console, `--zelftest` writes to the console it was
 started from (`AttachConsole`), and an unexpected start error is shown as a
 Windows message box.
@@ -191,7 +197,7 @@ tonen** (`POST /instellingen/sleutel/tonen`) shows it in groups of 8, only when
 the databases are open (not in `ZONDER_DATABASE`, and refused while there is a
 start error) and only a key that actually opens them
 (`init_db.herstelsleutel_als_hij_past()`). POST only and only from AVS itself
-(`_van_deze_app`), the response is `Cache-Control: no-store`, and a normal GET of
+(`controleer_herkomst`), the response is `Cache-Control: no-store`, and a normal GET of
 the page never contains the key.
 
 The SQL files are read from `init_db.SQL_DIR` (`src/db/` from source,

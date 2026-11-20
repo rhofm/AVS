@@ -40,7 +40,7 @@
     {{ startfout }}</p>
   {% endif %}
 
-  <form method="post" class="instellingen">
+  <form method="post" action="{{ url_for('instellingen_opslaan') }}" class="instellingen">
 
     {# ---------- eerste dag van de week ---------- #}
     <fieldset class="instelling">

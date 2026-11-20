@@ -89,6 +89,35 @@ ZONDER_DATABASE = frozenset({"static", "instellingen_pagina", "instellingen_opsl
 #: Tekens van leven van de pagina's zelf (ui/levensduur.py); tellen niet als 'gewoon' verzoek.
 LEVENSTEKENS = frozenset({"levend", "weg"})
 
+#: Namen waaronder de browser AVS mag aanspreken. Een andere naam (bijv. een website die zijn
+#: domeinnaam naar 127.0.0.1 laat wijzen: 'DNS rebinding') krijgt niets te zien.
+EIGEN_HOSTS = frozenset({"127.0.0.1", "localhost"})
+#: Methodes die niets veranderen; al het andere moet van AVS zelf komen (_van_deze_app).
+VEILIGE_METHODES = frozenset({"GET", "HEAD", "OPTIONS"})
+
+
+def _eigen_host(host: str) -> bool:
+    """Is 'host' (de Host-kop, bijv. '127.0.0.1:5050') AVS zelf? De poort doet niet mee."""
+    return urlparse(f"//{host}").hostname in EIGEN_HOSTS
+
+
+def _van_deze_app() -> bool:
+    """Komt dit verzoek van een pagina van AVS zelf? Een andere website in dezelfde browser kan
+    ook naar 127.0.0.1 posten (CSRF); de browser vertelt dan waar het verzoek vandaan komt.
+
+    Eerst Sec-Fetch-Site (alle huidige browsers; ook op een pagina met Referrer-Policy
+    no-referrer, waar de Origin 'null' is), anders Origin of Referer. Zonder enige herkomst
+    (oude browser, tests) telt het als AVS zelf: een moderne browser stuurt bij een verzoek
+    van een andere site altijd een van die koppen mee.
+    """
+    site = request.headers.get("Sec-Fetch-Site")
+    if site is not None:
+        return site == "same-origin"
+    herkomst = request.headers.get("Origin") or request.headers.get("Referer")
+    if not herkomst:
+        return True
+    return urlparse(herkomst).netloc == request.host
+
 
 def _ui_map() -> Path:
     """Map met templates/ en static/, ook in de PyInstaller-.exe (sys._MEIPASS)."""
@@ -131,6 +160,20 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
         opslag = g.pop("db", None)
         if opslag is not None:
             opslag.sluit()
+
+    # ---------------- alleen AVS zelf (als eerste: vóór levenstekens en databases) ----------------
+    @app.before_request
+    def controleer_herkomst():
+        """Elk verzoek moet aan AVS gericht zijn (Host), en alles wat iets verandert (POST)
+        moet van een AVS-pagina komen. Zo kan een website die toevallig open staat geen
+        gegevens lezen of wijzigen. Een afgewezen verzoek telt niet als teken van leven."""
+        if not _eigen_host(request.host):
+            return Response("Onbekend adres. Open AVS via http://127.0.0.1.", status=400,
+                            mimetype="text/plain")
+        if request.method not in VEILIGE_METHODES and not _van_deze_app():
+            return Response("Dit verzoek kwam niet van AVS zelf en is geweigerd.", status=403,
+                            mimetype="text/plain")
+        return None
 
     @app.before_request
     def teken_van_leven():
@@ -1629,14 +1672,6 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
         flash("Instellingen opgeslagen.")
         return redirect(url_for("instellingen_pagina"))
 
-    def _van_deze_app() -> bool:
-        """Komt het formulier van AVS zelf? Een andere website in dezelfde browser kan ook naar
-        127.0.0.1 posten; browsers sturen dan een Origin (of Referer) van die site mee."""
-        herkomst = request.headers.get("Origin") or request.headers.get("Referer")
-        if not herkomst:
-            return True                     # geen herkomst meegestuurd (oude browser, tests)
-        return urlparse(herkomst).netloc == request.host
-
     # ---------------- levensduur (ui/levensduur.py) ----------------
     def _pagina_id() -> str:
         return request.get_data(as_text=True, cache=False)[:64].strip()
@@ -1651,15 +1686,14 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
     @app.post("/weg")
     def weg():
         bewaker = app.config["AVS_BEWAKER"]
-        if bewaker is not None and _van_deze_app():
+        if bewaker is not None:             # alleen van AVS zelf: controleer_herkomst()
             bewaker.weg(_pagina_id())
         return "", 204
 
     @app.post("/afsluiten")
     def afsluiten():
-        """Knop 'AVS afsluiten': eerst deze pagina, daarna stopt de server (na dit verzoek)."""
-        if not _van_deze_app():
-            abort(403)
+        """Knop 'AVS afsluiten': eerst deze pagina, daarna stopt de server (na dit verzoek).
+        Alleen van AVS zelf (controleer_herkomst)."""
         bewaker = app.config["AVS_BEWAKER"]
         if bewaker is not None:
             bewaker.stop_nu()
@@ -1670,9 +1704,8 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
         """Herstelsleutel terugzetten (nieuwe computer, Windows opnieuw geïnstalleerd).
 
         De sleutel wordt nooit teruggezet in de pagina, gelogd of bewaard buiten de sleutelkluis.
+        Alleen van AVS zelf (controleer_herkomst).
         """
-        if not _van_deze_app():
-            abort(403)
         try:
             herstel(request.form.get("herstelsleutel", ""), app.config["AVS_MAP"])
             init_db(app.config["AVS_MAP"], app.config["AVS_HOOFD"])     # databases bijwerken met de sleutel
@@ -1693,10 +1726,11 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
         niet bij een startfout (dan houdt controleer_start() dit verzoek al tegen, want dit
         endpoint staat niet in ZONDER_DATABASE) en alleen een sleutel die de databases echt opent.
 
-        Alleen via POST vanaf AVS zelf, zodat de sleutel niet in de browsergeschiedenis of een
-        bladwijzer belandt en een andere website hem niet kan opvragen; nooit gelogd of gecachet.
+        Alleen via POST vanaf AVS zelf (controleer_herkomst), zodat de sleutel niet in de
+        browsergeschiedenis of een bladwijzer belandt en een andere website hem niet kan opvragen;
+        nooit gelogd of gecachet.
         """
-        if not _van_deze_app() or app.config["AVS_STARTFOUT"]:
+        if app.config["AVS_STARTFOUT"]:
             abort(403)
         try:
             sleutel = in_groepjes(herstelsleutel_als_hij_past(app.config["AVS_MAP"], app.config["AVS_HOOFD"]))
