@@ -235,7 +235,16 @@ def _leden(db: Opslag, groep: Groep, groepsdagen: set[str], schemas: dict[str, T
             if not schema.traint_op(d):
                 dagen.append(LidDag(None))
             elif d in groepsdagen:
-                dagen.append(LidDag(MET_GROEP))
+                # Traint een andere groep dezelfde dag en koos de atleet (Trainingsschema.keuze) alleen
+                # die training, dan traint hij die dag elders, ook al heeft deze groep dan ook training.
+                gekozen = schema.keuze.get(d)
+                eigen = {(groep.id, t) for t in groep.tijden(d)}
+                if gekozen and eigen and not (gekozen & eigen):
+                    namen = {g.id: g.naam for g in anderen}
+                    dagen.append(LidDag(ELDERS, [namen[gid] for gid in dict.fromkeys(g for g, _ in sorted(gekozen, key=lambda k: k[1]))
+                                                 if gid in namen]))
+                else:
+                    dagen.append(LidDag(MET_GROEP))
             else:
                 dagen.append(LidDag(ELDERS, [g.naam for g in anderen if d in dagen_van(g)]))
         uit.append(GroepLid(a, leeftijdscategorie(a, vandaag), dagen))
