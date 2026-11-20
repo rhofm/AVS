@@ -87,7 +87,7 @@ def test_senioren_horen_niet_bij_masters_regels():
 
 def test_klasse_onbekend_zoals_de_ploeg_hem_geeft():
     # ploeg.tijdschema geeft 'Masters' zonder klasse door: dan telt elke masters-regel (zoals eerder)
-    for tekst in ("M45", "V35+", "Masters-M", "SEN-M"):
+    for tekst in ("M45", "M35+", "Masters-M", "SEN-M"):
         assert chronoloog.past_bij(_regel(tekst), "Masters", "M") is not False, tekst
 
 

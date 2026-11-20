@@ -74,7 +74,7 @@ def test_template():
 def test_meerdaagse_wedstrijd_staat_op_elke_dag():
     with opslag() as db:
         mid = voorbeeld(db)
-        start = VANDAAG + timedelta(days=40)
+        start = VANDAAG + timedelta(days=50)               # na de Indoor Cup (dag 40)
         w = planning.plan_wedstrijd(db, "Meerkamp", start, einddatum=start + timedelta(days=2))
         planning.inschrijven(db, w.id, mid, ["100m"])
         assert db.wedstrijd(w.id).einddatum == start + timedelta(days=2)

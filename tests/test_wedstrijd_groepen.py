@@ -74,7 +74,7 @@ def test_inschrijven_uit_formulier_en_groep_kiezen():
         assert detail.inschrijven_uit_formulier(db, w.id, [mid], [ver.id], {ver.id: "Mannen|1"}) == 1
         assert [i.groep for i in db.inschrijvingen(mid) if i.wedstrijd_id == w.id] == ["Mannen|1"]
         d = detail.wedstrijd_detail(db, w.id, VANDAAG)
-        assert [s for s, _ in d.groepsopties[ver.id]] == ["Mannen|1", "Mannen|2", "Vrouwen|1"]
+        assert [s for s, _ in d.groepsopties[ver.id]] == ["Mannen|1", "Vrouwen|1", "Mannen|2"]   # op tijd: 10:00, 10:00, 11:30
         assert d.deelnemers[0].groep_van == {ver.id: "Mannen|1"}
         assert "niet" not in " ".join(d.deelnemers[0].niet_in_tijdschema)      # staat nu wel in het tijdschema
         assert "Vrouwen" in detail.groep_kiezen(db, w.id, mid, ver.id, "Vrouwen|1")
