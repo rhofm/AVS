@@ -52,7 +52,7 @@ def programma_label(programma: str) -> str:
 class OverzichtRegel:
     ploeg: Ploeg
     competitie: str
-    ploegnaam: str                  # 'U16 meisjes'
+    ploegnaam: str                  # 'U16 vrouwen'
     programma: str                  # 'Wedstrijd 2'
     wedstrijd: Wedstrijd | None
     deelnemers: int
@@ -144,7 +144,7 @@ def lees_formulier(db: Opslag, form: Mapping, bestaande: Ploeg | None = None) ->
     fouten: dict[str, str] = {}
     naam = " ".join((form.get("naam") or "").split())
     if not naam:
-        fouten["naam"] = "Geef de ploeg een naam, bijv. 'U16 meisjes A'."
+        fouten["naam"] = "Geef de ploeg een naam, bijv. 'U16 vrouwen A'."
     bestand, _, categorie = (form.get("ploeg") or "").partition("|")
     rs: Regelset | None = None
     try:
@@ -400,7 +400,7 @@ def optimaliseren(db: Opslag, ploeg_id: int, strategie: str, vastzetten: bool = 
 @dataclass(slots=True)
 class DagRegel:
     ploeg: Ploeg
-    ploegnaam: str                       # 'U16 meisjes'
+    ploegnaam: str                       # 'U16 vrouwen'
     programma: str
     strategie: str                       # code; standaard de laatst gebruikte of max_punten
     deelnemers: int

@@ -123,7 +123,7 @@ class AtleetLandingspagina:
 
     @property
     def geslacht(self) -> str | None:
-        """'Meisje', 'Jongen', 'Vrouw', 'Man' of 'X'."""
+        """'Vrouw', 'Man' of 'X' (voor alle categorieën, ook de jeugd)."""
         return geslacht_tekst(self.atleet.geslacht, self.categorie)
 
     @property
@@ -134,16 +134,10 @@ class AtleetLandingspagina:
 
 FASES: tuple[str, ...] = ("BMO", "Wedstrijdgericht", "Specialisatie")
 
-_GESLACHT_JEUGD = {"M": "Jongen", "V": "Meisje", "X": "X"}
-_GESLACHT_SENIOR = {"M": "Man", "V": "Vrouw", "X": "X"}
-_GROEP_JEUGD = {"M": "jongens", "V": "meisjes"}
-_GROEP_SENIOR = {"M": "mannen", "V": "vrouwen"}
-#: Vanaf deze categorieën heet het mannen/vrouwen in plaats van jongens/meisjes.
-VOLWASSEN = ("U18", "U20", "Senior")      # en alle masters, zie volwassen()
-
-
-def volwassen(categorie: str | None) -> bool:
-    return categorie in VOLWASSEN or is_masters(categorie)
+#: Sinds de Atletiekunie alle categorieën 'mannen' en 'vrouwen' noemt, zijn 'jongens'/'meisjes'
+#: weg uit het scherm. Oude teksten blijven wel leesbaar (models.programma.lees_categorie).
+_GESLACHT = {"M": "Man", "V": "Vrouw", "X": "X"}
+_GROEP = {"M": "mannen", "V": "vrouwen"}
 
 
 def categorie_code(categorie: str | None, geslacht: str | None) -> str | None:
@@ -163,18 +157,20 @@ def categorie_code(categorie: str | None, geslacht: str | None) -> str | None:
 
 
 def geslacht_tekst(geslacht: str | None, categorie: str | None) -> str | None:
-    """'Meisje' / 'Jongen' t/m U16, 'Vrouw' / 'Man' vanaf U18 (en zonder bekende leeftijd), 'X'."""
+    """'Man' / 'Vrouw' in elke categorie, 'X' bij geslacht X (None als het geslacht onbekend is).
+
+    De categorie telt niet meer mee; de parameter blijft zodat aanroepers niet hoeven te veranderen.
+    """
     if geslacht is None:
         return None
-    jeugd = categorie is not None and not volwassen(categorie)
-    return (_GESLACHT_JEUGD if jeugd else _GESLACHT_SENIOR)[geslacht]
+    return _GESLACHT[geslacht]
 
 
 def categorie_groep(categorie: str | None, geslacht: str | None) -> str | None:
-    """Groep onder de code: 'meisjes'/'jongens' t/m U16, 'vrouwen'/'mannen' vanaf U18 (None bij X/onbekend)."""
+    """Groep onder de code: 'mannen' of 'vrouwen' in elke categorie (None bij X/onbekend)."""
     if categorie is None or geslacht not in ("M", "V"):
         return None
-    return (_GROEP_SENIOR if volwassen(categorie) else _GROEP_JEUGD)[geslacht]
+    return _GROEP[geslacht]
 
 
 def fase_van(categorie: str | None) -> str | None:

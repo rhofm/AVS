@@ -71,13 +71,16 @@ def test_leeftijdscategorie():
     assert landingspagina.categorie_code("U16", "X") == "U16"
     assert landingspagina.categorie_code("U16", None) == "U16"
     assert landingspagina.categorie_code(None, "V") is None
-    assert landingspagina.geslacht_tekst("V", "U16") == "Meisje"
+    assert landingspagina.geslacht_tekst("V", "U16") == "Vrouw"
     assert landingspagina.geslacht_tekst("M", "Senior") == "Man"
     assert landingspagina.geslacht_tekst("V", None) == "Vrouw"
     assert landingspagina.geslacht_tekst(None, "U16") is None
-    assert landingspagina.categorie_groep("U16", "V") == "meisjes"
+    assert landingspagina.categorie_groep("U16", "V") == "vrouwen"
     assert landingspagina.categorie_groep("Senior", "M") == "mannen"
-    assert landingspagina.categorie_groep("U16", "M") == "jongens"
+    assert landingspagina.categorie_groep("U16", "M") == "mannen"
+    assert landingspagina.geslacht_tekst("M", "U12") == "Man"
+    assert landingspagina.geslacht_tekst("X", "U12") == "X"
+    assert landingspagina.categorie_groep("U8", "V") == "vrouwen"
     assert landingspagina.categorie_groep("U18", "V") == "vrouwen"
     assert landingspagina.categorie_groep("U20", "M") == "mannen"
     assert landingspagina.geslacht_tekst("V", "U18") == "Vrouw"
@@ -128,7 +131,8 @@ def test_template():
         mid = voorbeeld(db)
         html = render(landingspagina.landingspagina(db, mid, peildatum=VANDAAG))
         assert "Anna Voorbeeld" in html and "Sprint &amp; verspringen" in html
-        assert "U16V<small>meisjes</small>" in html and "<span>Meisje</span>" in html
+        assert "U16V<small>vrouwen</small>" in html and "<span>Vrouw</span>" in html
+        assert "meisje" not in html.lower() and "jongen" not in html.lower()
         assert html.count("&#9632;") == 3                       # drie trainingsdagen
         assert 'aria-current="step">Wedstrijdgericht' in html
         assert "za 24 okt" in html and "over 8 dagen" in html and "volgt nog" in html

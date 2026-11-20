@@ -49,7 +49,7 @@ class Rij:
 
     @property
     def categorie_sortering(self) -> int:
-        """Categorie jong naar oud, jongens voor meisjes; onbekend achteraan."""
+        """Categorie jong naar oud, mannen voor vrouwen; onbekend achteraan."""
         if self.categorie not in CATEGORIE_VOLGORDE:
             return 99
         return CATEGORIE_VOLGORDE.index(self.categorie) * 3 + {"M": 0, "V": 1}.get(self.atleet.geslacht, 2)

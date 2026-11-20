@@ -23,7 +23,7 @@ class ProgrammaOnderdeel:
     starttijd: str                       # 'HH:MM'
     onderdeel_id: int | None = None      # onderdeel uit de lijst; None = (nog) niet gekoppeld
     onderdeel_tekst: str | None = None   # naam zoals in het tijdschema, bijv. '60m horden 76,2cm'
-    categorie: str | None = None         # bijv. 'Meisjes U16', 'JU14'; None = voor iedereen
+    categorie: str | None = None         # bijv. 'Vrouwen U16', 'Meisjes U16' (oud), 'JU14'; None = voor iedereen
     ronde: str = ""                      # 'serie', 'finale', ...; '' = n.v.t.
     groep: int | None = None             # 1e, 2e, ... groep; None = één groep
     duur: int | None = None              # minuten; None = onbekend
@@ -97,7 +97,7 @@ class ProgrammaOnderdeel:
 
     @property
     def omschrijving(self) -> str:
-        """Bijv. '60m horden 76,2cm Meisjes U16, serie, groep 2'."""
+        """Bijv. '60m horden 76,2cm Vrouwen U16, serie, groep 2'."""
         kop = " ".join(x for x in (self.naam, self.categorie) if x)
         rest = [x for x in (self.ronde, f"groep {self.groep}" if self.groep else None) if x]
         return ", ".join([kop, *rest])
@@ -147,7 +147,9 @@ _MU = re.compile(r"\bMU\s?(\d{1,2})\b", re.I)                              # MU1
 def lees_categorie(tekst: str | None) -> tuple[str | None, str | None]:
     """Categorie en geslacht uit tijdschema-tekst: ('U16', 'V'), ('Senior', 'M'), (None, None).
 
-    'Meisjes U16' / 'MU16' -> ('U16', 'V'); 'Jongens U14' / 'JU14' -> ('U14', 'M');
+    'Vrouwen U16' -> ('U16', 'V'); 'Mannen U14' -> ('U14', 'M'). Sinds de Atletiekunie alle
+    categorieën mannen/vrouwen noemt is dat de norm; de oude woorden en notaties blijven leesbaar
+    voor oude tijdschema's en links: 'Meisjes U16' / 'MU16' -> ('U16', 'V'); 'Jongens U14' / 'JU14' -> ('U14', 'M');
     'Vrouwen' / 'VSen' -> ('Senior', 'V'); 'U12' -> ('U12', None). Wat niet te lezen is: None.
     Ook de notatie van atletiek.nu: 'U16-V' -> ('U16', 'V'), 'SEN-M' -> ('Senior', 'M'),
     'VU20+V Masters' -> ('U20', 'V'), 'MU20 + M Masters' -> ('U20', 'M') (MU20 = mannen U20).

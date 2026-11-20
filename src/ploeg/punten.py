@@ -43,7 +43,7 @@ FORMULES = ("au_loop", "au_techn", "lineair", "wa_loop", "wa_spring", "wa_werp")
 LOOP_FORMULES = ("au_loop", "wa_loop")      # lager is beter
 MET_C = ("lineair", "wa_loop", "wa_spring", "wa_werp")
 
-ALLE = "alle"                               # geslachtssleutel voor 'jongens/meisjes samen'
+ALLE = "alle"                               # geslachtssleutel voor 'mannen/vrouwen samen'
 GESLACHTEN = ("M", "V")
 
 _EPS = 1e-9          # vangt afrondfouten van floats op bij afkappen en grenzen
@@ -208,7 +208,7 @@ class Puntentelling:
     """Alle tabellen uit één YAML-bestand.
 
     `tabellen[tabel][geslacht][onderdeel] -> Formule`, met geslacht 'M', 'V' of
-    'alle' (zelfde constanten voor jongens en meisjes, of gemengde estafette).
+    'alle' (zelfde constanten voor mannen en vrouwen, of gemengde estafette).
     """
 
     def __init__(self, naam: str, uitgave: str, tabellen: dict[str, dict[str, dict[str, Formule]]],

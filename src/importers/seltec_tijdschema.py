@@ -9,10 +9,10 @@ Seltec toont geen eindtijden: de duur blijft onbekend. Een regel kan voor meer c
 tegelijk zijn ('U18M, U16J, U16M'); die blijft één regel.
 
 Categorieën. Seltec gebruikt bij U18, U20, senioren en masters M = mannen en V = vrouwen,
-maar bij U16 en jonger J = jongens en M = meisjes ('U18M' is een man, 'U16M' een meisje).
+maar bij U16 en jonger gebruikt Seltec nog J (= man) en M (= vrouw) ('U18M' is een man, 'U16M' een vrouw).
 Daarom worden de codes vertaald naar een notatie zonder dubbelzinnigheid:
     U20M -> U20-M   U18V -> U18-V   U16J -> U16-M   U16M -> U16-V   SENV -> SEN-V   MASTERSM -> Masters-M
-Andere tekst ('Junioren D U14 Meisjes') blijft zoals hij is.
+Andere tekst ('Junioren D U14 Meisjes', oude benaming) blijft zoals hij is.
 
 Datum per dag: de pagina's noemen alleen 'Dag N'; de datum is de eerste dag uit de kop + (N - 1).
 
@@ -69,7 +69,7 @@ def seltec_categorie(code: str) -> str:
         geslacht = "M"
     elif letter == "V":
         geslacht = "V"
-    else:                                         # 'M': meisjes t/m U16, mannen vanaf U18
+    else:                                         # 'M': vrouwen t/m U16, mannen vanaf U18
         geslacht = "V" if jong else "M"
     naam = "Masters" if leeftijd.startswith("MASTER") else leeftijd
     return f"{naam}-{geslacht}"

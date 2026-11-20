@@ -14,7 +14,7 @@ Gebruik:
     rs.controleer("U16-V", "wedstrijd_1", leden, inzet, categorieen)   # -> [Overtreding, ...]
     regels.controleer_dag({"U14-V A": leden_a, "U16-V": leden_b})      # 10.10: één ploeg per dag
 
-Categorieën zijn codes als 'U14-V' (meisjes U14), 'U16-M' (jongens U16) of
+Categorieën zijn codes als 'U14-V' (vrouwen U14), 'U16-M' (mannen U16) of
 'SEN-V'; maak ze met `categorie_code(leeftijdscategorie, geslacht)`. De
 leeftijdscategorie op de wedstrijddag komt van `atleten.landingspagina.leeftijdscategorie`.
 

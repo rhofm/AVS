@@ -5,13 +5,13 @@
 # opnieuw in; een fout (tikfout, onbekend onderdeel) wordt in gewone taal gemeld.
 #
 # Onderdeelsleutels zijn dezelfde als in config/puntentelling/au_2025.yaml.
-# Categorieën: <leeftijd>-<geslacht>, bijv. U14-V (meisjes), U16-M (jongens).
+# Categorieën: <leeftijd>-<geslacht>, bijv. U14-V (vrouwen), U16-M (mannen).
 
 naam: U14/U16-competitie
 seizoen: 2026-2027
 bron: Wedstrijdbepalingen Competitie 2026-2027 (april 2026)
 puntentelling: au_2025          # bestand in config/puntentelling/
-puntentabel: au_u14_u16          # zelfde tabel voor jongens en meisjes
+puntentabel: au_u14_u16          # zelfde tabel voor mannen en vrouwen
 puntentoekenning: prestatie      # 18.1: punten naar prestatie
 
 algemeen:
@@ -27,7 +27,7 @@ algemeen:
 
 ploegen:
   U14-V:
-    naam: U14 meisjes
+    naam: U14 vrouwen
     geslacht: V
     toegestaan: [U14-V]          # U12 mag niet meedoen
     programma:
@@ -38,7 +38,7 @@ ploegen:
       finale_2027: {60m: 3, 600m: 3, 60mH: 3, 4x60m: 1, hoogspringen: 2, verspringen: 2, kogelstoten: 2, speerwerpen: 2}
 
   U14-M:
-    naam: U14 jongens
+    naam: U14 mannen
     geslacht: M
     toegestaan: [U14-M]          # U12 mag niet meedoen
     programma:
@@ -49,7 +49,7 @@ ploegen:
       finale_2027: {80m: 3, 1000m: 3, 80mH: 3, 4x80m: 1, hoogspringen: 2, verspringen: 2, kogelstoten: 2, discuswerpen: 2}
 
   U16-V:
-    naam: U16 meisjes
+    naam: U16 vrouwen
     geslacht: V
     toegestaan: [U14-V, U16-V]   # een U14 mag in de U16-ploeg (10.10, opmerking)
     programma:
@@ -60,7 +60,7 @@ ploegen:
       finale_2027: {150m: 3, 800m: 3, 300mH: 3, 4x80m: 1, hoogspringen: 2, verspringen: 2, kogelstoten: 2, discuswerpen: 2}
 
   U16-M:
-    naam: U16 jongens
+    naam: U16 mannen
     geslacht: M
     toegestaan: [U14-M, U16-M]
     programma:
@@ -72,7 +72,7 @@ ploegen:
 
 # Hoe de onderdelen heten bij de prestaties (zoals atletiek.nu ze noemt) en
 # welke specificatie (hordehoogte, gewicht) bij welke categorie hoort.
-# Met 'materiaal: ploeg' telt de categorie van de ploeg: een U14-meisje in de
+# Met 'materiaal: ploeg' telt de categorie van de ploeg: een U14-vrouw in de
 # U16-ploeg gooit met de U16-kogel.
 #
 # Voorspellen (ploeg/voorspeller.py) als een atleet het onderdeel nog niet deed:

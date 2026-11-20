@@ -8,7 +8,7 @@ opgeslagen: het wordt elke keer uitgerekend.
 
 Koppelen gaat zo:
   * de regel moet hetzelfde onderdeel hebben als een inschrijving van de atleet;
-  * staat er een categorie bij de regel ('Meisjes U16', 'JU14'), dan moet die
+  * staat er een categorie bij de regel ('Vrouwen U16', 'Meisjes U16' (oud), 'JU14'), dan moet die
     passen bij de atleet. Kan de app de categorie niet lezen (bijv. 'JPA'), dan
     telt de regel wel mee maar met zeker=False: controleer dat zelf;
   * zijn er meerdere groepen (groep 1, 2, ...) van hetzelfde onderdeel en de

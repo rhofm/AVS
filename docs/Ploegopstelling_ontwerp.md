@@ -62,7 +62,7 @@ ploeg/export.py           └ csv voor atletiek.nu
   niet voor de competitie. **Open punt:** factoren controleren tegen de
   spreadsheet.
 - **Tests** (uit het document zelf):
-  - U12 jongen 60 m handtijd 8,7 → 87 punten (Athletics Champs-formule; alleen
+  - U12 man 60 m handtijd 8,7 → 87 punten (Athletics Champs-formule; alleen
     als controle van de formule-engine);
   - mannen 100 m 11,5 s (AU-senioren) → 688 punten (zie spreadsheet);
   - grenzen van de stukken (hoog 1,35/1,40, ver 4,41) aan beide kanten.
@@ -116,7 +116,7 @@ Per competitie:
 
 | Competitie | Bijzonderheden in de YAML |
 |------------|---------------------------|
-| U14/U16 | Aparte jongens-/meisjesploegen; lopen tellen beste 2, technisch beste 1; tabel `au_u14_u16` (zelfde voor jongens en meisjes). |
+| U14/U16 | Aparte mannen-/vrouwenploegen; lopen tellen beste 2, technisch beste 1; tabel `au_u14_u16` (zelfde voor mannen en vrouwen). |
 | U18/U20 | U16 mag als U18 meedoen (bepaling 4.5 slot); U18 eigen hordehoogte en werpmateriaal; 2000 m steeple alleen U18. Tabel `au_senioren`. |
 | Masters | Aparte mannen-/vrouwenploegen; age grading; eigen werpmateriaal per leeftijdsklasse (65.1). Finale: één ploeg per vereniging per geslacht (62.3). |
 | Senioren 2e/3e divisie | **Gemengd**: mannen- en vrouwenonderdelen in één ploeg, punten opgeteld (5, 18.5). Elk programmaonderdeel krijgt `geslacht`. 4×400 m gemengd = 2 M + 2 V. Geen U16 (4.5 slot). |

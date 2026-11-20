@@ -24,7 +24,7 @@ Bij voorkeur met een kopregel. Herkende kolomnamen (hoofdletters/spaties maken n
     voornaam;tussenvoegsel;achternaam;geboortedatum;atletieknu
 of met de naam in één kolom:
     naam;geboortedatum;atletieknu
-Optioneel: geslacht (M/V/X, man/vrouw, jongen/meisje), club en het licentienummer
+Optioneel: geslacht (M/V/X, man/vrouw; oude 'jongen'/'meisje' blijft leesbaar), club en het licentienummer
 van de Atletiekunie (kolom 'licentienummer', 'AU-licentie', 'licentie nr', ...).
 In de atletiek.nu-kolom mag het nummer staan of de link naar het profiel.
 Het licentienummer wordt alleen gelezen als er een kopregel is (zonder kopregel is

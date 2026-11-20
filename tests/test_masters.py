@@ -89,3 +89,13 @@ def test_klasse_onbekend_zoals_de_ploeg_hem_geeft():
     # ploeg.tijdschema geeft 'Masters' zonder klasse door: dan telt elke masters-regel (zoals eerder)
     for tekst in ("M45", "V35+", "Masters-M", "SEN-M"):
         assert chronoloog.past_bij(_regel(tekst), "Masters", "M") is not False, tekst
+
+
+@pytest.mark.parametrize("tekst, verwacht", [
+    ("Vrouwen U16", ("U16", "V")), ("Mannen U14", ("U14", "M")),          # nieuwe benaming
+    ("Meisjes U16", ("U16", "V")), ("Jongens U14", ("U14", "M")),        # oude tijdschema's blijven leesbaar
+    ("MU16", ("U16", "V")), ("JU14", ("U14", "M")),
+])
+def test_mannen_vrouwen_en_oude_benaming(tekst, verwacht):
+    from models.programma import lees_categorie
+    assert lees_categorie(tekst) == verwacht
