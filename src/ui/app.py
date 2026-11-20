@@ -41,7 +41,8 @@ from atleten import prs_importeren as prs_import
 from atleten.aanwezigheid import aanwezigheid
 import instellingen
 from db.init_db import (HERSTEL_UITLEG, InstallatieFout, OvernameFout, SleutelFout, herstel,
-                        herstelsleutel_als_hij_past, in_groepjes, init_db, oude_data_overnemen, standaard_map)
+                        herstelsleutel_als_hij_past, hoofdsleutel, in_groepjes, init_db, oude_data_overnemen,
+                        standaard_map)
 from db.queries import OnvolledigVerwijderd, Opslag, OpslagFout
 from importers.base import ImportFout
 from groepen import groep as groepsbeheer
@@ -143,16 +144,25 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
     app = Flask(__name__, template_folder=str(ui / "templates"), static_folder=str(ui / "static"))
     app.secret_key = os.urandom(32)         # alleen voor meldingen na opslaan; hoeft niet te blijven bestaan
     app.config["AVS_MAP"] = map
-    app.config["AVS_HOOFD"] = hoofd
+    app.config["AVS_HOOFD"] = hoofd             # None = bij het eerste gebruik uit de sleutelkluis (hoofd_uit_geheugen())
     app.config["AVS_STARTFOUT"] = startfout     # wordt None na 'Sleutel herstellen'
     app.config["AVS_STARTFOUT_SLEUTEL"] = sleutelfout
     app.config["AVS_BEWAKER"] = bewaker
     registreer_filters(app.jinja_env)
 
     # ---------------- databases per request ----------------
+    def hoofd_uit_geheugen() -> str | bytes:
+        """De hoofdsleutel: één keer uit de sleutelkluis, daarna uit het geheugen. Zo hangt niet
+        elke pagina af van de sleutelkluis van Windows. Lukt het lezen niet (SleutelFout,
+        SleutelkluisFout), dan wordt niets onthouden en probeert het volgende verzoek het opnieuw.
+        Nooit loggen of in een pagina zetten (behalve via herstelsleutel_tonen)."""
+        if app.config["AVS_HOOFD"] is None:
+            app.config["AVS_HOOFD"] = hoofdsleutel()
+        return app.config["AVS_HOOFD"]
+
     def db() -> Opslag:
         if "db" not in g:
-            g.db = Opslag(map=app.config["AVS_MAP"], hoofd=app.config["AVS_HOOFD"])
+            g.db = Opslag(map=app.config["AVS_MAP"], hoofd=hoofd_uit_geheugen())
         return g.db
 
     @app.teardown_appcontext
@@ -1710,7 +1720,7 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
         """
         try:
             herstel(request.form.get("herstelsleutel", ""), app.config["AVS_MAP"])
-            init_db(app.config["AVS_MAP"], app.config["AVS_HOOFD"])     # databases bijwerken met de sleutel
+            init_db(app.config["AVS_MAP"], hoofd_uit_geheugen())     # databases bijwerken met de (nu bewaarde) sleutel
         except (SleutelFout, InstallatieFout) as e:
             pagina, status = _instellingenpagina(instellingen.actief(), sleutel_fout=f"Niet hersteld: {e}",
                                                  status=400)
@@ -1735,7 +1745,7 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
         if app.config["AVS_STARTFOUT"]:
             abort(403)
         try:
-            sleutel = in_groepjes(herstelsleutel_als_hij_past(app.config["AVS_MAP"], app.config["AVS_HOOFD"]))
+            sleutel = in_groepjes(herstelsleutel_als_hij_past(app.config["AVS_MAP"], hoofd_uit_geheugen()))
         except (SleutelFout, InstallatieFout) as e:
             pagina, status = _instellingenpagina(instellingen.actief(), tonen_fout=f"Kan de sleutel niet tonen: {e}",
                                                  status=500)

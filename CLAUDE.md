@@ -150,6 +150,11 @@ The keyring can fail on its own (no backend, Credential Manager blocked):
 `_lees_hoofdsleutel`/`_bewaar_hoofdsleutel` turn any `KeyringError` into
 `SleutelkluisFout` (an `InstallatieFout`, not a `SleutelFout`: restoring the key
 can't help), shown on the error page at start and during use; never a traceback.
+The web app reads the key from the keyring **once** and keeps it in memory
+(`hoofd_uit_geheugen()` in `ui/app.py`, stored in `app.config["AVS_HOOFD"]`), so
+a keyring hiccup halfway through a session doesn't break pages; a failed read
+is not remembered, so the next request tries again. Get the key in the app only
+through `hoofd_uit_geheugen()`, never with `hoofdsleutel()` directly.
 
 ## Database
 
