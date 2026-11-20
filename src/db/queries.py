@@ -40,6 +40,8 @@ from datetime import date
 from pathlib import Path
 from typing import Iterable, Mapping
 
+import sqlcipher3
+
 from models import (
     DAGEN,
     NEUTRAAL,
@@ -87,6 +89,30 @@ from .init_db import hoofdsleutel, nieuw_master_id, pseudoniem, verbind
 
 class OpslagFout(ValueError):
     """Iets kan niet worden opgeslagen, bijv. een onbekend onderdeel of een ongekoppelde prestatie."""
+
+
+class OnvolledigVerwijderd(OpslagFout):
+    """Een atleet verwijderen is halverwege mislukt. De atleet staat nog in personen.db, dus
+    nog een keer verwijderen maakt het af (zie Opslag.atleet_verwijderen)."""
+
+    def __init__(self, database: str, fout: Exception) -> None:
+        super().__init__(
+            f"Het verwijderen is niet helemaal gelukt ({database}.db: {fout}). De atleet staat er nog: "
+            "vul de naam opnieuw in en klik nog een keer op Verwijderen om het af te maken.")
+        self.database = database
+
+
+#: Elke tabel met een atleet_ref, per gepseudonimiseerde database. Opslag.atleet_verwijderen()
+#: wist ze allemaal; tests/test_atleet_verwijderen.py faalt als er een tabel met atleet_ref
+#: bijkomt die hier niet staat. (In personen.db gaat alles mee via ON DELETE CASCADE.)
+ATLEET_TABELLEN: dict[str, tuple[str, ...]] = {
+    "prestaties": ("prestatie", "inschrijving", "doel_regel"),
+    "testen": ("testresultaat",),                         # testresultaat_deel gaat mee (CASCADE)
+    "trainingsschema": ("trainingsschema", "trainingskeuze"),
+    "absentie": ("absentie",),
+    "leerdoelscores": ("leerdoelscore",),
+    "notities": ("notitie",),
+}
 
 
 # ============================================================
@@ -140,6 +166,10 @@ class Opslag:
 
     def __exit__(self, *_) -> None:
         self.sluit()
+
+    def _db(self, database: str) -> sqlcipher3.Connection:
+        """De verbinding met een database uit init_db.DATABASES, op naam."""
+        return self.personen if database == "personen" else getattr(self, f"{database}_db")
 
     # ---------- pseudoniemen ----------
     def _ref(self, master_id: str, database: str) -> str:
@@ -234,33 +264,30 @@ class Opslag:
 
         Bedoeld voor een verzoek tot verwijdering (AVG). Wie alleen niet meer
         traint: zet `actief = False` en sla op.
+
+        Eén transactie per database, personen.db als LAATSTE: mislukt er onderweg iets, dan
+        staat de atleet er nog (OnvolledigVerwijderd) en maakt nog een keer verwijderen het af;
+        elke stap mag twee keer. Andersom zou er gegevens achterblijven onder een pseudoniem
+        dat niemand meer kan uitrekenen.
         """
-        ref_p = self._ref(master_id, "prestaties")
-        ref_t = self._ref(master_id, "testen")
-        ref_s = self._ref(master_id, "trainingsschema")
-        ref_a = self._ref(master_id, "absentie")
-        ref_l = self._ref(master_id, "leerdoelscores")
-        ref_n = self._ref(master_id, "notities")
-        with self.prestaties_db:
-            self.prestaties_db.execute("DELETE FROM prestatie WHERE atleet_ref = ?", (ref_p,))
-            self.prestaties_db.execute("DELETE FROM inschrijving WHERE atleet_ref = ?", (ref_p,))
-            self.prestaties_db.execute("DELETE FROM doel_regel WHERE atleet_ref = ?", (ref_p,))
-            # Persoonlijke doelen zonder regels hebben geen eigenaar meer.
-            self.prestaties_db.execute(
-                "DELETE FROM doel WHERE groep_id IS NULL AND id NOT IN (SELECT doel_id FROM doel_regel)")
-        with self.testen_db:
-            self.testen_db.execute("DELETE FROM testresultaat WHERE atleet_ref = ?", (ref_t,))
-        with self.trainingsschema_db:
-            self.trainingsschema_db.execute("DELETE FROM trainingsschema WHERE atleet_ref = ?", (ref_s,))
-            self.trainingsschema_db.execute("DELETE FROM trainingskeuze WHERE atleet_ref = ?", (ref_s,))
-        with self.absentie_db:
-            self.absentie_db.execute("DELETE FROM absentie WHERE atleet_ref = ?", (ref_a,))
-        with self.leerdoelscores_db:
-            self.leerdoelscores_db.execute("DELETE FROM leerdoelscore WHERE atleet_ref = ?", (ref_l,))
-        with self.notities_db:
-            self.notities_db.execute("DELETE FROM notitie WHERE atleet_ref = ?", (ref_n,))
-        with self.personen:  # groep_lid, voortgang, opstellingen gaan mee (CASCADE)
-            self.personen.execute("DELETE FROM atleet WHERE master_id = ?", (master_id,))
+        for database, tabellen in ATLEET_TABELLEN.items():
+            conn = self._db(database)
+            ref = self._ref(master_id, database)
+            try:
+                with conn:
+                    for tabel in tabellen:     # vaste namen uit ATLEET_TABELLEN, geen invoer
+                        conn.execute(f"DELETE FROM {tabel} WHERE atleet_ref = ?", (ref,))
+                    if database == "prestaties":
+                        # Persoonlijke doelen zonder regels hebben geen eigenaar meer.
+                        conn.execute(
+                            "DELETE FROM doel WHERE groep_id IS NULL AND id NOT IN (SELECT doel_id FROM doel_regel)")
+            except sqlcipher3.Error as e:
+                raise OnvolledigVerwijderd(database, e) from e
+        try:
+            with self.personen:  # groep_lid, voortgang, opstellingen gaan mee (CASCADE)
+                self.personen.execute("DELETE FROM atleet WHERE master_id = ?", (master_id,))
+        except sqlcipher3.Error as e:
+            raise OnvolledigVerwijderd("personen", e) from e
         self._vergeet_pseudoniemen()
 
     # ============================================================

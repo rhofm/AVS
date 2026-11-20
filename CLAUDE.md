@@ -231,6 +231,13 @@ it only holds `.gitkeep`).
   `leerdoelscore.leerdoel_id` → `leerlijnen.db`) are not enforced
   by SQLite; check them in Python. Deleting a training must go through
   `Opslag.training_verwijderen()` so its absence rows go too.
+- Deleting an athlete (AVG) goes through `Opslag.atleet_verwijderen()`: it wipes
+  every table in `queries.ATLEET_TABELLEN`, one transaction per database, and
+  `personen.db` **last**, so a failure halfway (`OnvolledigVerwijderd`) leaves the
+  athlete in place and deleting again finishes it. A new table with `atleet_ref`
+  must be added to `ATLEET_TABELLEN` (`tests/test_atleet_verwijderen.py` fails
+  otherwise); a new table in `personen.db` with `atleet_id` needs
+  `ON DELETE CASCADE`.
 - Leerdoel ids are never reused or renumbered (scores point to them); retire a
   leerdoel with `actief = 0` in a migration. The old `leerlijn`/`leerlijn_stap`/
   `atleet_leerlijn` tables in `personen.db` predate `leerlijnen.db` and are superseded

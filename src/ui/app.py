@@ -42,7 +42,7 @@ from atleten.aanwezigheid import aanwezigheid
 import instellingen
 from db.init_db import (HERSTEL_UITLEG, InstallatieFout, OvernameFout, SleutelFout, herstel,
                         herstelsleutel_als_hij_past, in_groepjes, init_db, oude_data_overnemen, standaard_map)
-from db.queries import Opslag, OpslagFout
+from db.queries import OnvolledigVerwijderd, Opslag, OpslagFout
 from importers.base import ImportFout
 from groepen import groep as groepsbeheer
 from groepen import groep_importeren
@@ -297,6 +297,8 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
         haal_atleet(master_id)
         try:
             a = atleetbeheer.verwijderen(db(), master_id, request.form.get("bevestiging", ""))
+        except OnvolledigVerwijderd as e:              # halverwege mislukt: nog een keer maakt het af
+            return _aanpassen(master_id, verwijder_fout=str(e), status=500)
         except (OpslagFout, ValueError) as e:
             return _aanpassen(master_id, verwijder_fout=str(e), status=400)
         flash(f"{a.naam} en alle gegevens zijn verwijderd.")
