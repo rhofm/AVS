@@ -26,7 +26,7 @@ from collections import Counter
 from dataclasses import dataclass, field
 from datetime import date, timedelta
 
-from atleten.landingspagina import DAG_KORT, categorie_code, leeftijdscategorie
+from atleten.landingspagina import CATEGORIEEN, DAG_KORT, categorie_code, leeftijdscategorie
 from db.queries import Opslag
 from instellingen import dagvolgorde, tijd as toon_tijd
 from leerlijnen.voortgang import leerdoelenpagina
@@ -167,7 +167,7 @@ class GroepLandingspagina:
     @property
     def categorieen(self) -> list[str]:
         """De categorieën in de groep, jong naar oud: ['U14', 'U16']."""
-        volgorde = ["U8", "U10", "U12", "U14", "U16", "U18", "U20", "Senior"]
+        volgorde = CATEGORIEEN
         aanwezig = {l.categorie for l in self.leden if l.categorie}
         return [c for c in volgorde if c in aanwezig]
 

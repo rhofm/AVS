@@ -29,6 +29,7 @@ from atleten.landingspagina import leeftijdscategorie
 from db.queries import Opslag, OpslagFout
 from instellingen import naam_sleutel, tijd as toon_tijd
 from models import Atleet, ProgrammaOnderdeel, Wedstrijd, lees_categorie
+from models.programma import is_masters, masters_klasse
 
 
 # ============================================================
@@ -52,6 +53,22 @@ def past_bij(regel: ProgrammaOnderdeel, categorie: str | None, geslacht: str | N
     return _past_bij_categorie(regel.categorie, categorie, geslacht)
 
 
+def _leeftijd_past(regel: str, atleet: str) -> bool:
+    """Leeftijdsdeel van een regel ('U16', 'Senior', 'Masters', 'Masters 40', 'Masters 35+') tegen de
+    categorie van de atleet ('U16', 'Senior', 'Masters 40', of 'Masters' zonder klasse, zoals de ploeg
+    het geeft). Masters doen ook mee bij de senioren; een klasse (M40) past alleen bij die klasse en
+    'V35+' bij die klasse en ouder. Is de klasse van de atleet onbekend, dan telt elke masters-regel."""
+    if regel == atleet:
+        return True
+    if not is_masters(atleet):
+        return False
+    klasse = masters_klasse(atleet)
+    regel_klasse = masters_klasse(regel)
+    if klasse is None or regel_klasse is None:
+        return regel == "Senior" or is_masters(regel)
+    return klasse >= regel_klasse if regel.endswith("+") else klasse == regel_klasse
+
+
 def _past_bij_categorie(tekst: str, categorie: str | None, geslacht: str | None) -> bool | None:
     """past_bij voor één categorie-tekst."""
     leeftijd, regel_geslacht = lees_categorie(tekst)
@@ -60,7 +77,7 @@ def _past_bij_categorie(tekst: str, categorie: str | None, geslacht: str | None)
     if leeftijd is not None:
         if categorie is None:
             return None                               # geboortedatum onbekend
-        if leeftijd != categorie:
+        if not _leeftijd_past(leeftijd, categorie):
             return False
     if regel_geslacht is not None and geslacht in ("M", "V") and regel_geslacht != geslacht:
         return False

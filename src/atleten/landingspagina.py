@@ -24,6 +24,7 @@ from groepen.doelen import doelen_van_atleet
 from instellingen import dagvolgorde, tijd as toon_tijd, weekbegin
 from leerlijnen.voortgang import LeerlijnBlok, samenvatting
 from models import DAGEN, Atleet, Notitie, Trainingsschema, Wedstrijd
+from models.programma import MASTERS_KLASSEN, is_masters, masters_categorie, masters_klasse
 
 from .aanwezigheid import aanwezigheid
 from .prestaties import toon_waarde
@@ -35,14 +36,26 @@ DAG_KORT: dict[str, str] = {
 }
 
 
-def leeftijdscategorie(atleet: Atleet, peildatum: date) -> str | None:
-    """Atletiekcategorie (U10 … U20, 'Senior') voor het kalenderjaar van de peildatum.
+MASTERS_VANAF = 35      # leeftijd op de peildatum (op de wedstrijddag, zoals ploeg.regels.masters_code)
 
-    Telt met de leeftijd die de atleet dít jaar bereikt, zoals de Atletiekunie:
-    wie dit jaar 14 of 15 wordt, is U16. Zonder geboortedatum: None.
+#: Alle categorieën, jong naar oud: U8 ... U20, Senior, Masters 35 ... Masters 95.
+CATEGORIEEN = ("U8", "U10", "U12", "U14", "U16", "U18", "U20", "Senior",
+               *(masters_categorie(k) for k in MASTERS_KLASSEN))
+
+
+def leeftijdscategorie(atleet: Atleet, peildatum: date) -> str | None:
+    """Atletiekcategorie (U10 … U20, 'Senior', 'Masters 35' … 'Masters 95') voor de peildatum.
+
+    Jeugd telt met de leeftijd die de atleet dít jaar bereikt, zoals de Atletiekunie:
+    wie dit jaar 14 of 15 wordt, is U16. Masters (35+) telt met de leeftijd op de
+    peildatum zelf, in klassen van vijf jaar (38 -> 'Masters 35', 47 -> 'Masters 45'; vanaf
+    95 'Masters 95'). Zonder geboortedatum: None.
     """
     if atleet.geboortejaar is None:
         return None
+    leeftijd = atleet.leeftijd_op(peildatum)
+    if leeftijd is not None and leeftijd >= MASTERS_VANAF:
+        return masters_categorie(min(leeftijd // 5 * 5, MASTERS_KLASSEN[-1]))
     leeftijd_dit_jaar = peildatum.year - atleet.geboortejaar
     if leeftijd_dit_jaar >= 20:
         return "Senior"
@@ -126,11 +139,16 @@ _GESLACHT_SENIOR = {"M": "Man", "V": "Vrouw", "X": "X"}
 _GROEP_JEUGD = {"M": "jongens", "V": "meisjes"}
 _GROEP_SENIOR = {"M": "mannen", "V": "vrouwen"}
 #: Vanaf deze categorieën heet het mannen/vrouwen in plaats van jongens/meisjes.
-VOLWASSEN = ("U18", "U20", "Senior")
+VOLWASSEN = ("U18", "U20", "Senior")      # en alle masters, zie volwassen()
+
+
+def volwassen(categorie: str | None) -> bool:
+    return categorie in VOLWASSEN or is_masters(categorie)
 
 
 def categorie_code(categorie: str | None, geslacht: str | None) -> str | None:
-    """Categorie met geslacht: ('U16', 'V') -> 'U16V', ('Senior', 'M') -> 'SenM'.
+    """Categorie met geslacht: ('U16', 'V') -> 'U16V', ('Senior', 'M') -> 'SenM',
+    ('Masters 40', 'V') -> 'V40' (zoals de masterscategorieën heten), ('Masters 40', None) -> 'Masters 40'.
 
     Bij geslacht X of onbekend alleen de categorie ('U16', 'Senior').
     """
@@ -138,14 +156,17 @@ def categorie_code(categorie: str | None, geslacht: str | None) -> str | None:
         return None
     if geslacht not in ("M", "V"):
         return categorie
-    return f"{'Sen' if categorie == 'Senior' else categorie}{geslacht}"
+    if (klasse := masters_klasse(categorie)) is not None:
+        return f"{geslacht}{klasse}"
+    voorvoegsel = {"Senior": "Sen", "Masters": "Mas"}.get(categorie, categorie)
+    return f"{voorvoegsel}{geslacht}"
 
 
 def geslacht_tekst(geslacht: str | None, categorie: str | None) -> str | None:
     """'Meisje' / 'Jongen' t/m U16, 'Vrouw' / 'Man' vanaf U18 (en zonder bekende leeftijd), 'X'."""
     if geslacht is None:
         return None
-    jeugd = categorie is not None and categorie not in VOLWASSEN
+    jeugd = categorie is not None and not volwassen(categorie)
     return (_GESLACHT_JEUGD if jeugd else _GESLACHT_SENIOR)[geslacht]
 
 
@@ -153,7 +174,7 @@ def categorie_groep(categorie: str | None, geslacht: str | None) -> str | None:
     """Groep onder de code: 'meisjes'/'jongens' t/m U16, 'vrouwen'/'mannen' vanaf U18 (None bij X/onbekend)."""
     if categorie is None or geslacht not in ("M", "V"):
         return None
-    return (_GROEP_SENIOR if categorie in VOLWASSEN else _GROEP_JEUGD)[geslacht]
+    return (_GROEP_SENIOR if volwassen(categorie) else _GROEP_JEUGD)[geslacht]
 
 
 def fase_van(categorie: str | None) -> str | None:

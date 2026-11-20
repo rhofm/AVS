@@ -14,7 +14,7 @@ from datetime import date, timedelta
 from typing import Callable
 
 from atleten.aanwezigheid import NIET_INGEVULD, STATUS_TEKST
-from atleten.landingspagina import categorie_code, leeftijdscategorie
+from atleten.landingspagina import CATEGORIEEN, categorie_code, leeftijdscategorie
 from atleten.prestaties import toon_waarde
 from atleten.testen import laatste_per_test
 from db.queries import Opslag
@@ -56,7 +56,7 @@ class Rij:
 
 
 #: Volgorde van de leeftijdscategorieën, jong naar oud.
-CATEGORIE_VOLGORDE = ("U8", "U10", "U12", "U14", "U16", "U18", "U20", "Senior")
+CATEGORIE_VOLGORDE = CATEGORIEEN
 
 
 def _volgorde(rij: Rij) -> tuple:

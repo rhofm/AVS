@@ -108,6 +108,36 @@ class ProgrammaOnderdeel:
 # ============================================================
 _LEEFTIJD = re.compile(r"\b(?:[MJVW]?U)\s?(\d{1,2})\b", re.I)        # 'U16', 'U 16', 'MU16', 'JU14', 'VU20'
 _MASTERS = re.compile(r"\bmasters?\b", re.I)
+_MASTERS_KLASSE = re.compile(r"\b([MV])\s?(\d{2})(\+)?(?!\d)", re.I)         # 'M35', 'V40', 'M 85', 'V60+'
+
+#: Masterscategorieën van vijf jaar: M35, V40, ..., 95 (de laatste klasse is 95+). Zoals ploeg.regels.masters_code.
+MASTERS_KLASSEN = tuple(range(35, 100, 5))
+
+
+def masters_categorie(klasse: int) -> str:
+    """'Masters 40': de categorie van een atleet van 40 t/m 44 (leeftijd op de wedstrijddag)."""
+    return f"Masters {klasse}"
+
+
+def is_masters(categorie: str | None) -> bool:
+    """'Masters' (klasse onbekend) of 'Masters 40'."""
+    return categorie == "Masters" or (categorie is not None and categorie.startswith("Masters "))
+
+
+def masters_klasse(categorie: str | None) -> int | None:
+    """40 voor 'Masters 40'; None voor 'Masters' zonder klasse en voor al het andere."""
+    if categorie is None or not categorie.startswith("Masters "):
+        return None
+    getal = categorie[len("Masters "):].rstrip("+")
+    return int(getal) if getal.isdigit() else None
+
+
+def _klasse_in(tekst: str) -> tuple[str, int, bool] | None:
+    """('V', 40, False) voor 'V40', ('M', 35, True) voor 'M35+'. Alleen echte klassen: 35, 40, ..., 95."""
+    for m in _MASTERS_KLASSE.finditer(tekst):
+        if int(m.group(2)) in MASTERS_KLASSEN:
+            return m.group(1).upper(), int(m.group(2)), bool(m.group(3))
+    return None
 _SENIOR = re.compile(r"\b(senioren|seniors?|sen|mannen|vrouwen|heren|dames|[MV]sen)\b", re.I)
 _VROUW = re.compile(r"\b(meisjes|meiden|vrouwen|dames|Vsen|VU\d{1,2})\b|-V\b|\bSEN-V\b", re.I)
 _MAN = re.compile(r"\b(jongens|mannen|heren|JU\d{1,2}|Msen)\b|-M\b|\bSEN-M\b", re.I)
@@ -122,19 +152,26 @@ def lees_categorie(tekst: str | None) -> tuple[str | None, str | None]:
     Ook de notatie van atletiek.nu: 'U16-V' -> ('U16', 'V'), 'SEN-M' -> ('Senior', 'M'),
     'VU20+V Masters' -> ('U20', 'V'), 'MU20 + M Masters' -> ('U20', 'M') (MU20 = mannen U20).
     En wat de Seltec-importer maakt: 'U16-V', 'SEN-M', 'Masters-V' -> ('Masters', 'V').
+    Masterklassen: 'M35' -> ('Masters 35', 'M'), 'V40' -> ('Masters 40', 'V'), 'V35+' -> ('Masters 35+', 'V')
+    (vanaf 35); 'Masters' zonder klasse -> ('Masters', ...).
     Eén categorie per keer; een lijst ('U18-M, U16-V') splitst wedstrijden/chronoloog.past_bij.
     """
     if not tekst or not tekst.strip():
         return None, None
+    klasse = None
     if m := _LEEFTIJD.search(tekst):
         leeftijd = f"U{int(m.group(1))}"
+    elif klasse := _klasse_in(tekst):
+        leeftijd = masters_categorie(klasse[1]) + ("+" if klasse[2] else "")
     elif _MASTERS.search(tekst):
-        leeftijd = "Masters"            # 35+; geen eigen categorie bij de atleten
+        leeftijd = "Masters"            # 35+, klasse onbekend
     elif _SENIOR.search(tekst):
         leeftijd = "Senior"
     else:
         leeftijd = None
-    if _VROUW.search(tekst):
+    if klasse:
+        geslacht = klasse[0]            # de letter van de klasse: M35 = mannen, V40 = vrouwen
+    elif _VROUW.search(tekst):
         geslacht = "V"
     elif _MAN.search(tekst):
         geslacht = "M"
