@@ -106,6 +106,25 @@ def test_landingspagina():
         assert landingspagina.landingspagina(db, "0" * 32) is None
 
 
+def test_deze_week_toont_de_variant_van_de_atleet():
+    """Doet de atleet een afwijkende training (variant), dan staat die op zijn pagina, niet de gewone."""
+    with opslag() as db:
+        mid = voorbeeld(db)
+        bram = beheer.nieuwe_atleet(db, "Bram", "Proef", geslacht="M", geboortedatum="2011")
+        db.trainingsschema_opslaan(Trainingsschema.met_dagen(bram.master_id, ["dinsdag"]))
+        g = db.groepen_van_atleet(mid)[0]
+        g.voeg_toe(bram.master_id)
+        db.groep_opslaan(g)
+        dinsdag = VANDAAG - timedelta(days=VANDAAG.weekday()) + timedelta(days=1)
+        hoofd = next(t for t in db.trainingen(g.id) if t.datum == dinsdag)
+        db.training_opslaan(Training(g.id, dinsdag, "Revalidatie", hoofdtraining_id=hoofd.id, atleten=[mid]))
+
+        anna = landingspagina.landingspagina(db, mid, peildatum=VANDAAG)
+        assert anna.schema[1].gekoppeld == ["U16 sprint – Revalidatie"]
+        bram_lp = landingspagina.landingspagina(db, bram.master_id, peildatum=VANDAAG)
+        assert bram_lp.schema[1].gekoppeld == ["U16 sprint – Startblok"]   # wie de variant niet doet
+
+
 def test_lege_atleet():
     with opslag() as db:
         a = beheer.nieuwe_atleet(db, "Bas", "Leeg")

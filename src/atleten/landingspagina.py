@@ -194,7 +194,8 @@ def _schema(db: Opslag, master_id: str, schema: Trainingsschema, vandaag: date) 
             if not schema.traint_mee(t, g):          # andere training gekozen of geen trainingsdag
                 continue
             tijd = t.effectieve_starttijd(g)
-            tekst = f"{g.naam} – {t.onderwerp}" if t.onderwerp else g.naam
+            wat = db.training_voor_atleet(t.id, master_id) or t   # zijn afwijkende variant, als hij die doet
+            tekst = f"{g.naam} – {wat.onderwerp}" if wat.onderwerp else g.naam
             tekst = f"{toon_tijd(tijd)} {tekst}" if tijd else tekst
             gekoppeld[DAGEN[t.datum.weekday()]].append(tekst)
     return [
