@@ -159,6 +159,15 @@ def categorie_code(categorie: str | None, geslacht: str | None) -> str | None:
     return f"{voorvoegsel}{geslacht}"
 
 
+class MetCategorieCode:
+    """Voor rijen met de velden `atleet` en `categorie` (leeftijdscategorie, bijv. 'U16'): de code
+    voor op het scherm ('U16V'). Een mix-in, geen dataclass: de velden van de rij blijven zoals ze zijn."""
+
+    @property
+    def categorie_code(self) -> str | None:
+        return categorie_code(self.categorie, self.atleet.geslacht)
+
+
 def geslacht_tekst(geslacht: str | None) -> str | None:
     """'Man' / 'Vrouw' in elke categorie, 'X' bij geslacht X (None als het geslacht onbekend is)."""
     if geslacht is None:

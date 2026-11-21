@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 from datetime import date
 from typing import Mapping
 
-from atleten.landingspagina import categorie_code
+from atleten.landingspagina import MetCategorieCode
 from db.queries import Opslag, OpslagFout
 from models import Atleet, Groep, Testresultaat
 from testen import resultaten
@@ -41,16 +41,12 @@ class GroepInvoerFout(OpslagFout):
 
 
 @dataclass
-class InvulRij:
+class InvulRij(MetCategorieCode):
     atleet: Atleet
     categorie: str | None                          # leeftijdscategorie (U14, ...)
     laatste: resultaten.ResultaatRegel | None      # laatste resultaat op deze test
     invoer: list[str]                              # wat er in elk veld staat (leeg = niets)
     fout: str | None = None
-
-    @property
-    def categorie_code(self) -> str | None:
-        return categorie_code(self.categorie, self.atleet.geslacht)
 
 
 @dataclass

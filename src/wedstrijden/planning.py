@@ -13,8 +13,7 @@ Werkwijze:
     w = plan_wedstrijd(db, "Clubkampioenschappen", date(2027, 5, 15), locatie="Nijmegen",
                        link="https://www.atletiek.nu/wedstrijd/main/45678/")
     inschrijven(db, w.id, anna.master_id, ["100m", "Verspringen"])
-    for o in komende_wedstrijden(db):
-        print(o.wedstrijd.naam, o.aantal_deelnemers)
+    komende_wedstrijden(db)        # per wedstrijd: .wedstrijd en .aantal_deelnemers
 """
 
 from __future__ import annotations

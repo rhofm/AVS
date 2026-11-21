@@ -41,7 +41,7 @@ from datetime import date, timedelta
 from typing import Iterable, Mapping
 
 from atleten.aanwezigheid import NIET_INGEVULD, STATUS_TEKST
-from atleten.landingspagina import categorie_code, leeftijdscategorie
+from atleten.landingspagina import leeftijdscategorie, MetCategorieCode
 from db.queries import Opslag, OpslagFout
 from models import ABSENTIE_STATUSSEN, DAGEN, TRAININGSONDERDELEN, Absentie, Atleet, Groep, Periode, Training
 
@@ -381,7 +381,7 @@ def variant_verwijderen(db: Opslag, variant_id: int) -> Training:
 # Aanwezigheid invullen
 # ============================================================
 @dataclass
-class InvulRegel:
+class InvulRegel(MetCategorieCode):
     atleet: Atleet
     categorie: str | None
     status: str | None                # voorgestelde of opgeslagen status; None = niets kiezen
@@ -389,10 +389,6 @@ class InvulRegel:
     ingeroosterd: bool                # doet deze training volgens zijn schema (gekozen training op die dag)
     opgeslagen: bool                  # er staat al een status in de database
     lid: bool = True                  # False = niet (meer) in de groep, wel een opgeslagen status
-
-    @property
-    def categorie_code(self) -> str | None:
-        return categorie_code(self.categorie, self.atleet.geslacht)
 
     @property
     def veld(self) -> str:

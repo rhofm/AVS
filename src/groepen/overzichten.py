@@ -14,7 +14,7 @@ from datetime import date, timedelta
 from typing import Callable
 
 from atleten.aanwezigheid import NIET_INGEVULD, STATUS_TEKST
-from atleten.landingspagina import CATEGORIEEN, categorie_code
+from atleten.landingspagina import CATEGORIEEN, MetCategorieCode
 from atleten.prestaties import toon_waarde
 from atleten.testen import laatste_per_test
 from db.queries import Opslag
@@ -34,14 +34,10 @@ STATUS_LETTER = {"aanwezig": "A", "afgemeld": "M", "afwezig": "X", "blessure": "
 # Gedeeld: één rij per atleet
 # ============================================================
 @dataclass
-class Rij:
+class Rij(MetCategorieCode):
     atleet: Atleet
     categorie: str | None
     cellen: list = field(default_factory=list)
-
-    @property
-    def categorie_code(self) -> str | None:
-        return categorie_code(self.categorie, self.atleet.geslacht)
 
     @property
     def naam_sortering(self) -> str:

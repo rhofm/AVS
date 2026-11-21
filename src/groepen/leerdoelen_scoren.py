@@ -18,7 +18,7 @@ from dataclasses import dataclass, field
 from datetime import date
 from typing import Mapping
 
-from atleten.landingspagina import categorie_code
+from atleten.landingspagina import MetCategorieCode
 from db.queries import Opslag, OpslagFout
 from leerlijnen.voortgang import VELD_PREFIX, leerdoelcategorie
 from models import CATEGORIEEN, Atleet, Groep, Leerdoel, LeerdoelScore
@@ -27,7 +27,7 @@ from .leden import leden_met_categorie
 
 
 @dataclass
-class ScoreRij:
+class ScoreRij(MetCategorieCode):
     atleet: Atleet
     categorie: str | None                # leeftijdscategorie van de atleet (U14, ...)
     score: LeerdoelScore | None          # laatste score op dit leerdoel; None = nog niet beoordeeld
@@ -36,10 +36,6 @@ class ScoreRij:
     @property
     def waarde(self) -> int | None:
         return self.score.score if self.score else None
-
-    @property
-    def categorie_code(self) -> str | None:
-        return categorie_code(self.categorie, self.atleet.geslacht)
 
 
 @dataclass

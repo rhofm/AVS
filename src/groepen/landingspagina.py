@@ -26,7 +26,7 @@ from collections import Counter
 from dataclasses import dataclass, field
 from datetime import date, timedelta
 
-from atleten.landingspagina import CATEGORIEEN, DAG_KORT, categorie_code, leeftijdscategorie
+from atleten.landingspagina import CATEGORIEEN, DAG_KORT, leeftijdscategorie, MetCategorieCode
 from db.queries import Opslag
 from instellingen import dagvolgorde, tijd as toon_tijd
 from leerlijnen.voortgang import leerdoelenpagina
@@ -76,14 +76,10 @@ class LidDag:
 
 
 @dataclass
-class GroepLid:
+class GroepLid(MetCategorieCode):
     atleet: Atleet
     categorie: str | None             # 'U16'
     dagen: list[LidDag]               # maandag t/m zondag
-
-    @property
-    def categorie_code(self) -> str | None:
-        return categorie_code(self.categorie, self.atleet.geslacht)
 
 
 @dataclass

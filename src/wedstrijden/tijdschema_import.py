@@ -3,7 +3,7 @@
     verslag = tijdschema_importeren(db, wedstrijd_id)                 # link van de wedstrijd zelf
     verslag = tijdschema_importeren(db, wedstrijd_id, "https://www.atletiek.nu/wedstrijd/main/45678/")
     verslag = tijdschema_importeren(db, wedstrijd_id, "https://uitslagen.atletiek.nl/Competitions/Details/19133")
-    print(verslag.tekst)
+    # verslag.tekst: de samenvatting voor de trainer
 
 Welke site het is, volgt uit de link (of uit de inhoud van een opgeslagen bestand); bij
 alleen een nummer uit de link van de wedstrijd zelf (anders atletiek.nu).

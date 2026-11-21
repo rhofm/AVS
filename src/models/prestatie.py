@@ -169,6 +169,7 @@ class PR:
 
 @dataclass(slots=True)
 class Test:
+    __test__ = False                # geen pytest-testklasse, ondanks de naam
     naam: str                       # bijv. '30m vliegend', 'Kogelstoten achterwaarts'
     eenheid: str                    # van de hoofdwaarde: 'punten' bij een totaalscore, anders die van het eerste onderdeel
     lager_is_beter: bool
@@ -189,6 +190,7 @@ class TestDeel:
 
 @dataclass(slots=True)
 class Testresultaat:
+    __test__ = False                # geen pytest-testklasse, ondanks de naam
     atleet_id: str                  # master_id
     test_id: int
     datum: date
