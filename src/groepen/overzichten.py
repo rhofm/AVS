@@ -14,7 +14,7 @@ from datetime import date, timedelta
 from typing import Callable
 
 from atleten.aanwezigheid import NIET_INGEVULD, STATUS_TEKST
-from atleten.landingspagina import CATEGORIEEN, categorie_code, leeftijdscategorie
+from atleten.landingspagina import CATEGORIEEN, categorie_code
 from atleten.prestaties import toon_waarde
 from atleten.testen import laatste_per_test
 from db.queries import Opslag
@@ -24,6 +24,7 @@ from models import Atleet, Groep, Testresultaat, Training
 from testen.sjabloon import Bibliotheek
 
 from .landingspagina import DagAanwezigheid, GroepLid, LeerlijnGemiddelde, _aanwezigheid, _leerdoelen
+from .leden import leden_met_categorie
 
 #: Korte letter per status in het aanwezigheidsregister (naast de kleur).
 STATUS_LETTER = {"aanwezig": "A", "afgemeld": "M", "afwezig": "X", "blessure": "B", NIET_INGEVULD: "?"}
@@ -88,15 +89,6 @@ def _markeer_beste(rijen: list[Rij], waarden: list[list[float | None]], lager_is
                 rijen[i].cellen[k].beste = waarden[i][k] == top
 
 
-def _atleten(db: Opslag, groep: Groep, vandaag: date) -> list[tuple[Atleet, str | None]]:
-    uit = []
-    for mid in groep.leden:
-        a = db.atleet(mid)
-        if a is not None:
-            uit.append((a, leeftijdscategorie(a, vandaag)))
-    return uit
-
-
 # ============================================================
 # PR's
 # ============================================================
@@ -140,7 +132,7 @@ class Tabel:
 def prs(db: Opslag, groep: Groep, *, peildatum: date | None = None) -> Tabel:
     """PR's van alle atleten: één kolom per onderdeel waarop minstens één atleet een PR heeft."""
     vandaag = peildatum or date.today()
-    atleten = _atleten(db, groep, vandaag)
+    atleten = leden_met_categorie(db, groep, vandaag)
     onderdelen = {o.id: o for o in db.onderdelen()}
     per_atleet = {a.master_id: {pr.onderdeel_id: pr.waarde for pr in db.prs(a.master_id)} for a, _ in atleten}
     gebruikt = sorted({oid for p in per_atleet.values() for oid in p},
@@ -174,7 +166,7 @@ def testresultaten(db: Opslag, groep: Groep, *, peildatum: date | None = None,
     """
     vandaag = peildatum or date.today()
     bib = bibliotheek or Bibliotheek([], [])
-    atleten = _atleten(db, groep, vandaag)
+    atleten = leden_met_categorie(db, groep, vandaag)
     testen = {t.id: t for t in db.testen()}
     per_atleet = {a.master_id: laatste_per_test(db, a.master_id) for a, _ in atleten}
     gebruikt = sorted({tid for p in per_atleet.values() for tid in p}, key=lambda tid: testen[tid].naam)
@@ -249,7 +241,7 @@ class LeerdoelenTabel:
 def leerdoelen(db: Opslag, groep: Groep, *, peildatum: date | None = None) -> LeerdoelenTabel:
     """Per atleet per leerlijn: hoeveel leerdoelen zelfstandig, hoeveel beoordeeld, gemiddelde score."""
     vandaag = peildatum or date.today()
-    atleten = _atleten(db, groep, vandaag)
+    atleten = leden_met_categorie(db, groep, vandaag)
     per_atleet: dict[str, dict[str, LeerlijnCel]] = {}
     for a, cat in atleten:
         p = leerdoelenpagina(db, a.master_id, cat, peildatum=vandaag)
@@ -328,7 +320,7 @@ def aanwezigheid(db: Opslag, groep: Groep, *, peildatum: date | None = None, wek
     trainingen = db.trainingen(groep.id, van=van, tot=vandaag)
     statussen = {t.id: {a.atleet_id: a for a in db.absenties(t.id)} for t in trainingen}
     rijen = []
-    for a, cat in _atleten(db, groep, vandaag):
+    for a, cat in leden_met_categorie(db, groep, vandaag):
         schema = db.trainingsschema(a.master_id)
         cellen = []
         for t in trainingen:

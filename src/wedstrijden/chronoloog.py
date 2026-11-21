@@ -28,7 +28,7 @@ from typing import Mapping
 from atleten.landingspagina import leeftijdscategorie
 from db.queries import Opslag, OpslagFout
 from instellingen import naam_sleutel, tijd as toon_tijd
-from models import Atleet, ProgrammaOnderdeel, Wedstrijd, lees_categorie
+from models import Atleet, ProgrammaOnderdeel, lees_categorie
 from models.programma import is_masters, masters_klasse
 
 
@@ -99,10 +99,6 @@ class SchemaRegel:
         return (r.onderdeel_id or r.onderdeel_tekst, r.categorie or "", r.ronde, r.datum)
 
 
-def _categorie(atleet: Atleet, w: Wedstrijd) -> str | None:
-    return leeftijdscategorie(atleet, w.datum)
-
-
 def _schema(regels: list[ProgrammaOnderdeel], onderdelen: set[int] | Mapping[int, str | None],
             categorie: str | None, geslacht: str | None) -> list[SchemaRegel]:
     """onderdelen: ids van de ingeschreven onderdelen, of id -> door de trainer gekozen groep
@@ -145,7 +141,7 @@ def persoonlijk_schema(db: Opslag, wedstrijd_id: int, master_id: str) -> list[Sc
         raise OpslagFout(f"Atleet {master_id} bestaat niet.")
     onderdelen = {i.onderdeel_id: i.groep for i in db.inschrijvingen(master_id)
                   if i.wedstrijd_id == wedstrijd_id and i.onderdeel_id is not None}
-    return _schema(db.programma(wedstrijd_id), onderdelen, _categorie(a, w), a.geslacht)
+    return _schema(db.programma(wedstrijd_id), onderdelen, leeftijdscategorie(a, w.datum), a.geslacht)
 
 
 # ============================================================
@@ -174,7 +170,7 @@ def overzicht(db: Opslag, wedstrijd_id: int) -> list[OverzichtRegel]:
         a = db.atleet(mid)
         if a is None:
             continue
-        for s in _schema(regels, onderdelen, _categorie(a, w), a.geslacht):
+        for s in _schema(regels, onderdelen, leeftijdscategorie(a, w.datum), a.geslacht):
             (uit[s.regel.id].atleten if s.zeker else uit[s.regel.id].misschien).append(a)
     for o in uit.values():
         o.atleten.sort(key=sorteer)
@@ -221,7 +217,7 @@ def botsingen(db: Opslag, wedstrijd_id: int, min_pauze: int = 0) -> list[Botsing
         a = db.atleet(mid)
         if a is None:
             continue
-        schema = _schema(regels, onderdelen, _categorie(a, w), a.geslacht)
+        schema = _schema(regels, onderdelen, leeftijdscategorie(a, w.datum), a.geslacht)
         for x, y in combinations(schema, 2):
             if x.sleutel == y.sleutel:
                 continue                                   # groep 1 of groep 2: alternatieven

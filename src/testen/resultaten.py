@@ -22,7 +22,7 @@ from models import Test, TestDeel, Testresultaat
 
 from . import sjabloon as sj
 from .formule import FormuleFout
-from .sjabloon import Bibliotheek, Onderdeel, Sjabloon, SjabloonFout
+from .sjabloon import Bibliotheek, Sjabloon, SjabloonFout
 
 
 def lees_waarde(tekst: str | float | int | None) -> float | None:

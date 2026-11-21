@@ -18,11 +18,12 @@ from dataclasses import dataclass, field
 from datetime import date
 from typing import Mapping
 
-from atleten.landingspagina import categorie_code, leeftijdscategorie
+from atleten.landingspagina import categorie_code
 from db.queries import Opslag, OpslagFout
-from instellingen import naam_tekst
 from leerlijnen.voortgang import VELD_PREFIX, leerdoelcategorie
 from models import CATEGORIEEN, Atleet, Groep, Leerdoel, LeerdoelScore
+
+from .leden import leden_met_categorie
 
 
 @dataclass
@@ -63,16 +64,6 @@ class ScorePagina:
         return sum(1 for r in self.rijen if r.score)
 
 
-def _leden(db: Opslag, groep: Groep, vandaag: date) -> list[tuple[Atleet, str | None]]:
-    uit = []
-    for mid in groep.leden:
-        a = db.atleet(mid)
-        if a is not None:
-            uit.append((a, leeftijdscategorie(a, vandaag)))
-    uit.sort(key=lambda x: naam_tekst(x[0]))
-    return uit
-
-
 def scorepagina(db: Opslag, groep: Groep, leerdoel_id: str | None = None, *,
                 peildatum: date | None = None) -> ScorePagina:
     """De keuzelijst van leerdoelen en, bij een gekozen leerdoel, de atleten met hun laatste score.
@@ -80,7 +71,7 @@ def scorepagina(db: Opslag, groep: Groep, leerdoel_id: str | None = None, *,
     Een onbekend of niet-actief leerdoel in `leerdoel_id` geeft een OpslagFout.
     """
     vandaag = peildatum or date.today()
-    leden = _leden(db, groep, vandaag)
+    leden = leden_met_categorie(db, groep, vandaag)
     categorieen = {leerdoelcategorie(cat) for _, cat in leden}
     categorieen.discard(None)
     namen = dict(db.leerdoel_leerlijnen())

@@ -17,10 +17,10 @@ from dataclasses import dataclass
 from datetime import date
 
 from atleten.landingspagina import DAG_KORT
-from atleten.overzicht import plat
 from db.queries import Opslag
 from instellingen import dagvolgorde, tijd as toon_tijd
 from models import Groep
+from teksthulp import plat
 
 from .landingspagina import trainingsdagen
 

@@ -24,7 +24,7 @@ from groepen.doelen import doelen_van_atleet
 from instellingen import dagvolgorde, tijd as toon_tijd, weekbegin
 from leerlijnen.voortgang import LeerlijnBlok, samenvatting
 from models import DAGEN, Atleet, Notitie, Trainingsschema, Wedstrijd
-from models.programma import MASTERS_KLASSEN, is_masters, masters_categorie, masters_klasse
+from models.programma import MASTERS_KLASSEN, masters_categorie, masters_klasse
 
 from .aanwezigheid import aanwezigheid
 from .prestaties import toon_waarde
@@ -124,7 +124,7 @@ class AtleetLandingspagina:
     @property
     def geslacht(self) -> str | None:
         """'Vrouw', 'Man' of 'X' (voor alle categorieën, ook de jeugd)."""
-        return geslacht_tekst(self.atleet.geslacht, self.categorie)
+        return geslacht_tekst(self.atleet.geslacht)
 
     @property
     def fase(self) -> str | None:
@@ -159,11 +159,8 @@ def categorie_code(categorie: str | None, geslacht: str | None) -> str | None:
     return f"{voorvoegsel}{geslacht}"
 
 
-def geslacht_tekst(geslacht: str | None, categorie: str | None) -> str | None:
-    """'Man' / 'Vrouw' in elke categorie, 'X' bij geslacht X (None als het geslacht onbekend is).
-
-    De categorie telt niet meer mee; de parameter blijft zodat aanroepers niet hoeven te veranderen.
-    """
+def geslacht_tekst(geslacht: str | None) -> str | None:
+    """'Man' / 'Vrouw' in elke categorie, 'X' bij geslacht X (None als het geslacht onbekend is)."""
     if geslacht is None:
         return None
     return _GESLACHT[geslacht]

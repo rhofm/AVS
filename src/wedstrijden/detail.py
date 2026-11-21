@@ -165,11 +165,6 @@ def groepsopties(regels: list[ProgrammaOnderdeel]) -> dict[int, list[tuple[str, 
     return {o: list(groepen.items()) for o, groepen in uit.items()}
 
 
-def _sorteer(a: Atleet) -> tuple[str, str, str]:
-    """Op achternaam of voornaam, zoals in Instellingen gekozen."""
-    return naam_sleutel(a)
-
-
 def _code(a: Atleet, op: date) -> str | None:
     return categorie_code(leeftijdscategorie(a, op), a.geslacht)
 
@@ -206,7 +201,7 @@ def wedstrijd_detail(db: Opslag, wedstrijd_id: int, peildatum: date | None = Non
         onderdelen.sort(key=lambda o: o.naam.lower())
         los = [o.naam for o in onderdelen if o.id not in gedekt.get(mid, set())]
         deelnemers.append(Deelnemer(a, _code(a, w.datum), onderdelen, los, gekozen_groep.get(mid, {})))
-    deelnemers.sort(key=lambda d: _sorteer(d.atleet))
+    deelnemers.sort(key=lambda d: naam_sleutel(d.atleet))
 
     return WedstrijdDetail(w, dagen, deelnemers, chronoloog.botsingen(db, wedstrijd_id),
                            w.dagen_tot(vandaag), _uitslagen(db, wedstrijd_id, alle_onderdelen),
@@ -228,7 +223,7 @@ def _uitslagen(db: Opslag, wedstrijd_id: int, onderdelen: dict[int, Onderdeel]) 
             continue
         uit.append(UitslagRij(a, o.naam, toon_waarde(p.waarde, o.eenheid), p.wind,
                               prs[p.atleet_id].get(o.id) == p.waarde))
-    return sorted(uit, key=lambda r: (*_sorteer(r.atleet), r.onderdeel.lower()))
+    return sorted(uit, key=lambda r: (*naam_sleutel(r.atleet), r.onderdeel.lower()))
 
 
 # ============================================================
@@ -314,7 +309,7 @@ def inschrijfformulier(db: Opslag, wedstrijd_id: int, regel_id: int | None = Non
             atleten[mid] = a
 
     kandidaten = []
-    for a in sorted(atleten.values(), key=_sorteer):
+    for a in sorted(atleten.values(), key=naam_sleutel):
         cat = leeftijdscategorie(a, w.datum)
         past = chronoloog.past_bij(regel, cat, a.geslacht) if regel is not None else True
         kandidaten.append(Kandidaat(a, categorie_code(cat, a.geslacht), past,

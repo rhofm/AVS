@@ -15,12 +15,13 @@ from dataclasses import dataclass, field
 from datetime import date
 from typing import Mapping
 
-from atleten.landingspagina import categorie_code, leeftijdscategorie
+from atleten.landingspagina import categorie_code
 from db.queries import Opslag, OpslagFout
-from instellingen import naam_tekst
 from models import Atleet, Groep, Testresultaat
 from testen import resultaten
 from testen.sjabloon import Bibliotheek, Sjabloon
+
+from .leden import leden_met_categorie
 
 VELD_PREFIX = "waarde-"
 
@@ -65,16 +66,6 @@ class InvulPagina:
         return sum(1 for r in self.rijen if r.laatste)
 
 
-def _leden(db: Opslag, groep: Groep, vandaag: date) -> list[tuple[Atleet, str | None]]:
-    uit = []
-    for mid in groep.leden:
-        a = db.atleet(mid)
-        if a is not None:
-            uit.append((a, leeftijdscategorie(a, vandaag)))
-    uit.sort(key=lambda x: naam_tekst(x[0]))
-    return uit
-
-
 def invulpagina(db: Opslag, groep: Groep, bibliotheek: Bibliotheek, slug: str | None = None, *,
                 formulier: Mapping[str, str] | None = None, fouten: Mapping[str, str] | None = None,
                 peildatum: date | None = None) -> InvulPagina:
@@ -91,7 +82,7 @@ def invulpagina(db: Opslag, groep: Groep, bibliotheek: Bibliotheek, slug: str | 
     s = bron.sjabloon
     test = db.test_op_sjabloon(s.slug)
     rijen = []
-    for a, cat in _leden(db, groep, vandaag):
+    for a, cat in leden_met_categorie(db, groep, vandaag):
         regels = resultaten.resultaatregels(db, a.master_id, bibliotheek=bibliotheek, test_id=test.id) if test else []
         invoer = [(formulier or {}).get(veldnaam(a.master_id, i), "") for i in range(len(s.onderdelen))]
         rijen.append(InvulRij(a, cat, regels[0] if regels else None, invoer, (fouten or {}).get(a.master_id)))
