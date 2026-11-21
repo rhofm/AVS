@@ -31,7 +31,6 @@ from __future__ import annotations
 import re
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
-from functools import lru_cache
 from pathlib import Path
 from typing import Iterable, Literal, Mapping
 
@@ -39,7 +38,7 @@ import yaml
 
 from models.ploeg import Inzet, PloegLid
 from ploeg import punten as _punten
-from ploeg.config import config_bestand, config_bestanden, gezocht_in
+from ploeg.config import config_bestand, config_bestanden, geladen, gezocht_in, lees_yaml
 
 Soort = Literal["loop", "technisch", "estafette"]
 Ernst = Literal["fout", "waarschuwing"]
@@ -665,18 +664,15 @@ def bestanden(map: Path | None = None) -> list[str]:
     return uit
 
 
-@lru_cache(maxsize=16)
-def _laad(pad: str, gewijzigd: int, puntenmap: str | None) -> Regelset:
-    p = Path(pad)
-    try:
-        ruw = yaml.safe_load(p.read_text(encoding="utf-8"))
-    except yaml.YAMLError as e:
-        raise RegelFout(f"{p.name} is geen geldige YAML: {e}") from None
-    return Regelset.uit_dict(ruw, bestand=p.stem, puntenmap=Path(puntenmap) if puntenmap else None)
+def _bouw(pad: Path, puntenmap: str | None) -> Regelset:
+    return Regelset.uit_dict(lees_yaml(pad, RegelFout), bestand=pad.stem,
+                             puntenmap=Path(puntenmap) if puntenmap else None)
 
 
 def laad(bestand: str, map: Path | None = None, puntenmap: Path | None = None) -> Regelset:
-    """Regelset uit `config/ploeg_regels/<bestand>.yaml`. Een aangepast bestand wordt opnieuw gelezen."""
+    """Regelset uit `config/ploeg_regels/<bestand>.yaml`. Opnieuw ingelezen (en dus opnieuw
+    gecontroleerd tegen de puntentelling) zodra het regelbestand of een puntentellingsbestand is
+    gewijzigd. De Regelset wordt gedeeld: nooit veranderen."""
     naam = bestand[:-5] if bestand.endswith(".yaml") else bestand
     if not naam or "/" in naam or "\\" in naam or naam.startswith("."):
         raise RegelFout(f"Ongeldige naam voor een regelbestand: {bestand!r}.")
@@ -684,4 +680,6 @@ def laad(bestand: str, map: Path | None = None, puntenmap: Path | None = None) -
     if pad is None or not pad.is_file():
         waar = pad.parent if pad is not None else gezocht_in("ploeg_regels")
         raise RegelFout(f"Regelbestand {naam}.yaml niet gevonden in {waar}.")
-    return _laad(str(pad), pad.stat().st_mtime_ns, str(puntenmap) if puntenmap else None)
+    punten = (sorted((Path(puntenmap) / "puntentelling").glob("*.yaml")) if puntenmap
+              else config_bestanden("puntentelling"))
+    return geladen(pad, _bouw, str(puntenmap) if puntenmap else None, afhankelijk=punten)

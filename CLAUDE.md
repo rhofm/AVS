@@ -101,7 +101,9 @@ from source and frozen; never use the working directory). Frozen, each file is
 looked up separately: `config/` next to the `.exe` first (the team leader's own
 edits and additions), then the copy built into the `.exe`; an empty file
 (only whitespace/#-comments) never hides a filled one. Loaded files are cached
-by path + modification time, so an edited YAML file counts without a restart. Design of the team feature: `docs/Ploegopstelling_ontwerp.md`.
+by path + modification time (`ploeg.config.geladen`; a rule set also reloads when
+any points file changes, so it is re-checked against it), so an edited YAML file
+counts without a restart. Cached objects are shared: never modify them. Design of the team feature: `docs/Ploegopstelling_ontwerp.md`.
 
 **Dependencies** are in `pyproject.toml` (Python 3.13), installed into the
 conda environment with `pip install -e .[dev]` (`[dev]` = pytest + PyInstaller).

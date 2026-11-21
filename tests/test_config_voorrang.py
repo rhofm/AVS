@@ -116,6 +116,21 @@ def test_eigen_puntentelling_gaat_voor_en_wordt_opnieuw_gelezen(exe):
     assert "t" not in punten.puntentelling("au_2025").tabellen
 
 
+def test_regelset_opnieuw_gecontroleerd_na_aangepaste_puntentelling(exe):
+    """Een regelset is gecontroleerd tegen zijn puntentelling. Verandert alleen de puntentelling,
+    dan moet die controle opnieuw: anders blijft een regelset in gebruik met een tabel die weg is."""
+    extern, _ = exe
+    eerst = regels.laad("u14_u16_2026-2027")
+    assert regels.laad("u14_u16_2026-2027") is eerst                # niets gewijzigd: uit de cache
+
+    (extern / "puntentelling" / "au_2025.yaml").write_text(EIGEN_PUNTEN, encoding="utf-8")   # zonder au_u14_u16
+    with pytest.raises(regels.RegelFout, match="au_u14_u16"):
+        regels.laad("u14_u16_2026-2027")
+
+    (extern / "puntentelling" / "au_2025.yaml").unlink()             # terug naar de meegebouwde
+    assert regels.laad("u14_u16_2026-2027").puntentabel == "au_u14_u16"
+
+
 def test_niet_gevonden_noemt_beide_mappen(exe):
     extern, meegebouwd = exe
     with pytest.raises(regels.RegelFout) as e:
