@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 from datetime import date
 
 from db.queries import Opslag
-from models import Atleet, Groep, Leerlijn, LeerlijnStap, Onderdeel, Prestatie, Test, Testresultaat, Wedstrijd
+from models import Atleet, Groep, Onderdeel, Prestatie, Test, Testresultaat, Wedstrijd
 
 from .testen import laatste_per_test
 
@@ -34,17 +34,6 @@ class TestRegel:
 
 
 @dataclass
-class LeerlijnStand:
-    leerlijn: Leerlijn
-    behaald: int                         # aantal behaalde stappen
-    volgende: LeerlijnStap | None        # None = leerlijn afgerond
-
-    @property
-    def totaal(self) -> int:
-        return len(self.leerlijn.stappen)
-
-
-@dataclass
 class AtleetProfiel:
     atleet: Atleet
     leeftijd: int | None
@@ -52,7 +41,6 @@ class AtleetProfiel:
     recente_prestaties: list[Prestatie] = field(default_factory=list)
     geplande_wedstrijden: list[GeplandeWedstrijd] = field(default_factory=list)
     testen: list[TestRegel] = field(default_factory=list)
-    leerlijnen: list[LeerlijnStand] = field(default_factory=list)
     groepen: list[Groep] = field(default_factory=list)
 
 
@@ -82,14 +70,6 @@ def profiel(db: Opslag, master_id: str, *, peildatum: date | None = None,
         key=lambda r: r.test.naam,
     )
 
-    behaald_ids = {v.stap_id for v in db.voortgang(master_id) if v.behaald}
-    standen = []
-    for lijn in db.leerlijnen():
-        stap_ids = {s.id for s in lijn.stappen}
-        aantal = len(stap_ids & behaald_ids)
-        if aantal:  # alleen leerlijnen waar de atleet aan begonnen is
-            standen.append(LeerlijnStand(lijn, aantal, lijn.volgende_stap(behaald_ids)))
-
     return AtleetProfiel(
         atleet=atleet,
         leeftijd=atleet.leeftijd_op(vandaag),
@@ -97,6 +77,5 @@ def profiel(db: Opslag, master_id: str, *, peildatum: date | None = None,
         recente_prestaties=db.prestaties(master_id)[:aantal_recent],
         geplande_wedstrijden=gepland,
         testen=testregels,
-        leerlijnen=standen,
         groepen=db.groepen_van_atleet(master_id),
     )

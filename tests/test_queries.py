@@ -14,7 +14,7 @@ from pathlib import Path
 from db.init_db import init_db, pseudoniem
 from db.queries import Opslag, OpslagFout
 from models import (
-    PR, heeft_windmeting, Absentie, Atleet, Groep, Inschrijving, Leerlijn, LeerlijnStap, LeerlijnVoortgang,
+    PR, heeft_windmeting, Absentie, Atleet, Groep, Inschrijving,
     Onderdeel, Prestatie, Test, Testresultaat, Training, Trainingsschema, Wedstrijd, Notitie,
 )
 from hulp import TESTSLEUTEL, verwacht as _verwacht
@@ -349,18 +349,6 @@ def test_notities():
         _verwacht(OpslagFout, lambda: db.notitie_opslaan(Notitie(anna.master_id, date(2026, 10, 1), "x", id=999)))
         db.notitie_verwijderen(n3.id)
         assert db.notitie(n3.id) is None and db.notities(tim.master_id) == []
-
-
-def test_leerlijnen():
-    with opslag() as db:
-        anna, _, _, _ = _basis(db)
-        lijn = db.leerlijn_opslaan(Leerlijn("Sprint", stappen=[
-            LeerlijnStap(1, "Armactie"), LeerlijnStap(2, "Blokstart")]))
-        terug = db.leerlijn(lijn.id)
-        assert [s.naam for s in terug.stappen] == ["Armactie", "Blokstart"]
-        db.voortgang_opslaan(LeerlijnVoortgang(anna.master_id, terug.stappen[0].id, date(2026, 9, 1)))
-        behaald = {v.stap_id for v in db.voortgang(anna.master_id) if v.behaald}
-        assert terug.volgende_stap(behaald).naam == "Blokstart"
 
 
 def test_atleet_verwijderen_wist_alles():

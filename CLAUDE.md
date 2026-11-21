@@ -81,7 +81,7 @@ This project holds personal data about athletes, many of them minors.
 
 | Package       | Purpose |
 |---------------|---------|
-| `models/`     | Data classes: `atleet`, `prestatie`, `groep`, `leerlijn`, `periodisering`, `rooster`, `doel`, `ploeg` |
+| `models/`     | Data classes: `atleet`, `prestatie`, `groep`, `leerdoel`, `periodisering`, `rooster`, `doel`, `ploeg` |
 | `db/`         | `schema_<database>.sql`, `init_db.py` (keys, connect, create/migrate), `queries.py`, `migrations/<database>/` |
 | `importers/`  | Import results from links: atletiek.nu PRs, atletiek.nu competitions, Seltec competitions |
 | `ploeg/`      | Team selection: `vergelijk` (compare athletes), `voorspeller` (predictions), `estafettes` (relays), `regels` (rules), `opstelling` (lineup), `optimaliseer` + `strategieen/` (selection "mentalities") |
@@ -246,7 +246,9 @@ it only holds `.gitkeep`).
 - Leerdoel ids are never reused or renumbered (scores point to them); retire a
   leerdoel with `actief = 0` in a migration. The old `leerlijn`/`leerlijn_stap`/
   `atleet_leerlijn` tables in `personen.db` predate `leerlijnen.db` and are superseded
-  by it (the old `Opslag.leerlijn*`/`voortgang*` methods still use them).
+  by it: no code uses them any more and they are always empty. They stay because
+  the baseline schema is frozen; never write to them, and drop them only in a
+  migration.
 - Notes (`notities.db`) are free text: the pseudonym protects the link to the
   athlete, but not what is written in the text. Only the encryption protects
   that. Keep notes factual, no diagnoses, and don't name other athletes.

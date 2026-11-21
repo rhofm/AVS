@@ -12,7 +12,6 @@ from .atleet import GESLACHTEN, Atleet, Geslacht
 from .doel import BEOORDELINGEN, DOELSOORTEN, STATUSSEN, Doel, DoelRegel
 from .groep import ABSENTIE_STATUSSEN, Absentie, AbsentieStatus, Groep, TRAININGSONDERDELEN, Training, normaliseer_tijd
 from .leerdoel import CATEGORIEEN, LEERDOEL_BRONNEN, Categorie, Leerdoel, LeerdoelScore
-from .leerlijn import Leerlijn, LeerlijnStap, LeerlijnVoortgang
 from .notitie import Notitie
 from .periodisering import FASE_CODES, FASEN, Fase, Mesocyclus, MesoWeek, Periode, Periodisering
 from .ploeg import (BESCHIKBAAR, NEUTRAAL, PRESTATIEBASIS, ROLLEN, VOORKEUREN, Beschikbaar, Inzet, Ploeg, PloegLid,
@@ -45,7 +44,6 @@ __all__ = [
     "Groep", "normaliseer_tijd", "Training", "TRAININGSONDERDELEN", "Absentie", "AbsentieStatus", "ABSENTIE_STATUSSEN",
     "Fase", "FASEN", "FASE_CODES", "Mesocyclus", "MesoWeek", "Periode", "Periodisering",
     "Rooster", "RoosterRegel", "GroepRooster", "INHOUD", "INHOUD_VELDEN",
-    "Leerlijn", "LeerlijnStap", "LeerlijnVoortgang",
     "Leerdoel", "LeerdoelScore", "Categorie", "CATEGORIEEN", "LEERDOEL_BRONNEN",
     "Trainingsschema", "DAGEN",
     "Notitie",

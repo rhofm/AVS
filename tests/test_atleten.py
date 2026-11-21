@@ -10,7 +10,7 @@ from datetime import date
 from atleten import beheer, koppelen, prestaties, profiel, testen
 from db.queries import OpslagFout
 from models import (
-    Groep, Inschrijving, Leerlijn, LeerlijnStap, LeerlijnVoortgang, Onderdeel, Prestatie, Test, Wedstrijd,
+    Groep, Inschrijving, Onderdeel, Prestatie, Test, Wedstrijd,
 )
 from hulp import lege_opslag, verwacht as _verwacht
 
@@ -168,9 +168,6 @@ def test_profiel():
         db.inschrijving_opslaan(Inschrijving(anna.master_id, straks.id, db.onderdeel("800m").id))
         db.test_opslaan(Test("30m vliegend", "s", True))
         testen.resultaat_toevoegen(db, anna.master_id, "30m vliegend", date(2026, 10, 1), 3.95)
-        lijn = db.leerlijn_opslaan(Leerlijn("Sprint", stappen=[LeerlijnStap(1, "Armactie"), LeerlijnStap(2, "Blokstart")]))
-        db.leerlijn_opslaan(Leerlijn("Werpen", stappen=[LeerlijnStap(1, "Stand")]))
-        db.voortgang_opslaan(LeerlijnVoortgang(anna.master_id, lijn.stappen[0].id, date(2026, 9, 1)))
         db.groep_opslaan(Groep("Junioren C", "2026-2027", [anna.master_id]))
 
         prof = profiel.profiel(db, anna.master_id, peildatum=date(2026, 10, 15))
@@ -179,8 +176,6 @@ def test_profiel():
         assert len(prof.recente_prestaties) == 2
         assert [(g.wedstrijd.naam, g.onderdeel.naam) for g in prof.geplande_wedstrijden] == [("Straks", "800m")]
         assert prof.testen[0].laatste.waarde == 3.95
-        assert [(s.leerlijn.naam, s.behaald, s.totaal, s.volgende.naam) for s in prof.leerlijnen] == \
-               [("Sprint", 1, 2, "Blokstart")]
         assert [g.naam for g in prof.groepen] == ["Junioren C"]
         assert "Anna" not in repr(prof.atleet)
         assert profiel.profiel(db, "f" * 32) is None

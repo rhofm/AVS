@@ -56,9 +56,6 @@ from models import (
     CATEGORIEEN,
     Leerdoel,
     LeerdoelScore,
-    Leerlijn,
-    LeerlijnStap,
-    LeerlijnVoortgang,
     Notitie,
     Onderdeel,
     Fase,
@@ -1406,61 +1403,6 @@ class Opslag:
                and (groep_id is None or trainingen[r["training_id"]]["groep_id"] == groep_id)]
         uit.sort(key=lambda r: (trainingen[r["training_id"]]["datum"], r["training_id"]))
         return [Absentie(r["training_id"], master_id, r["status"], r["reden"]) for r in uit]
-
-    # ============================================================
-    # Leerlijnen (personen.db)
-    # ============================================================
-    def leerlijn_opslaan(self, lijn: Leerlijn) -> Leerlijn:
-        """Leerlijn en stappen opslaan. Stappen die niet meer in de lijst staan worden
-        NIET verwijderd (dat zou de voortgang van atleten wissen)."""
-        with self.personen:
-            if lijn.id is None:
-                lijn.id = self.personen.execute(
-                    "INSERT INTO leerlijn (naam, beschrijving) VALUES (?, ?)", (lijn.naam, lijn.beschrijving)
-                ).lastrowid
-            else:
-                self.personen.execute("UPDATE leerlijn SET naam = ?, beschrijving = ? WHERE id = ?",
-                                      (lijn.naam, lijn.beschrijving, lijn.id))
-            for s in lijn.stappen:
-                s.leerlijn_id = lijn.id
-                if s.id is None:
-                    s.id = self.personen.execute(
-                        "INSERT INTO leerlijn_stap (leerlijn_id, volgorde, naam, beschrijving) VALUES (?, ?, ?, ?)",
-                        (lijn.id, s.volgorde, s.naam, s.beschrijving),
-                    ).lastrowid
-                else:
-                    self.personen.execute(
-                        "UPDATE leerlijn_stap SET leerlijn_id = ?, volgorde = ?, naam = ?, beschrijving = ? WHERE id = ?",
-                        (lijn.id, s.volgorde, s.naam, s.beschrijving, s.id),
-                    )
-        return lijn
-
-    def _leerlijn(self, r) -> Leerlijn:
-        stappen = [LeerlijnStap(s["volgorde"], s["naam"], s["beschrijving"], s["leerlijn_id"], s["id"])
-                   for s in self.personen.execute(
-                       "SELECT * FROM leerlijn_stap WHERE leerlijn_id = ? ORDER BY volgorde", (r["id"],))]
-        return Leerlijn(r["naam"], r["beschrijving"], stappen, r["id"])
-
-    def leerlijn(self, leerlijn_id: int) -> Leerlijn | None:
-        r = self.personen.execute("SELECT * FROM leerlijn WHERE id = ?", (leerlijn_id,)).fetchone()
-        return self._leerlijn(r) if r else None
-
-    def leerlijnen(self) -> list[Leerlijn]:
-        return [self._leerlijn(r) for r in self.personen.execute("SELECT * FROM leerlijn ORDER BY naam").fetchall()]
-
-    def voortgang_opslaan(self, v: LeerlijnVoortgang) -> None:
-        with self.personen:
-            self.personen.execute(
-                """INSERT INTO atleet_leerlijn (atleet_id, stap_id, behaald_op, notities) VALUES (?, ?, ?, ?)
-                   ON CONFLICT (atleet_id, stap_id) DO UPDATE SET
-                       behaald_op = excluded.behaald_op, notities = excluded.notities""",
-                (v.atleet_id, v.stap_id, _naar_tekst(v.behaald_op), v.notities),
-            )
-
-    def voortgang(self, master_id: str) -> list[LeerlijnVoortgang]:
-        return [LeerlijnVoortgang(r["atleet_id"], r["stap_id"], _naar_datum(r["behaald_op"]), r["notities"])
-                for r in self.personen.execute(
-                    "SELECT * FROM atleet_leerlijn WHERE atleet_id = ?", (master_id,))]
 
     # ============================================================
     # Leerdoelen (leerlijnen.db): de catalogus, zonder persoonsgegevens
