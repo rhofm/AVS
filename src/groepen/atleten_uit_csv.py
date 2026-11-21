@@ -9,14 +9,7 @@ Voor elke regel in de CSV:
      naar prestaties.db (onder het pseudoniem, zonder naam).
 Opnieuw draaien is veilig: bestaande atleten en prestaties worden herkend en
 niet dubbel opgeslagen. Mislukt een atleet (bijv. door een browsercontrole van
-atletiek.nu), dan gaat het programma door met de volgende en komen de
-mislukte regels in '<bestand>_mislukt.csv', zodat je alleen die opnieuw draait.
-
-Gebruik (vanuit de map AVS):
-    python src/groepen/atleten_uit_csv.py                       # pakt de CSV in data/
-    python src/groepen/atleten_uit_csv.py data/groep_a.csv
-    python src/groepen/atleten_uit_csv.py data/groep_a.csv --proef   # alleen laten zien wat er gelezen wordt
-    python src/groepen/atleten_uit_csv.py data/groep_a.csv --html-map data/profielen
+atletiek.nu), dan gaat de import door met de volgende; de pagina noemt de mislukte regels.
 
 Het CSV-bestand (scheidingsteken ;)
 -----------------------------------
@@ -42,31 +35,25 @@ Een naam in één kolom wordt zo gesplitst: 'Jan de Vries' en 'Vries, Jan de'
 -> voornaam 'Jan', tussenvoegsel 'de', achternaam 'Vries'. Zonder
 tussenvoegsel is het laatste woord de achternaam ('Anne Marie Jansen'). Bij
 dubbele achternamen zonder streepje gaat dat mis: gebruik dan aparte kolommen.
-Controleer het altijd eerst met --proef.
 
 Vereist: pip install requests beautifulsoup4 curl_cffi sqlcipher3-wheels keyring
 """
 
 from __future__ import annotations
 
-import argparse
 import csv
 import re
-import sys
 import time
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from pathlib import Path
 from typing import Callable
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-
-from atleten.atleet_toevoegen_atletieknu import Uitkomst, voeg_toe  # noqa: E402
-from db.init_db import standaard_map  # noqa: E402
-from db.queries import Opslag  # noqa: E402
-from importers.atletieknu_prs import AtletiekNuPRImporter, atleet_id_uit  # noqa: E402
-from importers.base import ImportFout  # noqa: E402
-from models import Atleet  # noqa: E402
+from atleten.atleet_toevoegen_atletieknu import Uitkomst, voeg_toe
+from db.queries import Opslag
+from importers.atletieknu_prs import AtletiekNuPRImporter, atleet_id_uit
+from importers.base import ImportFout
+from models import Atleet
 
 SCHEIDINGSTEKEN = ";"
 STANDAARD_PAUZE = 3.0   # seconden tussen twee verzoeken aan atletiek.nu
@@ -95,7 +82,6 @@ class Regel:
     geslacht: str | None = None
     club: str | None = None
     au_licentienummer: str | None = field(default=None, repr=False)
-    ruw: list[str] = field(default_factory=list, repr=False)   # originele cellen, voor _mislukt.csv
 
     @property
     def naam(self) -> str:
@@ -355,7 +341,7 @@ def lees_csv(bron: Path | str, *, tekst: str | None = None) -> Leesresultaat:
             continue
         uit.regels.append(Regel(n, voornaam, achternaam, atletieknu_id, tussenvoegsel=tussenvoegsel,
                                 geboortedatum=geboortedatum, geslacht=geslacht,
-                                club=cel(rij, "club") or None, au_licentienummer=licentie, ruw=rij))
+                                club=cel(rij, "club") or None, au_licentienummer=licentie))
     return uit
 
 
@@ -433,76 +419,12 @@ def _vul_lege_velden_aan(db: Opslag, atleet: Atleet, regel: Regel) -> None:
         db.atleet_opslaan(atleet)
 
 
-def schrijf_mislukt(pad: Path, lees: Leesresultaat, verslag: Verslag) -> Path | None:
-    """Mislukte regels (+ reden) naar '<naam>_mislukt.csv' naast het origineel, om opnieuw te draaien."""
-    if not verslag.mislukt:
-        if pad.exists():
-            pad.unlink()                       # oud bestand van een vorige keer opruimen
-        return None
-    with pad.open("w", newline="", encoding="utf-8-sig") as f:
-        w = csv.writer(f, delimiter=SCHEIDINGSTEKEN)
-        if lees.kopregel:
-            w.writerow([*lees.kopregel, "reden"])
-        for regel, reden in verslag.mislukt:
-            w.writerow([*regel.ruw, reden])
-    return pad
-
-
-# --------------------------------------------------------------------------- opdrachtregel
-
-def kies_csv(map: Path) -> Path:
-    """De CSV in data/ (zonder _mislukt-bestanden). Bij meerdere: vragen welke."""
-    kandidaten = sorted(p for p in map.glob("*.csv") if not p.stem.endswith("_mislukt"))
-    if len(kandidaten) == 1:
-        return kandidaten[0]
-    if not kandidaten:
-        raise SystemExit(f"Geen CSV-bestand gevonden in {map}. Geef het pad op: "
-                         "python src/groepen/atleten_uit_csv.py pad/naar/bestand.csv")
-    if not sys.stdin.isatty():
-        raise SystemExit("Meerdere CSV-bestanden in data/; geef aan welke: "
-                         + ", ".join(p.name for p in kandidaten))
-    print("Welk bestand?")
-    for i, p in enumerate(kandidaten, 1):
-        print(f"  {i}. {p.name}")
-    while True:
-        keuze = input("Nummer: ").strip()
-        if keuze.isdigit() and 1 <= int(keuze) <= len(kandidaten):
-            return kandidaten[int(keuze) - 1]
-
-
-def maak_bevestig(modus: str) -> Callable[[Atleet], bool] | None:
-    """'ja': bestaande atleet met dezelfde naam gebruiken; 'nieuw': altijd nieuw; 'vraag': vragen."""
-    if modus == "nieuw":
-        return None
-
-    def bevestig(kandidaat: Atleet) -> bool:
-        extra = ", ".join(str(x) for x in (kandidaat.geboortejaar, kandidaat.club) if x)
-        beschrijving = kandidaat.naam + (f" ({extra})" if extra else "")
-        if modus == "ja":
-            return True
-        if not sys.stdin.isatty():
-            raise BevestigingNodig(f"er bestaat al een atleet {beschrijving} zonder atletiek.nu-nummer. "
-                                   "Draai opnieuw met --ja (zelfde persoon) of --nieuw (andere persoon).")
-        antwoord = input(f"  Er bestaat al een atleet {beschrijving} zonder atletiek.nu-nummer.\n"
-                         "  Is dit dezelfde persoon? [j/n]: ").strip().lower()
-        return antwoord in ("j", "ja", "y", "yes")
-    return bevestig
-
-
-def maak_haal_html(html_map: Path | None, pauze: float) -> Callable[[str], str]:
-    """Profiel uit <html_map>/<nummer>.html als dat bestaat, anders van atletiek.nu."""
+def maak_haal_html(pauze: float = STANDAARD_PAUZE) -> Callable[[str], str]:
+    """Haalt profielen van atletiek.nu op, met minstens `pauze` seconden tussen twee verzoeken."""
     importer = AtletiekNuPRImporter()
     vorige = [0.0]
 
     def haal(atletieknu_id: str) -> str:
-        if html_map is not None:
-            bestand = html_map / f"{atletieknu_id}.html"
-            if bestand.exists():
-                html = importer.laad_html(str(bestand))
-                in_pagina = atleet_id_uit("", html)
-                if in_pagina and in_pagina != atletieknu_id:
-                    raise ImportFout(f"{bestand.name} is het profiel van {in_pagina}, niet van {atletieknu_id}.")
-                return html
         wachten = vorige[0] + pauze - time.monotonic()
         if wachten > 0:
             time.sleep(wachten)                 # atletiek.nu niet overbelasten
@@ -511,69 +433,3 @@ def maak_haal_html(html_map: Path | None, pauze: float) -> Callable[[str], str]:
         finally:
             vorige[0] = time.monotonic()
     return haal
-
-
-def toon_proef(lees: Leesresultaat) -> None:
-    kolommen = ", ".join(f"{veld}=kolom {i + 1}" for veld, i in sorted(lees.kolommen.items(), key=lambda x: x[1]))
-    print(f"Kopregel: {'ja' if lees.kopregel else 'nee (kolommen geraden)'}; {kolommen}\n")
-    print(f"{'regel':>5}  {'voornaam':<15} {'tussenv.':<9} {'achternaam':<20} {'geboren':<11} {'nummer':<9} "
-          f"{'gesl.':<6} licentie")
-    for r in lees.regels:
-        print(f"{r.regelnummer:>5}  {r.voornaam:<15} {r.tussenvoegsel or '':<9} {r.achternaam:<20} "
-              f"{r.geboortedatum or '':<11} {r.atletieknu_id:<9} {r.geslacht or '':<6} {r.au_licentienummer or ''}")
-
-
-def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(
-        description="Voeg atleten uit een CSV (met ;) toe aan personen.db en importeer hun prestaties van atletiek.nu.")
-    parser.add_argument("csv", nargs="?", type=Path, help="CSV-bestand (standaard: het CSV-bestand in data/)")
-    parser.add_argument("--proef", action="store_true",
-                        help="alleen tonen hoe de CSV gelezen wordt; er verandert niets")
-    parser.add_argument("--html-map", type=Path, metavar="MAP",
-                        help="map met opgeslagen profielpagina's <nummer>.html (bij een browsercontrole)")
-    parser.add_argument("--pauze", type=float, default=STANDAARD_PAUZE,
-                        help=f"seconden tussen verzoeken aan atletiek.nu (standaard {STANDAARD_PAUZE:g})")
-    keuze = parser.add_mutually_exclusive_group()
-    keuze.add_argument("--ja", action="store_true",
-                       help="bestaande atleet met dezelfde naam (zonder nummer) zonder vragen gebruiken")
-    keuze.add_argument("--nieuw", action="store_true",
-                       help="altijd een nieuwe atleet maken als het nummer nog niet bekend is")
-    parser.add_argument("--map", type=Path, help="map met de databases (standaard data/)")
-    args = parser.parse_args(argv)
-
-    pad = args.csv or kies_csv(args.map or standaard_map())
-    if not pad.exists():
-        print(f"Bestand niet gevonden: {pad}", file=sys.stderr)
-        return 1
-
-    lees = lees_csv(pad)
-    for n, melding in lees.fouten:
-        print(f"Regel {n}: {melding}" if n else melding, file=sys.stderr)
-    if not lees.regels:
-        print("Geen atleten om toe te voegen.", file=sys.stderr)
-        return 1
-    print(f"{len(lees.regels)} atleten gelezen uit {pad.name}"
-          + (f", {len(lees.fouten)} regel(s) met fouten overgeslagen" if lees.fouten else "") + ".")
-
-    if args.proef:
-        toon_proef(lees)
-        return 0
-
-    modus = "ja" if args.ja else "nieuw" if args.nieuw else "vraag"
-    with Opslag(map=args.map) as db:
-        verslag = importeer_regels(db, lees.regels, haal_html=maak_haal_html(args.html_map, args.pauze),
-                                   bevestig=maak_bevestig(modus))
-
-    nieuw = sum(1 for _, u in verslag.gelukt if u.status == "nieuw")
-    prestaties = sum(u.nieuw for _, u in verslag.gelukt)
-    print(f"\nKlaar: {len(verslag.gelukt)} gelukt ({nieuw} nieuwe atleten, {prestaties} nieuwe prestaties), "
-          f"{len(verslag.mislukt)} mislukt.")
-    mislukt_pad = schrijf_mislukt(pad.with_name(f"{pad.stem}_mislukt.csv"), lees, verslag)
-    if mislukt_pad:
-        print(f"De mislukte regels staan in {mislukt_pad.name}. Draai dat bestand later opnieuw, "
-              "of sla de profielen op (Ctrl+S) in een map en gebruik --html-map.")
-    return 0 if not verslag.mislukt and not lees.fouten else 2
-
-
-if __name__ == "__main__":
-    sys.exit(main())

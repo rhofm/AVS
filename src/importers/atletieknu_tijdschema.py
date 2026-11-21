@@ -13,32 +13,20 @@ startlijst-URL (/wedstrijd/startlijst/<startgroep>/<onderdeel>/).
 ('Vrouwen groep A' -> categorie 'Vrouwen', groep 1). Regels zonder tijd ('n/a', bijv.
 reserves) worden overgeslagen.
 
-Gebruik:
-    python atletieknu_tijdschema.py 43465
-    python atletieknu_tijdschema.py https://www.atletiek.nu/wedstrijd/main/43465/
-    python atletieknu_tijdschema.py opgeslagen_tijdschema.html --csv tijdschema.csv
-
 Vereist: pip install requests beautifulsoup4 curl_cffi
 """
 
 from __future__ import annotations
 
-import argparse
 import re
-import sys
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 
 from bs4 import BeautifulSoup, Tag
 
-try:                                    # als pakket: from importers import atletieknu_tijdschema
-    from .atletieknu_wedstrijd import (BASIS_URL, AtletiekNuWedstrijdImporter, Wedstrijd, parse_datum,
-                                       parse_wedstrijd, wedstrijd_id_uit_url)
-    from .base import ImportFout, clean, write_csv
-except ImportError:                     # als script: python atletieknu_tijdschema.py ...
-    from atletieknu_wedstrijd import (BASIS_URL, AtletiekNuWedstrijdImporter, Wedstrijd,  # type: ignore
-                                      parse_datum, parse_wedstrijd, wedstrijd_id_uit_url)
-    from base import ImportFout, clean, write_csv  # type: ignore
+from .atletieknu_wedstrijd import (BASIS_URL, AtletiekNuWedstrijdImporter, Wedstrijd, parse_datum,
+                                   parse_wedstrijd, wedstrijd_id_uit_url)
+from .base import ImportFout, clean
 
 TIJDSCHEMA_URL = BASIS_URL + "/wedstrijd/chronoloog/{id}/"
 
@@ -200,12 +188,8 @@ class AtletiekNuTijdschemaImporter(AtletiekNuWedstrijdImporter):
     """
 
     url_patronen = (r"atletiek\.nu/wedstrijd/chronoloog/\d+",)
-
-    def controleer_pagina(self, html: str, url: str) -> None:
-        if "Checking your browser" in html and "chronoloog" not in html and "pageTitle" not in html:
-            raise ImportFout(
-                f"atletiek.nu gaf een browsercontrole-pagina terug voor {url}.\n"
-                "Open het tijdschema in je browser, sla het op (Ctrl+S, 'Alleen HTML') en importeer dat bestand.")
+    echte_inhoud = ("chronoloog", "pageTitle")
+    browsercontrole_uitleg = "Open het tijdschema in je browser, sla het op (Ctrl+S, 'Alleen HTML') en importeer dat bestand."
 
     def parse(self, bron: str) -> tuple[Wedstrijd, list[TijdschemaRegel]]:
         """
@@ -227,30 +211,3 @@ class AtletiekNuTijdschemaImporter(AtletiekNuWedstrijdImporter):
 def laad_tijdschema(bron: str, log=print) -> tuple[Wedstrijd, list[TijdschemaRegel]]:
     return AtletiekNuTijdschemaImporter(log=log).parse(bron)
 
-
-can_handle = AtletiekNuTijdschemaImporter.can_handle
-
-
-# --------------------------------------------------------------------------- script
-
-def main() -> None:
-    p = argparse.ArgumentParser(description="Tijdschema (chronoloog) van een wedstrijd op atletiek.nu.")
-    p.add_argument("bron", help="wedstrijd-id, link naar de wedstrijd, of opgeslagen HTML-bestand")
-    p.add_argument("--csv", help="schrijf het tijdschema naar dit CSV-bestand")
-    args = p.parse_args()
-    try:
-        wedstrijd, regels = laad_tijdschema(args.bron, log=lambda *a: print(*a, file=sys.stderr))
-    except ImportFout as e:
-        sys.exit(f"Fout: {e}")
-    print(f"{wedstrijd.naam} - {wedstrijd.plaats}")
-    for r in regels:
-        tijd = f"{r.starttijd}-{r.eindtijd}" if r.eindtijd else r.starttijd
-        groep = f" groep {r.groep}" if r.groep else ""
-        print(f"{r.datum} {tijd:<11} {r.onderdeel:<24} {r.categorie}{groep}  {r.opmerking}")
-    if args.csv:
-        write_csv(args.csv, [asdict(r) for r in regels])
-        print(f"Opgeslagen: {args.csv}", file=sys.stderr)
-
-
-if __name__ == "__main__":
-    main()

@@ -48,5 +48,5 @@ teams, Tijn Voorbeeld 3000m                          -> "10:10,1h", waarde 610.1
 teams, alle uitslagen                                -> geen lege atleetnamen, geen "Reserve atleet"
 ```
 
-Gebruik in tests: geef de map als bron (`laad_uitslagen("tests/fixtures/atletieknu_wedstrijd/teams")`)
+Gebruik in tests: geef de map als bron (`AtletiekNuWedstrijdImporter().parse("tests/fixtures/atletieknu_wedstrijd/teams")`)
 of vervang `requests.Session` door een nep-sessie die URL's naar deze bestanden vertaalt.

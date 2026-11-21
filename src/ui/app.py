@@ -1585,8 +1585,8 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
         """Profielpagina's van atletiek.nu ophalen (met pauze); tests zetten AVS_HAAL_PROFIEL."""
         haal = app.config.get("AVS_HAAL_PROFIEL")
         if haal is None:
-            from groepen.atleten_uit_csv import STANDAARD_PAUZE, maak_haal_html
-            haal = maak_haal_html(None, STANDAARD_PAUZE)
+            from groepen.atleten_uit_csv import maak_haal_html
+            haal = maak_haal_html()
         return haal
 
     def _groepimport(rijen=None, keuze=None, dubbel="overslaan", *, fouten=None, fout=None, resultaat=None,

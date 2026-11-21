@@ -1,44 +1,23 @@
 """
-Importeer de uitslagen van een wedstrijd op atletiek.nu voor een groep atleten
-of voor alle atleten van een vereniging, en exporteer ze naar CSV/JSON.
+Importeer de uitslagen van een wedstrijd op atletiek.nu.
 
 Werkwijze: de uitslagenpagina van de wedstrijd linkt naar één pagina per onderdeel
 (/wedstrijd/uitslagenonderdeel/<id>/<onderdeel>/). Die pagina's worden allemaal
-opgehaald; elke rij in elke uitslagtabel wordt een Uitslag, daarna wordt gefilterd.
-
-Gebruik:
-    python atletieknu_wedstrijd.py 43465 --vereniging "Nijmegen Atletiek"
-    python atletieknu_wedstrijd.py https://www.atletiek.nu/wedstrijd/uitslagen/43465/ \\
-        --atleten "Anna Voorbeeld" "Bas van Proefstra" "Lotte Testerink"
-    python atletieknu_wedstrijd.py 44999 --team "Nijmegen Heren 1"     # teamwedstrijd (incl. estafettes)
-    python atletieknu_wedstrijd.py 43465 --atleten-bestand groep.txt   # één naam per regel
-    python atletieknu_wedstrijd.py 43465 --alles                       # iedereen
-    python atletieknu_wedstrijd.py opgeslagen_map/ --vereniging Nijmegen  # opgeslagen onderdeelpagina's
-    python atletieknu_wedstrijd.py 43465 --vereniging Nijmegen --csv uitslagen.csv --json uitslagen.json
+opgehaald; elke rij in elke uitslagtabel wordt een Uitslag.
+AVS koppelt ze daarna aan de eigen atleten (wedstrijden/uitslag_import.py).
 
 Vereist: pip install requests beautifulsoup4 curl_cffi
 """
 
-import argparse
-import difflib
-import json
 import re
-import sys
-from collections import Counter
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from datetime import date
-from pathlib import Path
 from urllib.parse import unquote, urljoin
 
 import requests
 from bs4 import BeautifulSoup, Tag
 
-try:                                    # als pakket: from src.importers import atletieknu_wedstrijd
-    from .base import (Importer, ImportFout, clean, filter_atleten, filter_team,
-                       filter_vereniging, lopers_lijst, to_number, write_csv)
-except ImportError:                     # als script: python atletieknu_wedstrijd.py ...
-    from base import (Importer, ImportFout, clean, filter_atleten, filter_team,  # type: ignore
-                      filter_vereniging, lopers_lijst, to_number, write_csv)
+from .base import Importer, ImportFout, clean, to_number
 
 BASIS_URL = "https://www.atletiek.nu"
 UITSLAGEN_URL = BASIS_URL + "/wedstrijd/uitslagen/{id}/"
@@ -342,10 +321,6 @@ def parse_onderdeel_pagina(html: str, url: str, wedstrijd: Wedstrijd) -> list[Ui
     return uitslagen
 
 
-# --------------------------------------------------------------------------- filteren
-# filter_vereniging, filter_team en filter_atleten komen uit base.py.
-
-
 # --------------------------------------------------------------------------- importer
 
 TE_VEEL_RE = re.compile(r"<title>\s*Too many requests", re.I)
@@ -353,8 +328,8 @@ TE_VEEL_RE = re.compile(r"<title>\s*Too many requests", re.I)
 
 class AtletiekNuWedstrijdImporter(Importer):
     """
-    Wedstrijduitslagen van atletiek.nu. parse(bron) geeft (Wedstrijd, [Uitslag, ...]) terug,
-    ongefilterd; filter daarna met filter_vereniging / filter_team / filter_atleten.
+    Wedstrijduitslagen van atletiek.nu. parse(bron) geeft (Wedstrijd, [Uitslag, ...]) terug:
+    alle uitslagen van de wedstrijd, van iedereen.
     """
 
     bron = "atletieknu"
@@ -362,20 +337,15 @@ class AtletiekNuWedstrijdImporter(Importer):
     url_patronen = (r"atletiek\.nu/wedstrijd/(uitslagen|uitslagenonderdeel|main)/\d+",)
     pauze = 1.0               # atletiek.nu blokkeert tijdelijk bij te veel snelle verzoeken
     imiteer_browser = "chrome"  # atletiek.nu blokkeert de Python-bibliotheek requests
+    echte_inhoud = ("deelnemerstabel", "pageTitle")
+    browsercontrole_uitleg = ("Open de onderdeelpagina's in je browser, sla ze op (Ctrl+S, 'Alleen HTML') in één map\n"
+                              "en importeer die map.")
     max_pogingen = 6
     opnieuw_bij_status = (429,)
 
     def moet_wachten(self, resp: requests.Response) -> bool:
         # Na ±10 snelle verzoeken een 'Too many requests'-pagina, soms met status 200!
         return super().moet_wachten(resp) or bool(TE_VEEL_RE.search(resp.text))
-
-    def controleer_pagina(self, html: str, url: str) -> None:
-        # atletiek.nu toont soms een "Checking your browser"-pagina aan scripts.
-        if "Checking your browser" in html and "deelnemerstabel" not in html and "pageTitle" not in html:
-            raise ImportFout(
-                f"atletiek.nu gaf een browsercontrole-pagina terug voor {url}.\n"
-                "Open de onderdeelpagina's in je browser, sla ze op (Ctrl+S, 'Alleen HTML') in één map\n"
-                "en importeer die map.")
 
     def parse(self, bron: str) -> tuple[Wedstrijd, list[Uitslag]]:
         """
@@ -411,113 +381,3 @@ class AtletiekNuWedstrijdImporter(Importer):
         for link in links:
             uitslagen += parse_onderdeel_pagina(self.haal_op(link), link, wedstrijd)
         return wedstrijd, uitslagen
-
-
-# Functie-interface (zoals vóór de klasse), voor scripts en bestaande code.
-
-def laad_uitslagen(bron: str, log=print) -> tuple[Wedstrijd, list[Uitslag]]:
-    return AtletiekNuWedstrijdImporter(log=log).parse(bron)
-
-
-can_handle = AtletiekNuWedstrijdImporter.can_handle
-
-
-def parse(url: str) -> tuple[Wedstrijd, list[Uitslag]]:
-    """Alle uitslagen van de wedstrijd (ongefilterd); filter daarna met filter_vereniging/filter_atleten."""
-    return AtletiekNuWedstrijdImporter().parse(url)
-
-
-# --------------------------------------------------------------------------- uitvoer
-
-def print_overzicht(uitslagen: list[Uitslag]) -> None:
-    per_atleet: dict[str, list[Uitslag]] = {}
-    for u in uitslagen:
-        if not u.estafette:
-            per_atleet.setdefault(u.atleet, []).append(u)
-    for naam, rijen in per_atleet.items():
-        team = f" - {rijen[0].team}" if rijen[0].team else ""
-        print(f"\n{naam} - {rijen[0].vereniging} - {rijen[0].categorie}{team}")
-        for u in rijen:
-            spec = f" ({u.specificatie})" if u.specificatie else ""
-            wind = f" [{u.wind}]" if u.wind else ""
-            extra = f"  {u.record}" if u.record else ""
-            pos = f"#{u.positie}" if u.positie else ""
-            print(f"  {u.onderdeel + spec:<32} {u.prestatie:>9}{wind:<12} {pos:<4}{extra}")
-
-    estafettes = [u for u in uitslagen if u.estafette]
-    if estafettes:
-        print("\nEstafettes")
-        for u in estafettes:
-            pos = f"#{u.positie}" if u.positie else ""
-            print(f"  {u.atleet:<32} {u.prestatie:>9}             {pos}")
-            print(f"    lopers: {u.lopers or '(onbekend)'}")
-
-
-def main() -> None:
-    ap = argparse.ArgumentParser(description="Importeer wedstrijduitslagen van atletiek.nu")
-    ap.add_argument("bron", help="wedstrijd-id, uitslagen-URL, onderdeel-URL, HTML-bestand of map")
-    wie = ap.add_mutually_exclusive_group(required=True)
-    wie.add_argument("--vereniging", help="alle atleten van deze vereniging, bv. 'Nijmegen Atletiek'")
-    wie.add_argument("--team", help="alle uitslagen van één competitieteam, bv. 'Nijmegen Heren 1'")
-    wie.add_argument("--atleten", nargs="+", metavar="NAAM", help="namen van atleten (tussen aanhalingstekens)")
-    wie.add_argument("--atleten-bestand", metavar="TXT", help="tekstbestand met één atleetnaam per regel")
-    wie.add_argument("--alles", action="store_true", help="alle uitslagen, zonder filter")
-    ap.add_argument("--csv", default="uitslagen.csv", help="pad voor CSV (standaard uitslagen.csv)")
-    ap.add_argument("--json", help="optioneel pad voor JSON-uitvoer {'wedstrijd': {...}, 'uitslagen': [...]}")
-    args = ap.parse_args()
-
-    try:
-        wedstrijd, alle = laad_uitslagen(args.bron)
-    except ImportFout as fout:
-        sys.exit(str(fout))
-    if not alle:
-        sys.exit("Geen uitslagen gevonden.")
-
-    if args.alles:
-        uitslagen = alle
-    elif args.vereniging:
-        uitslagen = filter_vereniging(alle, args.vereniging)
-        if not uitslagen:
-            clubs = sorted({u.vereniging for u in alle if u.vereniging})
-            tips = difflib.get_close_matches(args.vereniging, clubs, n=5, cutoff=0.3)
-            sys.exit(f"Geen atleten van '{args.vereniging}' gevonden."
-                     + (f" Bedoel je: {', '.join(tips)}?" if tips else f"\nVerenigingen: {', '.join(clubs)}"))
-    elif args.team:
-        uitslagen = filter_team(alle, args.team)
-        if not uitslagen:
-            teams = sorted({u.team for u in alle if u.team})
-            if not teams:
-                sys.exit("Deze wedstrijd heeft geen teams (alleen bij teamwedstrijden zoals competities).")
-            tips = difflib.get_close_matches(args.team, teams, n=5, cutoff=0.3)
-            sys.exit(f"Geen team '{args.team}' gevonden."
-                     + (f" Bedoel je: {', '.join(tips)}?" if tips else f"\nTeams: {', '.join(teams)}"))
-    else:
-        namen = args.atleten or Path(args.atleten_bestand).read_text(encoding="utf-8").splitlines()
-        uitslagen, ontbrekend = filter_atleten(alle, namen)
-        for naam in ontbrekend:
-            tips = difflib.get_close_matches(naam, sorted({u.atleet for u in alle}), n=3, cutoff=0.6)
-            print(f"Let op: geen uitslagen voor '{naam}'" + (f" (bedoel je {', '.join(tips)}?)" if tips else ""))
-
-    rows = [asdict(u) for u in uitslagen]
-    write_csv(args.csv, rows, Uitslag.__dataclass_fields__)
-    print_overzicht(uitslagen)
-
-    print(f"\n{wedstrijd.naam} - {wedstrijd.plaats} - {wedstrijd.datum}"
-          + (f" t/m {wedstrijd.einddatum}" if wedstrijd.einddatum != wedstrijd.datum else ""))
-    print("Uitslagen per onderdeel:")
-    for (ond, spec), n in Counter((u.onderdeel, u.specificatie) for u in uitslagen).items():
-        print(f"  {ond + (f' ({spec})' if spec else ''):<32} {n:>4}")
-    n_atleten = len({u.atleet for u in uitslagen if not u.estafette})
-    n_estafettes = sum(u.estafette for u in uitslagen)
-    print(f"{len(uitslagen)} uitslagen van {n_atleten} atleten"
-          + (f" (waarvan {n_estafettes} estafettes)" if n_estafettes else "")
-          + f" geschreven naar {args.csv}")
-
-    if args.json:
-        data = {"wedstrijd": asdict(wedstrijd), "uitslagen": rows}
-        Path(args.json).write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
-        print(f"JSON geschreven naar {args.json}")
-
-
-if __name__ == "__main__":
-    main()

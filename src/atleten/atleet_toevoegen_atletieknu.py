@@ -2,12 +2,6 @@
 Voeg een atleet toe aan personen.db (als hij er nog niet in staat) en importeer
 al zijn prestaties van atletiek.nu in prestaties.db.
 
-Gebruik (vanuit de map AVS):
-    python src/atleten/atleet_toevoegen_atletieknu.py Jan Vries -t de 123456
-    python src/atleten/atleet_toevoegen_atletieknu.py Jan Jansen https://www.atletiek.nu/atleet/profiel/123456/
-    python src/atleten/atleet_toevoegen_atletieknu.py Jan Jansen 123456 --html profiel.html
-    python src/atleten/atleet_toevoegen_atletieknu.py          # vraagt alles zelf
-
 Werkwijze:
   1. Staat er al een atleet met dit atletiek.nu-id?        -> die wordt gebruikt.
   2. Staat er een atleet met dezelfde naam zónder id?       -> na bevestiging krijgt
@@ -24,21 +18,15 @@ Vereist: pip install requests beautifulsoup4 curl_cffi sqlcipher3-wheels keyring
 
 from __future__ import annotations
 
-import argparse
-import sys
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Callable, Literal
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-
-from atleten import beheer  # noqa: E402
-from atleten.importeer_atletieknu import importeer  # noqa: E402
-from atleten.koppelen import normaliseer  # noqa: E402
-from db.queries import Opslag  # noqa: E402
-from importers.atletieknu_prs import AtletiekNuPRImporter, atleet_id_uit, parse_results  # noqa: E402
-from importers.base import ImportFout  # noqa: E402
-from models import GESLACHTEN, Atleet  # noqa: E402
+from atleten import beheer
+from atleten.importeer_atletieknu import importeer
+from db.queries import Opslag
+from importers.atletieknu_prs import AtletiekNuPRImporter, atleet_id_uit, parse_results
+from importers.base import ImportFout
+from models import Atleet
 
 Status = Literal["bestond", "id_toegevoegd", "nieuw"]
 
@@ -129,95 +117,3 @@ def voeg_toe(db: Opslag, voornaam: str, achternaam: str, bron: str, *,
                                          tussenvoegsel=tussenvoegsel, **gegevens)
     nieuw, bekend, overgeslagen = importeer(db, atleet.master_id, resultaten)
     return Uitkomst(atleet, status, nieuw, bekend, overgeslagen)
-
-
-# --------------------------------------------------------------------------- opdrachtregel
-
-def _vraag(tekst: str, verplicht: bool = True) -> str:
-    while True:
-        antwoord = input(f"{tekst}: ").strip()
-        if antwoord or not verplicht:
-            return antwoord
-        print("  Dit is verplicht.")
-
-
-def _bevestig_via_toetsenbord(altijd_ja: bool) -> Callable[[Atleet], bool]:
-    def bevestig(kandidaat: Atleet) -> bool:
-        extra = ", ".join(str(x) for x in (kandidaat.geboortejaar, kandidaat.club) if x)
-        beschrijving = f"{kandidaat.naam}" + (f" ({extra})" if extra else "")
-        if altijd_ja:
-            print(f"Bestaande atleet zonder atletiek.nu-id gevonden: {beschrijving}; id wordt toegevoegd.")
-            return True
-        if not sys.stdin.isatty():
-            raise SystemExit(f"Er bestaat al een atleet {beschrijving} zonder atletiek.nu-id. "
-                             "Draai opnieuw met --ja om het id aan deze atleet toe te voegen, "
-                             "of met --nieuw om toch een nieuwe atleet te maken.")
-        antwoord = input(f"Er bestaat al een atleet {beschrijving} zonder atletiek.nu-id.\n"
-                         "Is dit dezelfde persoon? [j/n]: ").strip().lower()
-        return antwoord in ("j", "ja", "y", "yes")
-    return bevestig
-
-
-def main() -> int:
-    parser = argparse.ArgumentParser(
-        description="Voeg een atleet toe (als die nog niet bestaat) en importeer zijn prestaties van atletiek.nu.")
-    parser.add_argument("voornaam", nargs="?")
-    parser.add_argument("achternaam", nargs="?", help="achternaam zonder tussenvoegsel")
-    parser.add_argument("bron", nargs="?", help="atletiek.nu-id of link naar het profiel (PR-pagina)")
-    parser.add_argument("-t", "--tussenvoegsel", help="bv. 'de', 'van der'")
-    parser.add_argument("--html", metavar="BESTAND",
-                        help="opgeslagen profielpagina gebruiken i.p.v. ophalen (bij een browsercontrole)")
-    parser.add_argument("--geslacht", choices=GESLACHTEN)
-    parser.add_argument("--geboortedatum", help="'YYYY-MM-DD' of alleen 'YYYY'")
-    parser.add_argument("--club")
-    keuze = parser.add_mutually_exclusive_group()
-    keuze.add_argument("--ja", action="store_true",
-                       help="bestaande atleet met dezelfde naam (zonder id) zonder vragen gebruiken")
-    keuze.add_argument("--nieuw", action="store_true",
-                       help="altijd een nieuwe atleet maken als het id nog niet bekend is")
-    parser.add_argument("--map", type=Path, help="map met de databases (standaard data/)")
-    args = parser.parse_args()
-
-    if not args.voornaam:                       # zonder argumenten: alles vragen
-        args.voornaam = _vraag("Voornaam")
-        args.tussenvoegsel = _vraag("Tussenvoegsel (leeg laten als er geen is)", verplicht=False)
-        args.achternaam = _vraag("Achternaam")
-    elif not args.achternaam:
-        args.achternaam = _vraag("Achternaam")
-    if not args.bron:
-        args.bron = _vraag("atletiek.nu-id of link naar het profiel")
-
-    try:
-        atletieknu_id = atletieknu_id_uit(args.bron)
-        html = laad_profiel(atletieknu_id, args.html)
-    except (ValueError, ImportFout) as fout:
-        print(fout, file=sys.stderr)
-        return 1
-
-    bevestig = None if args.nieuw else _bevestig_via_toetsenbord(args.ja)
-    try:
-        with Opslag(map=args.map) as db:
-            u = voeg_toe(db, args.voornaam, args.achternaam, atletieknu_id, tussenvoegsel=args.tussenvoegsel,
-                         html=html, bevestig=bevestig, geslacht=args.geslacht,
-                         geboortedatum=args.geboortedatum, club=args.club)
-            aantal_prs = len(db.prs(u.atleet.master_id))
-    except ValueError as fout:
-        print(fout, file=sys.stderr)
-        return 1
-
-    if u.status == "bestond":
-        opgegeven = Atleet(args.voornaam.strip(), args.achternaam.strip(), tussenvoegsel=args.tussenvoegsel).naam
-        print(f"{u.atleet.naam} stond al in de database met atletiek.nu-id {atletieknu_id}.")
-        if normaliseer(opgegeven) != normaliseer(u.atleet.naam):
-            print(f"  Let op: opgegeven naam was '{opgegeven}'. Controleer of het id klopt.")
-    elif u.status == "id_toegevoegd":
-        print(f"atletiek.nu-id {atletieknu_id} toegevoegd aan bestaande atleet {u.atleet.naam}.")
-    else:
-        print(f"Nieuwe atleet aangemaakt: {u.atleet.naam}.")
-    print(f"Prestaties: {u.nieuw} nieuw, {u.bekend} stonden er al, "
-          f"{u.overgeslagen} overgeslagen (DNF/DNS e.d.). PR's: {aantal_prs}")
-    return 0
-
-
-if __name__ == "__main__":
-    sys.exit(main())
