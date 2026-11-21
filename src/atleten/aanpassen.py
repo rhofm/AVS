@@ -87,7 +87,7 @@ def opslaan(db: Opslag, master_id: str, invoer: NieuweAtleetInvoer, *, actief: b
         voornaam=invoer.voornaam, achternaam=invoer.achternaam, tussenvoegsel=invoer.tussenvoegsel,
         geslacht=invoer.geslacht, geboortedatum=invoer.geboortedatum, club=invoer.club,
         atletieknu_id=invoer.atletieknu_id, specialisatie=invoer.specialisatie, actief=actief,
-        notities=atleet.notities, au_licentienummer=invoer.au_licentienummer, master_id=master_id, aangemaakt_op=atleet.aangemaakt_op,
+        au_licentienummer=invoer.au_licentienummer, master_id=master_id, aangemaakt_op=atleet.aangemaakt_op,
     )
     velden = [naam for veld, naam in VELDNAMEN.items() if getattr(atleet, veld) != getattr(nieuw, veld)]
     if velden:

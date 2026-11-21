@@ -191,31 +191,32 @@ class Opslag:
             voornaam=r["voornaam"], tussenvoegsel=r["tussenvoegsel"], achternaam=r["achternaam"],
             geslacht=r["geslacht"],
             geboortedatum=r["geboortedatum"], club=r["club"], atletieknu_id=r["atletieknu_id"],
-            specialisatie=r["specialisatie"], actief=bool(r["actief"]), notities=r["notities"],
+            specialisatie=r["specialisatie"], actief=bool(r["actief"]),
             au_licentienummer=r["au_licentienummer"],
             master_id=r["master_id"], aangemaakt_op=r["aangemaakt_op"],
         )
 
     def atleet_opslaan(self, a: Atleet) -> Atleet:
-        """Nieuwe atleet toevoegen of een bestaande bijwerken. Een nieuwe atleet krijgt een master_id."""
+        """Nieuwe atleet toevoegen of een bestaande bijwerken. Een nieuwe atleet krijgt een master_id.
+        De oude kolom atleet.notities wordt niet meer gebruikt (notities staan in notities.db)."""
         nieuw = a.master_id is None
         if nieuw:
             a.master_id = nieuw_master_id()
         with self.personen:
             self.personen.execute(
                 """INSERT INTO atleet (master_id, voornaam, tussenvoegsel, achternaam, geslacht,
-                                       geboortedatum, club, atletieknu_id, specialisatie, actief, notities,
+                                       geboortedatum, club, atletieknu_id, specialisatie, actief,
                                        au_licentienummer)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                    ON CONFLICT (master_id) DO UPDATE SET
                        voornaam = excluded.voornaam, tussenvoegsel = excluded.tussenvoegsel,
                        achternaam = excluded.achternaam,
                        geslacht = excluded.geslacht, geboortedatum = excluded.geboortedatum,
                        club = excluded.club, atletieknu_id = excluded.atletieknu_id,
                        specialisatie = excluded.specialisatie, actief = excluded.actief,
-                       notities = excluded.notities, au_licentienummer = excluded.au_licentienummer""",
+                       au_licentienummer = excluded.au_licentienummer""",
                 (a.master_id, a.voornaam, a.tussenvoegsel, a.achternaam, a.geslacht, a.geboortedatum,
-                 a.club, a.atletieknu_id, a.specialisatie, int(a.actief), a.notities, a.au_licentienummer),
+                 a.club, a.atletieknu_id, a.specialisatie, int(a.actief), a.au_licentienummer),
             )
         if nieuw:
             self._vergeet_pseudoniemen()

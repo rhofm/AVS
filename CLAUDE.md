@@ -258,6 +258,9 @@ it only holds `.gitkeep`).
   by it: no code uses them any more and they are always empty. They stay because
   the baseline schema is frozen; never write to them, and drop them only in a
   migration.
+- The old column `atleet.notities` in `personen.db` is unused and always empty
+  (notes live in `notities.db`); it stays because the baseline is frozen. Never
+  write to it.
 - Notes (`notities.db`) are free text: the pseudonym protects the link to the
   athlete, but not what is written in the text. Only the encryption protects
   that. Keep notes factual, no diagnoses, and don't name other athletes.
@@ -383,8 +386,11 @@ it only holds `.gitkeep`).
 
 - Every importer implements the shared interface in `importers/base.py`:
   `can_handle(url)` and `parse(url)`.
-- `importers/detect.py` picks the importer automatically by trying each
-  `can_handle(url)` until one matches. Register new importers there.
+- Every `Importer` subclass with a `bron` registers itself (`__init_subclass__`).
+  The app picks the importer it needs itself; `importers/detect.py`
+  (`kies_importer`) tries each `can_handle(url)` and its tests check that every
+  kind of link is claimed by exactly one importer. A new importer module must be
+  imported in `detect.py`, so those tests see it.
 - The atletiek.nu timetable importer (`importers/atletieknu_tijdschema.py`)
   reads `/wedstrijd/chronoloog/<id>/`; any meet link or id works. Duration only
   exists when the page has the timeline tab ('visueel'); otherwise it stays
