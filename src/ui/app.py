@@ -40,7 +40,7 @@ from atleten import trainingsschema as schemabeheer
 from atleten import prs_importeren as prs_import
 from atleten.aanwezigheid import aanwezigheid
 import instellingen
-from db.init_db import (HERSTEL_UITLEG, InstallatieFout, OvernameFout, SleutelFout, herstel,
+from db.init_db import (HERSTEL_UITLEG, InstallatieFout, OntbrekendeDatabase, OvernameFout, SleutelFout, herstel,
                         herstelsleutel_als_hij_past, hoofdsleutel, in_groepjes, init_db, oude_data_overnemen,
                         standaard_map)
 from db.queries import OnvolledigVerwijderd, Opslag, OpslagFout
@@ -86,7 +86,7 @@ ATLEET_BINNENKORT: dict[str, str] = {
 #: Pagina's die ook werken als de databases niet open kunnen (bijv. sleutel kwijt):
 #: daar zet de gebruiker de herstelsleutel terug. Ze gebruiken geen database.
 ZONDER_DATABASE = frozenset({"static", "instellingen_pagina", "instellingen_opslaan", "sleutel_herstellen",
-                             "levend", "weg", "afsluiten"})
+                             "levend", "weg", "afsluiten", "lege_databases"})
 #: Tekens van leven van de pagina's zelf (ui/levensduur.py); tellen niet als 'gewoon' verzoek.
 LEVENSTEKENS = frozenset({"levend", "weg"})
 
@@ -128,7 +128,8 @@ def _ui_map() -> Path:
 
 
 def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfout: str | None = None,
-             sleutelfout: bool = True, bewaker: Bewaker | None = None) -> Flask:
+             sleutelfout: bool = True, bewaker: Bewaker | None = None,
+             ontbrekend: list[str] | None = None) -> Flask:
     """Maak de Flask-app.
 
     map / hoofd: databasemap en sleutel; None = de normale (data/ en de sleutelkluis).
@@ -137,6 +138,8 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
                  Instellingen (ZONDER_DATABASE), waar de sleutel kan worden hersteld.
     sleutelfout: True als startfout over de sleutel gaat (dan een knop 'Sleutel herstellen');
                  False bij bijv. een onvolledige installatie (InstallatieFout).
+    ontbrekend:  bij OntbrekendeDatabase de ontbrekende databases: de foutpagina biedt dan
+                 'Toch leeg beginnen' aan (POST /databases/leeg-beginnen).
     bewaker:     stopt AVS als er geen pagina meer open is (ui/levensduur.py); None = nooit
                  vanzelf stoppen (tests). Kan ook later in app.config["AVS_BEWAKER"] worden gezet.
     """
@@ -147,6 +150,7 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
     app.config["AVS_HOOFD"] = hoofd             # None = bij het eerste gebruik uit de sleutelkluis (hoofd_uit_geheugen())
     app.config["AVS_STARTFOUT"] = startfout     # wordt None na 'Sleutel herstellen'
     app.config["AVS_STARTFOUT_SLEUTEL"] = sleutelfout
+    app.config["AVS_ONTBREKEND"] = ontbrekend or None
     app.config["AVS_BEWAKER"] = bewaker
     registreer_filters(app.jinja_env)
 
@@ -196,8 +200,12 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
     def controleer_start():
         fout = app.config["AVS_STARTFOUT"]
         if fout and request.endpoint not in ZONDER_DATABASE:
-            return render_template("fout.html", titel="AVS kan niet starten", tekst=fout,
-                                   sleutel_herstellen=app.config["AVS_STARTFOUT_SLEUTEL"]), 500
+            return _startfoutpagina()
+
+    def _startfoutpagina(extra_fout: str | None = None, status: int = 500):
+        return render_template("fout.html", titel="AVS kan niet starten", tekst=app.config["AVS_STARTFOUT"],
+                               sleutel_herstellen=app.config["AVS_STARTFOUT_SLEUTEL"],
+                               ontbrekend=app.config["AVS_ONTBREKEND"], extra_fout=extra_fout), status
 
     @app.before_request
     def instellingen_laden():
@@ -1721,6 +1729,12 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
         try:
             herstel(request.form.get("herstelsleutel", ""), app.config["AVS_MAP"])
             init_db(app.config["AVS_MAP"], hoofd_uit_geheugen())     # databases bijwerken met de (nu bewaarde) sleutel
+        except OntbrekendeDatabase as e:
+            # De sleutel staat er nu wel; er ontbreekt nog een bestand: die foutpagina met zijn knop.
+            app.config.update(AVS_STARTFOUT=str(e), AVS_STARTFOUT_SLEUTEL=False, AVS_ONTBREKEND=e.ontbrekend)
+            r = redirect("/")
+            r.headers["Cache-Control"] = "no-store"
+            return r
         except (SleutelFout, InstallatieFout) as e:
             pagina, status = _instellingenpagina(instellingen.actief(), sleutel_fout=f"Niet hersteld: {e}",
                                                  status=400)
@@ -1731,6 +1745,28 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
         r = redirect(url_for("instellingen_pagina"))
         r.headers["Cache-Control"] = "no-store"
         return r
+
+    @app.post("/databases/leeg-beginnen")
+    def lege_databases():
+        """Knop op de foutpagina bij OntbrekendeDatabase: de ontbrekende databases bewust leeg opnieuw
+        aanmaken. Alleen met het vinkje 'zeker', en alleen de databases die toen ontbraken."""
+        ontbrekend = app.config["AVS_ONTBREKEND"]
+        if not ontbrekend:
+            return redirect("/")
+        if request.form.get("zeker") != "1":
+            return _startfoutpagina("Vink eerst aan dat je weet dat de gegevens in dit bestand weg zijn.", 400)
+        try:
+            init_db(app.config["AVS_MAP"], app.config["AVS_HOOFD"], lege_toestaan=ontbrekend)
+        except OntbrekendeDatabase as e:          # er is intussen nog iets anders weg
+            app.config.update(AVS_STARTFOUT=str(e), AVS_ONTBREKEND=e.ontbrekend)
+            return _startfoutpagina()
+        except (SleutelFout, InstallatieFout) as e:
+            app.config.update(AVS_STARTFOUT=str(e), AVS_ONTBREKEND=None,
+                              AVS_STARTFOUT_SLEUTEL=isinstance(e, SleutelFout))
+            return _startfoutpagina()
+        app.config.update(AVS_STARTFOUT=None, AVS_ONTBREKEND=None, AVS_AANGEVULD_OP=None)
+        flash("Opnieuw begonnen met " + ", ".join(f"een lege {d}.db" for d in ontbrekend) + ".")
+        return redirect(url_for("atleten"))
 
     @app.post("/instellingen/sleutel/tonen")
     def herstelsleutel_tonen():
@@ -1983,6 +2019,7 @@ def start(map: Path | None = None, browser: bool = True) -> None:
     """Databases klaarzetten, de server starten en de browser openen."""
     startfout = None
     sleutelfout = True
+    ontbrekend = None
     try:
         if map is None:
             oude_data_overnemen()           # eenmalig: data/ naast de .exe -> %LOCALAPPDATA%\AVS\data
@@ -1991,9 +2028,11 @@ def start(map: Path | None = None, browser: bool = True) -> None:
         startfout, sleutelfout = str(e), False
     except SleutelFout as e:
         startfout = str(e) if HERSTEL_UITLEG in str(e) else f"{e}\n\n{HERSTEL_UITLEG}"
+    except OntbrekendeDatabase as e:        # foutpagina met de knop 'toch leeg beginnen'
+        startfout, sleutelfout, ontbrekend = str(e), False, e.ontbrekend
     except InstallatieFout as e:
         startfout, sleutelfout = str(e), False
-    app = maak_app(map=map, startfout=startfout, sleutelfout=sleutelfout)
+    app = maak_app(map=map, startfout=startfout, sleutelfout=sleutelfout, ontbrekend=ontbrekend)
     poort = _vrije_poort()
     adres = f"http://{HOST}:{poort}/"
     # Eén gebruiker op één computer: één thread is genoeg en houdt SQLCipher eenvoudig.

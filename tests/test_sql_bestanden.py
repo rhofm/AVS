@@ -185,7 +185,7 @@ def test_leeg_bestand_is_niet_te_oud(sql_kopie, tmp_path):
     data = tmp_path / "data"
     _stil(init_db, data, hoofd=TESTSLEUTEL)
     db_init.db_pad("notities", data).unlink()
-    verbind("notities", data, TESTSLEUTEL).close()  # lege, versleutelde database
+    verbind("notities", data, TESTSLEUTEL, aanmaken=True).close()  # lege, versleutelde database
     _stil(init_db, data, hoofd=TESTSLEUTEL)
     assert _versie(data, "notities") == db_init.basisversie("notities")
 
@@ -218,7 +218,7 @@ def test_start_bij_installatiefout(monkeypatch, tmp_path):
     def nep_init_db(map=None, hoofd=None):
         raise InstallatieFout("AVS is niet volledig geïnstalleerd: test.")
 
-    def nep_maak_app(map=None, hoofd=None, startfout=None, sleutelfout=True):
+    def nep_maak_app(map=None, hoofd=None, startfout=None, sleutelfout=True, ontbrekend=None):
         gezien.update(startfout=startfout, sleutelfout=sleutelfout)
         raise SystemExit                            # geen echte server starten
 

@@ -168,7 +168,13 @@ is), or `$AVS_DATA` when that environment variable is set. On the first frozen
 start with an empty data folder, `oude_data_overnemen()` copies a `data/`
 folder next to the `.exe` (copy only, never overwrite, all-or-nothing; on
 failure `OvernameFout` and no `init_db()`, so no empty databases appear). The
-Instellingen page shows the data folder. Never hard-code `data/` elsewhere. The files:
+Instellingen page shows the data folder. Empty databases are only created when
+the folder has none at all (first start): if some exist and one is missing (lost,
+not copied), `init_db()` raises `OntbrekendeDatabase` and creates nothing; the
+error page offers 'Toch leeg beginnen' (checkbox, `POST /databases/leeg-beginnen`
+→ `init_db(lege_toestaan=...)`). A database added in a later AVS version goes in
+`init_db.NIEUW_NA_BASIS`, so existing installations get it silently. `verbind()`
+never creates a file (only `aanmaken=True`, used by `init_db()`). Never hard-code `data/` elsewhere. The files:
 
 | File             | Contents | Athlete identified by |
 |------------------|----------|-----------------------|

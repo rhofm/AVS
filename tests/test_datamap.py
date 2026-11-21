@@ -168,7 +168,7 @@ def _start_met(monkeypatch, init_db_stub):
     from ui import app as app_mod
     gezien = {}
 
-    def nep_maak_app(map=None, hoofd=None, startfout=None, sleutelfout=True):
+    def nep_maak_app(map=None, hoofd=None, startfout=None, sleutelfout=True, ontbrekend=None):
         gezien.update(startfout=startfout, sleutelfout=sleutelfout)
         raise SystemExit
 

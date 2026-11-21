@@ -11,7 +11,7 @@ import tempfile
 from datetime import date
 from pathlib import Path
 
-from db.init_db import init_db, pseudoniem
+from db.init_db import OntbrekendeDatabase, init_db, pseudoniem
 from db.queries import Opslag, OpslagFout
 from models import (
     PR, heeft_windmeting, Absentie, Atleet, Groep, Inschrijving,
@@ -245,13 +245,16 @@ def test_trainingsschema():
         assert pseudoniem(anna.master_id, "testen", TESTSLEUTEL) not in refs
 
 
-def test_bestaande_installatie_krijgt_trainingsschema():
-    """Wie al drie databases heeft, krijgt trainingsschema.db erbij met dezelfde sleutel."""
+def test_bestaande_installatie_zonder_trainingsschema():
+    """trainingsschema.db kwam er ooit bij en werd toen vanzelf aangemaakt. Sinds de samenvoeging
+    (oktober 2026) heeft elke installatie hem: ontbreekt hij nu, dan is hij verloren en komt er
+    alleen bewust een lege (zie tests/test_ontbrekende_database.py)."""
     with tempfile.TemporaryDirectory() as tmp:
         with contextlib.redirect_stdout(io.StringIO()):
             init_db(Path(tmp), hoofd=TESTSLEUTEL)
-            (Path(tmp) / "trainingsschema.db").unlink()   # zoals vóór deze database bestond
-            init_db(Path(tmp), hoofd=TESTSLEUTEL)
+            (Path(tmp) / "trainingsschema.db").unlink()
+            _verwacht(OntbrekendeDatabase, lambda: init_db(Path(tmp), hoofd=TESTSLEUTEL))
+            init_db(Path(tmp), hoofd=TESTSLEUTEL, lege_toestaan=["trainingsschema"])
         with Opslag(map=Path(tmp), hoofd=TESTSLEUTEL) as db:
             anna = db.atleet_opslaan(Atleet("Anna", "Voorbeeld"))
             db.trainingsschema_opslaan(Trainingsschema.met_dagen(anna.master_id, ["woensdag"]))

@@ -57,9 +57,14 @@ weigert dat. De basisschema's zelf zijn bevroren: tests/test_basisschema.py
 vergelijkt ze met tests/fixtures/basisschema.json. Een schemawijziging is dus
 altijd een nieuwe migratie.
 
-Een bestaande database wordt nooit gewist. Komt er een nieuwe database bij
-(zoals trainingsschema.db), dan maakt dit script hem bij de volgende start aan
-met de bestaande hoofdsleutel.
+Een bestaande database wordt nooit gewist. Een lege database wordt alleen
+vanzelf aangemaakt als er nog géén databases zijn (eerste start). Ontbreekt er
+één terwijl de andere er wel zijn (verloren, of niet meegekopieerd), dan weigert
+init_db() met OntbrekendeDatabase: anders zouden bijv. alle prestaties stil
+verdwenen lijken. Alleen met lege_toestaan (knop op de foutpagina) komt er dan
+toch een lege. Komt er in een nieuwe versie van AVS een nieuwe database bij, zet
+hem dan in NIEUW_NA_BASIS: die mag bij een bestaande installatie ontbreken en
+wordt dan vanzelf aangemaakt met de bestaande hoofdsleutel.
 
 Vereist: pip install sqlcipher3-wheels keyring
 
@@ -94,6 +99,7 @@ import shutil
 import sys
 from contextlib import closing
 from pathlib import Path
+from typing import Iterable
 
 import sqlcipher3
 
@@ -115,6 +121,10 @@ DATABASES = ("personen", "prestaties", "testen", "trainingsschema", "absentie", 
              "notities")
 # Databases waarin een atleet als pseudoniem staat (personen.db gebruikt master_id).
 GEPSEUDONIMISEERD = ("prestaties", "testen", "trainingsschema", "absentie", "leerdoelscores", "notities")
+#: Databases die na de samenvoeging van oktober 2026 zijn bijgekomen: die mogen bij een bestaande
+#: installatie nog ontbreken en worden dan vanzelf (leeg) aangemaakt. Alle andere ontbrekende
+#: databases zijn verloren of niet meegekopieerd: zie OntbrekendeDatabase.
+NIEUW_NA_BASIS: frozenset[str] = frozenset()
 
 KEYRING_DIENST = "AVS"
 KEYRING_NAAM = "hoofdsleutel"
@@ -138,6 +148,23 @@ class OvernameFout(RuntimeError):
 class InstallatieFout(RuntimeError):
     """Bestanden van AVS zelf ontbreken of passen niet bij de databases (onvolledige build,
     of een oudere AVS dan de databases). Heeft niets met de sleutel te maken."""
+
+
+class OntbrekendeDatabase(InstallatieFout):
+    """Er staan databases in de datamap, maar niet allemaal: een bestand is verloren of niet
+    meegekopieerd. AVS maakt er niet stil een lege voor (dan lijken de gegevens weg); de
+    gebruiker zet het bestand terug of kiest bewust voor een lege (init_db(lege_toestaan=...))."""
+
+    def __init__(self, map: Path, ontbrekend: list[str]) -> None:
+        self.map = map
+        self.ontbrekend = list(ontbrekend)
+        bestanden = ", ".join(f"{d}.db" for d in self.ontbrekend)
+        super().__init__(
+            f"In de map {map} ontbreekt {bestanden}. De andere bestanden van AVS staan er wel, dus "
+            "dit bestand is waarschijnlijk verloren gegaan of niet meegekopieerd.\n\n"
+            "Heb je een reservekopie? Zet het bestand dan terug in die map en start AVS opnieuw.\n"
+            "Is het echt kwijt, dan kan AVS opnieuw beginnen met een leeg bestand; de gegevens "
+            "die daarin stonden zijn dan weg.")
 
 
 class SleutelkluisFout(InstallatieFout):
@@ -321,14 +348,21 @@ def db_pad(database: str, map: Path | None = None) -> Path:
     return (Path(map) if map else standaard_map()) / f"{database}.db"
 
 
-def verbind(database: str, map: Path | None = None, hoofd: str | bytes | None = None) -> sqlcipher3.Connection:
+def verbind(database: str, map: Path | None = None, hoofd: str | bytes | None = None, *,
+            aanmaken: bool = False) -> sqlcipher3.Connection:
     """Open een versleutelde database met foreign keys aan en rijen als dict-achtige objecten.
 
     database: een naam uit DATABASES, bijv. 'personen' of 'absentie'.
     hoofd:    alleen voor tests; normaal komt de sleutel uit de sleutelkluis.
+    aanmaken: alleen init_db(): maak het bestand als het er niet is. Anders geeft een ontbrekend
+              bestand een InstallatieFout, in plaats van stil een lege database.
     """
     pad = db_pad(database, map)
-    pad.parent.mkdir(parents=True, exist_ok=True)
+    if not pad.exists():
+        if not aanmaken:
+            raise InstallatieFout(f"{pad.name} ontbreekt in {pad.parent}. Start AVS opnieuw; "
+                                  "dan legt AVS uit wat je kunt doen.")
+        pad.parent.mkdir(parents=True, exist_ok=True)
     hoofd = _naar_bytes(hoofd) if hoofd is not None else hoofdsleutel()
     db_sleutel = _afgeleid(hoofd, f"versleuteling:{database}").hex()
 
@@ -484,7 +518,7 @@ def _controleer_versies(map: Path, hoofd: bytes) -> None:
 def _init_een(database: str, map: Path | None, hoofd: bytes) -> int:
     # closing(): `with conn` alleen commit, maar sluit de verbinding niet. Op Windows
     # blijft het bestand dan open (en vergrendeld) tot de garbage collector langskomt.
-    with closing(verbind(database, map, hoofd)) as conn, conn:
+    with closing(verbind(database, map, hoofd, aanmaken=True)) as conn, conn:
         versie = huidige_versie(conn)
 
         if versie == 0:
@@ -503,11 +537,25 @@ def _init_een(database: str, map: Path | None, hoofd: bytes) -> int:
     return versie
 
 
-def init_db(map: Path | None = None, hoofd: str | bytes | None = None) -> Path:
+def ontbrekende_databases(map: Path | None = None) -> list[str]:
+    """Databases die er niet zijn terwijl er wel andere zijn (en die niet in NIEUW_NA_BASIS staan).
+    Leeg bij een volledige map én bij een lege map (eerste start)."""
+    map = Path(map) if map else standaard_map()
+    bestaand = {db for db in DATABASES if db_pad(db, map).exists()}
+    if not bestaand:
+        return []
+    return [db for db in DATABASES if db not in bestaand and db not in NIEUW_NA_BASIS]
+
+
+def init_db(map: Path | None = None, hoofd: str | bytes | None = None, *,
+            lege_toestaan: Iterable[str] = ()) -> Path:
     """Maak de databases aan en/of breng ze naar de nieuwste versie. Geeft de map terug.
 
     hoofd: alleen voor tests; normaal komt de sleutel uit de sleutelkluis en
     wordt hij bij de allereerste start aangemaakt.
+    lege_toestaan: ontbrekende databases die bewust leeg opnieuw mogen beginnen (de knop op de
+    foutpagina). Ontbreekt er een andere terwijl er wel databases zijn: OntbrekendeDatabase,
+    en er wordt niets aangemaakt.
     """
     controleer_sql_bestanden()                  # eerst: zonder SQL-bestanden niets aanraken
     map = Path(map) if map else standaard_map()
@@ -525,7 +573,12 @@ def init_db(map: Path | None = None, hoofd: str | bytes | None = None) -> Path:
             )
         hoofd = hoofdsleutel(aanmaken=True)
 
+    # Eerst de versies: een installatie van vóór de samenvoeging mist misschien een database die
+    # toen nog niet bestond; die moet 'start eerst de vorige AVS' horen, niet 'bestand verloren'.
     _controleer_versies(map, hoofd)
+    ontbrekend = [db for db in ontbrekende_databases(map) if db not in set(lege_toestaan)]
+    if ontbrekend:
+        raise OntbrekendeDatabase(map, ontbrekend)
     for database in DATABASES:
         versie = _init_een(database, map, hoofd)
         print(f"{database}.db up-to-date: versie {versie}")
