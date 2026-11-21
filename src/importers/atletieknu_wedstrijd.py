@@ -366,7 +366,7 @@ class AtletiekNuWedstrijdImporter(Importer):
             wedstrijd = parse_wedstrijd(html, url)
             return wedstrijd, parse_onderdeel_pagina(html, url, wedstrijd)
 
-        wid = bron if bron.isdigit() else wedstrijd_id_uit_url(bron)
+        wid = bron if bron.isdecimal() else wedstrijd_id_uit_url(bron)
         if not wid:
             raise ImportFout(f"Kan geen wedstrijd-id halen uit '{bron}'.")
         url = UITSLAGEN_URL.format(id=wid)

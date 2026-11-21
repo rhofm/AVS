@@ -254,7 +254,7 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
     def atleten():
         groep = request.args.get("groep", "")
         o = atletenoverzicht(db(), zoek=request.args.get("q", ""), categorie=request.args.get("cat", ""),
-                             groep_id=int(groep) if groep.isdigit() else None,
+                             groep_id=int(groep) if groep.isdecimal() else None,
                              ook_inactief=request.args.get("alle") == "1")
         meldingen = get_flashed_messages()
         return render_template("atleten.html", o=o, melding=meldingen[0] if meldingen else None,
@@ -549,7 +549,7 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
         k = periodisering.kopieerpagina(db(), groep_id)
         if k is None:
             abort(404)
-        gekozen = [int(x) for x in request.form.getlist("groep") if x.isdigit()]
+        gekozen = [int(x) for x in request.form.getlist("groep") if x.isdecimal()]
         fasen, cycli = request.form.get("fasen") == "1", request.form.get("cycli") == "1"
         fout, bevestigen = None, []
         if request.method == "POST":
@@ -577,7 +577,7 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
 
     def _roosterpagina(groep_id: int, fout: str | None = None, status: int = 200):
         keuze = request.args.get("rooster", "")
-        p = roosterbeheer.roosterpagina(db(), groep_id, rooster_id=int(keuze) if keuze.isdigit() else None)
+        p = roosterbeheer.roosterpagina(db(), groep_id, rooster_id=int(keuze) if keuze.isdecimal() else None)
         if p is None:
             abort(404)
         meldingen = get_flashed_messages()
@@ -612,7 +612,7 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
     def rooster_wijzigen(rooster_id: int):
         r = db().rooster(rooster_id)
         groep_id = request.form.get("groep", "")
-        if r is None or not groep_id.isdigit():
+        if r is None or not groep_id.isdecimal():
             abort(404)
         try:
             r, n = roosterbeheer.rooster_wijzigen(db(), rooster_id, request.form.get("naam", ""),
@@ -626,7 +626,7 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
     @app.route("/rooster/<int:rooster_id>/regel", methods=["GET", "POST"])
     def rooster_regel(rooster_id: int):
         a = request.values
-        groep_id = int(a["groep"]) if a.get("groep", "").isdigit() else None
+        groep_id = int(a["groep"]) if a.get("groep", "").isdecimal() else None
         try:
             f = roosterbeheer.regelformulier(db(), rooster_id, a.get("week"), a.get("dag"), a.get("tijd"),
                                              groep_id=groep_id)
@@ -1012,7 +1012,7 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
                                melding=meldingen[0] if meldingen else None), status
 
     def _regel_id(waarde: str | None) -> int | None:
-        return int(waarde) if waarde and waarde.isdigit() else None
+        return int(waarde) if waarde and waarde.isdecimal() else None
 
     @app.get("/wedstrijd/<int:wedstrijd_id>/inschrijven")
     def wedstrijd_inschrijven(wedstrijd_id: int):
@@ -1022,14 +1022,14 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
     def wedstrijd_inschrijven_opslaan(wedstrijd_id: int):
         regel_id = _regel_id(request.form.get("regel"))
         atleten, onderdelen = request.form.getlist("atleet"), request.form.getlist("onderdeel")
-        groepen = {int(k[6:]): v for k, v in request.form.items() if k.startswith("groep-") and k[6:].isdigit()}
+        groepen = {int(k[6:]): v for k, v in request.form.items() if k.startswith("groep-") and k[6:].isdecimal()}
         try:
             aantal = wedstrijddetail.inschrijven_uit_formulier(db(), wedstrijd_id, atleten, onderdelen, groepen)
         except OpslagFout as e:
             if db().wedstrijd(wedstrijd_id) is None:
                 abort(404)
             return _inschrijfpagina(wedstrijd_id, regel_id, fout=str(e), status=400,
-                                    onderdelen=[int(o) for o in onderdelen if o.isdigit()],
+                                    onderdelen=[int(o) for o in onderdelen if o.isdecimal()],
                                     gekozen=[m for m in atleten if db().atleet(m)])
         namen = [o.naam for o in db().onderdelen() if str(o.id) in onderdelen]
         wat = f"voor {', '.join(namen)}" if namen else "(onderdelen volgen nog)"
@@ -1045,7 +1045,7 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
         onderdeel = request.form.get("onderdeel", "")
         try:
             tekst = wedstrijddetail.groep_kiezen(db(), wedstrijd_id, request.form.get("atleet", ""),
-                                                 int(onderdeel) if onderdeel.isdigit() else -1,
+                                                 int(onderdeel) if onderdeel.isdecimal() else -1,
                                                  request.form.get("groep", ""))
         except OpslagFout as e:
             if db().wedstrijd(wedstrijd_id) is None:
@@ -1059,7 +1059,7 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
         onderdeel = request.form.get("onderdeel", "")
         try:
             tekst = wedstrijddetail.afmelden(db(), wedstrijd_id, request.form.get("atleet", ""),
-                                             int(onderdeel) if onderdeel.isdigit() else None)
+                                             int(onderdeel) if onderdeel.isdecimal() else None)
         except OpslagFout as e:
             if db().wedstrijd(wedstrijd_id) is None:
                 abort(404)
@@ -1425,7 +1425,7 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
 
     def _groep_of_none(groep_id: str | None):
         """De groep uit ?groep=... (waar je vandaan kwam), of None als die niet bestaat."""
-        return db().groep(int(groep_id)) if groep_id and groep_id.isdigit() else None
+        return db().groep(int(groep_id)) if groep_id and groep_id.isdecimal() else None
 
     def _herkomst(bron):
         """(atleet, groep) uit ?atleet=/?groep= of de verborgen velden; hoogstens één van de twee."""
@@ -1604,7 +1604,7 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
             gevraagd = request.args.get("groep", "")
             keuze = groep_importeren.Groepkeuze(
                 "bestaand" if groepen else "nieuw",
-                int(gevraagd) if gevraagd.isdigit() else None,
+                int(gevraagd) if gevraagd.isdecimal() else None,
                 seizoen=groepsbeheer.huidig_seizoen(date.today()))
         return render_template(
             "groep_importeren.html", rijen=groep_importeren.aangevuld(rijen or []), kolommen=groep_importeren.KOLOMMEN,

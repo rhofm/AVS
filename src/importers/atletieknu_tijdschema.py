@@ -97,7 +97,7 @@ def groep_uit(startgroep: str) -> tuple[str, int | None]:
     if not m:
         return startgroep, None
     w = m.group(1)
-    groep = int(w) if w.isdigit() else ord(w.upper()) - ord("A") + 1
+    groep = int(w) if w.isdecimal() else ord(w.upper()) - ord("A") + 1
     rest = clean(GROEP_RE.sub(" ", startgroep, count=1))
     return rest, groep
 
@@ -199,7 +199,7 @@ class AtletiekNuTijdschemaImporter(AtletiekNuWedstrijdImporter):
         if self.is_lokaal(bron):
             url, html = self.lees_bestanden(bron)[0]
             return parse_tijdschema(html, url)
-        wid = bron if str(bron).isdigit() else wedstrijd_id_uit_url(bron)
+        wid = bron if str(bron).isdecimal() else wedstrijd_id_uit_url(bron)
         if not wid:
             raise ImportFout(f"Kan geen wedstrijd-id halen uit '{bron}'.")
         url = TIJDSCHEMA_URL.format(id=wid)

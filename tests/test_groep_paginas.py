@@ -159,6 +159,8 @@ def test_routes():
             # Elke link op deze pagina werkt.
             for link in sorted(set(re.findall(r'href="(/(?:groep|atleet|training)/[^"]*)"', r.get_data(as_text=True)))):
                 assert c.get(link).status_code == 200, (pad, link)
+        aw_html = c.get(f"/groep/{gid}/aanwezigheid").get_data(as_text=True)
+        assert re.search(r">(ma|di|wo|do|vr|za|zo)<br>\d{1,2} [a-z]{3}</a></th>", aw_html)   # 'di<br>13 okt'
         ld_html = c.get(f"/groep/{gid}/leerdoelen").get_data(as_text=True)
         assert "sorteerbaar" in ld_html and ld_html.count('class="sorteer"') >= 3 and 'data-eerst="af"' in ld_html
         assert "/static/sorteer.js" in ld_html and c.get("/static/sorteer.js").status_code == 200

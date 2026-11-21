@@ -138,7 +138,7 @@ def parse_tijdschema(html: str, url: str = "") -> tuple[Wedstrijd, list[Tijdsche
 
 def details_id(bron: str) -> str:
     """Wedstrijd-id uit een id of een Seltec-link ('/Details/19133/2' -> '19133')."""
-    if str(bron).isdigit():
+    if str(bron).isdecimal():
         return str(bron)
     return wedstrijd_id_uit_url(bron)
 

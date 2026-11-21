@@ -130,7 +130,7 @@ def lees_geslacht(tekst: str) -> str | None:
 def lees_atletieknu_id(tekst: str) -> str:
     """Nummer uit '123456' of een profiel-link. '' als er geen nummer in staat."""
     tekst = tekst.strip()
-    if re.fullmatch(r"\d+(\.0)?", tekst):               # Excel maakt er soms '123456.0' van
+    if re.fullmatch(r"[0-9]+(\.0)?", tekst):            # Excel maakt er soms '123456.0' van
         return tekst.split(".")[0]
     return atleet_id_uit(tekst)
 
@@ -145,7 +145,7 @@ def lees_licentienummer(tekst: str) -> str | None:
         t = t[:-2]
     if not t:
         return None
-    if not t.isdigit():
+    if not (t.isascii() and t.isdecimal()):
         raise ValueError(f"onbekend AU-licentienummer {tekst.strip()!r}; alleen cijfers.")
     return t
 

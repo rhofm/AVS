@@ -130,7 +130,7 @@ def _uren_minuten(hhmm: str | None) -> tuple[int, int] | None:
     if not hhmm:
         return None
     delen = str(hhmm).strip().split(":")
-    if len(delen) < 2 or not all(x.isdigit() for x in delen[:2]):
+    if len(delen) < 2 or not all(x.isdecimal() for x in delen[:2]):
         return None
     u, m = int(delen[0]), int(delen[1])
     if not (0 <= u <= 23 and 0 <= m <= 59):

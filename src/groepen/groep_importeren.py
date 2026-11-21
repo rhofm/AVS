@@ -162,7 +162,7 @@ class Groepkeuze:
 def lees_groepkeuze(formulier: Mapping[str, str]) -> Groepkeuze:
     soort = "nieuw" if formulier.get("groepsoort") == "nieuw" else "bestaand"
     groep = (formulier.get("groep_id") or "").strip()
-    return Groepkeuze(soort, int(groep) if groep.isdigit() else None,
+    return Groepkeuze(soort, int(groep) if groep.isdecimal() else None,
                       " ".join((formulier.get("groepnaam") or "").split()),
                       " ".join((formulier.get("seizoen") or "").split()))
 

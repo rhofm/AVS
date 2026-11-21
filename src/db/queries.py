@@ -248,10 +248,12 @@ class Opslag:
         return op_naam(self._atleet(r) for r in self.personen.execute(sql))
 
     def atleten_zoeken(self, tekst: str, alleen_actief: bool = False) -> list[Atleet]:
-        """Zoek op (een deel van) de volledige naam, hoofdletterongevoelig."""
-        patroon = f"%{tekst.strip()}%"
+        """Zoek op (een deel van) de volledige naam, hoofdletterongevoelig. '%' en '_' in de tekst
+        zijn gewone tekens, geen jokers."""
+        letterlijk = tekst.strip().replace("!", "!!").replace("%", "!%").replace("_", "!_")
+        patroon = f"%{letterlijk}%"
         sql = ("SELECT * FROM atleet "
-               "WHERE (voornaam || ' ' || COALESCE(tussenvoegsel || ' ', '') || achternaam) LIKE ?")
+               "WHERE (voornaam || ' ' || COALESCE(tussenvoegsel || ' ', '') || achternaam) LIKE ? ESCAPE '!'")
         if alleen_actief:
             sql += " AND actief = 1"
         return op_naam(self._atleet(r) for r in self.personen.execute(sql, (patroon,)))
@@ -331,6 +333,11 @@ class Opslag:
                          bron=r["bron"], bron_url=r["bron_url"], id=r["id"], indoor=bool(r["indoor"]),
                          einddatum=_naar_datum(r["einddatum"]))
 
+    def wedstrijd_op_link(self, bron_url: str) -> Wedstrijd | None:
+        """De wedstrijd met deze (genormaliseerde) link, of None. bron_url is uniek."""
+        r = self.prestaties_db.execute("SELECT * FROM wedstrijd WHERE bron_url = ?", (bron_url,)).fetchone()
+        return self._wedstrijd(r) if r else None
+
     def wedstrijd_opslaan(self, w: Wedstrijd) -> Wedstrijd:
         """Toevoegen of bijwerken. Een wedstrijd met dezelfde bron_url wordt hergebruikt,
         zodat dezelfde link twee keer importeren geen dubbele wedstrijd oplevert.
@@ -339,11 +346,9 @@ class Opslag:
         er al stonden krijgen de nieuwe waarde (indoor telt altijd voor een PR).
         """
         if w.id is None and w.bron_url:
-            r = self.prestaties_db.execute(
-                "SELECT id FROM wedstrijd WHERE bron_url = ?", (w.bron_url,)
-            ).fetchone()
-            if r:
-                w.id = r[0]
+            bestaand = self.wedstrijd_op_link(w.bron_url)
+            if bestaand is not None:
+                w.id = bestaand.id
         with self.prestaties_db:
             waarden = (w.naam, _naar_tekst(w.datum), w.locatie, w.bron, w.bron_url, int(w.indoor),
                        _naar_tekst(w.einddatum))

@@ -127,14 +127,14 @@ def lees_formulier(db: Opslag, form: Mapping, *, peildatum: date | None = None,
         except ValueError:
             fouten["geboortedatum"] = "Vul een geldige geboortedatum in (niet in de toekomst)."
     elif jaar_tekst:
-        if jaar_tekst.isdigit() and 1900 <= int(jaar_tekst) <= vandaag.year:
+        if jaar_tekst.isdecimal() and 1900 <= int(jaar_tekst) <= vandaag.year:
             geboortedatum = jaar_tekst
         else:
             fouten["geboortejaar"] = f"Vul een geboortejaar in tussen 1900 en {vandaag.year}."
 
     atletieknu_id = _schoon(form.get("atletieknu_id"))
     if atletieknu_id is not None:
-        if not atletieknu_id.isdigit():
+        if not (atletieknu_id.isascii() and atletieknu_id.isdecimal()):
             fouten["atletieknu_id"] = "Het atletiek.nu-id bestaat alleen uit cijfers."
         else:
             bestaand = db.atleet_op_atletieknu_id(atletieknu_id)
@@ -143,7 +143,7 @@ def lees_formulier(db: Opslag, form: Mapping, *, peildatum: date | None = None,
 
     licentie = "".join(str(form.get("au_licentienummer") or "").split()) or None   # '12 34 567' -> '1234567'
     if licentie is not None:
-        if not licentie.isdigit():
+        if not (licentie.isascii() and licentie.isdecimal()):
             fouten["au_licentienummer"] = "Het AU-licentienummer bestaat alleen uit cijfers."
         else:
             bestaand = db.atleet_op_au_licentienummer(licentie)
@@ -153,7 +153,7 @@ def lees_formulier(db: Opslag, form: Mapping, *, peildatum: date | None = None,
     groep_ids: list[int] = []
     bekend = {g.id for g in db.groepen()}
     for g in lijst("groep"):
-        if not str(g).isdigit() or int(g) not in bekend:
+        if not str(g).isdecimal() or int(g) not in bekend:
             fouten["groep"] = "Een van de gekozen groepen bestaat niet (meer)."
             break
         groep_ids.append(int(g))

@@ -96,7 +96,7 @@ def site_van(bron: str, wedstrijd: Wedstrijd | None = None) -> str:
     if Importer.is_lokaal(bron):
         html = Importer.lees_bestanden(bron)[0][1]
         return "seltec" if "roundlisttimetable" in html else "atletieknu"
-    if tekst.isdigit():
+    if tekst.isdecimal():
         return "seltec" if wedstrijd and bron_uit_link(wedstrijd.bron_url) == "seltec" else "atletieknu"
     if "atletiek.nu/wedstrijd/" in tekst:
         return "atletieknu"
@@ -228,9 +228,7 @@ def wedstrijd_uit_link(db: Opslag, bron: str, indoor: bool = False,
     bron_wedstrijd, regels = _ophalen(bron, None, importer)
     link = _link_van(bron, bron_wedstrijd)
 
-    bestaand = None
-    if link:
-        bestaand = next((w for w in db.wedstrijden() if w.bron_url == link), None)
+    bestaand = db.wedstrijd_op_link(link) if link else None
     if bestaand is not None:
         return NieuweWedstrijd(bestaand, _opslaan(db, bestaand, bron_wedstrijd, regels), True)
 

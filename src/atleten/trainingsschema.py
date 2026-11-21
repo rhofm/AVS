@@ -161,7 +161,7 @@ def lees_trainingen(formulier) -> dict[str, set[tuple[int, str]]]:
     for d in DAGEN:
         for waarde in lijst(TRAINING_VELD + d):
             gid, _, tijd = str(waarde).partition("|")
-            if not gid.isdigit() or not tijd:
+            if not gid.isdecimal() or not tijd:
                 raise OpslagFout("Ongeldige keuze van een training.")
             uit.setdefault(d, set()).add((int(gid), tijd))
     return uit

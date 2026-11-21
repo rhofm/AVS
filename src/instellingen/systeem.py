@@ -35,7 +35,7 @@ def _register(naam: str) -> str | None:
 def eerste_weekdag() -> int:
     """0 = maandag … 6 = zondag."""
     waarde = _register("iFirstDayOfWeek")
-    if waarde is not None and waarde.strip().isdigit() and 0 <= int(waarde) <= 6:
+    if waarde is not None and waarde.strip().isdecimal() and 0 <= int(waarde) <= 6:
         return int(waarde)
     return STANDAARD_EERSTE_WEEKDAG
 

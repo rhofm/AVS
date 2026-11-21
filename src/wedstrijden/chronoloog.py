@@ -20,6 +20,7 @@ Geen SQL: alles via `Opslag`.
 
 from __future__ import annotations
 
+from collections import Counter
 from dataclasses import dataclass, field
 from datetime import date
 from itertools import combinations
@@ -95,8 +96,11 @@ class SchemaRegel:
     @property
     def sleutel(self) -> tuple:
         """Regels met dezelfde sleutel zijn alternatieven (groep 1 of 2): de atleet doet er één."""
-        r = self.regel
-        return (r.onderdeel_id or r.onderdeel_tekst, r.categorie or "", r.ronde, r.datum)
+        return _sleutel(self.regel)
+
+
+def _sleutel(r: ProgrammaOnderdeel) -> tuple:
+    return (r.onderdeel_id or r.onderdeel_tekst, r.categorie or "", r.ronde, r.datum)
 
 
 def _schema(regels: list[ProgrammaOnderdeel], onderdelen: set[int] | Mapping[int, str | None],
@@ -116,12 +120,8 @@ def _schema(regels: list[ProgrammaOnderdeel], onderdelen: set[int] | Mapping[int
         if past is False:
             continue
         gekozen.append((r, past is True))
-    per_sleutel: dict[tuple, int] = {}
-    for r, _ in gekozen:
-        k = (r.onderdeel_id, r.categorie or "", r.ronde, r.datum)
-        per_sleutel[k] = per_sleutel.get(k, 0) + 1
-    return [SchemaRegel(r, zeker, per_sleutel[(r.onderdeel_id, r.categorie or "", r.ronde, r.datum)] > 1)
-            for r, zeker in gekozen]
+    per_sleutel = Counter(_sleutel(r) for r, _ in gekozen)
+    return [SchemaRegel(r, zeker, per_sleutel[_sleutel(r)] > 1) for r, zeker in gekozen]
 
 
 # ============================================================

@@ -356,7 +356,7 @@ def parse_overzicht(html: str, url: str = "", alleen_lijst: str = "") -> tuple[W
 
 def overzicht_url(bron: str) -> str:
     """Wedstrijd-id of willekeurige Seltec-wedstrijd-URL -> URL van het uitslagenoverzicht."""
-    if bron.isdigit():
+    if bron.isdecimal():
         return BASIS_URL + OVERZICHT_PAD.format(id=bron)
     wid = wedstrijd_id_uit_url(bron)
     if not wid:

@@ -7,11 +7,14 @@
 {% macro fout(veld) -%}
   {% if fouten[veld] %}<span class="veld__fout" id="fout-{{ veld }}">{{ fouten[veld] }}</span>{% endif %}
 {%- endmacro %}
-{% macro tekstveld(veld, label, verplicht=false, extra="", hint="") -%}
+{# Altijd autocomplete="off" (namen van kinderen niet in de browser bewaren). #}
+{% macro tekstveld(veld, label, verplicht=false, hint="", autofocus=false, placeholder="", lijst="", numeriek=false) -%}
   <div class="veld{{ ' veld--fout' if fouten[veld] }}">
     <label for="veld-{{ veld }}">{{ label }}{% if verplicht %} <span aria-hidden="true">*</span>{% endif %}</label>
     <input type="text" id="veld-{{ veld }}" name="{{ veld }}" value="{{ f.waarden[veld] }}"{% if verplicht %} required{% endif %}
-           {%- if fouten[veld] %} aria-invalid="true" aria-describedby="fout-{{ veld }}"{% endif %} {{ extra | safe }}>
+           {%- if fouten[veld] %} aria-invalid="true" aria-describedby="fout-{{ veld }}"{% endif %} autocomplete="off"
+           {%- if autofocus %} autofocus{% endif %}{% if placeholder %} placeholder="{{ placeholder }}"{% endif %}
+           {%- if lijst %} list="{{ lijst }}"{% endif %}{% if numeriek %} inputmode="numeric"{% endif %}>
     {% if hint %}<span class="zacht veld__hint">{{ hint }}</span>{% endif %}
     {{ fout(veld) }}
   </div>
@@ -20,9 +23,9 @@
     <section class="blok" aria-labelledby="kop-persoon">
       <h2 class="subkop" id="kop-persoon">Persoonsgegevens</h2>
       <div class="velden">
-        {{ tekstveld("voornaam", "Voornaam", verplicht=true, extra='autocomplete="off" autofocus') }}
-        {{ tekstveld("tussenvoegsel", "Tussenvoegsel", extra='autocomplete="off" placeholder="bijv. van der"') }}
-        {{ tekstveld("achternaam", "Achternaam", verplicht=true, extra='autocomplete="off"') }}
+        {{ tekstveld("voornaam", "Voornaam", verplicht=true, autofocus=true) }}
+        {{ tekstveld("tussenvoegsel", "Tussenvoegsel", placeholder="bijv. van der") }}
+        {{ tekstveld("achternaam", "Achternaam", verplicht=true) }}
       </div>
       <div class="velden">
         <fieldset class="veld keuzerij{{ ' veld--fout' if fouten.geslacht }}">
@@ -51,11 +54,11 @@
     <section class="blok" aria-labelledby="kop-atletiek">
       <h2 class="subkop" id="kop-atletiek">Atletiek</h2>
       <div class="velden">
-        {{ tekstveld("specialisatie", "Specialisatie", extra='list="specialisaties" autocomplete="off"', hint="kies of typ zelf") }}
+        {{ tekstveld("specialisatie", "Specialisatie", lijst="specialisaties", hint="kies of typ zelf") }}
         <datalist id="specialisaties">{% for s in f.specialisaties %}<option value="{{ s }}">{% endfor %}</datalist>
-        {{ tekstveld("atletieknu_id", "atletiek.nu-id", extra='inputmode="numeric" autocomplete="off"', hint="het nummer uit de link van het atletenprofiel; voor het koppelen van uitslagen") }}
-        {{ tekstveld("au_licentienummer", "AU-licentienummer", extra='inputmode="numeric" autocomplete="off"', hint="licentienummer van de Atletiekunie (alleen cijfers)") }}
-        {{ tekstveld("club", "Club", extra='autocomplete="off"', hint="alleen als het een andere club is") }}
+        {{ tekstveld("atletieknu_id", "atletiek.nu-id", numeriek=true, hint="het nummer uit de link van het atletenprofiel; voor het koppelen van uitslagen") }}
+        {{ tekstveld("au_licentienummer", "AU-licentienummer", numeriek=true, hint="licentienummer van de Atletiekunie (alleen cijfers)") }}
+        {{ tekstveld("club", "Club", hint="alleen als het een andere club is") }}
       </div>
     </section>
 

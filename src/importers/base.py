@@ -198,7 +198,7 @@ class Importer(ABC):
                 raise ImportFout(f"{self.site} blijft weigeren (status {resp.status_code}) voor {url}. "
                                  "Probeer het later opnieuw.")
             retry_after = resp.headers.get("Retry-After", "")
-            pauze = float(retry_after) if retry_after.isdigit() else wacht
+            pauze = float(retry_after) if retry_after.isdecimal() else wacht
             print(f"  {self.site} vraagt om rustiger aan te doen - {pauze:.0f} s wachten...", file=sys.stderr)
             time.sleep(pauze)
             wacht *= 2

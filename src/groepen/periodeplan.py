@@ -89,7 +89,7 @@ def formulier(db: Opslag, groep_id: int, *, ingevuld: Mapping[str, str] | None =
 def _aantal(formulier: Mapping[str, str], voorvoegsel: str) -> int:
     """Hoeveel genummerde rijen er in het formulier staan (velden '<voorvoegsel><i>...')."""
     nummers = [int(k[len(voorvoegsel):].split("-")[0]) for k in formulier
-               if k.startswith(voorvoegsel) and k[len(voorvoegsel):].split("-")[0].isdigit()]
+               if k.startswith(voorvoegsel) and k[len(voorvoegsel):].split("-")[0].isdecimal()]
     return max(nummers) + 1 if nummers else 0
 
 

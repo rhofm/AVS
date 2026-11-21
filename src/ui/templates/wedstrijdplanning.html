@@ -39,7 +39,7 @@
           <th scope="col">Datum</th>
           <th scope="col">Wedstrijd</th>
           <th scope="col">Locatie</th>
-          <th scope="col">{{ "Atleten &amp; onderdelen" | safe if planning.groep else "Onderdelen" }}</th>
+          <th scope="col">{{ "Atleten & onderdelen" if planning.groep else "Onderdelen" }}</th>
         </tr>
       </thead>
       <tbody>

@@ -340,7 +340,7 @@ def koppelen(db: Opslag, groep_id: int, formulier: Mapping[str, str], *, peildat
             rooster = db.rooster_opslaan(Rooster(formulier.get("naam", ""), weken))
         except ValueError as e:
             raise OpslagFout(str(e)) from None
-    elif keuze.isdigit() and db.rooster(int(keuze)) is not None:
+    elif keuze.isdecimal() and db.rooster(int(keuze)) is not None:
         rooster = db.rooster(int(keuze))
     else:
         raise OpslagFout("Kies een rooster of maak een nieuw rooster.")

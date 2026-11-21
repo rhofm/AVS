@@ -288,7 +288,7 @@ class AtletiekNuPRImporter(Importer):
         """Accepteert een atleet-id, een profiel-URL of een pad naar een opgeslagen HTML-bestand."""
         if self.is_lokaal(bron):
             return self.lees_bestanden(bron)[0][1]
-        url = PROFILE_URL.format(id=bron) if bron.isdigit() else bron.split("#")[0]
+        url = PROFILE_URL.format(id=bron) if bron.isdecimal() else bron.split("#")[0]
         return self.haal_op(url)
 
     def parse(self, bron: str) -> tuple[str, list[PR], list[Resultaat]]:
@@ -298,7 +298,7 @@ class AtletiekNuPRImporter(Importer):
 
 def atleet_id_uit(bron: str, html: str = "") -> str:
     """atletiek.nu-profiel-id uit een id, URL of (opgeslagen) pagina; '' als onbekend."""
-    if bron.isdigit():
+    if bron.isascii() and bron.isdecimal():
         return bron
-    m = re.search(r"/atleet/profiel/(\d+)", bron) or re.search(r"/atleet/profiel/(\d+)", html or "")
+    m = re.search(r"/atleet/profiel/([0-9]+)", bron) or re.search(r"/atleet/profiel/([0-9]+)", html or "")
     return m.group(1) if m else ""
