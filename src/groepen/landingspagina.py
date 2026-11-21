@@ -85,14 +85,6 @@ class GroepLid:
     def categorie_code(self) -> str | None:
         return categorie_code(self.categorie, self.atleet.geslacht)
 
-    @property
-    def met_groep(self) -> int:
-        return sum(1 for d in self.dagen if d.soort == MET_GROEP)
-
-    @property
-    def elders(self) -> int:
-        return sum(1 for d in self.dagen if d.soort == ELDERS)
-
 
 @dataclass
 class KomendeTraining:
@@ -170,10 +162,6 @@ class GroepLandingspagina:
         volgorde = CATEGORIEEN
         aanwezig = {l.categorie for l in self.leden if l.categorie}
         return [c for c in volgorde if c in aanwezig]
-
-    @property
-    def leerdoelen_beoordeeld(self) -> int:
-        return max((b.beoordeeld for b in self.leerdoelen), default=0)
 
     @property
     def aanwezig_pct(self) -> float | None:

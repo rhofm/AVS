@@ -475,21 +475,6 @@ class Opslag:
         )
         return [PR(master_id, r["onderdeel_id"], r["waarde"]) for r in rijen]
 
-    def prs_van_groep(self, master_ids: Iterable[str], onderdeel_id: int) -> list[PR]:
-        """PR's op één onderdeel voor meerdere atleten, beste eerst. Voor ploeg/vergelijk."""
-        per_ref = {self._ref(m, "prestaties"): m for m in master_ids}
-        if not per_ref:
-            return []
-        rijen = self.prestaties_db.execute(
-            f"""SELECT pr.atleet_ref, pr.waarde, o.lager_is_beter FROM pr
-                JOIN onderdeel o ON o.id = pr.onderdeel_id
-                WHERE pr.onderdeel_id = ? AND pr.atleet_ref IN ({_vraagtekens(len(per_ref))})""",
-            (onderdeel_id, *per_ref),
-        ).fetchall()
-        prs = [PR(per_ref[r["atleet_ref"]], onderdeel_id, r["waarde"]) for r in rijen]
-        lager_beter = bool(rijen[0]["lager_is_beter"]) if rijen else True
-        return sorted(prs, key=lambda pr: pr.waarde, reverse=not lager_beter)
-
     def inschrijving_opslaan(self, i: Inschrijving) -> None:
         if self.wedstrijd(i.wedstrijd_id) is None:
             raise OpslagFout(f"Wedstrijd {i.wedstrijd_id} bestaat niet.")
@@ -915,24 +900,6 @@ class Opslag:
             self.trainingsschema_db.execute("DELETE FROM trainingskeuze WHERE atleet_ref = ?", (ref,))
             self.trainingsschema_db.executemany(
                 "INSERT OR IGNORE INTO trainingskeuze (atleet_ref, dag, groep_id, starttijd) VALUES (?, ?, ?, ?)", rijen)
-
-    def atleten_op_dag(self, dag: str, master_ids: Iterable[str] | None = None) -> list[str]:
-        """master_ids van de atleten die op `dag` ('dinsdag') trainen.
-
-        Met master_ids alleen binnen die atleten (bijv. de leden van een groep).
-        Atleten die niet (meer) in personen.db staan, worden overgeslagen.
-        """
-        dag = dag.lower()
-        if dag not in DAGEN:
-            raise OpslagFout(f"Onbekende dag {dag!r}; kies uit {DAGEN}.")
-        refs = self.trainingsschema_db.execute(
-            f"SELECT atleet_ref FROM trainingsschema WHERE {dag} = 1"  # dag is gecontroleerd tegen DAGEN
-        ).fetchall()
-        ids = [m for m in (self._master_id(r[0], "trainingsschema") for r in refs) if m is not None]
-        if master_ids is not None:
-            binnen = set(master_ids)
-            ids = [m for m in ids if m in binnen]
-        return ids
 
     # ============================================================
     # Groepen, periodisering, trainingen, absentie (personen.db)
@@ -1461,9 +1428,6 @@ class Opslag:
     # Leerdoelscores (leerdoelscores.db), lang formaat:
     # één rij per atleet per leerdoel per datum
     # ============================================================
-    def leerdoelscore_opslaan(self, s: LeerdoelScore) -> None:
-        """Eén score opslaan. Op dezelfde dag opnieuw scoren overschrijft die dag."""
-        self.leerdoelscores_opslaan([s])
 
     def leerdoelscores_opslaan(self, scores: Iterable[LeerdoelScore]) -> None:
         """Meerdere scores in één transactie, bijv. een hele groep na een training."""
@@ -1509,22 +1473,6 @@ class Opslag:
                 for r in self.leerdoelscores_db.execute(
                     "SELECT * FROM laatste_leerdoelscore WHERE atleet_ref = ?",
                     (self._ref(master_id, "leerdoelscores"),))}
-
-    def leerdoelscores_breed(self, master_ids: Iterable[str], leerdoel_ids: Iterable[str] | None = None,
-                             ) -> dict[str, dict[str, int | None]]:
-        """Overzicht in breed formaat voor het scherm: per atleet per leerdoel de laatste score.
-
-        Geeft {master_id: {leerdoel_id: score of None}}. Zonder leerdoel_ids: alle
-        leerdoelen die minstens één van deze atleten een score heeft. Wordt alleen
-        berekend, nooit opgeslagen.
-        """
-        master_ids = list(master_ids)
-        laatste = {m: self.laatste_leerdoelscores(m) for m in master_ids}
-        if leerdoel_ids is None:
-            leerdoel_ids = sorted({lid for scores in laatste.values() for lid in scores})
-        leerdoel_ids = list(leerdoel_ids)
-        return {m: {lid: (laatste[m][lid].score if lid in laatste[m] else None) for lid in leerdoel_ids}
-                for m in master_ids}
 
     # ============================================================
     # Notities (notities.db): vrije tekst per atleet per datum

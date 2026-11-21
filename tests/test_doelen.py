@@ -60,7 +60,7 @@ def _prestatie(db, ids, wie, onderdeel, waarde, datum, *, wedstrijd=None, wind=1
 # ============================================================
 def test_model():
     r = DoelRegel("vrij", omschrijving="  Ploeg haalt 18 000 punten ", onderdeel_id=3, streefwaarde=1)
-    assert (r.omschrijving, r.onderdeel_id, r.streefwaarde, r.voor_groep) == ("Ploeg haalt 18 000 punten", None, None, True)
+    assert (r.omschrijving, r.onderdeel_id, r.streefwaarde, r.atleet_id) == ("Ploeg haalt 18 000 punten", None, None, None)
     for f in (lambda: DoelRegel("snelheid"), lambda: DoelRegel("prestatie", onderdeel_id=1),
               lambda: DoelRegel("leerdoel", leerdoel_id="SPR-U14-01", streefwaarde=6),
               lambda: DoelRegel("leerdoel", leerdoel_id="SPR-U14-01", streefwaarde=2.5),
@@ -192,10 +192,10 @@ def test_status_leerdoel():
             DoelRegel("leerdoel", ids["anna"], leerdoel_id=ld.id, streefwaarde=4)]))
         r = doelbeheer.doelstand(db, d, vandaag=VANDAAG).standen[0]
         assert r.status == "open" and r.wat.startswith(f"{ld.id}: score ≥ 4")
-        db.leerdoelscore_opslaan(LeerdoelScore(ids["anna"], ld.id, 3, VANDAAG + timedelta(5)))
+        db.leerdoelscores_opslaan([LeerdoelScore(ids["anna"], ld.id, 3, VANDAAG + timedelta(5))])
         assert doelbeheer.doelstand(db, d, vandaag=VANDAAG + timedelta(6)).standen[0].resultaat == "score 3"
-        db.leerdoelscore_opslaan(LeerdoelScore(ids["anna"], ld.id, 4, VANDAAG + timedelta(25)))
-        db.leerdoelscore_opslaan(LeerdoelScore(ids["anna"], ld.id, 2, VANDAAG + timedelta(40)))   # na de streefdatum
+        db.leerdoelscores_opslaan([LeerdoelScore(ids["anna"], ld.id, 4, VANDAAG + timedelta(25))])
+        db.leerdoelscores_opslaan([LeerdoelScore(ids["anna"], ld.id, 2, VANDAAG + timedelta(40))])   # na de streefdatum
         r = doelbeheer.doelstand(db, d, vandaag=VANDAAG + timedelta(45)).standen[0]
         assert (r.status, r.resultaat) == ("behaald", "score 4")
 

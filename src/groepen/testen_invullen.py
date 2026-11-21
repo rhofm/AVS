@@ -61,10 +61,6 @@ class InvulPagina:
     rijen: list[InvulRij] = field(default_factory=list)
     vandaag: date = field(default_factory=date.today)
 
-    @property
-    def met_laatste(self) -> int:
-        return sum(1 for r in self.rijen if r.laatste)
-
 
 def invulpagina(db: Opslag, groep: Groep, bibliotheek: Bibliotheek, slug: str | None = None, *,
                 formulier: Mapping[str, str] | None = None, fouten: Mapping[str, str] | None = None,

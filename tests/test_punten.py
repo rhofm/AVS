@@ -194,17 +194,17 @@ def test_eigen_uitgave_uit_andere_map():
         assert pt.punten("t", "100m", "V", 10.0) == 100
 
 
-def test_config_map():
-    assert (config.config_map() / "puntentelling" / "au_2025.yaml").is_file()
+def test_config_mappen():
+    assert (config.config_mappen()[0] / "puntentelling" / "au_2025.yaml").is_file()
     oud_frozen, oud_exe = getattr(sys, "frozen", None), sys.executable
     with tempfile.TemporaryDirectory() as tmp:
         try:
             sys.frozen = True
             sys.executable = str(Path(tmp) / "AVS.exe")
             sys._MEIPASS = str(Path(tmp) / "_intern")
-            assert config.config_map() == Path(tmp) / "_intern" / "config"        # geen map naast de .exe
+            assert config.config_mappen()[0] == Path(tmp) / "_intern" / "config"        # geen map naast de .exe
             (Path(tmp) / "config").mkdir()
-            assert config.config_map() == Path(tmp).resolve() / "config"          # wel: die gaat voor
+            assert config.config_mappen()[0] == Path(tmp).resolve() / "config"          # wel: die gaat voor
         finally:
             sys.executable = oud_exe
             del sys._MEIPASS

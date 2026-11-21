@@ -76,12 +76,6 @@ def zet_actief(db: Opslag, master_id: str, actief: bool) -> Atleet:
     return db.atleet_opslaan(atleet)
 
 
-def zet_specialisatie(db: Opslag, master_id: str, specialisatie: str | None) -> Atleet:
-    atleet = _haal(db, master_id)
-    atleet.specialisatie = specialisatie.strip() if specialisatie and specialisatie.strip() else None
-    return db.atleet_opslaan(atleet)
-
-
 def verwijderen(db: Opslag, master_id: str, *, bevestigd: bool = False) -> None:
     """Verwijder een atleet en AL zijn gegevens uit alle databases (verzoek tot verwijdering).
 

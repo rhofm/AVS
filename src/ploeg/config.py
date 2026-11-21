@@ -42,11 +42,6 @@ def config_mappen() -> list[Path]:
     return [_REPO_ROOT / "config"]
 
 
-def config_map() -> Path:
-    """De map met de hoogste voorrang (voor meldingen). Zoek bestanden met config_bestand()."""
-    return config_mappen()[0]
-
-
 def _leeg(pad: Path) -> bool:
     """Alleen witruimte en #-commentaar (zoals '#This is an empty temporary file')."""
     try:

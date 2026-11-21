@@ -92,7 +92,8 @@ def test_landingspagina():
         assert leden["Anna"].dagen[5].andere_groepen == []                         # zelf / elders
         assert leden["Cas"].dagen[0].soort == "elders" and leden["Cas"].dagen[0].andere_groepen == ["Werpgroep"]
         assert "Werpgroep" in leden["Cas"].dagen[0].uitleg
-        assert (leden["Bram"].met_groep, leden["Bram"].elders) == (2, 0)
+        assert [d.soort for d in leden["Bram"].dagen].count("groep") == 2
+        assert "elders" not in [d.soort for d in leden["Bram"].dagen]
 
         assert [r.wedstrijd.naam for r in lp.wedstrijden] == ["Clubkampioenschappen"]
         assert [d.naam for d in lp.wedstrijden[0].deelnames] == ["Bram Test", "Anna Voorbeeld"]

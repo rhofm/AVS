@@ -17,7 +17,7 @@ from test_ploegen import BESTAND, DAG, JAAR, opslag
 from atleten import beheer
 from models import Atleet, Inzet, Ploeg, PloegLid, Prestatie
 from ploeg import estafettes, opstelling, punten, regels, strategieen, vergelijk
-from ploeg.config import config_map
+from ploeg.config import config_mappen
 from ploeg.optimaliseer import optimaliseer
 from ploeg.vergelijk import Cel, Matrix, Rij
 from ploeg.voorspeller import Beentijd
@@ -32,7 +32,7 @@ def _p(onderdeel: str, waarde: float, geslacht: str = "V") -> int:
 
 
 def _ruw(bestand: str = BESTAND) -> dict:
-    return yaml.safe_load((config_map() / "ploeg_regels" / f"{bestand}.yaml").read_text(encoding="utf-8"))
+    return yaml.safe_load((config_mappen()[0] / "ploeg_regels" / f"{bestand}.yaml").read_text(encoding="utf-8"))
 
 
 # ------------------------------------------------------------
