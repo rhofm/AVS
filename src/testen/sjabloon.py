@@ -30,12 +30,13 @@ from __future__ import annotations
 import os
 import re
 import tempfile
-import unicodedata
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Sequence
 
 import yaml
+
+from teksthulp import slug
 
 from .formule import Formule, FormuleFout
 
@@ -249,9 +250,7 @@ def _netjes(x: float) -> float | int:
 # ====================================================================== bestanden
 def maak_slug(naam: str) -> str:
     """Bestandsnaam voor een testnaam: 'Hoogspringen staand' -> 'hoogspringen_staand'."""
-    s = unicodedata.normalize("NFKD", naam).encode("ascii", "ignore").decode().lower()
-    s = re.sub(r"[^a-z0-9]+", "_", s).strip("_")
-    return s[:60] or "test"
+    return slug(naam, max_lengte=60, standaard="test")
 
 
 _SLUG = re.compile(r"^[a-z0-9][a-z0-9_-]*$")

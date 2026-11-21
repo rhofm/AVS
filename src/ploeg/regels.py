@@ -15,7 +15,7 @@ Gebruik:
     regels.controleer_dag({"U14-V A": leden_a, "U16-V": leden_b})      # 10.10: één ploeg per dag
 
 Categorieën zijn codes als 'U14-V' (vrouwen U14), 'U16-M' (mannen U16) of
-'SEN-V'; maak ze met `categorie_code(leeftijdscategorie, geslacht)`. De
+'SEN-V'; maak ze met `ploegcategorie(leeftijdscategorie, geslacht)`. De
 leeftijdscategorie op de wedstrijddag komt van `atleten.landingspagina.leeftijdscategorie`.
 
 Bij het laden wordt alles gecontroleerd, ook tegen de puntentelling: elk
@@ -31,7 +31,6 @@ from __future__ import annotations
 import re
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
-from functools import lru_cache
 from pathlib import Path
 from typing import Iterable, Literal, Mapping
 
@@ -39,7 +38,7 @@ import yaml
 
 from models.ploeg import Inzet, PloegLid
 from ploeg import punten as _punten
-from ploeg.config import config_bestand, config_bestanden, gezocht_in
+from ploeg.config import config_bestand, config_bestanden, geladen, gezocht_in, lees_yaml
 
 Soort = Literal["loop", "technisch", "estafette"]
 Ernst = Literal["fout", "waarschuwing"]
@@ -67,8 +66,11 @@ class RegelFout(ValueError):
     """Een regelbestand is niet te lezen of klopt niet, of een gevraagde ploeg/wedstrijd bestaat niet."""
 
 
-def categorie_code(leeftijdscategorie: str | None, geslacht: str | None) -> str | None:
-    """'U14' + 'V' -> 'U14-V'; 'Senior' + 'M' -> 'SEN-M'. Onbekend (of geslacht X) -> None."""
+def ploegcategorie(leeftijdscategorie: str | None, geslacht: str | None) -> str | None:
+    """'U14' + 'V' -> 'U14-V'; 'Senior' + 'M' -> 'SEN-M'. Onbekend (of geslacht X) -> None.
+
+    De sleutel van een categorie in de regelbestanden. Voor op het scherm ('U14V', 'SenM')
+    is er atleten.landingspagina.categorie_code."""
     if not leeftijdscategorie or geslacht not in ("M", "V"):
         return None
     leeftijd = "SEN" if leeftijdscategorie.strip().lower() in ("senior", "sen") else leeftijdscategorie.strip().upper()
@@ -662,18 +664,15 @@ def bestanden(map: Path | None = None) -> list[str]:
     return uit
 
 
-@lru_cache(maxsize=16)
-def _laad(pad: str, gewijzigd: int, puntenmap: str | None) -> Regelset:
-    p = Path(pad)
-    try:
-        ruw = yaml.safe_load(p.read_text(encoding="utf-8"))
-    except yaml.YAMLError as e:
-        raise RegelFout(f"{p.name} is geen geldige YAML: {e}") from None
-    return Regelset.uit_dict(ruw, bestand=p.stem, puntenmap=Path(puntenmap) if puntenmap else None)
+def _bouw(pad: Path, puntenmap: str | None) -> Regelset:
+    return Regelset.uit_dict(lees_yaml(pad, RegelFout), bestand=pad.stem,
+                             puntenmap=Path(puntenmap) if puntenmap else None)
 
 
 def laad(bestand: str, map: Path | None = None, puntenmap: Path | None = None) -> Regelset:
-    """Regelset uit `config/ploeg_regels/<bestand>.yaml`. Een aangepast bestand wordt opnieuw gelezen."""
+    """Regelset uit `config/ploeg_regels/<bestand>.yaml`. Opnieuw ingelezen (en dus opnieuw
+    gecontroleerd tegen de puntentelling) zodra het regelbestand of een puntentellingsbestand is
+    gewijzigd. De Regelset wordt gedeeld: nooit veranderen."""
     naam = bestand[:-5] if bestand.endswith(".yaml") else bestand
     if not naam or "/" in naam or "\\" in naam or naam.startswith("."):
         raise RegelFout(f"Ongeldige naam voor een regelbestand: {bestand!r}.")
@@ -681,4 +680,6 @@ def laad(bestand: str, map: Path | None = None, puntenmap: Path | None = None) -
     if pad is None or not pad.is_file():
         waar = pad.parent if pad is not None else gezocht_in("ploeg_regels")
         raise RegelFout(f"Regelbestand {naam}.yaml niet gevonden in {waar}.")
-    return _laad(str(pad), pad.stat().st_mtime_ns, str(puntenmap) if puntenmap else None)
+    punten = (sorted((Path(puntenmap) / "puntentelling").glob("*.yaml")) if puntenmap
+              else config_bestanden("puntentelling"))
+    return geladen(pad, _bouw, str(puntenmap) if puntenmap else None, afhankelijk=punten)

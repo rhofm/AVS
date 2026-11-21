@@ -44,7 +44,7 @@ def test_code_is_m35_v40_en_teksten():
     assert landingspagina.categorie_code("Masters 60", "V") == "V60"
     assert landingspagina.categorie_code("Masters 40", None) == "Masters 40"
     assert landingspagina.categorie_code("Senior", "M") == "SenM"
-    assert landingspagina.geslacht_tekst("V", "Masters 40") == "Vrouw"
+    assert landingspagina.geslacht_tekst("V") == "Vrouw"
     assert landingspagina.categorie_groep("Masters 40", "M") == "mannen"
 
 

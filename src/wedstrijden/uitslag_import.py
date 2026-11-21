@@ -97,7 +97,7 @@ class UitslagVerslag:
 # Hulpfuncties
 # ============================================================
 def _importer_voor(bron: str, w: Wedstrijd) -> Importer:
-    site = bron_uit_link(bron) if not str(bron).isdigit() else (w.bron or "atletieknu")
+    site = bron_uit_link(bron) if not str(bron).isdecimal() else (w.bron or "atletieknu")
     if Importer.is_lokaal(bron):                   # opgeslagen pagina('s): kijk naar de inhoud
         html = Importer.lees_bestanden(bron)[0][1].lower()
         site = "seltec" if "competitions/" in html and "atletiek.nu" not in html else "atletieknu"
@@ -115,7 +115,7 @@ def _onderdeelnaam(u) -> str:
 
 def _geboortejaar(u) -> int | None:
     jaar = getattr(u, "geboortejaar", "") or ""
-    return int(jaar) if str(jaar).isdigit() else None
+    return int(jaar) if str(jaar).isdecimal() else None
 
 
 def _club_botst(a: Atleet, club: str) -> bool:
@@ -135,7 +135,7 @@ class _Onderdelen:
         if naam in self._cache:
             return self._cache[naam]
         code = getattr(u, "onderdeel_code", "") if not (u.specificatie or "") else ""
-        o = self.db.onderdeel(naam) or zoek_onderdeel(self.alle, naam, code if not code.isdigit() else "")
+        o = self.db.onderdeel(naam) or zoek_onderdeel(self.alle, naam, code if not code.isdecimal() else "")
         if o is None:
             eenheid = eenheid_van(naam)
             o = self.db.onderdeel_opslaan(Onderdeel(naam, eenheid, lager_is_beter=(eenheid == "tijd")))
@@ -272,7 +272,7 @@ def uit_formulier(db: Opslag, wedstrijd_id: int, formulier) -> list[TeControlere
     """Terug uit de verborgen velden: sleutels, kandidaat-<sleutel> (master_ids) en prestaties-<sleutel>."""
     uit = []
     for sleutel in formulier.getlist("sleutel"):
-        if not sleutel.startswith("p") or not sleutel[1:].isdigit():
+        if not sleutel.startswith("p") or not sleutel[1:].isdecimal():
             continue
         kandidaten = [a for m in formulier.getlist(f"kandidaat-{sleutel}") if (a := db.atleet(m)) is not None]
         try:

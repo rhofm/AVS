@@ -30,12 +30,11 @@ from __future__ import annotations
 import math
 import re
 from dataclasses import dataclass
-from functools import lru_cache
 from pathlib import Path
 
 import yaml
 
-from ploeg.config import config_bestand, gezocht_in
+from ploeg.config import config_bestand, geladen, gezocht_in, lees_yaml
 
 STANDAARD_UITGAVE = "au_2025"
 
@@ -347,18 +346,6 @@ def _pad(naam: str, map: Path | None) -> Path | None:
     return config_bestand("puntentelling", bestand)
 
 
-def _gewijzigd(pad: Path) -> int:
-    try:
-        return pad.stat().st_mtime_ns
-    except OSError:
-        return 0
-
-
-@lru_cache(maxsize=8)
-def _laad(pad: str, gewijzigd: int) -> Puntentelling:
-    return Puntentelling.uit_bestand(Path(pad))
-
-
 def puntentelling(uitgave: str = STANDAARD_UITGAVE, map: Path | None = None) -> Puntentelling:
     """De puntentelling uit `config/puntentelling/<uitgave>.yaml` (eenmaal ingelezen; een
     aangepast bestand wordt opnieuw gelezen). Zonder `map`: per bestand eerst de map naast
@@ -366,7 +353,7 @@ def puntentelling(uitgave: str = STANDAARD_UITGAVE, map: Path | None = None) -> 
     pad = _pad(uitgave, map)
     if pad is None:
         raise PuntenFout(f"Puntentelling {uitgave}.yaml niet gevonden in {gezocht_in('puntentelling')}.")
-    return _laad(str(pad), _gewijzigd(pad))
+    return geladen(pad, Puntentelling.uit_bestand)
 
 
 def punten(tabel: str, onderdeel: str, geslacht: str, prestatie: float,
@@ -438,14 +425,8 @@ class Leeftijdsfactoren:
         return cls(str(ruw.get("naam", bron)), str(ruw.get("bron", "")), factoren)
 
 
-@lru_cache(maxsize=8)
-def _laad_factoren(pad_tekst: str, gewijzigd: int) -> Leeftijdsfactoren:
-    pad = Path(pad_tekst)
-    try:
-        ruw = yaml.safe_load(pad.read_text(encoding="utf-8"))
-    except yaml.YAMLError as e:
-        raise PuntenFout(f"{pad.name} is geen geldige YAML: {e}") from None
-    return Leeftijdsfactoren.uit_dict(ruw, pad.name)
+def _bouw_factoren(pad: Path) -> Leeftijdsfactoren:
+    return Leeftijdsfactoren.uit_dict(lees_yaml(pad, PuntenFout), pad.name)
 
 
 def leeftijdsfactoren(naam: str, map: Path | None = None) -> Leeftijdsfactoren:
@@ -455,7 +436,7 @@ def leeftijdsfactoren(naam: str, map: Path | None = None) -> Leeftijdsfactoren:
     if pad is None or not pad.is_file():
         waar = pad.parent if pad is not None else gezocht_in("puntentelling")
         raise PuntenFout(f"Bestand met leeftijdsfactoren {naam}.yaml niet gevonden in {waar}.")
-    return _laad_factoren(str(pad), _gewijzigd(pad))
+    return geladen(pad, _bouw_factoren)
 
 
 _TECHNISCH = {"hoogspringen", "polsstokhoogspringen", "verspringen", "hinkstapspringen", "kogelstoten",

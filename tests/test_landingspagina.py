@@ -71,20 +71,16 @@ def test_leeftijdscategorie():
     assert landingspagina.categorie_code("U16", "X") == "U16"
     assert landingspagina.categorie_code("U16", None) == "U16"
     assert landingspagina.categorie_code(None, "V") is None
-    assert landingspagina.geslacht_tekst("V", "U16") == "Vrouw"
-    assert landingspagina.geslacht_tekst("M", "Senior") == "Man"
-    assert landingspagina.geslacht_tekst("V", None) == "Vrouw"
-    assert landingspagina.geslacht_tekst(None, "U16") is None
+    assert landingspagina.geslacht_tekst("V") == "Vrouw"
+    assert landingspagina.geslacht_tekst("M") == "Man"
+    assert landingspagina.geslacht_tekst(None) is None
     assert landingspagina.categorie_groep("U16", "V") == "vrouwen"
     assert landingspagina.categorie_groep("Senior", "M") == "mannen"
     assert landingspagina.categorie_groep("U16", "M") == "mannen"
-    assert landingspagina.geslacht_tekst("M", "U12") == "Man"
-    assert landingspagina.geslacht_tekst("X", "U12") == "X"
+    assert landingspagina.geslacht_tekst("X") == "X"
     assert landingspagina.categorie_groep("U8", "V") == "vrouwen"
     assert landingspagina.categorie_groep("U18", "V") == "vrouwen"
     assert landingspagina.categorie_groep("U20", "M") == "mannen"
-    assert landingspagina.geslacht_tekst("V", "U18") == "Vrouw"
-    assert landingspagina.geslacht_tekst("M", "U20") == "Man"
     assert landingspagina.categorie_code("U18", "V") == "U18V"
     assert landingspagina.fase_van("U12") == "BMO"
     assert landingspagina.fase_van("U16") == "Wedstrijdgericht"
@@ -108,6 +104,25 @@ def test_landingspagina():
             ("Clubkampioenschappen", ["100m", "Verspringen"], 8), ("Indoor Cup", [], 40)]
         assert sorted((r.onderdeel, r.waarde) for r in lp.prs) == [("100m", "13,20"), ("Verspringen", "4,80 m")]
         assert landingspagina.landingspagina(db, "0" * 32) is None
+
+
+def test_deze_week_toont_de_variant_van_de_atleet():
+    """Doet de atleet een afwijkende training (variant), dan staat die op zijn pagina, niet de gewone."""
+    with opslag() as db:
+        mid = voorbeeld(db)
+        bram = beheer.nieuwe_atleet(db, "Bram", "Proef", geslacht="M", geboortedatum="2011")
+        db.trainingsschema_opslaan(Trainingsschema.met_dagen(bram.master_id, ["dinsdag"]))
+        g = db.groepen_van_atleet(mid)[0]
+        g.voeg_toe(bram.master_id)
+        db.groep_opslaan(g)
+        dinsdag = VANDAAG - timedelta(days=VANDAAG.weekday()) + timedelta(days=1)
+        hoofd = next(t for t in db.trainingen(g.id) if t.datum == dinsdag)
+        db.training_opslaan(Training(g.id, dinsdag, "Revalidatie", hoofdtraining_id=hoofd.id, atleten=[mid]))
+
+        anna = landingspagina.landingspagina(db, mid, peildatum=VANDAAG)
+        assert anna.schema[1].gekoppeld == ["U16 sprint – Revalidatie"]
+        bram_lp = landingspagina.landingspagina(db, bram.master_id, peildatum=VANDAAG)
+        assert bram_lp.schema[1].gekoppeld == ["U16 sprint – Startblok"]   # wie de variant niet doet
 
 
 def test_lege_atleet():

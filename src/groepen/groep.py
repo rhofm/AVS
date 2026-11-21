@@ -34,7 +34,7 @@ from datetime import date
 import re
 from typing import Iterable, Mapping
 
-from atleten.landingspagina import DAG_KORT, categorie_code, leeftijdscategorie
+from atleten.landingspagina import DAG_KORT, leeftijdscategorie, MetCategorieCode
 from db.queries import Opslag, OpslagFout
 from instellingen import dagvolgorde, naam_sleutel, tijd as toon_tijd
 from models import DAGEN, Atleet, Groep, Trainingsschema
@@ -48,14 +48,10 @@ _TIJD = re.compile(r"^([01]?\d|2[0-3]):([0-5]\d)$")
 
 
 @dataclass
-class Kandidaat:
+class Kandidaat(MetCategorieCode):
     atleet: Atleet
     categorie: str | None
     andere_groepen: list[str] = field(default_factory=list)
-
-    @property
-    def categorie_code(self) -> str | None:
-        return categorie_code(self.categorie, self.atleet.geslacht)
 
 
 @dataclass

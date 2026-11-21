@@ -39,10 +39,6 @@ class Leerdoel:
         if self.bron not in LEERDOEL_BRONNEN:
             raise ValueError(f"Onbekende bron {self.bron!r}; kies uit {LEERDOEL_BRONNEN}.")
 
-    def geldt_voor(self, categorie: str) -> bool:
-        """Of dit doel bij een atleet in `categorie` hoort (leerlijnen zijn doorlopend)."""
-        return CATEGORIEEN.index(self.categorie) <= CATEGORIEEN.index(categorie)
-
 
 @dataclass(slots=True)
 class LeerdoelScore:

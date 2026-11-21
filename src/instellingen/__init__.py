@@ -26,12 +26,12 @@ from __future__ import annotations
 import json
 import os
 import tempfile
-import unicodedata
 from dataclasses import asdict, dataclass, replace
 from datetime import date, timedelta
 from pathlib import Path
 
 from models import DAGEN
+from teksthulp import plat
 
 from . import systeem
 
@@ -120,14 +120,8 @@ class Instellingen:
         return f"{self.tijd(begin)}–{self.tijd(eind)}"
 
 
-def _plat(tekst: str | None) -> str:
-    """Kleine letters, zonder accenten en dubbele spaties: 'Zoë  ' -> 'zoe'."""
-    tekst = unicodedata.normalize("NFKD", tekst or "")
-    return " ".join("".join(c for c in tekst if not unicodedata.combining(c)).lower().split())
-
-
 def _naam_sleutel(atleet, volgorde: str) -> tuple[str, str, str]:
-    voor, achter, tussen = _plat(atleet.voornaam), _plat(atleet.achternaam), _plat(atleet.tussenvoegsel)
+    voor, achter, tussen = plat(atleet.voornaam), plat(atleet.achternaam), plat(atleet.tussenvoegsel)
     return (voor, achter, tussen) if volgorde == "voornaam" else (achter, voor, tussen)
 
 
@@ -136,7 +130,7 @@ def _uren_minuten(hhmm: str | None) -> tuple[int, int] | None:
     if not hhmm:
         return None
     delen = str(hhmm).strip().split(":")
-    if len(delen) < 2 or not all(x.isdigit() for x in delen[:2]):
+    if len(delen) < 2 or not all(x.isdecimal() for x in delen[:2]):
         return None
     u, m = int(delen[0]), int(delen[1])
     if not (0 <= u <= 23 and 0 <= m <= 59):

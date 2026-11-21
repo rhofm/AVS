@@ -40,6 +40,8 @@ from datetime import date
 from pathlib import Path
 from typing import Iterable, Mapping
 
+import sqlcipher3
+
 from models import (
     DAGEN,
     NEUTRAAL,
@@ -54,9 +56,6 @@ from models import (
     CATEGORIEEN,
     Leerdoel,
     LeerdoelScore,
-    Leerlijn,
-    LeerlijnStap,
-    LeerlijnVoortgang,
     Notitie,
     Onderdeel,
     Fase,
@@ -87,6 +86,30 @@ from .init_db import hoofdsleutel, nieuw_master_id, pseudoniem, verbind
 
 class OpslagFout(ValueError):
     """Iets kan niet worden opgeslagen, bijv. een onbekend onderdeel of een ongekoppelde prestatie."""
+
+
+class OnvolledigVerwijderd(OpslagFout):
+    """Een atleet verwijderen is halverwege mislukt. De atleet staat nog in personen.db, dus
+    nog een keer verwijderen maakt het af (zie Opslag.atleet_verwijderen)."""
+
+    def __init__(self, database: str, fout: Exception) -> None:
+        super().__init__(
+            f"Het verwijderen is niet helemaal gelukt ({database}.db: {fout}). De atleet staat er nog: "
+            "vul de naam opnieuw in en klik nog een keer op Verwijderen om het af te maken.")
+        self.database = database
+
+
+#: Elke tabel met een atleet_ref, per gepseudonimiseerde database. Opslag.atleet_verwijderen()
+#: wist ze allemaal; tests/test_atleet_verwijderen.py faalt als er een tabel met atleet_ref
+#: bijkomt die hier niet staat. (In personen.db gaat alles mee via ON DELETE CASCADE.)
+ATLEET_TABELLEN: dict[str, tuple[str, ...]] = {
+    "prestaties": ("prestatie", "inschrijving", "doel_regel"),
+    "testen": ("testresultaat",),                         # testresultaat_deel gaat mee (CASCADE)
+    "trainingsschema": ("trainingsschema", "trainingskeuze"),
+    "absentie": ("absentie",),
+    "leerdoelscores": ("leerdoelscore",),
+    "notities": ("notitie",),
+}
 
 
 # ============================================================
@@ -141,6 +164,10 @@ class Opslag:
     def __exit__(self, *_) -> None:
         self.sluit()
 
+    def _db(self, database: str) -> sqlcipher3.Connection:
+        """De verbinding met een database uit init_db.DATABASES, op naam."""
+        return self.personen if database == "personen" else getattr(self, f"{database}_db")
+
     # ---------- pseudoniemen ----------
     def _ref(self, master_id: str, database: str) -> str:
         return pseudoniem(master_id, database, self._hoofd)
@@ -164,31 +191,32 @@ class Opslag:
             voornaam=r["voornaam"], tussenvoegsel=r["tussenvoegsel"], achternaam=r["achternaam"],
             geslacht=r["geslacht"],
             geboortedatum=r["geboortedatum"], club=r["club"], atletieknu_id=r["atletieknu_id"],
-            specialisatie=r["specialisatie"], actief=bool(r["actief"]), notities=r["notities"],
+            specialisatie=r["specialisatie"], actief=bool(r["actief"]),
             au_licentienummer=r["au_licentienummer"],
             master_id=r["master_id"], aangemaakt_op=r["aangemaakt_op"],
         )
 
     def atleet_opslaan(self, a: Atleet) -> Atleet:
-        """Nieuwe atleet toevoegen of een bestaande bijwerken. Een nieuwe atleet krijgt een master_id."""
+        """Nieuwe atleet toevoegen of een bestaande bijwerken. Een nieuwe atleet krijgt een master_id.
+        De oude kolom atleet.notities wordt niet meer gebruikt (notities staan in notities.db)."""
         nieuw = a.master_id is None
         if nieuw:
             a.master_id = nieuw_master_id()
         with self.personen:
             self.personen.execute(
                 """INSERT INTO atleet (master_id, voornaam, tussenvoegsel, achternaam, geslacht,
-                                       geboortedatum, club, atletieknu_id, specialisatie, actief, notities,
+                                       geboortedatum, club, atletieknu_id, specialisatie, actief,
                                        au_licentienummer)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                    ON CONFLICT (master_id) DO UPDATE SET
                        voornaam = excluded.voornaam, tussenvoegsel = excluded.tussenvoegsel,
                        achternaam = excluded.achternaam,
                        geslacht = excluded.geslacht, geboortedatum = excluded.geboortedatum,
                        club = excluded.club, atletieknu_id = excluded.atletieknu_id,
                        specialisatie = excluded.specialisatie, actief = excluded.actief,
-                       notities = excluded.notities, au_licentienummer = excluded.au_licentienummer""",
+                       au_licentienummer = excluded.au_licentienummer""",
                 (a.master_id, a.voornaam, a.tussenvoegsel, a.achternaam, a.geslacht, a.geboortedatum,
-                 a.club, a.atletieknu_id, a.specialisatie, int(a.actief), a.notities, a.au_licentienummer),
+                 a.club, a.atletieknu_id, a.specialisatie, int(a.actief), a.au_licentienummer),
             )
         if nieuw:
             self._vergeet_pseudoniemen()
@@ -221,10 +249,12 @@ class Opslag:
         return op_naam(self._atleet(r) for r in self.personen.execute(sql))
 
     def atleten_zoeken(self, tekst: str, alleen_actief: bool = False) -> list[Atleet]:
-        """Zoek op (een deel van) de volledige naam, hoofdletterongevoelig."""
-        patroon = f"%{tekst.strip()}%"
+        """Zoek op (een deel van) de volledige naam, hoofdletterongevoelig. '%' en '_' in de tekst
+        zijn gewone tekens, geen jokers."""
+        letterlijk = tekst.strip().replace("!", "!!").replace("%", "!%").replace("_", "!_")
+        patroon = f"%{letterlijk}%"
         sql = ("SELECT * FROM atleet "
-               "WHERE (voornaam || ' ' || COALESCE(tussenvoegsel || ' ', '') || achternaam) LIKE ?")
+               "WHERE (voornaam || ' ' || COALESCE(tussenvoegsel || ' ', '') || achternaam) LIKE ? ESCAPE '!'")
         if alleen_actief:
             sql += " AND actief = 1"
         return op_naam(self._atleet(r) for r in self.personen.execute(sql, (patroon,)))
@@ -234,33 +264,30 @@ class Opslag:
 
         Bedoeld voor een verzoek tot verwijdering (AVG). Wie alleen niet meer
         traint: zet `actief = False` en sla op.
+
+        Eén transactie per database, personen.db als LAATSTE: mislukt er onderweg iets, dan
+        staat de atleet er nog (OnvolledigVerwijderd) en maakt nog een keer verwijderen het af;
+        elke stap mag twee keer. Andersom zou er gegevens achterblijven onder een pseudoniem
+        dat niemand meer kan uitrekenen.
         """
-        ref_p = self._ref(master_id, "prestaties")
-        ref_t = self._ref(master_id, "testen")
-        ref_s = self._ref(master_id, "trainingsschema")
-        ref_a = self._ref(master_id, "absentie")
-        ref_l = self._ref(master_id, "leerdoelscores")
-        ref_n = self._ref(master_id, "notities")
-        with self.prestaties_db:
-            self.prestaties_db.execute("DELETE FROM prestatie WHERE atleet_ref = ?", (ref_p,))
-            self.prestaties_db.execute("DELETE FROM inschrijving WHERE atleet_ref = ?", (ref_p,))
-            self.prestaties_db.execute("DELETE FROM doel_regel WHERE atleet_ref = ?", (ref_p,))
-            # Persoonlijke doelen zonder regels hebben geen eigenaar meer.
-            self.prestaties_db.execute(
-                "DELETE FROM doel WHERE groep_id IS NULL AND id NOT IN (SELECT doel_id FROM doel_regel)")
-        with self.testen_db:
-            self.testen_db.execute("DELETE FROM testresultaat WHERE atleet_ref = ?", (ref_t,))
-        with self.trainingsschema_db:
-            self.trainingsschema_db.execute("DELETE FROM trainingsschema WHERE atleet_ref = ?", (ref_s,))
-            self.trainingsschema_db.execute("DELETE FROM trainingskeuze WHERE atleet_ref = ?", (ref_s,))
-        with self.absentie_db:
-            self.absentie_db.execute("DELETE FROM absentie WHERE atleet_ref = ?", (ref_a,))
-        with self.leerdoelscores_db:
-            self.leerdoelscores_db.execute("DELETE FROM leerdoelscore WHERE atleet_ref = ?", (ref_l,))
-        with self.notities_db:
-            self.notities_db.execute("DELETE FROM notitie WHERE atleet_ref = ?", (ref_n,))
-        with self.personen:  # groep_lid, voortgang, opstellingen gaan mee (CASCADE)
-            self.personen.execute("DELETE FROM atleet WHERE master_id = ?", (master_id,))
+        for database, tabellen in ATLEET_TABELLEN.items():
+            conn = self._db(database)
+            ref = self._ref(master_id, database)
+            try:
+                with conn:
+                    for tabel in tabellen:     # vaste namen uit ATLEET_TABELLEN, geen invoer
+                        conn.execute(f"DELETE FROM {tabel} WHERE atleet_ref = ?", (ref,))
+                    if database == "prestaties":
+                        # Persoonlijke doelen zonder regels hebben geen eigenaar meer.
+                        conn.execute(
+                            "DELETE FROM doel WHERE groep_id IS NULL AND id NOT IN (SELECT doel_id FROM doel_regel)")
+            except sqlcipher3.Error as e:
+                raise OnvolledigVerwijderd(database, e) from e
+        try:
+            with self.personen:  # groep_lid, voortgang, opstellingen gaan mee (CASCADE)
+                self.personen.execute("DELETE FROM atleet WHERE master_id = ?", (master_id,))
+        except sqlcipher3.Error as e:
+            raise OnvolledigVerwijderd("personen", e) from e
         self._vergeet_pseudoniemen()
 
     # ============================================================
@@ -307,6 +334,11 @@ class Opslag:
                          bron=r["bron"], bron_url=r["bron_url"], id=r["id"], indoor=bool(r["indoor"]),
                          einddatum=_naar_datum(r["einddatum"]))
 
+    def wedstrijd_op_link(self, bron_url: str) -> Wedstrijd | None:
+        """De wedstrijd met deze (genormaliseerde) link, of None. bron_url is uniek."""
+        r = self.prestaties_db.execute("SELECT * FROM wedstrijd WHERE bron_url = ?", (bron_url,)).fetchone()
+        return self._wedstrijd(r) if r else None
+
     def wedstrijd_opslaan(self, w: Wedstrijd) -> Wedstrijd:
         """Toevoegen of bijwerken. Een wedstrijd met dezelfde bron_url wordt hergebruikt,
         zodat dezelfde link twee keer importeren geen dubbele wedstrijd oplevert.
@@ -315,11 +347,9 @@ class Opslag:
         er al stonden krijgen de nieuwe waarde (indoor telt altijd voor een PR).
         """
         if w.id is None and w.bron_url:
-            r = self.prestaties_db.execute(
-                "SELECT id FROM wedstrijd WHERE bron_url = ?", (w.bron_url,)
-            ).fetchone()
-            if r:
-                w.id = r[0]
+            bestaand = self.wedstrijd_op_link(w.bron_url)
+            if bestaand is not None:
+                w.id = bestaand.id
         with self.prestaties_db:
             waarden = (w.naam, _naar_tekst(w.datum), w.locatie, w.bron, w.bron_url, int(w.indoor),
                        _naar_tekst(w.einddatum))
@@ -445,21 +475,6 @@ class Opslag:
             "SELECT onderdeel_id, waarde FROM pr WHERE atleet_ref = ?", (self._ref(master_id, "prestaties"),)
         )
         return [PR(master_id, r["onderdeel_id"], r["waarde"]) for r in rijen]
-
-    def prs_van_groep(self, master_ids: Iterable[str], onderdeel_id: int) -> list[PR]:
-        """PR's op één onderdeel voor meerdere atleten, beste eerst. Voor ploeg/vergelijk."""
-        per_ref = {self._ref(m, "prestaties"): m for m in master_ids}
-        if not per_ref:
-            return []
-        rijen = self.prestaties_db.execute(
-            f"""SELECT pr.atleet_ref, pr.waarde, o.lager_is_beter FROM pr
-                JOIN onderdeel o ON o.id = pr.onderdeel_id
-                WHERE pr.onderdeel_id = ? AND pr.atleet_ref IN ({_vraagtekens(len(per_ref))})""",
-            (onderdeel_id, *per_ref),
-        ).fetchall()
-        prs = [PR(per_ref[r["atleet_ref"]], onderdeel_id, r["waarde"]) for r in rijen]
-        lager_beter = bool(rijen[0]["lager_is_beter"]) if rijen else True
-        return sorted(prs, key=lambda pr: pr.waarde, reverse=not lager_beter)
 
     def inschrijving_opslaan(self, i: Inschrijving) -> None:
         if self.wedstrijd(i.wedstrijd_id) is None:
@@ -886,24 +901,6 @@ class Opslag:
             self.trainingsschema_db.execute("DELETE FROM trainingskeuze WHERE atleet_ref = ?", (ref,))
             self.trainingsschema_db.executemany(
                 "INSERT OR IGNORE INTO trainingskeuze (atleet_ref, dag, groep_id, starttijd) VALUES (?, ?, ?, ?)", rijen)
-
-    def atleten_op_dag(self, dag: str, master_ids: Iterable[str] | None = None) -> list[str]:
-        """master_ids van de atleten die op `dag` ('dinsdag') trainen.
-
-        Met master_ids alleen binnen die atleten (bijv. de leden van een groep).
-        Atleten die niet (meer) in personen.db staan, worden overgeslagen.
-        """
-        dag = dag.lower()
-        if dag not in DAGEN:
-            raise OpslagFout(f"Onbekende dag {dag!r}; kies uit {DAGEN}.")
-        refs = self.trainingsschema_db.execute(
-            f"SELECT atleet_ref FROM trainingsschema WHERE {dag} = 1"  # dag is gecontroleerd tegen DAGEN
-        ).fetchall()
-        ids = [m for m in (self._master_id(r[0], "trainingsschema") for r in refs) if m is not None]
-        if master_ids is not None:
-            binnen = set(master_ids)
-            ids = [m for m in ids if m in binnen]
-        return ids
 
     # ============================================================
     # Groepen, periodisering, trainingen, absentie (personen.db)
@@ -1381,61 +1378,6 @@ class Opslag:
         return [Absentie(r["training_id"], master_id, r["status"], r["reden"]) for r in uit]
 
     # ============================================================
-    # Leerlijnen (personen.db)
-    # ============================================================
-    def leerlijn_opslaan(self, lijn: Leerlijn) -> Leerlijn:
-        """Leerlijn en stappen opslaan. Stappen die niet meer in de lijst staan worden
-        NIET verwijderd (dat zou de voortgang van atleten wissen)."""
-        with self.personen:
-            if lijn.id is None:
-                lijn.id = self.personen.execute(
-                    "INSERT INTO leerlijn (naam, beschrijving) VALUES (?, ?)", (lijn.naam, lijn.beschrijving)
-                ).lastrowid
-            else:
-                self.personen.execute("UPDATE leerlijn SET naam = ?, beschrijving = ? WHERE id = ?",
-                                      (lijn.naam, lijn.beschrijving, lijn.id))
-            for s in lijn.stappen:
-                s.leerlijn_id = lijn.id
-                if s.id is None:
-                    s.id = self.personen.execute(
-                        "INSERT INTO leerlijn_stap (leerlijn_id, volgorde, naam, beschrijving) VALUES (?, ?, ?, ?)",
-                        (lijn.id, s.volgorde, s.naam, s.beschrijving),
-                    ).lastrowid
-                else:
-                    self.personen.execute(
-                        "UPDATE leerlijn_stap SET leerlijn_id = ?, volgorde = ?, naam = ?, beschrijving = ? WHERE id = ?",
-                        (lijn.id, s.volgorde, s.naam, s.beschrijving, s.id),
-                    )
-        return lijn
-
-    def _leerlijn(self, r) -> Leerlijn:
-        stappen = [LeerlijnStap(s["volgorde"], s["naam"], s["beschrijving"], s["leerlijn_id"], s["id"])
-                   for s in self.personen.execute(
-                       "SELECT * FROM leerlijn_stap WHERE leerlijn_id = ? ORDER BY volgorde", (r["id"],))]
-        return Leerlijn(r["naam"], r["beschrijving"], stappen, r["id"])
-
-    def leerlijn(self, leerlijn_id: int) -> Leerlijn | None:
-        r = self.personen.execute("SELECT * FROM leerlijn WHERE id = ?", (leerlijn_id,)).fetchone()
-        return self._leerlijn(r) if r else None
-
-    def leerlijnen(self) -> list[Leerlijn]:
-        return [self._leerlijn(r) for r in self.personen.execute("SELECT * FROM leerlijn ORDER BY naam").fetchall()]
-
-    def voortgang_opslaan(self, v: LeerlijnVoortgang) -> None:
-        with self.personen:
-            self.personen.execute(
-                """INSERT INTO atleet_leerlijn (atleet_id, stap_id, behaald_op, notities) VALUES (?, ?, ?, ?)
-                   ON CONFLICT (atleet_id, stap_id) DO UPDATE SET
-                       behaald_op = excluded.behaald_op, notities = excluded.notities""",
-                (v.atleet_id, v.stap_id, _naar_tekst(v.behaald_op), v.notities),
-            )
-
-    def voortgang(self, master_id: str) -> list[LeerlijnVoortgang]:
-        return [LeerlijnVoortgang(r["atleet_id"], r["stap_id"], _naar_datum(r["behaald_op"]), r["notities"])
-                for r in self.personen.execute(
-                    "SELECT * FROM atleet_leerlijn WHERE atleet_id = ?", (master_id,))]
-
-    # ============================================================
     # Leerdoelen (leerlijnen.db): de catalogus, zonder persoonsgegevens
     # ============================================================
     @staticmethod
@@ -1487,9 +1429,6 @@ class Opslag:
     # Leerdoelscores (leerdoelscores.db), lang formaat:
     # één rij per atleet per leerdoel per datum
     # ============================================================
-    def leerdoelscore_opslaan(self, s: LeerdoelScore) -> None:
-        """Eén score opslaan. Op dezelfde dag opnieuw scoren overschrijft die dag."""
-        self.leerdoelscores_opslaan([s])
 
     def leerdoelscores_opslaan(self, scores: Iterable[LeerdoelScore]) -> None:
         """Meerdere scores in één transactie, bijv. een hele groep na een training."""
@@ -1535,22 +1474,6 @@ class Opslag:
                 for r in self.leerdoelscores_db.execute(
                     "SELECT * FROM laatste_leerdoelscore WHERE atleet_ref = ?",
                     (self._ref(master_id, "leerdoelscores"),))}
-
-    def leerdoelscores_breed(self, master_ids: Iterable[str], leerdoel_ids: Iterable[str] | None = None,
-                             ) -> dict[str, dict[str, int | None]]:
-        """Overzicht in breed formaat voor het scherm: per atleet per leerdoel de laatste score.
-
-        Geeft {master_id: {leerdoel_id: score of None}}. Zonder leerdoel_ids: alle
-        leerdoelen die minstens één van deze atleten een score heeft. Wordt alleen
-        berekend, nooit opgeslagen.
-        """
-        master_ids = list(master_ids)
-        laatste = {m: self.laatste_leerdoelscores(m) for m in master_ids}
-        if leerdoel_ids is None:
-            leerdoel_ids = sorted({lid for scores in laatste.values() for lid in scores})
-        leerdoel_ids = list(leerdoel_ids)
-        return {m: {lid: (laatste[m][lid].score if lid in laatste[m] else None) for lid in leerdoel_ids}
-                for m in master_ids}
 
     # ============================================================
     # Notities (notities.db): vrije tekst per atleet per datum

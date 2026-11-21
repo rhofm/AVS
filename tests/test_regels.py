@@ -16,7 +16,7 @@ import yaml
 
 from models import Inzet, PloegLid
 from ploeg import regels
-from ploeg.regels import RegelFout, Regelset, categorie_code, controleer_dag
+from ploeg.regels import RegelFout, Regelset, ploegcategorie, controleer_dag
 from hulp import verwacht as _verwacht
 
 BESTAND = "u14_u16_2026-2027"
@@ -95,12 +95,12 @@ def test_onderdeelnaam_met_materiaal_van_de_ploeg():
     assert r.onderdeel_naam("U14-V", "verspringen", "U14-V") == "Verspringen"
 
 
-def test_categorie_code():
-    assert categorie_code("U14", "V") == "U14-V"
-    assert categorie_code("Senior", "M") == "SEN-M"
-    assert categorie_code("U16", None) is None
-    assert categorie_code("U16", "X") is None
-    assert categorie_code(None, "V") is None
+def test_ploegcategorie():
+    assert ploegcategorie("U14", "V") == "U14-V"
+    assert ploegcategorie("Senior", "M") == "SEN-M"
+    assert ploegcategorie("U16", None) is None
+    assert ploegcategorie("U16", "X") is None
+    assert ploegcategorie(None, "V") is None
 
 
 def test_onbekende_ploeg_of_wedstrijd():

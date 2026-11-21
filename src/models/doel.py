@@ -86,10 +86,6 @@ class DoelRegel:
         if self.soort == "vrij":
             self.streefwaarde = None
 
-    @property
-    def voor_groep(self) -> bool:
-        return self.atleet_id is None
-
 
 @dataclass(slots=True)
 class Doel:

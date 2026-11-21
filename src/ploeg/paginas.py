@@ -130,7 +130,7 @@ def formulier(db: Opslag, vandaag: date, ingevuld: Mapping | None = None, ploeg:
                 if (rs.naam, prog) not in gezien:
                     gezien.add((rs.naam, prog))
                     f.programmas.append(Keuze(prog, rs.programma_naam(prog), rs.naam))
-    gekozen = int(f.wedstrijd) if f.wedstrijd.isdigit() else None
+    gekozen = int(f.wedstrijd) if f.wedstrijd.isdecimal() else None
     for w in db.wedstrijden(van=vandaag - timedelta(days=60)):
         f.wedstrijden.append(Keuze(str(w.id), f"{w.datum.isoformat()} · {w.naam}"))
     if gekozen and all(k.waarde != str(gekozen) for k in f.wedstrijden) and (w := db.wedstrijd(gekozen)):
@@ -163,7 +163,7 @@ def lees_formulier(db: Opslag, form: Mapping, bestaande: Ploeg | None = None) ->
     wedstrijd = None
     w_tekst = (form.get("wedstrijd") or "").strip()
     if w_tekst:
-        wedstrijd = db.wedstrijd(int(w_tekst)) if w_tekst.isdigit() else None
+        wedstrijd = db.wedstrijd(int(w_tekst)) if w_tekst.isdecimal() else None
         if wedstrijd is None:
             fouten["wedstrijd"] = "Deze wedstrijd bestaat niet (meer)."
     datum = wedstrijd.datum if wedstrijd else None
@@ -445,7 +445,7 @@ def lees_dagformulier(form: Mapping, dag: Dagpagina) -> list[tuple[int, str]]:
         if strategie not in _strategieen.STRATEGIEEN:
             fouten[f"strategie-{pid}"] = f"Onbekende strategie voor {r.ploeg.naam}."
         tekst = (form.get(f"volgorde-{pid}") or str(k + 1)).strip()
-        if not tekst.isdigit():
+        if not tekst.isdecimal():
             fouten[f"volgorde-{pid}"] = f"Volgorde van {r.ploeg.naam} is een getal (1 = eerst)."
             continue
         keuzes.append((int(tekst), k, pid, strategie))

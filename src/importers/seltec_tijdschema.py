@@ -16,35 +16,20 @@ Andere tekst ('Junioren D U14 Meisjes', oude benaming) blijft zoals hij is.
 
 Datum per dag: de pagina's noemen alleen 'Dag N'; de datum is de eerste dag uit de kop + (N - 1).
 
-Gebruik:
-    python seltec_tijdschema.py 19133
-    python seltec_tijdschema.py https://uitslagen.atletiek.nl/Competitions/Details/19133
-    python seltec_tijdschema.py opgeslagen_tijdschema.html --csv tijdschema.csv
-    python seltec_tijdschema.py map_met_opgeslagen_dagen/
-
 Vereist: pip install requests beautifulsoup4
 """
 
 from __future__ import annotations
 
-import argparse
 import re
-import sys
-from dataclasses import asdict
 from datetime import date, timedelta
 from urllib.parse import urljoin, urlparse
 
 from bs4 import BeautifulSoup, Tag
 
-try:                                    # als pakket: from importers import seltec_tijdschema
-    from .atletieknu_tijdschema import TijdschemaRegel, _tijd
-    from .base import ImportFout, clean, write_csv
-    from .seltec import BASIS_URL, SeltecImporter, Wedstrijd, parse_wedstrijd, wedstrijd_id_uit_url
-except ImportError:                     # als script: python seltec_tijdschema.py ...
-    from atletieknu_tijdschema import TijdschemaRegel, _tijd  # type: ignore
-    from base import ImportFout, clean, write_csv  # type: ignore
-    from seltec import (BASIS_URL, SeltecImporter, Wedstrijd, parse_wedstrijd,  # type: ignore
-                        wedstrijd_id_uit_url)
+from .atletieknu_tijdschema import TijdschemaRegel, _tijd
+from .base import ImportFout, clean
+from .seltec import BASIS_URL, SeltecImporter, Wedstrijd, parse_wedstrijd, wedstrijd_id_uit_url
 
 DETAILS_PAD = "/Competitions/Details/{id}"
 DAG_RE = re.compile(r"/Competitions/Details/\d+/(\d+)")
@@ -153,7 +138,7 @@ def parse_tijdschema(html: str, url: str = "") -> tuple[Wedstrijd, list[Tijdsche
 
 def details_id(bron: str) -> str:
     """Wedstrijd-id uit een id of een Seltec-link ('/Details/19133/2' -> '19133')."""
-    if str(bron).isdigit():
+    if str(bron).isdecimal():
         return str(bron)
     return wedstrijd_id_uit_url(bron)
 
@@ -214,29 +199,3 @@ def _sorteer(regels: list[TijdschemaRegel]) -> list[TijdschemaRegel]:
 def laad_tijdschema(bron: str, log=print) -> tuple[Wedstrijd, list[TijdschemaRegel]]:
     return SeltecTijdschemaImporter(log=log).parse(bron)
 
-
-can_handle = SeltecTijdschemaImporter.can_handle
-
-
-# --------------------------------------------------------------------------- script
-
-def main() -> None:
-    p = argparse.ArgumentParser(description="Tijdschema van een wedstrijd op Seltec (uitslagen.atletiek.nl).")
-    p.add_argument("bron", help="wedstrijd-id, Seltec-link, opgeslagen HTML-bestand of map")
-    p.add_argument("--csv", help="schrijf het tijdschema naar dit CSV-bestand")
-    args = p.parse_args()
-    try:
-        wedstrijd, regels = laad_tijdschema(args.bron, log=lambda *a: print(*a, file=sys.stderr))
-    except ImportFout as e:
-        sys.exit(f"Fout: {e}")
-    print(f"{wedstrijd.naam} - {wedstrijd.plaats}")
-    for r in regels:
-        ronde = f" ({r.ronde})" if r.ronde else ""
-        print(f"{r.datum} {r.starttijd}  {r.onderdeel + ronde:<34} {r.categorie:<28} {r.opmerking}")
-    if args.csv:
-        write_csv(args.csv, [asdict(r) for r in regels])
-        print(f"Opgeslagen: {args.csv}", file=sys.stderr)
-
-
-if __name__ == "__main__":
-    main()

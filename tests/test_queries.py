@@ -11,10 +11,10 @@ import tempfile
 from datetime import date
 from pathlib import Path
 
-from db.init_db import init_db, pseudoniem
+from db.init_db import OntbrekendeDatabase, init_db, pseudoniem
 from db.queries import Opslag, OpslagFout
 from models import (
-    PR, heeft_windmeting, Absentie, Atleet, Groep, Inschrijving, Leerlijn, LeerlijnStap, LeerlijnVoortgang,
+    PR, heeft_windmeting, Absentie, Atleet, Groep, Inschrijving,
     Onderdeel, Prestatie, Test, Testresultaat, Training, Trainingsschema, Wedstrijd, Notitie,
 )
 from hulp import TESTSLEUTEL, verwacht as _verwacht
@@ -100,11 +100,24 @@ def test_prestaties_en_prs():
         prs = {pr.onderdeel_id: pr.waarde for pr in db.prs(anna.master_id)}
         assert prs == {sprint.id: 12.9, ver.id: 4.8}
 
-        groep = db.prs_van_groep([anna.master_id, tim.master_id], sprint.id)
-        assert [(pr.atleet_id, pr.waarde) for pr in groep] == [(anna.master_id, 12.9), (tim.master_id, 13.5)]
+        assert {pr.onderdeel_id: pr.waarde for pr in db.prs(tim.master_id)}[sprint.id] == 13.5
 
         van_wedstrijd = db.prestaties_van_wedstrijd(w.id)
         assert len(van_wedstrijd) == 3 and {p.atleet_id for p in van_wedstrijd} == {anna.master_id}
+
+
+def test_prestatie_verwijderen():
+    """Een verkeerde prestatie weghalen: het PR rekent terug naar de beste die overblijft."""
+    with opslag() as db:
+        anna, tim, sprint, _ = _basis(db)
+        for mid, w in ((anna.master_id, 12.9), (anna.master_id, 13.5), (tim.master_id, 12.5)):
+            db.prestatie_opslaan(Prestatie("100m", date(2026, 6, 1), w, wind=0.5).gekoppeld(mid))
+        fout = next(p for p in db.prestaties(anna.master_id) if p.waarde == 12.9)
+        db.prestatie_verwijderen(fout.id)
+        assert [p.waarde for p in db.prestaties(anna.master_id)] == [13.5]
+        assert {pr.onderdeel_id: pr.waarde for pr in db.prs(anna.master_id)} == {sprint.id: 13.5}
+        db.prestatie_verwijderen(fout.id)                               # nog eens: geen fout
+        assert [p.waarde for p in db.prestaties(tim.master_id)] == [12.5]   # andere atleet blijft
 
 
 def test_pr_alleen_windlegaal():
@@ -122,7 +135,6 @@ def test_pr_alleen_windlegaal():
         # 12,9 (+2,6) en 12,8 (geen windmeting) tellen niet; 13,0 (precies +2,0) wel.
         assert prs[sprint.id] == 13.0
         assert ver.id not in prs  # te veel wind en geen meting: geen PR
-        assert db.prs_van_groep([anna.master_id], ver.id) == []
 
         # Bij een onderdeel zonder windmeting telt alles, ook met een (onzinnige) windwaarde.
         acht = db.onderdeel_opslaan(Onderdeel("800m", "tijd", True, "midden"))
@@ -160,7 +172,7 @@ def test_indoor_telt_altijd():
 
         # Losse indoorprestatie zonder wedstrijd (bijv. handmatig).
         db.prestatie_opslaan(Prestatie("Verspringen", date(2026, 2, 1), 5.0, indoor=True).gekoppeld(anna.master_id))
-        assert db.prs_van_groep([anna.master_id], ver.id)[0].waarde == 5.0
+        assert {pr.onderdeel_id: pr.waarde for pr in db.prs(anna.master_id)}[ver.id] == 5.0
 
 
 WINDNAMEN = [
@@ -230,11 +242,10 @@ def test_trainingsschema():
         assert db.trainingsschema(anna.master_id).dagen == ["maandag", "donderdag"]
         assert db.trainingsschema_db.execute("SELECT count(*) FROM trainingsschema").fetchone()[0] == 2
 
-        assert sorted(db.atleten_op_dag("Donderdag")) == sorted([anna.master_id, tim.master_id])
-        assert db.atleten_op_dag("zaterdag") == [tim.master_id]
-        assert db.atleten_op_dag("donderdag", master_ids=[anna.master_id]) == [anna.master_id]
-        assert db.atleten_op_dag("zondag") == []
-        _verwacht(OpslagFout, lambda: db.atleten_op_dag("maandag; DROP TABLE trainingsschema"))
+        def op(dag):
+            return [m for m in (anna.master_id, tim.master_id) if db.trainingsschema(m).traint_op(dag)]
+        assert op("donderdag") == [anna.master_id, tim.master_id]
+        assert op("zaterdag") == [tim.master_id] and op("zondag") == []
         _verwacht(OpslagFout, lambda: db.trainingsschema_opslaan(Trainingsschema("0" * 32, maandag=True)))
 
         # Eigen pseudoniem, anders dan in prestaties.db en testen.db.
@@ -245,13 +256,16 @@ def test_trainingsschema():
         assert pseudoniem(anna.master_id, "testen", TESTSLEUTEL) not in refs
 
 
-def test_bestaande_installatie_krijgt_trainingsschema():
-    """Wie al drie databases heeft, krijgt trainingsschema.db erbij met dezelfde sleutel."""
+def test_bestaande_installatie_zonder_trainingsschema():
+    """trainingsschema.db kwam er ooit bij en werd toen vanzelf aangemaakt. Sinds de samenvoeging
+    (oktober 2026) heeft elke installatie hem: ontbreekt hij nu, dan is hij verloren en komt er
+    alleen bewust een lege (zie tests/test_ontbrekende_database.py)."""
     with tempfile.TemporaryDirectory() as tmp:
         with contextlib.redirect_stdout(io.StringIO()):
             init_db(Path(tmp), hoofd=TESTSLEUTEL)
-            (Path(tmp) / "trainingsschema.db").unlink()   # zoals vóór deze database bestond
-            init_db(Path(tmp), hoofd=TESTSLEUTEL)
+            (Path(tmp) / "trainingsschema.db").unlink()
+            _verwacht(OntbrekendeDatabase, lambda: init_db(Path(tmp), hoofd=TESTSLEUTEL))
+            init_db(Path(tmp), hoofd=TESTSLEUTEL, lege_toestaan=["trainingsschema"])
         with Opslag(map=Path(tmp), hoofd=TESTSLEUTEL) as db:
             anna = db.atleet_opslaan(Atleet("Anna", "Voorbeeld"))
             db.trainingsschema_opslaan(Trainingsschema.met_dagen(anna.master_id, ["woensdag"]))
@@ -351,18 +365,6 @@ def test_notities():
         assert db.notitie(n3.id) is None and db.notities(tim.master_id) == []
 
 
-def test_leerlijnen():
-    with opslag() as db:
-        anna, _, _, _ = _basis(db)
-        lijn = db.leerlijn_opslaan(Leerlijn("Sprint", stappen=[
-            LeerlijnStap(1, "Armactie"), LeerlijnStap(2, "Blokstart")]))
-        terug = db.leerlijn(lijn.id)
-        assert [s.naam for s in terug.stappen] == ["Armactie", "Blokstart"]
-        db.voortgang_opslaan(LeerlijnVoortgang(anna.master_id, terug.stappen[0].id, date(2026, 9, 1)))
-        behaald = {v.stap_id for v in db.voortgang(anna.master_id) if v.behaald}
-        assert terug.volgende_stap(behaald).naam == "Blokstart"
-
-
 def test_atleet_verwijderen_wist_alles():
     with opslag() as db:
         anna, tim, sprint, _ = _basis(db)
@@ -383,7 +385,7 @@ def test_atleet_verwijderen_wist_alles():
         assert db.prestaties(anna.master_id) == []
         assert db.testresultaten(anna.master_id) == []
         assert db.trainingsschema(anna.master_id).dagen == []
-        assert db.atleten_op_dag("dinsdag") == [tim.master_id]
+        assert db.trainingsschema_db.execute("SELECT count(*) FROM trainingsschema").fetchone()[0] == 1   # alleen Tim
         assert db.absentie_db.execute("SELECT count(*) FROM absentie").fetchone()[0] == 1   # alleen Tim
         assert db.notities(anna.master_id) == []
         assert [n.inhoud for n in db.notities()] == ["Notitie over Tim"]

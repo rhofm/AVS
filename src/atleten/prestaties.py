@@ -7,7 +7,7 @@ import re
 from datetime import date
 
 from db.queries import Opslag, OpslagFout
-from models import MAX_WIND, Onderdeel, Prestatie  # noqa: F401  (MAX_WIND hier ook beschikbaar)
+from models import Onderdeel, Prestatie
 
 
 # ============================================================
@@ -47,11 +47,6 @@ def toon_waarde(waarde: float, eenheid: str) -> str:
     return f"{waarde:.0f} pnt"
 
 
-def windlegaal(p: Prestatie, onderdeel: Onderdeel) -> bool:
-    """Telt deze prestatie voor een PR? Zie Onderdeel.windlegaal()."""
-    return onderdeel.windlegaal(p.wind, p.indoor)
-
-
 # ============================================================
 # Toevoegen
 # ============================================================
@@ -79,7 +74,7 @@ def handmatig_toevoegen(db: Opslag, master_id: str, onderdeel: str | int, datum:
                   wedstrijd_id=wedstrijd_id, wind=wind, ronde=ronde, bron="handmatig",
                   indoor=indoor)
     db.prestatie_opslaan(p)
-    nieuw_pr = windlegaal(p, o) and (oud_pr is None or o.is_beter(waarde, oud_pr))
+    nieuw_pr = o.windlegaal(p.wind, p.indoor) and (oud_pr is None or o.is_beter(waarde, oud_pr))
     return p, nieuw_pr
 
 
@@ -95,7 +90,7 @@ def pr_historie(db: Opslag, master_id: str, onderdeel_id: int,
     prestaties = sorted(db.prestaties(master_id, onderdeel_id), key=lambda p: p.datum)
     historie: list[Prestatie] = []
     for p in prestaties:
-        if alleen_windlegaal and not windlegaal(p, o):
+        if alleen_windlegaal and not o.windlegaal(p.wind, p.indoor):
             continue
         if not historie or o.is_beter(p.waarde, historie[-1].waarde):
             historie.append(p)
@@ -109,7 +104,7 @@ def beste_in_periode(db: Opslag, master_id: str, van: date, tot: date,
     beste: dict[int, Prestatie] = {}
     for p in db.prestaties(master_id):
         o = onderdelen[p.onderdeel_id]
-        if not (van <= p.datum <= tot) or (alleen_windlegaal and not windlegaal(p, o)):
+        if not (van <= p.datum <= tot) or (alleen_windlegaal and not o.windlegaal(p.wind, p.indoor)):
             continue
         huidig = beste.get(p.onderdeel_id)
         if huidig is None or o.is_beter(p.waarde, huidig.waarde):

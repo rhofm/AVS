@@ -19,14 +19,13 @@ from __future__ import annotations
 
 import csv
 import io
-import re
-import unicodedata
 from dataclasses import dataclass
 from datetime import date
 
 from atleten.prestaties import toon_waarde
 from db.queries import Opslag
 from ploeg.paginas import ploegpagina
+from teksthulp import slug
 
 KOPPEN = ["AU nummer", "Naam", "Geslacht", "Geboortedatum", "Vereniging", "Categorie", "Team"]
 
@@ -53,9 +52,7 @@ def _waarde(waarde: float, eenheid: str) -> str:
 
 
 def _bestandsnaam(naam: str, datum: date) -> str:
-    ascii_ = unicodedata.normalize("NFKD", naam).encode("ascii", "ignore").decode()
-    slug = re.sub(r"[^A-Za-z0-9]+", "_", ascii_).strip("_").lower() or "ploeg"
-    return f"ploeg_{slug}_{datum.isoformat()}.csv"
+    return f"ploeg_{slug(naam, standaard='ploeg')}_{datum.isoformat()}.csv"
 
 
 def atletieknu_csv(db: Opslag, ploeg_id: int) -> Export | None:

@@ -63,11 +63,6 @@ def test_specialisten_en_scoreschaal():
         assert db.leerdoel_leerlijnen()[0] == ("SPR", "Sprint")
 
 
-def test_geldt_voor():
-    d = Leerdoel("VER-U12-01", "VER", "U12", 1, "x")
-    assert not d.geldt_voor("U10") and d.geldt_voor("U12") and d.geldt_voor("U18")
-
-
 # ---------- scores ----------
 def test_scores_lang_formaat_met_geschiedenis():
     with opslag() as db:
@@ -88,8 +83,8 @@ def test_scores_lang_formaat_met_geschiedenis():
 def test_zelfde_dag_overschrijft():
     with opslag() as db:
         anna = db.atleet_opslaan(Atleet("Anna", "Aalbers"))
-        db.leerdoelscore_opslaan(LeerdoelScore(anna.master_id, "SPR-U10-01", 2, date(2026, 9, 1)))
-        db.leerdoelscore_opslaan(LeerdoelScore(anna.master_id, "SPR-U10-01", 3, date(2026, 9, 1)))
+        db.leerdoelscores_opslaan([LeerdoelScore(anna.master_id, "SPR-U10-01", 2, date(2026, 9, 1))])
+        db.leerdoelscores_opslaan([LeerdoelScore(anna.master_id, "SPR-U10-01", 3, date(2026, 9, 1))])
         assert [s.score for s in db.leerdoelscores(anna.master_id)] == [3]
         db.leerdoelscore_verwijderen(anna.master_id, "SPR-U10-01", date(2026, 9, 1))
         assert db.leerdoelscores(anna.master_id) == []
@@ -104,11 +99,8 @@ def test_breed_overzicht():
             LeerdoelScore(anna.master_id, "SPR-U10-01", 5, date(2026, 10, 1)),
             LeerdoelScore(bas.master_id, "SPR-U10-02", 3, date(2026, 9, 1)),
         ])
-        breed = db.leerdoelscores_breed([anna.master_id, bas.master_id])
-        assert breed == {anna.master_id: {"SPR-U10-01": 5, "SPR-U10-02": None},
-                         bas.master_id: {"SPR-U10-01": None, "SPR-U10-02": 3}}
-        u10 = [d.id for d in db.leerdoelen("U10")]
-        assert list(db.leerdoelscores_breed([bas.master_id], u10)[bas.master_id]) == u10
+        assert {k: s.score for k, s in db.laatste_leerdoelscores(anna.master_id).items()} == {"SPR-U10-01": 5}
+        assert {k: s.score for k, s in db.laatste_leerdoelscores(bas.master_id).items()} == {"SPR-U10-02": 3}
 
 
 def test_ongeldige_scores_geweigerd():
@@ -116,10 +108,10 @@ def test_ongeldige_scores_geweigerd():
         anna = db.atleet_opslaan(Atleet("Anna", "Aalbers"))
         _verwacht_fout(ValueError, LeerdoelScore, anna.master_id, "SPR-U10-01", 6, date(2026, 9, 1))
         _verwacht_fout(ValueError, LeerdoelScore, anna.master_id, "SPR-U10-01", 0, date(2026, 9, 1))
-        _verwacht_fout(OpslagFout, db.leerdoelscore_opslaan,
-                       LeerdoelScore(anna.master_id, "XXX-U10-01", 3, date(2026, 9, 1)))
-        _verwacht_fout(OpslagFout, db.leerdoelscore_opslaan,
-                       LeerdoelScore("0" * 32, "SPR-U10-01", 3, date(2026, 9, 1)))
+        _verwacht_fout(OpslagFout, db.leerdoelscores_opslaan,
+                       [LeerdoelScore(anna.master_id, "XXX-U10-01", 3, date(2026, 9, 1))])
+        _verwacht_fout(OpslagFout, db.leerdoelscores_opslaan,
+                       [LeerdoelScore("0" * 32, "SPR-U10-01", 3, date(2026, 9, 1))])
 
 
 def test_privacy_alleen_pseudoniem_en_verwijderen():
@@ -128,7 +120,7 @@ def test_privacy_alleen_pseudoniem_en_verwijderen():
             init_db(Path(tmp), hoofd=TESTSLEUTEL)
         with Opslag(map=Path(tmp), hoofd=TESTSLEUTEL) as db:
             anna = db.atleet_opslaan(Atleet("Anna", "Aalbers"))
-            db.leerdoelscore_opslaan(LeerdoelScore(anna.master_id, "SPR-U10-01", 4, date(2026, 9, 1)))
+            db.leerdoelscores_opslaan([LeerdoelScore(anna.master_id, "SPR-U10-01", 4, date(2026, 9, 1))])
         with contextlib.closing(verbind("leerdoelscores", Path(tmp), TESTSLEUTEL)) as conn:
             refs = [r[0] for r in conn.execute("SELECT atleet_ref FROM leerdoelscore")]
         assert refs == [pseudoniem(anna.master_id, "leerdoelscores", TESTSLEUTEL)]

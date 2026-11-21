@@ -17,9 +17,14 @@ Nooit uitgaan van de huidige werkmap.
 from __future__ import annotations
 
 import sys
+from functools import lru_cache
 from pathlib import Path
+from typing import Callable, Iterable, TypeVar
+
+import yaml
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]   # src/ploeg -> repo-root
+T = TypeVar("T")
 
 
 def _naast_exe() -> Path:
@@ -35,11 +40,6 @@ def config_mappen() -> list[Path]:
             mappen.append(Path(meegebouwd) / "config")
         return [m for m in mappen if m.is_dir()] or mappen[-1:]     # niets gevonden: de meegebouwde
     return [_REPO_ROOT / "config"]
-
-
-def config_map() -> Path:
-    """De map met de hoogste voorrang (voor meldingen). Zoek bestanden met config_bestand()."""
-    return config_mappen()[0]
 
 
 def _leeg(pad: Path) -> bool:
@@ -73,3 +73,35 @@ def config_bestanden(submap: str, patroon: str = "*.yaml") -> list[Path]:
 def gezocht_in(submap: str) -> str:
     """Voor foutmeldingen: de mappen waarin gezocht is."""
     return " en ".join(str(m / submap) for m in config_mappen())
+
+
+# ============================================================
+# Laden, één keer per versie van het bestand
+# ============================================================
+def gewijzigd(pad: Path | None) -> int:
+    """Wijzigingstijd (ns) van een bestand; 0 als het er niet (meer) is."""
+    try:
+        return pad.stat().st_mtime_ns if pad is not None else 0
+    except OSError:
+        return 0
+
+
+def lees_yaml(pad: Path, fout: type[Exception]):
+    """De inhoud van een YAML-bestand; een kapot bestand geeft `fout` met uitleg voor de gebruiker."""
+    try:
+        return yaml.safe_load(pad.read_text(encoding="utf-8"))
+    except yaml.YAMLError as e:
+        raise fout(f"{pad.name} is geen geldige YAML: {e}") from None
+
+
+def geladen(pad: Path, bouw: Callable[..., T], *args, afhankelijk: Iterable[Path | None] = ()) -> T:
+    """`bouw(pad, *args)`, maar één keer per versie: opnieuw zodra `pad` of een van de bestanden in
+    `afhankelijk` (bijv. de puntentellingen achter een regelbestand) is gewijzigd. Zo telt een
+    aangepast YAML-bestand zonder herstart. Het resultaat wordt gedeeld: nooit veranderen."""
+    versies = (gewijzigd(pad), *(gewijzigd(p) for p in afhankelijk))
+    return _geladen(bouw, str(pad), args, versies)
+
+
+@lru_cache(maxsize=64)
+def _geladen(bouw: Callable[..., T], pad: str, args: tuple, versies: tuple) -> T:
+    return bouw(Path(pad), *args)

@@ -7,8 +7,7 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
 
-from src.importers import atletieknu_prs, atletieknu_wedstrijd, base, detect, seltec
-from src.importers import seltec
+from src.importers import atletieknu_prs, atletieknu_tijdschema, atletieknu_wedstrijd, base, detect, seltec
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 SELTEC_URL = "https://uitslagen.atletiek.nl/Competitions/Resultoverview/19133"
@@ -106,18 +105,6 @@ class TestSeltec(unittest.TestCase):
         self.assertEqual(seltec.to_number("1:02:03,4"), 3723.4)
         self.assertIsNone(seltec.to_number("nm."))
 
-    # ---------------------------------------------------------------- filteren
-
-    def test_filter_atleten(self):
-        gevonden, ontbrekend = seltec.filter_atleten(
-            self.alle, ["tim proefmans", "Bas Proefmans", "Lotte Testerink", "Niet Bestaand"])
-        self.assertEqual(len(gevonden), 7)
-        self.assertEqual(ontbrekend, ["Niet Bestaand"])
-
-    def test_filter_vereniging(self):
-        self.assertEqual(len(seltec.filter_vereniging(self.alle, "AV Testclub")), 42)
-        self.assertEqual(len(seltec.filter_vereniging(self.alle, "testclub")), 42)   # 'bevat', hoofdletterongevoelig
-
     def test_alleen_een_onderdeellijst(self):
         html = (FIXTURES / "seltec_uitslagenoverzicht.html").read_text(encoding="utf-8")
         _, rijen = seltec.parse_overzicht(html, SELTEC_URL, alleen_lijst="982650")
@@ -127,9 +114,9 @@ class TestSeltec(unittest.TestCase):
     # ---------------------------------------------------------------- interface
 
     def test_can_handle_en_urls(self):
-        self.assertTrue(seltec.can_handle(SELTEC_URL))
-        self.assertTrue(seltec.can_handle("https://uitslagen.atletiek.nl/Competitions/CurrentList/982650/19133"))
-        self.assertFalse(seltec.can_handle("https://www.atletiek.nu/wedstrijd/uitslagen/43465/"))
+        self.assertTrue(seltec.SeltecImporter.can_handle(SELTEC_URL))
+        self.assertTrue(seltec.SeltecImporter.can_handle("https://uitslagen.atletiek.nl/Competitions/CurrentList/982650/19133"))
+        self.assertFalse(seltec.SeltecImporter.can_handle("https://www.atletiek.nu/wedstrijd/uitslagen/43465/"))
         self.assertEqual(seltec.overzicht_url("https://uitslagen.atletiek.nl/Competitions/CurrentList/982650/19133"),
                          SELTEC_URL)
         self.assertEqual(seltec.overzicht_url("19133"), SELTEC_URL)
@@ -268,6 +255,23 @@ class TestBase(unittest.TestCase):
                             [NepAntwoord(200, "<html>Checking your browser</html>")])
         with self.assertRaises(base.ImportFout):
             imp.haal_op("https://www.atletiek.nu/atleet/profiel/1/")
+
+    def test_browsercontrole_per_importer(self):
+        """Eén controle in Importer, per importer de tekst die een echte pagina herkent."""
+        controle = "<html>Checking your browser</html>"
+        gevallen = [
+            (atletieknu_prs.AtletiekNuPRImporter, "persoonlijkerecords", "pageTitle"),
+            (atletieknu_wedstrijd.AtletiekNuWedstrijdImporter, "deelnemerstabel", "chronoloog"),
+            (atletieknu_wedstrijd.AtletiekNuWedstrijdImporter, "pageTitle", "chronoloog"),
+            (atletieknu_tijdschema.AtletiekNuTijdschemaImporter, "chronoloog", "deelnemerstabel"),
+        ]
+        for klasse, echt, ander in gevallen:
+            with self.subTest(klasse=klasse.__name__, echt=echt):
+                klasse().controleer_pagina(controle + echt, "u")          # echte pagina: geen fout
+                klasse().controleer_pagina("<html>gewoon</html>", "u")
+                with self.assertRaisesRegex(base.ImportFout, "browsercontrole.*\n.*Ctrl\\+S"):
+                    klasse().controleer_pagina(controle + ander, "u")
+        seltec.SeltecImporter().controleer_pagina(controle, "u")          # Seltec controleert dit niet
 
     def test_lege_map_wordt_importfout(self):
         import tempfile

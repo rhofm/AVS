@@ -1,32 +1,17 @@
 """
-Export de persoonlijke records (PR's) én alle prestaties van een atleet op atletiek.nu
-naar CSV/JSON.
-
-Gebruik:
-    python export_prs.py 123456                       # PR's -> prs.csv
-    python export_prs.py 123456 --resultaten          # + alle prestaties -> resultaten.csv
-    python export_prs.py https://www.atletiek.nu/atleet/profiel/123456/
-    python export_prs.py profiel.html --resultaten    # parse een opgeslagen pagina
-    python export_prs.py 123456 --resultaten mijn.csv --json alles.json
+Lees de persoonlijke records (PR's) én alle prestaties van een atleet van zijn profiel op
+atletiek.nu (atleten/importeer_atletieknu.py zet ze in de databases).
 
 Vereist: pip install requests beautifulsoup4 curl_cffi
 """
 
-import argparse
-import json
 import re
-import sys
-from collections import Counter
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from datetime import datetime
-from pathlib import Path
 
 from bs4 import BeautifulSoup, Tag
 
-try:                                    # als pakket: from src.importers import atletieknu_prs
-    from .base import Importer, ImportFout, clean, to_number, write_csv
-except ImportError:                     # als script: python atletieknu_prs.py ...
-    from base import Importer, ImportFout, clean, to_number, write_csv  # type: ignore
+from .base import Importer, clean, to_number
 
 PROFILE_URL = "https://www.atletiek.nu/atleet/profiel/{id}/"
 # atletiek.nu gebruikt voor Nederland zowel "NLD" als "NED"; breid uit als je meer tegenkomt.
@@ -296,19 +281,14 @@ class AtletiekNuPRImporter(Importer):
     site = "atletiek.nu"
     url_patronen = (r"atletiek\.nu/atleet/profiel/\d+",)
     imiteer_browser = "chrome"  # atletiek.nu blokkeert de Python-bibliotheek requests
-
-    def controleer_pagina(self, html: str, url: str) -> None:
-        # atletiek.nu toont soms een "Checking your browser"-pagina aan scripts.
-        if "Checking your browser" in html and "persoonlijkerecords" not in html:
-            raise ImportFout(
-                "atletiek.nu gaf een browsercontrole-pagina terug i.p.v. het profiel.\n"
-                "Open het profiel in je browser, sla het op (Ctrl+S, 'Alleen HTML') en importeer dat bestand.")
+    echte_inhoud = ("persoonlijkerecords",)
+    browsercontrole_uitleg = "Open het profiel in je browser, sla het op (Ctrl+S, 'Alleen HTML') en importeer dat bestand."
 
     def laad_html(self, bron: str) -> str:
         """Accepteert een atleet-id, een profiel-URL of een pad naar een opgeslagen HTML-bestand."""
         if self.is_lokaal(bron):
             return self.lees_bestanden(bron)[0][1]
-        url = PROFILE_URL.format(id=bron) if bron.isdigit() else bron.split("#")[0]
+        url = PROFILE_URL.format(id=bron) if bron.isdecimal() else bron.split("#")[0]
         return self.haal_op(url)
 
     def parse(self, bron: str) -> tuple[str, list[PR], list[Resultaat]]:
@@ -318,71 +298,7 @@ class AtletiekNuPRImporter(Importer):
 
 def atleet_id_uit(bron: str, html: str = "") -> str:
     """atletiek.nu-profiel-id uit een id, URL of (opgeslagen) pagina; '' als onbekend."""
-    if bron.isdigit():
+    if bron.isascii() and bron.isdecimal():
         return bron
-    m = re.search(r"/atleet/profiel/(\d+)", bron) or re.search(r"/atleet/profiel/(\d+)", html or "")
+    m = re.search(r"/atleet/profiel/([0-9]+)", bron) or re.search(r"/atleet/profiel/([0-9]+)", html or "")
     return m.group(1) if m else ""
-
-
-# Functie-interface, voor scripts en bestaande code.
-
-can_handle = AtletiekNuPRImporter.can_handle
-
-
-def parse(url: str) -> tuple[str, list[PR], list[Resultaat]]:
-    """(atletieknu_id, PR's, alle prestaties) van het profiel achter de link."""
-    return AtletiekNuPRImporter().parse(url)
-
-
-def load_html(source: str) -> str:
-    return AtletiekNuPRImporter().laad_html(source)
-
-
-# --------------------------------------------------------------------------- uitvoer
-
-def main() -> None:
-    ap = argparse.ArgumentParser(description="Exporteer PR's en prestaties van atletiek.nu")
-    ap.add_argument("bron", help="atleet-id, profiel-URL of opgeslagen HTML-bestand")
-    ap.add_argument("--csv", default="prs.csv", help="pad voor PR-CSV (standaard prs.csv)")
-    ap.add_argument("--resultaten", nargs="?", const="resultaten.csv", metavar="CSV",
-                    help="exporteer ook alle prestaties (standaard naar resultaten.csv)")
-    ap.add_argument("--json", help="optioneel pad voor JSON-uitvoer {'prs': [...], 'resultaten': [...]}")
-    ap.add_argument("--alleen-belangrijk", action="store_true",
-                    help="alleen de PR-rijen die de site standaard toont")
-    args = ap.parse_args()
-
-    try:
-        html = load_html(args.bron)
-    except ImportFout as fout:
-        sys.exit(str(fout))
-
-    prs = parse_prs(html)
-    if args.alleen_belangrijk:
-        prs = [p for p in prs if p.belangrijk]
-    pr_rows = [asdict(p) for p in prs]
-    write_csv(args.csv, pr_rows, PR.__dataclass_fields__)
-
-    for p in prs:
-        spec = f" ({p.specificatie})" if p.specificatie else ""
-        wind = f" [{p.wind}]" if p.wind else ""
-        print(f"{p.onderdeel + spec:<36} {p.prestatie:>9}{wind:<12} {p.datum}  {p.plaats}")
-    print(f"\n{len(prs)} PR's geschreven naar {args.csv}")
-
-    res_rows = []
-    if args.resultaten:
-        results = parse_results(html)
-        res_rows = [asdict(r) for r in results]
-        write_csv(args.resultaten, res_rows, Resultaat.__dataclass_fields__)
-        print("\nPrestaties per onderdeel:")
-        for (ond, spec), n in Counter((r.onderdeel, r.specificatie) for r in results).items():
-            print(f"  {ond + (f' ({spec})' if spec else ''):<36} {n:>4}")
-        print(f"{len(results)} prestaties geschreven naar {args.resultaten}")
-
-    if args.json:
-        data = {"prs": pr_rows, "resultaten": res_rows} if args.resultaten else {"prs": pr_rows}
-        Path(args.json).write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
-        print(f"JSON geschreven naar {args.json}")
-
-
-if __name__ == "__main__":
-    main()

@@ -1,5 +1,7 @@
 {# Foutpagina (404, of databases die niet geopend konden worden).
-   Context: titel, tekst; sleutel_herstellen = True als AVS niet kon starten (link naar Instellingen). #}
+   Context: titel, tekst; sleutel_herstellen = True als AVS niet kon starten (link naar Instellingen);
+   ontbrekend = ontbrekende databases (OntbrekendeDatabase): dan de keuze om toch leeg te beginnen;
+   extra_fout = melding bij die keuze (bijv. vinkje vergeten). #}
 {% extends "basis.html" %}
 {% block titel %}{{ titel }}{% endblock %}
 
@@ -8,7 +10,17 @@
   <div class="blok">
     <h1 class="kop kop--pagina">{{ titel }}</h1>
     <p class="melding melding--fout" style="white-space: pre-line">{{ tekst }}</p>
-    {% if sleutel_herstellen %}
+    {% if ontbrekend %}
+    <form method="post" action="{{ url_for('lege_databases') }}" class="formulier">
+      {% if extra_fout %}<p class="melding melding--fout" role="alert">{{ extra_fout }}</p>{% endif %}
+      <label class="vinkje" for="zeker">
+        <input type="checkbox" id="zeker" name="zeker" value="1" required>
+        Ik weet dat de gegevens in {% for d in ontbrekend %}{{ d }}.db{{ ", " if not loop.last }}{% endfor %} weg zijn
+        en wil opnieuw beginnen met een leeg bestand.
+      </label>
+      <p><button class="knop" type="submit">Toch leeg beginnen</button></p>
+    </form>
+    {% elif sleutel_herstellen %}
     <p><a class="knop knop--vol" href="{{ url_for('instellingen_pagina') }}#sleutel">Sleutel herstellen &rarr;</a></p>
     {% else %}
     <a class="terug" href="/atleten">&larr; Naar atleten</a>

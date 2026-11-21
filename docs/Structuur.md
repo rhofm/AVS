@@ -143,6 +143,24 @@
 
 
 
+## Nog te bouwen: de achterkant bestaat al, het scherm nog niet
+
+De code hieronder werkt en is getest, maar er is nog geen knop of pagina voor.
+Bouw elk scherm op een eigen feature-branch.
+
+* Een wedstrijd afgelasten/verwijderen: `wedstrijden.planning.wedstrijd_afgelast()`
+  (weigert als er al uitslagen zijn; doelen houden de datum van de wedstrijd)
+* Een rooster (trainingssjabloon) verwijderen: `Opslag.rooster_verwijderen()`
+  (alleen als geen groep het meer gebruikt)
+* Een verkeerde prestatie verwijderen: `Opslag.prestatie_verwijderen()`; een prestatie met de
+  hand invoeren: `atleten.prestaties.handmatig_toevoegen()` (zegt meteen of het een PR is)
+* Een verkeerd ingevulde leerdoelscore verwijderen: `Opslag.leerdoelscore_verwijderen()`
+* Per atleet 'wanneer moet ik waar zijn' op een wedstrijd: `wedstrijden.chronoloog.persoonlijk_schema()`;
+  op de wedstrijdpagina een waarschuwing voor inschrijvingen die niet in het tijdschema staan:
+  `WedstrijdDetail.zonder_plek`
+
+
+
 ## ?
 
 *

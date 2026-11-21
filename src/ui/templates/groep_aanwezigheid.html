@@ -63,7 +63,7 @@
             <tr>
               <th scope="col">Naam</th>
               {% for t in reg.trainingen %}
-                <th scope="col" class="midden"><a href="{{ url_for('training', training_id=t.id) }}" title="{{ t.onderwerp or 'Training' }}">{{ t.datum | datum_kort | replace(' ', '<br>', 1) | safe }}</a></th>
+                <th scope="col" class="midden"><a href="{{ url_for('training', training_id=t.id) }}" title="{{ t.onderwerp or 'Training' }}">{% set dk = (t.datum | datum_kort).partition(' ') %}{{ dk[0] }}<br>{{ dk[2] }}</a></th>
               {% endfor %}
               <th scope="col" class="rechts">%</th>
             </tr>

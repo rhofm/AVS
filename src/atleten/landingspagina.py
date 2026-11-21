@@ -24,7 +24,7 @@ from groepen.doelen import doelen_van_atleet
 from instellingen import dagvolgorde, tijd as toon_tijd, weekbegin
 from leerlijnen.voortgang import LeerlijnBlok, samenvatting
 from models import DAGEN, Atleet, Notitie, Trainingsschema, Wedstrijd
-from models.programma import MASTERS_KLASSEN, is_masters, masters_categorie, masters_klasse
+from models.programma import MASTERS_KLASSEN, masters_categorie, masters_klasse
 
 from .aanwezigheid import aanwezigheid
 from .prestaties import toon_waarde
@@ -124,7 +124,7 @@ class AtleetLandingspagina:
     @property
     def geslacht(self) -> str | None:
         """'Vrouw', 'Man' of 'X' (voor alle categorieën, ook de jeugd)."""
-        return geslacht_tekst(self.atleet.geslacht, self.categorie)
+        return geslacht_tekst(self.atleet.geslacht)
 
     @property
     def fase(self) -> str | None:
@@ -145,6 +145,9 @@ def categorie_code(categorie: str | None, geslacht: str | None) -> str | None:
     ('Masters 40', 'V') -> 'V40' (zoals de masterscategorieën heten), ('Masters 40', None) -> 'Masters 40'.
 
     Bij geslacht X of onbekend alleen de categorie ('U16', 'Senior').
+
+    Alleen om te tonen (en groeperen op het scherm). De sleutel in de regelbestanden van de
+    ploegen ('U16-V', 'SEN-M') is ploeg.regels.ploegcategorie.
     """
     if categorie is None:
         return None
@@ -156,11 +159,17 @@ def categorie_code(categorie: str | None, geslacht: str | None) -> str | None:
     return f"{voorvoegsel}{geslacht}"
 
 
-def geslacht_tekst(geslacht: str | None, categorie: str | None) -> str | None:
-    """'Man' / 'Vrouw' in elke categorie, 'X' bij geslacht X (None als het geslacht onbekend is).
+class MetCategorieCode:
+    """Voor rijen met de velden `atleet` en `categorie` (leeftijdscategorie, bijv. 'U16'): de code
+    voor op het scherm ('U16V'). Een mix-in, geen dataclass: de velden van de rij blijven zoals ze zijn."""
 
-    De categorie telt niet meer mee; de parameter blijft zodat aanroepers niet hoeven te veranderen.
-    """
+    @property
+    def categorie_code(self) -> str | None:
+        return categorie_code(self.categorie, self.atleet.geslacht)
+
+
+def geslacht_tekst(geslacht: str | None) -> str | None:
+    """'Man' / 'Vrouw' in elke categorie, 'X' bij geslacht X (None als het geslacht onbekend is)."""
     if geslacht is None:
         return None
     return _GESLACHT[geslacht]
@@ -194,7 +203,8 @@ def _schema(db: Opslag, master_id: str, schema: Trainingsschema, vandaag: date) 
             if not schema.traint_mee(t, g):          # andere training gekozen of geen trainingsdag
                 continue
             tijd = t.effectieve_starttijd(g)
-            tekst = f"{g.naam} – {t.onderwerp}" if t.onderwerp else g.naam
+            wat = db.training_voor_atleet(t.id, master_id) or t   # zijn afwijkende variant, als hij die doet
+            tekst = f"{g.naam} – {wat.onderwerp}" if wat.onderwerp else g.naam
             tekst = f"{toon_tijd(tijd)} {tekst}" if tijd else tekst
             gekoppeld[DAGEN[t.datum.weekday()]].append(tekst)
     return [

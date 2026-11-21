@@ -12,24 +12,18 @@ static/sorteer.js op elke kolom kan sorteren. Geen SQL: alles via `Opslag`.
 
 from __future__ import annotations
 
-import unicodedata
 from dataclasses import dataclass, field
 from datetime import date
 
 from db.queries import Opslag
 from instellingen import naam_sleutel, naam_tekst
 from models import Atleet, Groep
+from teksthulp import plat
 
 from .landingspagina import categorie_code, leeftijdscategorie
 
 #: Volgorde van de categorieën voor sorteren en de keuzelijst.
 CATEGORIE_VOLGORDE: tuple[str, ...] = ("U8", "U10", "U12", "U14", "U16", "U18", "U20", "Senior")
-
-
-def plat(tekst: str | None) -> str:
-    """Kleine letters, zonder accenten en dubbele spaties: 'Zoë  van Dijk' -> 'zoe van dijk'."""
-    tekst = unicodedata.normalize("NFKD", tekst or "")
-    return " ".join("".join(c for c in tekst if not unicodedata.combining(c)).lower().split())
 
 
 @dataclass

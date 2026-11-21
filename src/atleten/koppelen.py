@@ -23,12 +23,12 @@ er nooit een naam in prestaties.db terechtkomt.
 from __future__ import annotations
 
 import re
-import unicodedata
 from dataclasses import dataclass, field
 from typing import Iterable, Literal
 
 from db.queries import Opslag
 from models import Atleet, Prestatie
+from teksthulp import plat
 
 Manier = Literal["atletieknu_id", "naam_en_jaar", "naam_en_club", "naam", "meerdere", "geen"]
 ZEKERE_MANIEREN = ("atletieknu_id", "naam_en_jaar", "naam_en_club")
@@ -42,10 +42,7 @@ def normaliseer(naam: str | None) -> str:
     if "," in naam:
         achter, _, voor = naam.partition(",")
         naam = f"{voor} {achter}"
-    naam = unicodedata.normalize("NFKD", naam)
-    naam = "".join(t for t in naam if not unicodedata.combining(t))
-    naam = re.sub(r"[^\w\s']", " ", naam.lower())
-    return " ".join(naam.split())
+    return " ".join(re.sub(r"[^\w\s']", " ", plat(naam)).split())
 
 
 @dataclass

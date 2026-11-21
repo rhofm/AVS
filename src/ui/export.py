@@ -14,11 +14,11 @@ Gebruik vanuit de UI: /training/<id>/export.md en /training/<id>/export.pdf (?na
 from __future__ import annotations
 
 import re
-import unicodedata
 from dataclasses import dataclass, field
 
 from groepen.trainingen import TrainingPagina
 from instellingen import tijd as toon_tijd
+from teksthulp import slug
 
 MAANDEN_LANG = ("januari", "februari", "maart", "april", "mei", "juni", "juli",
                 "augustus", "september", "oktober", "november", "december")
@@ -50,11 +50,6 @@ class Trainingsexport:
         return " · ".join(x for x in (self.groep, self.datum, self.starttijd) if x)
 
 
-def _slug(tekst: str) -> str:
-    ascii_ = unicodedata.normalize("NFKD", tekst).encode("ascii", "ignore").decode()
-    return re.sub(r"[^a-z0-9]+", "-", ascii_.lower()).strip("-") or "groep"
-
-
 def _onderdelen(t) -> list[tuple[str, str]]:
     return [*t.onderdelen, *((("Notities", t.notities),) if t.notities else ())]
 
@@ -66,7 +61,7 @@ def trainingsexport(tp: TrainingPagina, *, namen: bool = False) -> Trainingsexpo
         titel=t.onderwerp or "Training", groep=tp.groep.naam,
         datum=f"{DAGEN_LANG[d.weekday()]} {d.day} {MAANDEN_LANG[d.month - 1]} {d.year}",
         starttijd=toon_tijd(tp.starttijd) if tp.starttijd else None, periode=tp.periode.lang if tp.periode else None,
-        bestandsnaam=f"training-{d.isoformat()}-{_slug(tp.groep.naam)}")
+        bestandsnaam=f"training-{d.isoformat()}-{slug(tp.groep.naam, scheiding='-', standaard='groep')}")
     uit.delen.append(Deel("Training", _onderdelen(t)))
     for v, atleten in tp.varianten:
         if namen:

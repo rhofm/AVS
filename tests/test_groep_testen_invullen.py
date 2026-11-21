@@ -40,7 +40,7 @@ def test_pagina_en_opslaan():
         ip = ti.invulpagina(db, g, bib, s.slug)
         assert sorted(r.atleet.voornaam for r in ip.rijen) == ["Anna", "Bram", "Cas"]
         rij = {r.atleet.voornaam: r for r in ip.rijen}
-        assert rij["Anna"].laatste is not None and rij["Bram"].laatste is None and ip.met_laatste == 1
+        assert rij["Anna"].laatste is not None and rij["Bram"].laatste is None
         assert all(r.invoer == ["", ""] for r in ip.rijen)
         # Bram en Cas ingevuld, Anna leeg: twee resultaten.
         f = {veld(ids["bram"], 0): "0,5", veld(ids["bram"], 1): "4", veld(ids["cas"], 0): "0,4", veld(ids["cas"], 1): "5", veld(ids["anna"], 0): ""}

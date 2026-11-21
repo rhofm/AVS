@@ -165,11 +165,6 @@ def groepsopties(regels: list[ProgrammaOnderdeel]) -> dict[int, list[tuple[str, 
     return {o: list(groepen.items()) for o, groepen in uit.items()}
 
 
-def _sorteer(a: Atleet) -> tuple[str, str, str]:
-    """Op achternaam of voornaam, zoals in Instellingen gekozen."""
-    return naam_sleutel(a)
-
-
 def _code(a: Atleet, op: date) -> str | None:
     return categorie_code(leeftijdscategorie(a, op), a.geslacht)
 
@@ -206,7 +201,7 @@ def wedstrijd_detail(db: Opslag, wedstrijd_id: int, peildatum: date | None = Non
         onderdelen.sort(key=lambda o: o.naam.lower())
         los = [o.naam for o in onderdelen if o.id not in gedekt.get(mid, set())]
         deelnemers.append(Deelnemer(a, _code(a, w.datum), onderdelen, los, gekozen_groep.get(mid, {})))
-    deelnemers.sort(key=lambda d: _sorteer(d.atleet))
+    deelnemers.sort(key=lambda d: naam_sleutel(d.atleet))
 
     return WedstrijdDetail(w, dagen, deelnemers, chronoloog.botsingen(db, wedstrijd_id),
                            w.dagen_tot(vandaag), _uitslagen(db, wedstrijd_id, alle_onderdelen),
@@ -228,7 +223,7 @@ def _uitslagen(db: Opslag, wedstrijd_id: int, onderdelen: dict[int, Onderdeel]) 
             continue
         uit.append(UitslagRij(a, o.naam, toon_waarde(p.waarde, o.eenheid), p.wind,
                               prs[p.atleet_id].get(o.id) == p.waarde))
-    return sorted(uit, key=lambda r: (*_sorteer(r.atleet), r.onderdeel.lower()))
+    return sorted(uit, key=lambda r: (*naam_sleutel(r.atleet), r.onderdeel.lower()))
 
 
 # ============================================================
@@ -314,7 +309,7 @@ def inschrijfformulier(db: Opslag, wedstrijd_id: int, regel_id: int | None = Non
             atleten[mid] = a
 
     kandidaten = []
-    for a in sorted(atleten.values(), key=_sorteer):
+    for a in sorted(atleten.values(), key=naam_sleutel):
         cat = leeftijdscategorie(a, w.datum)
         past = chronoloog.past_bij(regel, cat, a.geslacht) if regel is not None else True
         kandidaten.append(Kandidaat(a, categorie_code(cat, a.geslacht), past,
@@ -460,8 +455,8 @@ def gegevens_opslaan(db: Opslag, wedstrijd_id: int | None, g: Gegevens) -> Wedst
         if oud is None:
             raise OpslagFout(f"Wedstrijd {wedstrijd_id} bestaat niet.")
     if link:
-        ander = next((w for w in db.wedstrijden() if w.bron_url == link and w.id != wedstrijd_id), None)
-        if ander is not None:
+        ander = db.wedstrijd_op_link(link)
+        if ander is not None and ander.id != wedstrijd_id:
             raise OpslagFout(f"Deze link hoort al bij de wedstrijd '{ander.naam}' van {ander.datum.isoformat()}.")
     bron = planning.bron_uit_link(link)
     if oud is not None and not link and oud.bron != "handmatig" and db.prestaties_van_wedstrijd(oud.id):
@@ -576,7 +571,7 @@ def tijdschema_wijzigingen(db: Opslag, wedstrijd_id: int, formulier) -> list[Tij
             duur = duur.strip()
             if not duur:
                 nieuwe_duur = None
-            elif duur.isdigit():
+            elif duur.isdecimal():
                 nieuwe_duur = int(duur)
             else:
                 raise OpslagFout(f"{r.omschrijving}: de duur is een aantal minuten (of leeg).")
@@ -636,14 +631,14 @@ def regel_toevoegen(db: Opslag, wedstrijd_id: int, invoer: NieuweRegel) -> Progr
         raise OpslagFout("Vul een starttijd in.")
     onderdeel_id = None
     if invoer.onderdeel_id:
-        if not invoer.onderdeel_id.isdigit() or db.onderdeel(int(invoer.onderdeel_id)) is None:
+        if not invoer.onderdeel_id.isdecimal() or db.onderdeel(int(invoer.onderdeel_id)) is None:
             raise OpslagFout("Kies een onderdeel uit de lijst.")
         onderdeel_id = int(invoer.onderdeel_id)
     if onderdeel_id is None and not invoer.onderdeel_tekst:
         raise OpslagFout("Kies een onderdeel uit de lijst of typ de naam.")
-    if invoer.groep and not invoer.groep.isdigit():
+    if invoer.groep and not invoer.groep.isdecimal():
         raise OpslagFout("Groep is een nummer: 1, 2, 3, ...")
-    if invoer.duur and not invoer.duur.isdigit():
+    if invoer.duur and not invoer.duur.isdecimal():
         raise OpslagFout("De duur is een aantal minuten (of leeg).")
     try:
         regel = ProgrammaOnderdeel(

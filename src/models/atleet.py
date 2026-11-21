@@ -33,7 +33,6 @@ class Atleet:
     atletieknu_id: str | None = field(default=None, repr=False)
     specialisatie: str | None = None
     actief: bool = True
-    notities: str | None = field(default=None, repr=False)
     tussenvoegsel: str | None = field(default=None, repr=False)   # bv. 'de', 'van der'
     au_licentienummer: str | None = field(default=None, repr=False)   # licentienummer Atletiekunie, alleen cijfers
     master_id: str | None = None        # None zolang nog niet opgeslagen; db/ maakt hem aan
@@ -50,7 +49,8 @@ class Atleet:
             _controleer_geboortedatum(self.geboortedatum)
         if self.au_licentienummer is not None:
             self.au_licentienummer = "".join(str(self.au_licentienummer).split()) or None
-            if self.au_licentienummer is not None and not self.au_licentienummer.isdigit():
+            if self.au_licentienummer is not None and not (self.au_licentienummer.isascii()
+                                                       and self.au_licentienummer.isdecimal()):
                 raise ValueError("Het AU-licentienummer bestaat alleen uit cijfers.")
 
     @property
@@ -80,7 +80,7 @@ class Atleet:
 
 
 def _controleer_geboortedatum(waarde: str) -> None:
-    if len(waarde) == 4 and waarde.isdigit():
+    if len(waarde) == 4 and waarde.isdecimal():
         return
     try:
         date.fromisoformat(waarde)

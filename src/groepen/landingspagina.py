@@ -26,7 +26,7 @@ from collections import Counter
 from dataclasses import dataclass, field
 from datetime import date, timedelta
 
-from atleten.landingspagina import CATEGORIEEN, DAG_KORT, categorie_code, leeftijdscategorie
+from atleten.landingspagina import CATEGORIEEN, DAG_KORT, leeftijdscategorie, MetCategorieCode
 from db.queries import Opslag
 from instellingen import dagvolgorde, tijd as toon_tijd
 from leerlijnen.voortgang import leerdoelenpagina
@@ -76,22 +76,10 @@ class LidDag:
 
 
 @dataclass
-class GroepLid:
+class GroepLid(MetCategorieCode):
     atleet: Atleet
     categorie: str | None             # 'U16'
     dagen: list[LidDag]               # maandag t/m zondag
-
-    @property
-    def categorie_code(self) -> str | None:
-        return categorie_code(self.categorie, self.atleet.geslacht)
-
-    @property
-    def met_groep(self) -> int:
-        return sum(1 for d in self.dagen if d.soort == MET_GROEP)
-
-    @property
-    def elders(self) -> int:
-        return sum(1 for d in self.dagen if d.soort == ELDERS)
 
 
 @dataclass
@@ -170,10 +158,6 @@ class GroepLandingspagina:
         volgorde = CATEGORIEEN
         aanwezig = {l.categorie for l in self.leden if l.categorie}
         return [c for c in volgorde if c in aanwezig]
-
-    @property
-    def leerdoelen_beoordeeld(self) -> int:
-        return max((b.beoordeeld for b in self.leerdoelen), default=0)
 
     @property
     def aanwezig_pct(self) -> float | None:

@@ -9,7 +9,7 @@ from hulp import verwacht
 from models import (
     Notitie,
     DAGEN, Trainingsschema,
-    Absentie, Atleet, Groep, Leerlijn, LeerlijnStap, LeerlijnVoortgang,
+    Absentie, Atleet, Groep,
     Onderdeel, Prestatie, heeft_windmeting,
 )
 
@@ -102,20 +102,6 @@ def test_groep_leden():
 def test_absentie():
     assert Absentie(1, NEP_ID, "aanwezig").aanwezig
     verwacht(ValueError, lambda: Absentie(1, NEP_ID, "ziek"))
-
-
-def test_leerlijn():
-    lijn = Leerlijn("Sprint", stappen=[
-        LeerlijnStap(2, "Startpositie", id=12),
-        LeerlijnStap(1, "Armactie", id=11),
-        LeerlijnStap(3, "Blokstart", id=13),
-    ])
-    assert [s.volgorde for s in lijn.stappen] == [1, 2, 3]
-    assert lijn.stap(2).naam == "Startpositie"
-    assert lijn.volgende_stap({11}).id == 12
-    assert lijn.volgende_stap({11, 12, 13}) is None
-    assert not LeerlijnVoortgang(NEP_ID, 11).behaald
-    assert LeerlijnVoortgang(NEP_ID, 11, date(2026, 9, 1)).behaald
 
 
 def test_trainingsschema():

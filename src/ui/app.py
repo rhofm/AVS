@@ -40,9 +40,10 @@ from atleten import trainingsschema as schemabeheer
 from atleten import prs_importeren as prs_import
 from atleten.aanwezigheid import aanwezigheid
 import instellingen
-from db.init_db import (HERSTEL_UITLEG, InstallatieFout, OvernameFout, SleutelFout, herstel,
-                        herstelsleutel_als_hij_past, in_groepjes, init_db, oude_data_overnemen, standaard_map)
-from db.queries import Opslag, OpslagFout
+from db.init_db import (HERSTEL_UITLEG, InstallatieFout, OntbrekendeDatabase, OvernameFout, SleutelFout, herstel,
+                        herstelsleutel_als_hij_past, hoofdsleutel, in_groepjes, init_db, oude_data_overnemen,
+                        standaard_map)
+from db.queries import OnvolledigVerwijderd, Opslag, OpslagFout
 from importers.base import ImportFout
 from groepen import groep as groepsbeheer
 from groepen import groep_importeren
@@ -85,9 +86,38 @@ ATLEET_BINNENKORT: dict[str, str] = {
 #: Pagina's die ook werken als de databases niet open kunnen (bijv. sleutel kwijt):
 #: daar zet de gebruiker de herstelsleutel terug. Ze gebruiken geen database.
 ZONDER_DATABASE = frozenset({"static", "instellingen_pagina", "instellingen_opslaan", "sleutel_herstellen",
-                             "levend", "weg", "afsluiten"})
+                             "levend", "weg", "afsluiten", "lege_databases"})
 #: Tekens van leven van de pagina's zelf (ui/levensduur.py); tellen niet als 'gewoon' verzoek.
 LEVENSTEKENS = frozenset({"levend", "weg"})
+
+#: Namen waaronder de browser AVS mag aanspreken. Een andere naam (bijv. een website die zijn
+#: domeinnaam naar 127.0.0.1 laat wijzen: 'DNS rebinding') krijgt niets te zien.
+EIGEN_HOSTS = frozenset({"127.0.0.1", "localhost"})
+#: Methodes die niets veranderen; al het andere moet van AVS zelf komen (_van_deze_app).
+VEILIGE_METHODES = frozenset({"GET", "HEAD", "OPTIONS"})
+
+
+def _eigen_host(host: str) -> bool:
+    """Is 'host' (de Host-kop, bijv. '127.0.0.1:5050') AVS zelf? De poort doet niet mee."""
+    return urlparse(f"//{host}").hostname in EIGEN_HOSTS
+
+
+def _van_deze_app() -> bool:
+    """Komt dit verzoek van een pagina van AVS zelf? Een andere website in dezelfde browser kan
+    ook naar 127.0.0.1 posten (CSRF); de browser vertelt dan waar het verzoek vandaan komt.
+
+    Eerst Sec-Fetch-Site (alle huidige browsers; ook op een pagina met Referrer-Policy
+    no-referrer, waar de Origin 'null' is), anders Origin of Referer. Zonder enige herkomst
+    (oude browser, tests) telt het als AVS zelf: een moderne browser stuurt bij een verzoek
+    van een andere site altijd een van die koppen mee.
+    """
+    site = request.headers.get("Sec-Fetch-Site")
+    if site is not None:
+        return site == "same-origin"
+    herkomst = request.headers.get("Origin") or request.headers.get("Referer")
+    if not herkomst:
+        return True
+    return urlparse(herkomst).netloc == request.host
 
 
 def _ui_map() -> Path:
@@ -98,7 +128,8 @@ def _ui_map() -> Path:
 
 
 def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfout: str | None = None,
-             sleutelfout: bool = True, bewaker: Bewaker | None = None) -> Flask:
+             sleutelfout: bool = True, bewaker: Bewaker | None = None,
+             ontbrekend: list[str] | None = None) -> Flask:
     """Maak de Flask-app.
 
     map / hoofd: databasemap en sleutel; None = de normale (data/ en de sleutelkluis).
@@ -107,6 +138,8 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
                  Instellingen (ZONDER_DATABASE), waar de sleutel kan worden hersteld.
     sleutelfout: True als startfout over de sleutel gaat (dan een knop 'Sleutel herstellen');
                  False bij bijv. een onvolledige installatie (InstallatieFout).
+    ontbrekend:  bij OntbrekendeDatabase de ontbrekende databases: de foutpagina biedt dan
+                 'Toch leeg beginnen' aan (POST /databases/leeg-beginnen).
     bewaker:     stopt AVS als er geen pagina meer open is (ui/levensduur.py); None = nooit
                  vanzelf stoppen (tests). Kan ook later in app.config["AVS_BEWAKER"] worden gezet.
     """
@@ -114,16 +147,26 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
     app = Flask(__name__, template_folder=str(ui / "templates"), static_folder=str(ui / "static"))
     app.secret_key = os.urandom(32)         # alleen voor meldingen na opslaan; hoeft niet te blijven bestaan
     app.config["AVS_MAP"] = map
-    app.config["AVS_HOOFD"] = hoofd
+    app.config["AVS_HOOFD"] = hoofd             # None = bij het eerste gebruik uit de sleutelkluis (hoofd_uit_geheugen())
     app.config["AVS_STARTFOUT"] = startfout     # wordt None na 'Sleutel herstellen'
     app.config["AVS_STARTFOUT_SLEUTEL"] = sleutelfout
+    app.config["AVS_ONTBREKEND"] = ontbrekend or None
     app.config["AVS_BEWAKER"] = bewaker
     registreer_filters(app.jinja_env)
 
     # ---------------- databases per request ----------------
+    def hoofd_uit_geheugen() -> str | bytes:
+        """De hoofdsleutel: één keer uit de sleutelkluis, daarna uit het geheugen. Zo hangt niet
+        elke pagina af van de sleutelkluis van Windows. Lukt het lezen niet (SleutelFout,
+        SleutelkluisFout), dan wordt niets onthouden en probeert het volgende verzoek het opnieuw.
+        Nooit loggen of in een pagina zetten (behalve via herstelsleutel_tonen)."""
+        if app.config["AVS_HOOFD"] is None:
+            app.config["AVS_HOOFD"] = hoofdsleutel()
+        return app.config["AVS_HOOFD"]
+
     def db() -> Opslag:
         if "db" not in g:
-            g.db = Opslag(map=app.config["AVS_MAP"], hoofd=app.config["AVS_HOOFD"])
+            g.db = Opslag(map=app.config["AVS_MAP"], hoofd=hoofd_uit_geheugen())
         return g.db
 
     @app.teardown_appcontext
@@ -131,6 +174,20 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
         opslag = g.pop("db", None)
         if opslag is not None:
             opslag.sluit()
+
+    # ---------------- alleen AVS zelf (als eerste: vóór levenstekens en databases) ----------------
+    @app.before_request
+    def controleer_herkomst():
+        """Elk verzoek moet aan AVS gericht zijn (Host), en alles wat iets verandert (POST)
+        moet van een AVS-pagina komen. Zo kan een website die toevallig open staat geen
+        gegevens lezen of wijzigen. Een afgewezen verzoek telt niet als teken van leven."""
+        if not _eigen_host(request.host):
+            return Response("Onbekend adres. Open AVS via http://127.0.0.1.", status=400,
+                            mimetype="text/plain")
+        if request.method not in VEILIGE_METHODES and not _van_deze_app():
+            return Response("Dit verzoek kwam niet van AVS zelf en is geweigerd.", status=403,
+                            mimetype="text/plain")
+        return None
 
     @app.before_request
     def teken_van_leven():
@@ -143,8 +200,12 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
     def controleer_start():
         fout = app.config["AVS_STARTFOUT"]
         if fout and request.endpoint not in ZONDER_DATABASE:
-            return render_template("fout.html", titel="AVS kan niet starten", tekst=fout,
-                                   sleutel_herstellen=app.config["AVS_STARTFOUT_SLEUTEL"]), 500
+            return _startfoutpagina()
+
+    def _startfoutpagina(extra_fout: str | None = None, status: int = 500):
+        return render_template("fout.html", titel="AVS kan niet starten", tekst=app.config["AVS_STARTFOUT"],
+                               sleutel_herstellen=app.config["AVS_STARTFOUT_SLEUTEL"],
+                               ontbrekend=app.config["AVS_ONTBREKEND"], extra_fout=extra_fout), status
 
     @app.before_request
     def instellingen_laden():
@@ -193,7 +254,7 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
     def atleten():
         groep = request.args.get("groep", "")
         o = atletenoverzicht(db(), zoek=request.args.get("q", ""), categorie=request.args.get("cat", ""),
-                             groep_id=int(groep) if groep.isdigit() else None,
+                             groep_id=int(groep) if groep.isdecimal() else None,
                              ook_inactief=request.args.get("alle") == "1")
         meldingen = get_flashed_messages()
         return render_template("atleten.html", o=o, melding=meldingen[0] if meldingen else None,
@@ -254,6 +315,8 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
         haal_atleet(master_id)
         try:
             a = atleetbeheer.verwijderen(db(), master_id, request.form.get("bevestiging", ""))
+        except OnvolledigVerwijderd as e:              # halverwege mislukt: nog een keer maakt het af
+            return _aanpassen(master_id, verwijder_fout=str(e), status=500)
         except (OpslagFout, ValueError) as e:
             return _aanpassen(master_id, verwijder_fout=str(e), status=400)
         flash(f"{a.naam} en alle gegevens zijn verwijderd.")
@@ -486,7 +549,7 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
         k = periodisering.kopieerpagina(db(), groep_id)
         if k is None:
             abort(404)
-        gekozen = [int(x) for x in request.form.getlist("groep") if x.isdigit()]
+        gekozen = [int(x) for x in request.form.getlist("groep") if x.isdecimal()]
         fasen, cycli = request.form.get("fasen") == "1", request.form.get("cycli") == "1"
         fout, bevestigen = None, []
         if request.method == "POST":
@@ -514,7 +577,7 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
 
     def _roosterpagina(groep_id: int, fout: str | None = None, status: int = 200):
         keuze = request.args.get("rooster", "")
-        p = roosterbeheer.roosterpagina(db(), groep_id, rooster_id=int(keuze) if keuze.isdigit() else None)
+        p = roosterbeheer.roosterpagina(db(), groep_id, rooster_id=int(keuze) if keuze.isdecimal() else None)
         if p is None:
             abort(404)
         meldingen = get_flashed_messages()
@@ -549,7 +612,7 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
     def rooster_wijzigen(rooster_id: int):
         r = db().rooster(rooster_id)
         groep_id = request.form.get("groep", "")
-        if r is None or not groep_id.isdigit():
+        if r is None or not groep_id.isdecimal():
             abort(404)
         try:
             r, n = roosterbeheer.rooster_wijzigen(db(), rooster_id, request.form.get("naam", ""),
@@ -563,7 +626,7 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
     @app.route("/rooster/<int:rooster_id>/regel", methods=["GET", "POST"])
     def rooster_regel(rooster_id: int):
         a = request.values
-        groep_id = int(a["groep"]) if a.get("groep", "").isdigit() else None
+        groep_id = int(a["groep"]) if a.get("groep", "").isdecimal() else None
         try:
             f = roosterbeheer.regelformulier(db(), rooster_id, a.get("week"), a.get("dag"), a.get("tijd"),
                                              groep_id=groep_id)
@@ -949,7 +1012,7 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
                                melding=meldingen[0] if meldingen else None), status
 
     def _regel_id(waarde: str | None) -> int | None:
-        return int(waarde) if waarde and waarde.isdigit() else None
+        return int(waarde) if waarde and waarde.isdecimal() else None
 
     @app.get("/wedstrijd/<int:wedstrijd_id>/inschrijven")
     def wedstrijd_inschrijven(wedstrijd_id: int):
@@ -959,14 +1022,14 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
     def wedstrijd_inschrijven_opslaan(wedstrijd_id: int):
         regel_id = _regel_id(request.form.get("regel"))
         atleten, onderdelen = request.form.getlist("atleet"), request.form.getlist("onderdeel")
-        groepen = {int(k[6:]): v for k, v in request.form.items() if k.startswith("groep-") and k[6:].isdigit()}
+        groepen = {int(k[6:]): v for k, v in request.form.items() if k.startswith("groep-") and k[6:].isdecimal()}
         try:
             aantal = wedstrijddetail.inschrijven_uit_formulier(db(), wedstrijd_id, atleten, onderdelen, groepen)
         except OpslagFout as e:
             if db().wedstrijd(wedstrijd_id) is None:
                 abort(404)
             return _inschrijfpagina(wedstrijd_id, regel_id, fout=str(e), status=400,
-                                    onderdelen=[int(o) for o in onderdelen if o.isdigit()],
+                                    onderdelen=[int(o) for o in onderdelen if o.isdecimal()],
                                     gekozen=[m for m in atleten if db().atleet(m)])
         namen = [o.naam for o in db().onderdelen() if str(o.id) in onderdelen]
         wat = f"voor {', '.join(namen)}" if namen else "(onderdelen volgen nog)"
@@ -982,7 +1045,7 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
         onderdeel = request.form.get("onderdeel", "")
         try:
             tekst = wedstrijddetail.groep_kiezen(db(), wedstrijd_id, request.form.get("atleet", ""),
-                                                 int(onderdeel) if onderdeel.isdigit() else -1,
+                                                 int(onderdeel) if onderdeel.isdecimal() else -1,
                                                  request.form.get("groep", ""))
         except OpslagFout as e:
             if db().wedstrijd(wedstrijd_id) is None:
@@ -996,7 +1059,7 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
         onderdeel = request.form.get("onderdeel", "")
         try:
             tekst = wedstrijddetail.afmelden(db(), wedstrijd_id, request.form.get("atleet", ""),
-                                             int(onderdeel) if onderdeel.isdigit() else None)
+                                             int(onderdeel) if onderdeel.isdecimal() else None)
         except OpslagFout as e:
             if db().wedstrijd(wedstrijd_id) is None:
                 abort(404)
@@ -1362,7 +1425,7 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
 
     def _groep_of_none(groep_id: str | None):
         """De groep uit ?groep=... (waar je vandaan kwam), of None als die niet bestaat."""
-        return db().groep(int(groep_id)) if groep_id and groep_id.isdigit() else None
+        return db().groep(int(groep_id)) if groep_id and groep_id.isdecimal() else None
 
     def _herkomst(bron):
         """(atleet, groep) uit ?atleet=/?groep= of de verborgen velden; hoogstens één van de twee."""
@@ -1530,8 +1593,8 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
         """Profielpagina's van atletiek.nu ophalen (met pauze); tests zetten AVS_HAAL_PROFIEL."""
         haal = app.config.get("AVS_HAAL_PROFIEL")
         if haal is None:
-            from groepen.atleten_uit_csv import STANDAARD_PAUZE, maak_haal_html
-            haal = maak_haal_html(None, STANDAARD_PAUZE)
+            from groepen.atleten_uit_csv import maak_haal_html
+            haal = maak_haal_html()
         return haal
 
     def _groepimport(rijen=None, keuze=None, dubbel="overslaan", *, fouten=None, fout=None, resultaat=None,
@@ -1541,7 +1604,7 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
             gevraagd = request.args.get("groep", "")
             keuze = groep_importeren.Groepkeuze(
                 "bestaand" if groepen else "nieuw",
-                int(gevraagd) if gevraagd.isdigit() else None,
+                int(gevraagd) if gevraagd.isdecimal() else None,
                 seizoen=groepsbeheer.huidig_seizoen(date.today()))
         return render_template(
             "groep_importeren.html", rijen=groep_importeren.aangevuld(rijen or []), kolommen=groep_importeren.KOLOMMEN,
@@ -1629,14 +1692,6 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
         flash("Instellingen opgeslagen.")
         return redirect(url_for("instellingen_pagina"))
 
-    def _van_deze_app() -> bool:
-        """Komt het formulier van AVS zelf? Een andere website in dezelfde browser kan ook naar
-        127.0.0.1 posten; browsers sturen dan een Origin (of Referer) van die site mee."""
-        herkomst = request.headers.get("Origin") or request.headers.get("Referer")
-        if not herkomst:
-            return True                     # geen herkomst meegestuurd (oude browser, tests)
-        return urlparse(herkomst).netloc == request.host
-
     # ---------------- levensduur (ui/levensduur.py) ----------------
     def _pagina_id() -> str:
         return request.get_data(as_text=True, cache=False)[:64].strip()
@@ -1651,15 +1706,14 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
     @app.post("/weg")
     def weg():
         bewaker = app.config["AVS_BEWAKER"]
-        if bewaker is not None and _van_deze_app():
+        if bewaker is not None:             # alleen van AVS zelf: controleer_herkomst()
             bewaker.weg(_pagina_id())
         return "", 204
 
     @app.post("/afsluiten")
     def afsluiten():
-        """Knop 'AVS afsluiten': eerst deze pagina, daarna stopt de server (na dit verzoek)."""
-        if not _van_deze_app():
-            abort(403)
+        """Knop 'AVS afsluiten': eerst deze pagina, daarna stopt de server (na dit verzoek).
+        Alleen van AVS zelf (controleer_herkomst)."""
         bewaker = app.config["AVS_BEWAKER"]
         if bewaker is not None:
             bewaker.stop_nu()
@@ -1670,12 +1724,17 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
         """Herstelsleutel terugzetten (nieuwe computer, Windows opnieuw geïnstalleerd).
 
         De sleutel wordt nooit teruggezet in de pagina, gelogd of bewaard buiten de sleutelkluis.
+        Alleen van AVS zelf (controleer_herkomst).
         """
-        if not _van_deze_app():
-            abort(403)
         try:
             herstel(request.form.get("herstelsleutel", ""), app.config["AVS_MAP"])
-            init_db(app.config["AVS_MAP"], app.config["AVS_HOOFD"])     # databases bijwerken met de sleutel
+            init_db(app.config["AVS_MAP"], hoofd_uit_geheugen())     # databases bijwerken met de (nu bewaarde) sleutel
+        except OntbrekendeDatabase as e:
+            # De sleutel staat er nu wel; er ontbreekt nog een bestand: die foutpagina met zijn knop.
+            app.config.update(AVS_STARTFOUT=str(e), AVS_STARTFOUT_SLEUTEL=False, AVS_ONTBREKEND=e.ontbrekend)
+            r = redirect("/")
+            r.headers["Cache-Control"] = "no-store"
+            return r
         except (SleutelFout, InstallatieFout) as e:
             pagina, status = _instellingenpagina(instellingen.actief(), sleutel_fout=f"Niet hersteld: {e}",
                                                  status=400)
@@ -1687,19 +1746,42 @@ def maak_app(map: Path | None = None, hoofd: str | bytes | None = None, startfou
         r.headers["Cache-Control"] = "no-store"
         return r
 
+    @app.post("/databases/leeg-beginnen")
+    def lege_databases():
+        """Knop op de foutpagina bij OntbrekendeDatabase: de ontbrekende databases bewust leeg opnieuw
+        aanmaken. Alleen met het vinkje 'zeker', en alleen de databases die toen ontbraken."""
+        ontbrekend = app.config["AVS_ONTBREKEND"]
+        if not ontbrekend:
+            return redirect("/")
+        if request.form.get("zeker") != "1":
+            return _startfoutpagina("Vink eerst aan dat je weet dat de gegevens in dit bestand weg zijn.", 400)
+        try:
+            init_db(app.config["AVS_MAP"], app.config["AVS_HOOFD"], lege_toestaan=ontbrekend)
+        except OntbrekendeDatabase as e:          # er is intussen nog iets anders weg
+            app.config.update(AVS_STARTFOUT=str(e), AVS_ONTBREKEND=e.ontbrekend)
+            return _startfoutpagina()
+        except (SleutelFout, InstallatieFout) as e:
+            app.config.update(AVS_STARTFOUT=str(e), AVS_ONTBREKEND=None,
+                              AVS_STARTFOUT_SLEUTEL=isinstance(e, SleutelFout))
+            return _startfoutpagina()
+        app.config.update(AVS_STARTFOUT=None, AVS_ONTBREKEND=None, AVS_AANGEVULD_OP=None)
+        flash("Opnieuw begonnen met " + ", ".join(f"een lege {d}.db" for d in ontbrekend) + ".")
+        return redirect(url_for("atleten"))
+
     @app.post("/instellingen/sleutel/tonen")
     def herstelsleutel_tonen():
         """Herstelsleutel laten zien, om op te schrijven. Alleen als de versleuteling open is:
         niet bij een startfout (dan houdt controleer_start() dit verzoek al tegen, want dit
         endpoint staat niet in ZONDER_DATABASE) en alleen een sleutel die de databases echt opent.
 
-        Alleen via POST vanaf AVS zelf, zodat de sleutel niet in de browsergeschiedenis of een
-        bladwijzer belandt en een andere website hem niet kan opvragen; nooit gelogd of gecachet.
+        Alleen via POST vanaf AVS zelf (controleer_herkomst), zodat de sleutel niet in de
+        browsergeschiedenis of een bladwijzer belandt en een andere website hem niet kan opvragen;
+        nooit gelogd of gecachet.
         """
-        if not _van_deze_app() or app.config["AVS_STARTFOUT"]:
+        if app.config["AVS_STARTFOUT"]:
             abort(403)
         try:
-            sleutel = in_groepjes(herstelsleutel_als_hij_past(app.config["AVS_MAP"], app.config["AVS_HOOFD"]))
+            sleutel = in_groepjes(herstelsleutel_als_hij_past(app.config["AVS_MAP"], hoofd_uit_geheugen()))
         except (SleutelFout, InstallatieFout) as e:
             pagina, status = _instellingenpagina(instellingen.actief(), tonen_fout=f"Kan de sleutel niet tonen: {e}",
                                                  status=500)
@@ -1937,6 +2019,7 @@ def start(map: Path | None = None, browser: bool = True) -> None:
     """Databases klaarzetten, de server starten en de browser openen."""
     startfout = None
     sleutelfout = True
+    ontbrekend = None
     try:
         if map is None:
             oude_data_overnemen()           # eenmalig: data/ naast de .exe -> %LOCALAPPDATA%\AVS\data
@@ -1945,9 +2028,11 @@ def start(map: Path | None = None, browser: bool = True) -> None:
         startfout, sleutelfout = str(e), False
     except SleutelFout as e:
         startfout = str(e) if HERSTEL_UITLEG in str(e) else f"{e}\n\n{HERSTEL_UITLEG}"
+    except OntbrekendeDatabase as e:        # foutpagina met de knop 'toch leeg beginnen'
+        startfout, sleutelfout, ontbrekend = str(e), False, e.ontbrekend
     except InstallatieFout as e:
         startfout, sleutelfout = str(e), False
-    app = maak_app(map=map, startfout=startfout, sleutelfout=sleutelfout)
+    app = maak_app(map=map, startfout=startfout, sleutelfout=sleutelfout, ontbrekend=ontbrekend)
     poort = _vrije_poort()
     adres = f"http://{HOST}:{poort}/"
     # Eén gebruiker op één computer: één thread is genoeg en houdt SQLCipher eenvoudig.

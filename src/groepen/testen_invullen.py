@@ -15,12 +15,13 @@ from dataclasses import dataclass, field
 from datetime import date
 from typing import Mapping
 
-from atleten.landingspagina import categorie_code, leeftijdscategorie
+from atleten.landingspagina import MetCategorieCode
 from db.queries import Opslag, OpslagFout
-from instellingen import naam_tekst
 from models import Atleet, Groep, Testresultaat
 from testen import resultaten
 from testen.sjabloon import Bibliotheek, Sjabloon
+
+from .leden import leden_met_categorie
 
 VELD_PREFIX = "waarde-"
 
@@ -40,16 +41,12 @@ class GroepInvoerFout(OpslagFout):
 
 
 @dataclass
-class InvulRij:
+class InvulRij(MetCategorieCode):
     atleet: Atleet
     categorie: str | None                          # leeftijdscategorie (U14, ...)
     laatste: resultaten.ResultaatRegel | None      # laatste resultaat op deze test
     invoer: list[str]                              # wat er in elk veld staat (leeg = niets)
     fout: str | None = None
-
-    @property
-    def categorie_code(self) -> str | None:
-        return categorie_code(self.categorie, self.atleet.geslacht)
 
 
 @dataclass
@@ -59,20 +56,6 @@ class InvulPagina:
     sjabloon: Sjabloon | None                      # None = nog niets gekozen
     rijen: list[InvulRij] = field(default_factory=list)
     vandaag: date = field(default_factory=date.today)
-
-    @property
-    def met_laatste(self) -> int:
-        return sum(1 for r in self.rijen if r.laatste)
-
-
-def _leden(db: Opslag, groep: Groep, vandaag: date) -> list[tuple[Atleet, str | None]]:
-    uit = []
-    for mid in groep.leden:
-        a = db.atleet(mid)
-        if a is not None:
-            uit.append((a, leeftijdscategorie(a, vandaag)))
-    uit.sort(key=lambda x: naam_tekst(x[0]))
-    return uit
 
 
 def invulpagina(db: Opslag, groep: Groep, bibliotheek: Bibliotheek, slug: str | None = None, *,
@@ -91,7 +74,7 @@ def invulpagina(db: Opslag, groep: Groep, bibliotheek: Bibliotheek, slug: str | 
     s = bron.sjabloon
     test = db.test_op_sjabloon(s.slug)
     rijen = []
-    for a, cat in _leden(db, groep, vandaag):
+    for a, cat in leden_met_categorie(db, groep, vandaag):
         regels = resultaten.resultaatregels(db, a.master_id, bibliotheek=bibliotheek, test_id=test.id) if test else []
         invoer = [(formulier or {}).get(veldnaam(a.master_id, i), "") for i in range(len(s.onderdelen))]
         rijen.append(InvulRij(a, cat, regels[0] if regels else None, invoer, (fouten or {}).get(a.master_id)))

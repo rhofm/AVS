@@ -1,45 +1,22 @@
 """
-Importer voor wedstrijduitslagen van Seltec (uitslagen.atletiek.nl en andere Seltec LA-portals):
-haal de uitslagen van een wedstrijd op voor een groep atleten of voor alle atleten van een
-vereniging, en exporteer ze naar CSV/JSON.
+Importer voor wedstrijduitslagen van Seltec (uitslagen.atletiek.nl en andere Seltec LA-portals).
 
 Werkwijze: het uitslagenoverzicht van de wedstrijd (/Competitions/Resultoverview/<id>) bevat
 álle uitslagen van alle onderdelen op één pagina. Die pagina wordt één keer opgehaald; elke
-rij in elk onderdeelblok wordt een Uitslag, daarna wordt gefilterd.
-
-Gebruik:
-    python seltec.py 19133 --vereniging "Nijmegen Atletiek"
-    python seltec.py https://uitslagen.atletiek.nl/Competitions/Resultoverview/19133 \\
-        --atleten "Tim Proefmans" "Bas Proefmans" "Lotte Testerink"
-    python seltec.py https://uitslagen.atletiek.nl/Competitions/CurrentList/982650/19133 --alles
-                                                            # alleen dit ene onderdeel
-    python seltec.py 19133 --atleten-bestand groep.txt      # één naam per regel
-    python seltec.py 19133 --alles                          # iedereen
-    python seltec.py opgeslagen.html --vereniging Nijmegen  # opgeslagen uitslagenoverzicht
-    python seltec.py 19133 --vereniging Nijmegen --csv uitslagen.csv --json uitslagen.json
+rij in elk onderdeelblok wordt een Uitslag.
+AVS koppelt ze daarna aan de eigen atleten (wedstrijden/uitslag_import.py).
 
 Vereist: pip install requests beautifulsoup4
 """
 
-import argparse
-import difflib
-import json
 import re
-import sys
-from collections import Counter
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from datetime import date
-from pathlib import Path
 from urllib.parse import urljoin, urlparse
 
 from bs4 import BeautifulSoup, Tag
 
-try:                                    # als pakket: from src.importers import seltec
-    from .base import (Importer, ImportFout, clean, filter_atleten, filter_vereniging,
-                       to_number, write_csv)
-except ImportError:                     # als script: python seltec.py ...
-    from base import (Importer, ImportFout, clean, filter_atleten, filter_vereniging,  # type: ignore
-                      to_number, write_csv)
+from .base import Importer, ImportFout, clean, to_number
 
 BASIS_URL = "https://uitslagen.atletiek.nl"
 OVERZICHT_PAD = "/Competitions/Resultoverview/{id}"
@@ -61,7 +38,7 @@ class Wedstrijd:
 
 @dataclass
 class Uitslag:
-    # Zelfde velden als atletieknu_wedstrijd.Uitslag (zodat beide importers dezelfde CSV geven),
+    # Zelfde velden als atletieknu_wedstrijd.Uitslag (zodat AVS beide op dezelfde manier verwerkt),
     # aangevuld met wat Seltec extra toont: geboortejaar, kwalificatie en opmerking.
     atleet: str             # naam zoals op de site, bv. "Tim Proefmans" (zonder toevoeging als "[GK]")
     deelnemer_id: str       # Seltec data-id van de rij (GUID, per uitslag, NIET per atleet)
@@ -375,15 +352,11 @@ def parse_overzicht(html: str, url: str = "", alleen_lijst: str = "") -> tuple[W
     return wedstrijd, uitslagen
 
 
-# --------------------------------------------------------------------------- filteren
-# filter_vereniging en filter_atleten komen uit base.py (Seltec kent geen teams).
-
-
 # --------------------------------------------------------------------------- importer
 
 def overzicht_url(bron: str) -> str:
     """Wedstrijd-id of willekeurige Seltec-wedstrijd-URL -> URL van het uitslagenoverzicht."""
-    if bron.isdigit():
+    if bron.isdecimal():
         return BASIS_URL + OVERZICHT_PAD.format(id=bron)
     wid = wedstrijd_id_uit_url(bron)
     if not wid:
@@ -395,8 +368,8 @@ def overzicht_url(bron: str) -> str:
 
 class SeltecImporter(Importer):
     """
-    Wedstrijduitslagen van Seltec. parse(bron) geeft (Wedstrijd, [Uitslag, ...]) terug, ongefilterd;
-    filter daarna met filter_vereniging / filter_atleten.
+    Wedstrijduitslagen van Seltec. parse(bron) geeft (Wedstrijd, [Uitslag, ...]) terug:
+    alle uitslagen van de wedstrijd, van iedereen.
     """
 
     bron = "seltec"
@@ -430,90 +403,3 @@ class SeltecImporter(Importer):
         self.log(f"{wedstrijd.naam} ({wedstrijd.plaats}, {wedstrijd.datum}) - "
                  f"{len({u.onderdeel_code for u in uitslagen})} onderdeellijsten, {len(uitslagen)} uitslagen")
         return wedstrijd, uitslagen
-
-
-# Functie-interface (zoals vóór de klasse), voor scripts en bestaande code.
-
-def laad_uitslagen(bron: str, log=print) -> tuple[Wedstrijd, list[Uitslag]]:
-    return SeltecImporter(log=log).parse(bron)
-
-
-can_handle = SeltecImporter.can_handle
-
-
-def parse(url: str) -> tuple[Wedstrijd, list[Uitslag]]:
-    """Alle uitslagen van de wedstrijd (ongefilterd); filter daarna met filter_vereniging/filter_atleten."""
-    return SeltecImporter().parse(url)
-
-
-# --------------------------------------------------------------------------- uitvoer
-
-def print_overzicht(uitslagen: list[Uitslag]) -> None:
-    per_atleet: dict[str, list[Uitslag]] = {}
-    for u in uitslagen:
-        per_atleet.setdefault(u.atleet, []).append(u)
-    for naam, rijen in per_atleet.items():
-        print(f"\n{naam} - {rijen[0].vereniging} - {rijen[0].categorie}")
-        for u in rijen:
-            titel = f"{u.onderdeel} {u.ronde}".strip() + (f" ({u.specificatie})" if u.specificatie else "")
-            wind = f" [{u.wind}]" if u.wind else ""
-            extra = "  ".join(x for x in (u.kwalificatie, u.record) if x)
-            pos = f"#{u.positie}" if u.positie else ""
-            print(f"  {titel:<36} {u.prestatie:>9}{wind:<12} {pos:<4} {extra}")
-
-
-def main() -> None:
-    ap = argparse.ArgumentParser(description="Importeer wedstrijduitslagen van Seltec (uitslagen.atletiek.nl)")
-    ap.add_argument("bron", help="wedstrijd-id, Seltec-URL, onderdeellijst-URL, HTML-bestand of map")
-    wie = ap.add_mutually_exclusive_group(required=True)
-    wie.add_argument("--vereniging", help="alle atleten van deze vereniging, bv. 'Nijmegen Atletiek'")
-    wie.add_argument("--atleten", nargs="+", metavar="NAAM", help="namen van atleten (tussen aanhalingstekens)")
-    wie.add_argument("--atleten-bestand", metavar="TXT", help="tekstbestand met één atleetnaam per regel")
-    wie.add_argument("--alles", action="store_true", help="alle uitslagen, zonder filter")
-    ap.add_argument("--csv", default="uitslagen.csv", help="pad voor CSV (standaard uitslagen.csv)")
-    ap.add_argument("--json", help="optioneel pad voor JSON-uitvoer {'wedstrijd': {...}, 'uitslagen': [...]}")
-    args = ap.parse_args()
-
-    try:
-        wedstrijd, alle = laad_uitslagen(args.bron)
-    except ImportFout as fout:
-        sys.exit(str(fout))
-    if not alle:
-        sys.exit("Geen uitslagen gevonden (nog geen uitslagen gepubliceerd?).")
-
-    if args.alles:
-        uitslagen = alle
-    elif args.vereniging:
-        uitslagen = filter_vereniging(alle, args.vereniging)
-        if not uitslagen:
-            clubs = sorted({u.vereniging for u in alle if u.vereniging})
-            tips = difflib.get_close_matches(args.vereniging, clubs, n=5, cutoff=0.3)
-            sys.exit(f"Geen atleten van '{args.vereniging}' gevonden."
-                     + (f" Bedoel je: {', '.join(tips)}?" if tips else f"\nVerenigingen: {', '.join(clubs)}"))
-    else:
-        namen = args.atleten or Path(args.atleten_bestand).read_text(encoding="utf-8").splitlines()
-        uitslagen, ontbrekend = filter_atleten(alle, namen)
-        for naam in ontbrekend:
-            tips = difflib.get_close_matches(naam, sorted({u.atleet for u in alle}), n=3, cutoff=0.6)
-            print(f"Let op: geen uitslagen voor '{naam}'" + (f" (bedoel je {', '.join(tips)}?)" if tips else ""))
-
-    rows = [asdict(u) for u in uitslagen]
-    write_csv(args.csv, rows, Uitslag.__dataclass_fields__)
-    print_overzicht(uitslagen)
-
-    print(f"\n{wedstrijd.naam} - {wedstrijd.plaats} - {wedstrijd.datum}"
-          + (f" t/m {wedstrijd.einddatum}" if wedstrijd.einddatum != wedstrijd.datum else ""))
-    print("Uitslagen per onderdeel:")
-    for (ond, spec), n in Counter((u.onderdeel, u.specificatie) for u in uitslagen).items():
-        print(f"  {ond + (f' ({spec})' if spec else ''):<32} {n:>4}")
-    n_atleten = len({u.atleet for u in uitslagen if not u.estafette})
-    print(f"{len(uitslagen)} uitslagen van {n_atleten} atleten geschreven naar {args.csv}")
-
-    if args.json:
-        data = {"wedstrijd": asdict(wedstrijd), "uitslagen": rows}
-        Path(args.json).write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
-        print(f"JSON geschreven naar {args.json}")
-
-
-if __name__ == "__main__":
-    main()

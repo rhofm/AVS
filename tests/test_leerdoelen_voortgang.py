@@ -75,7 +75,7 @@ def test_template():
     with opslag() as db:
         mid = voorbeeld(db)
         doel = db.leerdoelen("U16")[0]
-        db.leerdoelscore_opslaan(LeerdoelScore(mid, doel.id, 4, date(2026, 9, 1)))
+        db.leerdoelscores_opslaan([LeerdoelScore(mid, doel.id, 4, date(2026, 9, 1))])
         lp = voortgang.leerdoelenpagina(db, mid, "U16", peildatum=VANDAAG)
         html = render(lp)
         assert 'id="modus-bekijken" value="bekijken" checked' in html

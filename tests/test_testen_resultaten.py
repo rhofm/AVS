@@ -226,13 +226,11 @@ def test_sjabloon_verwijderen():
         assert sj.laad_bibliotheek(tmp).vind(s.slug) is not None
 
 
-def test_verloop_en_beste_werken_met_sjabloontests():
+def test_laatste_resultaat_werkt_met_sjabloontests():
     from atleten import testen as atleet_testen
     with opslag() as (db, tmp):
         anna = voorbeeldgroep(db)["anna"]
         s = bewaar(db, tmp, Sjabloon("30m", [Onderdeel("Tijd", "tijd")]))
         for dag, w in ((date(2026, 9, 1), "4,4"), (date(2026, 10, 1), "4,1"), (date(2026, 10, 8), "4,2")):
             res.resultaat_vastleggen(db, anna, s, dag, [w])
-        assert atleet_testen.beste(db, anna, "30m").waarde == 4.1               # lager is beter bij een tijd
-        assert atleet_testen.vooruitgang(db, anna, "30m") == 0.2
         assert atleet_testen.laatste_per_test(db, anna)[db.test_op_naam("30m").id].waarde == 4.2

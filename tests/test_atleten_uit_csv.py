@@ -4,12 +4,11 @@ Gebruikt de geanonimiseerde profielpagina uit tests/fixtures/ en een tijdelijke 
 een vaste testsleutel: raakt atletiek.nu, de sleutelkluis en data/ nooit aan.
 """
 
-import tempfile
 from pathlib import Path
 
 from atleten import beheer
 from groepen.atleten_uit_csv import (
-    BevestigingNodig, lees_csv, lees_datum, lees_licentienummer, importeer_regels, maak_bevestig, schrijf_mislukt,
+    BevestigingNodig, lees_csv, lees_datum, lees_licentienummer, importeer_regels,
     splits_naam, veld_van_kop,
 )
 from importers.base import ImportFout
@@ -141,20 +140,14 @@ def test_fout_bij_een_atleet_stopt_de_rest_niet():
         assert [r.atletieknu_id for r, _ in v.gelukt] == ["999999"]
         assert [r.atletieknu_id for r, _ in v.mislukt] == ["111111"]
         assert len(db.atleten(alleen_actief=False)) == 1       # mislukte atleet niet half aangemaakt
-
-    with tempfile.TemporaryDirectory() as tmp:
-        pad = schrijf_mislukt(Path(tmp) / "x_mislukt.csv", lees, v)
-        inhoud = pad.read_text(encoding="utf-8-sig").splitlines()
-        assert inhoud[0] == "naam;atletieknu;reden"
-        assert inhoud[1].startswith("Test de Vries;111111;atletiek.nu gaf")
-        assert lees_csv(pad).regels[0].atletieknu_id == "111111"   # opnieuw te gebruiken
+        assert "browsercontrole" in v.mislukt[0][1]               # de reden, voor op de pagina
 
 
 def test_bestaande_atleet_krijgt_nummer_en_geboortedatum():
     lees = lees_csv("x.csv", tekst="naam;geboortedatum;atletieknu\nTest Jansen;2011-05-01;999999\n")
     with opslag() as db:
         oud = beheer.nieuwe_atleet(db, "Test", "Jansen")
-        v = importeer_regels(db, lees.regels, haal_html=lambda _: PROFIEL, bevestig=maak_bevestig("ja"), log=stil)
+        v = importeer_regels(db, lees.regels, haal_html=lambda _: PROFIEL, bevestig=lambda _: True, log=stil)
         assert v.gelukt[0][1].status == "id_toegevoegd"
         opgeslagen = db.atleet(oud.master_id)
         assert (opgeslagen.atletieknu_id, opgeslagen.geboortedatum) == ("999999", "2011-05-01")

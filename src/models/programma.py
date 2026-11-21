@@ -129,7 +129,7 @@ def masters_klasse(categorie: str | None) -> int | None:
     if categorie is None or not categorie.startswith("Masters "):
         return None
     getal = categorie[len("Masters "):].rstrip("+")
-    return int(getal) if getal.isdigit() else None
+    return int(getal) if getal.isdecimal() else None
 
 
 def _klasse_in(tekst: str) -> tuple[str, int, bool] | None:

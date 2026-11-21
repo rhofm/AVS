@@ -81,15 +81,16 @@ This project holds personal data about athletes, many of them minors.
 
 | Package       | Purpose |
 |---------------|---------|
-| `models/`     | Data classes: `atleet`, `prestatie`, `groep`, `leerlijn`, `periodisering`, `rooster`, `doel`, `ploeg` |
+| `models/`     | Data classes: `atleet`, `prestatie`, `groep`, `leerdoel`, `periodisering`, `rooster`, `doel`, `ploeg` |
 | `db/`         | `schema_<database>.sql`, `init_db.py` (keys, connect, create/migrate), `queries.py`, `migrations/<database>/` |
 | `importers/`  | Import results from links: atletiek.nu PRs, atletiek.nu competitions, Seltec competitions |
 | `ploeg/`      | Team selection: `vergelijk` (compare athletes), `voorspeller` (predictions), `estafettes` (relays), `regels` (rules), `opstelling` (lineup), `optimaliseer` + `strategieen/` (selection "mentalities") |
-| `groepen/`    | Groups, `testen_invullen` (enter one test for a whole group), `absentie`, `periodeplan` (periodisering pages: mega/meso cycle, year view, copy), `rooster` (planned training content, import, apply to trainings), `doelen` (goals: status, forms), `leerdoelen_scoren` (score a whole group on one leerdoel) |
+| `groepen/`    | Groups, `testen_invullen` (enter one test for a whole group), `absentie`, `periodeplan` (periodisering pages: mega/meso cycle, year view, copy), `rooster` (planned training content, import, apply to trainings), `doelen` (goals: status, forms), `leerdoelen_scoren` (score a whole group on one leerdoel), `leden` (`leden_met_categorie`: members + age category, by name) |
 | `wedstrijden/` | `planning`: upcoming meets, who goes, which events (uses `wedstrijd` + `inschrijving` in `prestaties.db`) |
 | `atleten/`, `leerlijnen/` | Feature logic for athletes and learning pathways |
 | `testen/`     | Test templates and results: `formule` (safe formula engine), `sjabloon` (YAML templates + library), `resultaten` (record results/scores), `editor` (template form state) |
 | `ui/`         | Web UI |
+| `teksthulp/`  | `plat()` (lower case, no accents: for search/sort/compare) and `slug()` (a-z0-9 for file names); no AVS imports. Use these, never a new copy |
 
 Other folders: `config/ploeg_regels/*.yaml` (team rule sets, per competition),
 `config/testen/*.yaml` (shipped test templates; the team's own go in `<data folder>/testsjablonen/`, same file name wins),
@@ -100,7 +101,9 @@ from source and frozen; never use the working directory). Frozen, each file is
 looked up separately: `config/` next to the `.exe` first (the team leader's own
 edits and additions), then the copy built into the `.exe`; an empty file
 (only whitespace/#-comments) never hides a filled one. Loaded files are cached
-by path + modification time, so an edited YAML file counts without a restart. Design of the team feature: `docs/Ploegopstelling_ontwerp.md`.
+by path + modification time (`ploeg.config.geladen`; a rule set also reloads when
+any points file changes, so it is re-checked against it), so an edited YAML file
+counts without a restart. Cached objects are shared: never modify them. Design of the team feature: `docs/Ploegopstelling_ontwerp.md`.
 
 **Dependencies** are in `pyproject.toml` (Python 3.13), installed into the
 conda environment with `pip install -e .[dev]` (`[dev]` = pytest + PyInstaller).
@@ -123,8 +126,14 @@ and every `HARTSLAG` s, `navigator.sendBeacon('/weg')` on `pagehide`. The
 throttle background tabs to once a minute), or when no page came within
 `EERSTE_PAGINA` s; a jump in its own clock means the computer slept, which
 never stops AVS. It stops via `server.shutdown()` in another thread, so never in
-the middle of a request. `/weg` and `/afsluiten` only accept requests from AVS
-itself (`_van_deze_app`). Request logging is off (`_StilleHandler`: URLs contain
+the middle of a request.
+**Only AVS itself** (`controleer_herkomst`, the first `before_request` in
+`ui/app.py`): every request must have Host `127.0.0.1` or `localhost`
+(`EIGEN_HOSTS`, any port; else 400, against DNS rebinding), and every request
+that is not GET/HEAD/OPTIONS must come from an AVS page (`_van_deze_app`:
+`Sec-Fetch-Site` first, else Origin/Referer; else 403, against CSRF). This is
+central, so new routes need no check of their own; a refused request never
+counts as a sign of life. Request logging is off (`_StilleHandler`: URLs contain
 athlete ids). Without a console, `--zelftest` writes to the console it was
 started from (`AttachConsole`), and an unexpected start error is shown as a
 Windows message box.
@@ -144,6 +153,11 @@ The keyring can fail on its own (no backend, Credential Manager blocked):
 `_lees_hoofdsleutel`/`_bewaar_hoofdsleutel` turn any `KeyringError` into
 `SleutelkluisFout` (an `InstallatieFout`, not a `SleutelFout`: restoring the key
 can't help), shown on the error page at start and during use; never a traceback.
+The web app reads the key from the keyring **once** and keeps it in memory
+(`hoofd_uit_geheugen()` in `ui/app.py`, stored in `app.config["AVS_HOOFD"]`), so
+a keyring hiccup halfway through a session doesn't break pages; a failed read
+is not remembered, so the next request tries again. Get the key in the app only
+through `hoofd_uit_geheugen()`, never with `hoofdsleutel()` directly.
 
 ## Database
 
@@ -156,7 +170,13 @@ is), or `$AVS_DATA` when that environment variable is set. On the first frozen
 start with an empty data folder, `oude_data_overnemen()` copies a `data/`
 folder next to the `.exe` (copy only, never overwrite, all-or-nothing; on
 failure `OvernameFout` and no `init_db()`, so no empty databases appear). The
-Instellingen page shows the data folder. Never hard-code `data/` elsewhere. The files:
+Instellingen page shows the data folder. Empty databases are only created when
+the folder has none at all (first start): if some exist and one is missing (lost,
+not copied), `init_db()` raises `OntbrekendeDatabase` and creates nothing; the
+error page offers 'Toch leeg beginnen' (checkbox, `POST /databases/leeg-beginnen`
+→ `init_db(lege_toestaan=...)`). A database added in a later AVS version goes in
+`init_db.NIEUW_NA_BASIS`, so existing installations get it silently. `verbind()`
+never creates a file (only `aanmaken=True`, used by `init_db()`). Never hard-code `data/` elsewhere. The files:
 
 | File             | Contents | Athlete identified by |
 |------------------|----------|-----------------------|
@@ -191,7 +211,7 @@ tonen** (`POST /instellingen/sleutel/tonen`) shows it in groups of 8, only when
 the databases are open (not in `ZONDER_DATABASE`, and refused while there is a
 start error) and only a key that actually opens them
 (`init_db.herstelsleutel_als_hij_past()`). POST only and only from AVS itself
-(`_van_deze_app`), the response is `Cache-Control: no-store`, and a normal GET of
+(`controleer_herkomst`), the response is `Cache-Control: no-store`, and a normal GET of
 the page never contains the key.
 
 The SQL files are read from `init_db.SQL_DIR` (`src/db/` from source,
@@ -225,10 +245,22 @@ it only holds `.gitkeep`).
   `leerdoelscore.leerdoel_id` → `leerlijnen.db`) are not enforced
   by SQLite; check them in Python. Deleting a training must go through
   `Opslag.training_verwijderen()` so its absence rows go too.
+- Deleting an athlete (AVG) goes through `Opslag.atleet_verwijderen()`: it wipes
+  every table in `queries.ATLEET_TABELLEN`, one transaction per database, and
+  `personen.db` **last**, so a failure halfway (`OnvolledigVerwijderd`) leaves the
+  athlete in place and deleting again finishes it. A new table with `atleet_ref`
+  must be added to `ATLEET_TABELLEN` (`tests/test_atleet_verwijderen.py` fails
+  otherwise); a new table in `personen.db` with `atleet_id` needs
+  `ON DELETE CASCADE`.
 - Leerdoel ids are never reused or renumbered (scores point to them); retire a
   leerdoel with `actief = 0` in a migration. The old `leerlijn`/`leerlijn_stap`/
   `atleet_leerlijn` tables in `personen.db` predate `leerlijnen.db` and are superseded
-  by it (the old `Opslag.leerlijn*`/`voortgang*` methods still use them).
+  by it: no code uses them any more and they are always empty. They stay because
+  the baseline schema is frozen; never write to them, and drop them only in a
+  migration.
+- The old column `atleet.notities` in `personen.db` is unused and always empty
+  (notes live in `notities.db`); it stays because the baseline is frozen. Never
+  write to it.
 - Notes (`notities.db`) are free text: the pseudonym protects the link to the
   athlete, but not what is written in the text. Only the encryption protects
   that. Keep notes factual, no diagnoses, and don't name other athletes.
@@ -354,8 +386,11 @@ it only holds `.gitkeep`).
 
 - Every importer implements the shared interface in `importers/base.py`:
   `can_handle(url)` and `parse(url)`.
-- `importers/detect.py` picks the importer automatically by trying each
-  `can_handle(url)` until one matches. Register new importers there.
+- Every `Importer` subclass with a `bron` registers itself (`__init_subclass__`).
+  The app picks the importer it needs itself; `importers/detect.py`
+  (`kies_importer`) tries each `can_handle(url)` and its tests check that every
+  kind of link is claimed by exactly one importer. A new importer module must be
+  imported in `detect.py`, so those tests see it.
 - The atletiek.nu timetable importer (`importers/atletieknu_tijdschema.py`)
   reads `/wedstrijd/chronoloog/<id>/`; any meet link or id works. Duration only
   exists when the page has the timeline tab ('visueel'); otherwise it stays
@@ -416,7 +451,7 @@ it only holds `.gitkeep`).
   Event keys in rule files are the keys of the scoring table (`80mH`,
   `kogelstoten`, `4x80m`), or carry `punten:` when they differ (senior events
   `100m-V` / `100m-M` with `geslacht:` in the mixed ploeg `SEN`); categories are
-  codes like `U14-V`, `U16-M`, `SEN-V` (`categorie_code()`), or masters classes
+  codes like `U14-V`, `U16-M`, `SEN-V` (`ploeg.regels.ploegcategorie()`), or masters classes
   `V45` in a file with `leeftijdsklassen: masters` (`masters_code()`, age on the
   meet day; `V35+` in `toegestaan`/`specificatie` means "from V35"). Rule files
   exist for U14/U16, U18/U20, masters, NK Teams and senioren 1e/2e/3e divisie

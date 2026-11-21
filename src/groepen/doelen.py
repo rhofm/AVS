@@ -29,7 +29,7 @@ Geen SQL: alles via `Opslag`.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import date, timedelta
 from typing import Mapping
 
@@ -297,14 +297,14 @@ def _prs(db: Opslag, master_ids) -> dict[tuple[str, int], float]:
 def _met_pr(db: Opslag, c: _Cache, regels: list[Formregel]) -> list[Formregel]:
     prs = _prs(db, [r.atleet for r in regels])
     for r in regels:
-        if r.atleet and r.onderdeel.isdigit():
+        if r.atleet and r.onderdeel.isdecimal():
             w, o = prs.get((r.atleet, int(r.onderdeel))), c.onderdeel(int(r.onderdeel))
             r.pr = toon_waarde(w, o.eenheid) if w is not None and o else None
     return regels
 
 
 def _regels_uit(formulier: Mapping[str, str]) -> list[Formregel]:
-    nummers = sorted({int(k.split("-")[1]) for k in formulier if k.startswith("regel-") and k.split("-")[1].isdigit()})
+    nummers = sorted({int(k.split("-")[1]) for k in formulier if k.startswith("regel-") and k.split("-")[1].isdecimal()})
     uit = []
     for i in nummers:
         def v(naam):
@@ -368,7 +368,7 @@ def doelformulier(db: Opslag, *, groep_id: int | None = None, master_id: str | N
             a = db.atleet(r.atleet)
             if a:
                 atleten.append(a)
-    huidig = int(waarden["wedstrijd"]) if waarden["wedstrijd"].isdigit() else None
+    huidig = int(waarden["wedstrijd"]) if waarden["wedstrijd"].isdecimal() else None
     return Doelformulier(groep, atleet, doel, waarden, regels, atleten, db.onderdelen(), db.leerdoelen(),
                          _wedstrijdkeuze(db, huidig, vandaag))
 
@@ -377,7 +377,7 @@ def aanvullen(db: Opslag, f: Doelformulier) -> Doelformulier:
     """Voeg een regel toe per ingeschreven atleet (van de groep, of de atleet zelf) en onderdeel
     van de gekozen wedstrijd die er nog niet staat. De trainer vult de streefwaarden in."""
     wid = f.waarden.get("wedstrijd", "")
-    if not wid.isdigit() or db.wedstrijd(int(wid)) is None:
+    if not wid.isdecimal() or db.wedstrijd(int(wid)) is None:
         f.melding = "Kies eerst een wedstrijd; dan kunnen de inschrijvingen worden overgenomen."
         return f
     toegestaan = {a.master_id for a in f.atleten}
@@ -415,7 +415,7 @@ def _lees_regel(db: Opslag, c: _Cache, n: int, r: Formregel, persoonlijk_van: st
         raise OpslagFout(f"{wat}: kies een soort doel.")
     atleet = persoonlijk_van or (r.atleet or None)
     streef = None
-    onderdeel = int(r.onderdeel) if r.soort == "prestatie" and r.onderdeel.isdigit() else None
+    onderdeel = int(r.onderdeel) if r.soort == "prestatie" and r.onderdeel.isdecimal() else None
     if r.soort == "prestatie":
         o = c.onderdeel(onderdeel) if onderdeel else None
         if o is None:
@@ -429,7 +429,7 @@ def _lees_regel(db: Opslag, c: _Cache, n: int, r: Formregel, persoonlijk_van: st
     elif r.soort == "leerdoel":
         if not r.leerdoel or c.leerdoel(r.leerdoel) is None:
             raise OpslagFout(f"{wat}: kies een bestaand leerdoel (bijv. SPR-U14-02).")
-        if not r.streef.isdigit() or not 1 <= int(r.streef) <= 5:
+        if not r.streef.isdecimal() or not 1 <= int(r.streef) <= 5:
             raise OpslagFout(f"{wat}: de score is 1 tot en met 5.")
         streef = int(r.streef)
     elif not r.omschrijving:
@@ -461,7 +461,7 @@ def opslaan(db: Opslag, formulier: Mapping[str, str], *, groep_id: int | None = 
     if groep_id is None and not regels:
         raise OpslagFout("Vul minstens één regel in: wat wil de atleet bereiken?")
     try:
-        d = Doel(formulier.get("titel", ""), groep_id, int(wid) if wid.isdigit() else None,
+        d = Doel(formulier.get("titel", ""), groep_id, int(wid) if wid.isdecimal() else None,
                  _datum(formulier.get("startdatum"), "Vanaf"), _datum(formulier.get("datum"), "Streefdatum"),
                  formulier.get("beschrijving"), formulier.get("evaluatie"), regels,
                  oud.id if oud else None)

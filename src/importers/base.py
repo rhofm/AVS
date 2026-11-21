@@ -22,20 +22,17 @@ verbindingskenmerken en geven dan een 'Checking your browser'-pagina. Zet daarvo
 voordoet (pip install curl_cffi).
 
 Fouten tijdens het importeren (site onbereikbaar, geblokkeerd, niets gevonden) worden als
-ImportFout gegooid, met een melding die je direct aan de gebruiker kunt tonen. Een
-opdrachtregelscript vangt die op en stopt met sys.exit(str(fout)); de UI toont hem.
+ImportFout gegooid, met een melding die de UI direct aan de gebruiker toont.
 """
 
 from __future__ import annotations
 
-import csv
 import re
 import sys
 import time
-import unicodedata
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Callable, ClassVar, Iterable, Protocol
+from typing import Callable, ClassVar
 
 import requests
 
@@ -48,6 +45,10 @@ HEADERS = {
 }
 
 
+#: Wat atletiek.nu in plaats van de pagina toont aan programma's die hij niet vertrouwt.
+BROWSERCONTROLE = "Checking your browser"
+
+
 class ImportFout(Exception):
     """Importeren lukt niet; de tekst is bedoeld voor de gebruiker."""
 
@@ -57,13 +58,6 @@ class ImportFout(Exception):
 def clean(text: str) -> str:
     """Witruimte (ook harde spaties) samenvoegen tot enkele spaties en afknippen."""
     return re.sub(r"\s+", " ", (text or "").replace("\xa0", " ")).strip()
-
-
-def normaliseer(naam: str) -> str:
-    """Voor vergelijken: hoofdletterongevoelig, zonder accenten, enkele spaties."""
-    zonder_accent = "".join(c for c in unicodedata.normalize("NFKD", naam or "")
-                            if not unicodedata.combining(c))
-    return clean(zonder_accent).casefold()
 
 
 def to_number(prestatie: str) -> float | None:
@@ -89,80 +83,6 @@ def to_number(prestatie: str) -> float | None:
         return None
 
 
-def write_csv(path: str | Path, rows: list[dict], velden: Iterable[str] | None = None) -> None:
-    """CSV met ';' en utf-8-sig, zodat hij goed opent in Excel. `velden` = kolommen als rows leeg is."""
-    with open(path, "w", newline="", encoding="utf-8-sig") as f:
-        kolommen = list(rows[0].keys()) if rows else list(velden or [])
-        writer = csv.DictWriter(f, fieldnames=kolommen, delimiter=";")
-        writer.writeheader()
-        writer.writerows(rows)
-
-
-# --------------------------------------------------------------------------- filteren
-# Werkt op elke uitslag met de velden atleet, vereniging, team, estafette en lopers
-# (zoals de Uitslag-dataclasses van atletieknu_wedstrijd en seltec).
-
-class UitslagAchtig(Protocol):
-    atleet: str
-    vereniging: str
-    team: str
-    estafette: bool
-    lopers: str
-
-
-def naam_past(waarden: Iterable[str], gezocht: str) -> Callable[[str], bool]:
-    """
-    Geeft een functie die test of een naam (vereniging/team) overeenkomt: exact
-    (hoofdletterongevoelig) als die naam voorkomt, anders 'bevat'.
-    """
-    doel = normaliseer(gezocht)
-    if any(normaliseer(w) == doel for w in waarden):
-        return lambda w: normaliseer(w) == doel
-    return lambda w: bool(doel) and doel in normaliseer(w)
-
-
-def lopers_lijst(u: UitslagAchtig) -> list[str]:
-    return [n for n in (u.lopers or "").split(", ") if n]
-
-
-def namen_in_rij(u: UitslagAchtig) -> set[str]:
-    """Genormaliseerde atleetnamen in een rij: de lopers bij een estafette, anders de atleet."""
-    lopers = {normaliseer(n) for n in lopers_lijst(u)} if u.estafette else set()
-    return lopers or {normaliseer(u.atleet)}
-
-
-def filter_vereniging(uitslagen: list, vereniging: str) -> list:
-    """
-    Individuele uitslagen van atleten van de vereniging, plus estafettes waarin minstens één
-    van die atleten liep (de estafetterij zelf noemt vaak een andere club of 'Onbekend').
-    """
-    past = naam_past([u.vereniging for u in uitslagen], vereniging)
-    leden = {normaliseer(u.atleet) for u in uitslagen if not u.estafette and past(u.vereniging)}
-    return [u for u in uitslagen if past(u.vereniging)
-            or (u.estafette and leden & {normaliseer(n) for n in lopers_lijst(u)})]
-
-
-def filter_team(uitslagen: list, team: str) -> list:
-    """Alle uitslagen (individueel én estafettes) van één competitieteam, bv. 'Nijmegen Heren 1'."""
-    past = naam_past([u.team for u in uitslagen], team)
-    return [u for u in uitslagen if u.team and past(u.team)]
-
-
-def filter_atleten(uitslagen: list, namen: list[str]) -> tuple[list, list[str]]:
-    """
-    Uitslagen van deze atleten, inclusief estafettes waarin ze liepen.
-    Geeft (gevonden uitslagen, namen zonder uitslag) terug.
-    """
-    gezocht = {normaliseer(n): n for n in namen if clean(n)}
-    gevonden, aanwezig = [], set()
-    for u in uitslagen:
-        treffers = namen_in_rij(u) & gezocht.keys()
-        if treffers:
-            gevonden.append(u)
-            aanwezig |= treffers
-    return gevonden, [n for k, n in gezocht.items() if k not in aanwezig]
-
-
 # --------------------------------------------------------------------------- Importer
 
 class Importer(ABC):
@@ -175,6 +95,12 @@ class Importer(ABC):
     bron: ClassVar[str] = ""                  # 'atletieknu' / 'seltec' (kolom 'bron' in de database)
     site: ClassVar[str] = ""                  # naam voor meldingen, bv. "atletiek.nu"
     url_patronen: ClassVar[tuple[str, ...]] = ()   # regexen; één match = can_handle
+
+    # --- browsercontrole (controleer_pagina): tekst die alleen op een echte pagina staat, en
+    #     wat de trainer dan kan doen. Leeg = niet controleren.
+    echte_inhoud: ClassVar[tuple[str, ...]] = ()
+    browsercontrole_uitleg: ClassVar[str] = (
+        "Open de pagina in je browser, sla hem op (Ctrl+S, 'Alleen HTML') en importeer dat bestand.")
 
     # --- ophalen; per subklasse aan te passen
     headers: ClassVar[dict[str, str]] = HEADERS
@@ -244,7 +170,11 @@ class Importer(ABC):
         return resp.status_code in self.opnieuw_bij_status
 
     def controleer_pagina(self, html: str, url: str) -> None:
-        """Hook: gooi ImportFout als de pagina geen echte inhoud is (bv. een browsercontrole)."""
+        """ImportFout als de site een browsercontrole gaf in plaats van de pagina: dan staat
+        BROWSERCONTROLE erop en geen van `echte_inhoud`. Overschrijfbaar voor andere controles."""
+        if self.echte_inhoud and BROWSERCONTROLE in html and not any(t in html for t in self.echte_inhoud):
+            raise ImportFout(f"{self.site} gaf een browsercontrole-pagina terug voor {url}.\n"
+                             f"{self.browsercontrole_uitleg}")
 
     def haal_op(self, url: str) -> str:
         """
@@ -268,7 +198,7 @@ class Importer(ABC):
                 raise ImportFout(f"{self.site} blijft weigeren (status {resp.status_code}) voor {url}. "
                                  "Probeer het later opnieuw.")
             retry_after = resp.headers.get("Retry-After", "")
-            pauze = float(retry_after) if retry_after.isdigit() else wacht
+            pauze = float(retry_after) if retry_after.isdecimal() else wacht
             print(f"  {self.site} vraagt om rustiger aan te doen - {pauze:.0f} s wachten...", file=sys.stderr)
             time.sleep(pauze)
             wacht *= 2

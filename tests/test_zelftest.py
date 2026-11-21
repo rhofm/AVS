@@ -147,7 +147,7 @@ def test_kapotte_sleutelkluis_geeft_nette_fout(monkeypatch, tmp_path):
 
     gezien = {}
 
-    def nep_maak_app(map=None, hoofd=None, startfout=None, sleutelfout=True):
+    def nep_maak_app(map=None, hoofd=None, startfout=None, sleutelfout=True, ontbrekend=None):
         gezien.update(startfout=startfout, sleutelfout=sleutelfout)
         raise SystemExit
     monkeypatch.setattr(app_mod, "maak_app", nep_maak_app)

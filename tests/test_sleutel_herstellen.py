@@ -149,7 +149,7 @@ def test_start_melding(kluis, data, monkeypatch):
     """start() wijst naar Instellingen, niet naar de terminal."""
     gezien = {}
 
-    def nep_maak_app(map=None, hoofd=None, startfout=None, sleutelfout=True):
+    def nep_maak_app(map=None, hoofd=None, startfout=None, sleutelfout=True, ontbrekend=None):
         gezien.update(startfout=startfout, sleutelfout=sleutelfout)
         raise SystemExit                                # niet echt een server starten
 
