@@ -125,6 +125,10 @@ GEPSEUDONIMISEERD = ("prestaties", "testen", "trainingsschema", "absentie", "lee
 #: installatie nog ontbreken en worden dan vanzelf (leeg) aangemaakt. Alle andere ontbrekende
 #: databases zijn verloren of niet meegekopieerd: zie OntbrekendeDatabase.
 NIEUW_NA_BASIS: frozenset[str] = frozenset()
+#: Staat in de datamap zolang de allereerste start de databases nog aanmaakt. Is die start
+#: onderbroken (stroom weg, venster dicht), dan maakt de volgende start de rest gewoon af in
+#: plaats van te melden dat er databases verloren zijn: er waren nog geen gegevens.
+EERSTE_START = "eerste-start.bezig"
 
 KEYRING_DIENST = "AVS"
 KEYRING_NAAM = "hoofdsleutel"
@@ -542,10 +546,11 @@ def _init_een(database: str, map: Path | None, hoofd: bytes) -> int:
 
 def ontbrekende_databases(map: Path | None = None) -> list[str]:
     """Databases die er niet zijn terwijl er wel andere zijn (en die niet in NIEUW_NA_BASIS staan).
-    Leeg bij een volledige map én bij een lege map (eerste start)."""
+    Leeg bij een volledige map, bij een lege map (eerste start) en bij een onderbroken eerste
+    start (EERSTE_START staat er nog)."""
     map = Path(map) if map else standaard_map()
     bestaand = {db for db in DATABASES if db_pad(db, map).exists()}
-    if not bestaand:
+    if not bestaand or (map / EERSTE_START).exists():
         return []
     return [db for db in DATABASES if db not in bestaand and db not in NIEUW_NA_BASIS]
 
@@ -582,9 +587,14 @@ def init_db(map: Path | None = None, hoofd: str | bytes | None = None, *,
     ontbrekend = [db for db in ontbrekende_databases(map) if db not in set(lege_toestaan)]
     if ontbrekend:
         raise OntbrekendeDatabase(map, ontbrekend)
+    markering = map / EERSTE_START
+    if not any(db_pad(db, map).exists() for db in DATABASES):    # allereerste start
+        map.mkdir(parents=True, exist_ok=True)
+        markering.write_text("AVS maakt hier de databases aan.\n", encoding="utf-8")
     for database in DATABASES:
         versie = _init_een(database, map, hoofd)
         print(f"{database}.db up-to-date: versie {versie}")
+    markering.unlink(missing_ok=True)           # pas als alle databases er zijn
     return map
 
 
