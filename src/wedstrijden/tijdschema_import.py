@@ -38,7 +38,7 @@ from models import Onderdeel, ProgrammaOnderdeel, Wedstrijd
 from .planning import bron_uit_link, normaliseer_link
 
 
-_GEWICHT_TEKST = re.compile(r"\s*\d{1,2}(?:[.,]\d{1,3})?\s?kg\b", re.I)
+_SPECIFICATIE = re.compile(r"\s*\d{1,3}(?:[.,]\d{1,3})?\s?(?:kg|cm)\b", re.I)    # gewicht of hoogte: '3kg', '76,2cm'
 
 
 def _sleutel(naam: str) -> str:
@@ -50,16 +50,30 @@ def _sleutel(naam: str) -> str:
     return re.sub(r"[\s\-]+", "", t)
 
 
+def zoek_onderdelen(onderdelen: list[Onderdeel], naam: str, code: str = "") -> list[Onderdeel]:
+    """De onderdelen uit de lijst die bij deze naam of code horen.
+
+    Eén onderdeel bij een naam of code die precies past. Staat er in het tijdschema een gewicht of hoogte
+    die de lijst niet heeft ('Kogelstoten 3kg' tegen 'Kogelstoten'), dan telt het onderdeel zonder dat
+    als het er maar één is. Staat er geen gewicht of hoogte bij ('60m horden', terwijl de lijst
+    '60m horden 91,4cm' en '60m horden 106,7cm' heeft), dan horen alle varianten erbij: één tijdschemaregel
+    voor meerdere categorieën met elk een eigen hoogte. Anders: leeg.
+    """
+    namen = [x for x in (naam, code) if x]
+    gezocht = {_sleutel(x) for x in namen}
+    treffers = [o for o in onderdelen if _sleutel(o.naam) in gezocht]
+    if treffers:
+        return treffers if len(treffers) == 1 else []
+    zonder = {_sleutel(_SPECIFICATIE.sub("", x)) for x in namen}
+    if zonder != gezocht:                               # het tijdschema noemt een gewicht of hoogte
+        treffers = [o for o in onderdelen if _sleutel(o.naam) in zonder]
+        return treffers if len(treffers) == 1 else []
+    return [o for o in onderdelen if _sleutel(_SPECIFICATIE.sub("", o.naam)) in gezocht]
+
+
 def zoek_onderdeel(onderdelen: list[Onderdeel], naam: str, code: str = "") -> Onderdeel | None:
     """Het onderdeel uit de lijst met deze naam of code; None als er geen (of meer dan één) past."""
-    gezocht = {_sleutel(x) for x in (naam, code) if x}
-    treffers = [o for o in onderdelen if _sleutel(o.naam) in gezocht]
-    if not treffers:
-        # 'Kogelstoten 3kg' in het tijdschema, maar de lijst heeft alleen 'Kogelstoten': het gewicht
-        # zit dan in de groep (ProgrammaOnderdeel.gewicht), niet in het onderdeel.
-        zonder = {_sleutel(_GEWICHT_TEKST.sub("", x)) for x in (naam, code) if x}
-        if zonder != gezocht:
-            treffers = [o for o in onderdelen if _sleutel(o.naam) in zonder]
+    treffers = zoek_onderdelen(onderdelen, naam, code)
     return treffers[0] if len(treffers) == 1 else None
 
 
@@ -87,15 +101,18 @@ def naar_programma(wedstrijd_id: int, regels: list[TijdschemaRegel],
     """Regels van atletiek.nu -> regels voor wedstrijd_programma, en de namen die niet te koppelen waren."""
     uit, los = [], []
     for r in regels:
-        o = zoek_onderdeel(onderdelen, r.onderdeel, r.onderdeel_code)
-        if o is None and r.onderdeel not in los:
+        gevonden = zoek_onderdelen(onderdelen, r.onderdeel, r.onderdeel_code)
+        if not gevonden and r.onderdeel not in los:
             los.append(r.onderdeel)
-        uit.append(ProgrammaOnderdeel(
-            wedstrijd_id, date.fromisoformat(r.datum), r.starttijd,
-            onderdeel_id=o.id if o else None, onderdeel_tekst=r.onderdeel,
-            categorie=r.categorie or None, ronde=r.ronde, groep=r.groep, duur=r.duur,
-            opmerking=r.opmerking or None,
-        ))
+        # Meerdere varianten (horden van 91,4 en 106,7 cm): een regel per variant, met de naam van de variant,
+        # zodat elke atleet gekoppeld wordt aan de regel van het onderdeel waarvoor hij is ingeschreven.
+        for o in gevonden or [None]:
+            uit.append(ProgrammaOnderdeel(
+                wedstrijd_id, date.fromisoformat(r.datum), r.starttijd,
+                onderdeel_id=o.id if o else None, onderdeel_tekst=o.naam if o and len(gevonden) > 1 else r.onderdeel,
+                categorie=r.categorie or None, ronde=r.ronde, groep=r.groep, duur=r.duur,
+                opmerking=r.opmerking or None,
+            ))
     return uit, los
 
 

@@ -9,12 +9,12 @@ from datetime import date
 
 from db.queries import OpslagFout
 from importers import detect
-from importers.atletieknu_tijdschema import (AtletiekNuTijdschemaImporter, groep_uit,
+from importers.atletieknu_tijdschema import (AtletiekNuTijdschemaImporter, TijdschemaRegel, groep_uit,
                                              laad_tijdschema)
 from importers.base import ImportFout
 from models import Atleet, Inschrijving, Onderdeel, lees_categorie
 from wedstrijden import chronoloog, planning
-from wedstrijden.tijdschema_import import tijdschema_importeren, zoek_onderdeel
+from wedstrijden.tijdschema_import import naar_programma, tijdschema_importeren, zoek_onderdeel, zoek_onderdelen
 from hulp import opslag, verwacht as _verwacht
 from voorbeeld_wedstrijd import MEERKAMP, TEAMS, NepImporter
 
@@ -148,3 +148,16 @@ def test_zoek_onderdeel_zonder_gewicht_in_de_lijst():
     kogel = Onderdeel("Kogelstoten", "afstand", False, "werpen", id=7)
     assert zoek_onderdeel([kogel], "Kogelstoten 3kg").id == 7
     assert zoek_onderdeel([kogel], "Discuswerpen 1kg") is None
+
+
+def test_een_horden_regel_voor_meerdere_hoogtes():
+    horden = [Onderdeel(n, "tijd", True, "horden", id=i) for i, n in
+              ((1, "60 meter horden 106,7cm"), (2, "60 meter horden 91,4cm"), (3, "60 meter"))]
+    assert [o.id for o in zoek_onderdelen(horden, "60m horden")] == [1, 2]
+    assert zoek_onderdeel(horden, "60m horden") is None
+    assert zoek_onderdeel(horden, "60m horden 91,4cm").id == 2
+    assert zoek_onderdelen(horden, "60m horden 99cm") == []
+    regel = TijdschemaRegel("2027-01-16", "10:00", "", None, "60m horden", "", "Mannen", None, "", "", "")
+    programma, los = naar_programma(7, [regel], horden)
+    assert not los and [(p.onderdeel_id, p.onderdeel_tekst) for p in programma] == [
+        (1, "60 meter horden 106,7cm"), (2, "60 meter horden 91,4cm")]
