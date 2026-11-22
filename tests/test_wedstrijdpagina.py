@@ -5,47 +5,16 @@ inschrijven (ook vanuit een regel van het tijdschema), afmelden en de import.
 Alleen nepgegevens en een vaste testsleutel; niets van internet.
 """
 
-import contextlib
 import re
-from datetime import date, timedelta
-from pathlib import Path
+from datetime import timedelta
 
 from atleten import beheer
 from db.queries import OpslagFout
-from models import Onderdeel, ProgrammaOnderdeel
 from wedstrijden import detail, planning
-from hulp import app_client, lege_opslag, verwacht as _verwacht
+from hulp import app_client, verwacht as _verwacht
+from voorbeeld_wedstrijd import DAG, MEERKAMP, VANDAAG, opslag
 
-FIXTURE = Path(__file__).resolve().parent / "fixtures" / "atletieknu_tijdschema" / "meerkamp.html"
-DAG = date.today() + timedelta(days=8)
-
-
-@contextlib.contextmanager
-def opslag():
-    """(Opslag, map, ids) met een wedstrijd, een tijdschema en drie nep-atleten."""
-    with lege_opslag() as (db, tmp):
-        honderd = db.onderdeel_opslaan(Onderdeel("100m", "tijd", True, "sprint"))
-        ver = db.onderdeel_opslaan(Onderdeel("Verspringen", "afstand", False, "springen"))
-        kogel = db.onderdeel_opslaan(Onderdeel("Kogelstoten", "afstand", False, "werpen"))
-        jaar = DAG.year - 15                                         # U16 op de wedstrijddag
-        anna = beheer.nieuwe_atleet(db, "Anna", "Voorbeeld", geslacht="V", geboortedatum=f"{jaar}-03-14").master_id
-        bram = beheer.nieuwe_atleet(db, "Bram", "Test", geslacht="M", geboortedatum=f"{jaar}-05-01").master_id
-        cees = beheer.nieuwe_atleet(db, "Cees", "Nep", geslacht="M", geboortedatum=f"{DAG.year - 11}").master_id  # U12
-        w = planning.plan_wedstrijd(db, "Clubkampioenschappen", DAG, "Sportpark",
-                                    link="https://www.atletiek.nu/wedstrijd/main/45678/")
-        regels = [
-            ProgrammaOnderdeel(w.id, DAG, "10:00", honderd.id, categorie="Meisjes U16", ronde="serie", duur=30),
-            ProgrammaOnderdeel(w.id, DAG, "10:15", ver.id, categorie="MU16", groep=1, duur=45),
-            ProgrammaOnderdeel(w.id, DAG, "10:30", honderd.id, categorie="Jongens U16", duur=30),
-            ProgrammaOnderdeel(w.id, DAG, "11:00", kogel.id, categorie="Jongens U12"),
-            ProgrammaOnderdeel(w.id, DAG, "11:30", onderdeel_tekst="Hoogspringen", categorie="U14"),
-        ]
-        db.programma_vervangen(w.id, regels)
-        planning.inschrijven(db, w.id, anna, ["100m", "Verspringen"])     # 100m 10:00 en ver 10:15: botsing
-        planning.inschrijven(db, w.id, bram, ["100m", "Verspringen"])     # ver is alleen voor meisjes
-        ids = dict(w=w.id, anna=anna, bram=bram, cees=cees, honderd=honderd.id, ver=ver.id, kogel=kogel.id,
-                   regels=[r.id for r in regels])
-        yield db, Path(tmp), ids
+VASTE_VANDAAG = VANDAAG   # zie conftest.py; de wedstrijd is over 8 dagen
 
 
 def test_detail():
@@ -175,7 +144,7 @@ def test_import_route():
     with opslag() as (db, tmp, ids):
         c = app_client(tmp)
         # Een opgeslagen pagina werkt als 'link' (niets van internet).
-        r = c.post(f"/wedstrijd/{ids['w']}/tijdschema", data={"link": str(FIXTURE)})
+        r = c.post(f"/wedstrijd/{ids['w']}/tijdschema", data={"link": str(MEERKAMP)})
         assert r.status_code == 302
         html = c.get(f"/wedstrijd/{ids['w']}").get_data(as_text=True)
         assert "Tijdschema geïmporteerd" in html

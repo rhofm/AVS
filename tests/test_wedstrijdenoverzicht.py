@@ -10,7 +10,7 @@ import re
 from datetime import date, timedelta
 from pathlib import Path
 
-from test_landingspagina import VANDAAG, opslag, voorbeeld
+from voorbeeld_atleet import VANDAAG, opslag, voorbeeld
 
 from atleten import beheer
 from db.queries import Opslag

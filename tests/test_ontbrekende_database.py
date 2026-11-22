@@ -12,8 +12,7 @@ import pytest
 from db import init_db as db_init
 from db.init_db import InstallatieFout, OntbrekendeDatabase, db_pad, init_db, verbind
 from db.queries import Opslag
-from hulp import TESTSLEUTEL, lege_databases
-from test_sleutel_herstellen import SLEUTEL, _app_zonder_sleutel, data, kluis  # noqa: F401 (fixtures)
+from hulp import SLEUTEL, TESTSLEUTEL, app_zonder_sleutel, lege_databases
 from ui.app import maak_app
 
 
@@ -61,8 +60,8 @@ def test_bewust_leeg_beginnen(map_met_anna):
 def test_oude_installatie_hoort_eerst_over_de_versie(map_met_anna):
     """Een installatie van vóór de samenvoeging mist misschien een database die toen nog niet
     bestond. Dan geldt 'start eerst de vorige AVS', niet 'bestand verloren'."""
-    from test_sql_bestanden import _zet_versie
-    _zet_versie(map_met_anna, "personen", db_init.basisversie("personen") - 1)
+    from hulp import zet_versie
+    zet_versie(map_met_anna, "personen", db_init.basisversie("personen") - 1)
     db_pad("trainingsschema", map_met_anna).unlink()
     with pytest.raises(InstallatieFout) as e:
         _init(map_met_anna)
@@ -153,7 +152,7 @@ def test_knop_alleen_bij_ontbrekend_bestand(tmp_path):
 
 def test_sleutel_herstellen_en_dan_ontbrekend_bestand(kluis, data):
     db_pad("leerdoelscores", data).unlink()
-    c = _app_zonder_sleutel(data)
+    c = app_zonder_sleutel(data)
     r = c.post("/instellingen/sleutel", data={"herstelsleutel": SLEUTEL})
     assert r.status_code == 302 and kluis["sleutel"] == bytes.fromhex(SLEUTEL)
     html = c.get("/atleten").get_data(as_text=True)

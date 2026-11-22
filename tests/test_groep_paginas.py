@@ -1,13 +1,13 @@
 """Tests voor de pagina's onder een groep: groepen/overzichten.py, groepen/trainingen.py en de routes.
 
-Gebruikt de nepgroep uit test_groep_landingspagina (alleen nepgegevens, testsleutel).
+Gebruikt de nepgroep uit voorbeeld_groep.py (alleen nepgegevens, testsleutel).
 
 """
 
 import re
 from datetime import date
 
-from test_groep_landingspagina import MAANDAG, VANDAAG, opslag, voorbeeldgroep
+from voorbeeld_groep import MAANDAG, VANDAAG, opslag, voorbeeldgroep
 
 from atleten import beheer, prestaties
 from db.queries import OpslagFout

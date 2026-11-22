@@ -11,9 +11,8 @@ from pathlib import Path
 
 import pytest
 
-from test_tijdschema_import import MEERKAMP
+from voorbeeld_wedstrijd import BROWSERCONTROLE, MEERKAMP, opslag_met_100m
 from hulp import app_client
-from test_wedstrijd_nieuw import BROWSERCONTROLE, opslag
 
 from db.queries import OpslagFout
 from wedstrijden import detail, planning, tijdschema_import
@@ -29,7 +28,7 @@ def _wedstrijd(db, d=date(2026, 8, 29)):
 # ---------------------------------------------------------------- met de hand
 
 def test_regel_toevoegen_en_verwijderen():
-    with opslag() as (db, _):
+    with opslag_met_100m() as (db, _):
         w = _wedstrijd(db)
         o = db.onderdelen()[0]
         r = detail.regel_toevoegen(db, w.id, NieuweRegel(tijd="10:30", onderdeel_id=str(o.id), duur="15",
@@ -55,7 +54,7 @@ def test_regel_toevoegen_en_verwijderen():
     NieuweRegel(tijd="10:00", onderdeel_id="9999"),
 ])
 def test_regel_toevoegen_fouten(invoer):
-    with opslag() as (db, _):
+    with opslag_met_100m() as (db, _):
         w = _wedstrijd(db)
         with pytest.raises(OpslagFout):
             detail.regel_toevoegen(db, w.id, invoer)
@@ -63,7 +62,7 @@ def test_regel_toevoegen_fouten(invoer):
 
 
 def test_regel_verwijderen_van_een_andere_wedstrijd():
-    with opslag() as (db, _):
+    with opslag_met_100m() as (db, _):
         a, b = _wedstrijd(db), planning.plan_wedstrijd(db, "Andere", date(2026, 9, 1))
         r = detail.regel_toevoegen(db, a.id, NieuweRegel(tijd="10:00", onderdeel_tekst="Kogel"))
         with pytest.raises(OpslagFout):
@@ -74,7 +73,7 @@ def test_regel_verwijderen_van_een_andere_wedstrijd():
 # ---------------------------------------------------------------- uploaden
 
 def test_upload_atletieknu_pagina():
-    with opslag() as (db, _):
+    with opslag_met_100m() as (db, _):
         w = _wedstrijd(db)
         detail.regel_toevoegen(db, w.id, NieuweRegel(tijd="08:00", onderdeel_tekst="Oud"))
         v = tijdschema_import.tijdschema_uit_bestanden(db, w.id, [("meerkamp.html", MEERKAMP.read_bytes())])
@@ -83,7 +82,7 @@ def test_upload_atletieknu_pagina():
 
 
 def test_upload_seltec_dagpaginas_samen():
-    with opslag() as (db, _):
+    with opslag_met_100m() as (db, _):
         w = _wedstrijd(db, date(2026, 10, 10))
         v = tijdschema_import.tijdschema_uit_bestanden(
             db, w.id, [(n, (SELTEC / n).read_bytes()) for n in ("nk_dag1.html", "nk_dag2.html")])
@@ -91,7 +90,7 @@ def test_upload_seltec_dagpaginas_samen():
 
 
 def test_upload_fouten_laten_het_oude_schema_staan():
-    with opslag() as (db, _):
+    with opslag_met_100m() as (db, _):
         w = _wedstrijd(db)
         detail.regel_toevoegen(db, w.id, NieuweRegel(tijd="08:00", onderdeel_tekst="Blijft"))
         for bestanden in ([], [("a.html", b"")], [("a.html", BROWSERCONTROLE.encode())],
@@ -105,7 +104,7 @@ def test_upload_fouten_laten_het_oude_schema_staan():
 def test_upload_laat_niets_achter_op_schijf(tmp_path, monkeypatch):
     import tempfile
     monkeypatch.setattr(tempfile, "tempdir", str(tmp_path))
-    with opslag() as (db, _):
+    with opslag_met_100m() as (db, _):
         w = _wedstrijd(db)
         tijdschema_import.tijdschema_uit_bestanden(db, w.id, [("m.html", MEERKAMP.read_bytes())])
     assert list(tmp_path.iterdir()) == []
@@ -114,7 +113,7 @@ def test_upload_laat_niets_achter_op_schijf(tmp_path, monkeypatch):
 # ---------------------------------------------------------------- routes
 
 def test_routes():
-    with opslag() as (db, tmp):
+    with opslag_met_100m() as (db, tmp):
         w = _wedstrijd(db)
         c = app_client(tmp)
         pagina = c.get(f"/wedstrijd/{w.id}/tijdschema/regels").get_data(as_text=True)

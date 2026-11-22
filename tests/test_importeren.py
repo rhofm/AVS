@@ -6,7 +6,7 @@ Tijdelijke map met versleutelde databases, vaste testsleutel, alleen nepgegevens
 
 import re
 
-from test_startpagina import opslag
+from voorbeeld_atleet import opslag_met_map
 
 from ui import importeren
 from hulp import app_client
@@ -22,7 +22,7 @@ def test_keuzes():
 
 
 def test_importeerpagina():
-    with opslag() as (_, tmp):
+    with opslag_met_map() as (_, tmp):
         c = app_client(tmp)
         r = c.get("/importeren")
         html = r.get_data(as_text=True)
@@ -41,7 +41,7 @@ def test_importeerpagina():
 
 
 def test_importpaginas_werken_en_gaan_terug_naar_importeren():
-    with opslag() as (_, tmp):
+    with opslag_met_map() as (_, tmp):
         c = app_client(tmp)
         r = c.get("/importeren/groep")
         html = r.get_data(as_text=True)
@@ -53,7 +53,7 @@ def test_importpaginas_werken_en_gaan_terug_naar_importeren():
 
 
 def test_atleet_en_wedstrijd_sturen_door_naar_formulieren():
-    with opslag() as (_, tmp):
+    with opslag_met_map() as (_, tmp):
         c = app_client(tmp)
         for soort, doel, kop in (("atleet", "/atleten/nieuw", "Nieuwe atleet"),
                                  ("wedstrijd", "/wedstrijden/nieuw", "Nieuwe wedstrijd")):
@@ -63,7 +63,7 @@ def test_atleet_en_wedstrijd_sturen_door_naar_formulieren():
 
 
 def test_startpagina_knop_gaat_naar_importeren():
-    with opslag() as (_, tmp):
+    with opslag_met_map() as (_, tmp):
         c = app_client(tmp)
         assert 'href="/importeren"' in c.get("/").get_data(as_text=True)
         assert "Deze pagina komt nog" not in c.get("/importeren").get_data(as_text=True)

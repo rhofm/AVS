@@ -7,7 +7,7 @@ Alleen nep-atleten en een vaste testsleutel.
 import csv
 import io
 
-from test_ploegen import BESTAND, DAG, opslag
+from voorbeeld_ploeg import BESTAND, DAG, opslag
 
 from db.queries import Opslag
 from models import Inzet, Onderdeel, Ploeg, PloegLid, Wedstrijd

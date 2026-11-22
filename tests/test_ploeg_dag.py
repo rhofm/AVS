@@ -8,7 +8,7 @@ Alleen nepgegevens.
 import contextlib
 from datetime import date, timedelta
 
-from test_ploegen import BESTAND, DAG, JAAR, opslag
+from voorbeeld_ploeg import BESTAND, DAG, JAAR, opslag
 
 from atleten import beheer
 from db.queries import Opslag

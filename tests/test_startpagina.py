@@ -4,30 +4,16 @@ Tijdelijke map met versleutelde databases, vaste testsleutel, alleen nepgegevens
 
 """
 
-import contextlib
 import re
 from datetime import timedelta
-from pathlib import Path
 
-from test_landingspagina import VANDAAG, voorbeeld
-
-from models import Onderdeel
 from ui import startpagina
-from hulp import app_client, lege_opslag
-
-
-@contextlib.contextmanager
-def opslag(met_voorbeeld: bool = True):
-    with lege_opslag() as (db, tmp):
-        if met_voorbeeld:
-            db.onderdeel_opslaan(Onderdeel("100m", "tijd", True, "sprint"))
-            db.onderdeel_opslaan(Onderdeel("Verspringen", "afstand", False, "springen"))
-            voorbeeld(db)
-        yield db, Path(tmp)
+from hulp import app_client
+from voorbeeld_atleet import VANDAAG, opslag_met_map
 
 
 def test_tegels_volgorde_en_cijfers():
-    with opslag() as (db, _):
+    with opslag_met_map() as (db, _):
         t = startpagina.tegels(db, VANDAAG)
         assert [x.sleutel for x in t] == ["atleten", "groepen", "ploegen", "wedstrijden"]
         atleten, groepen, ploegen, wedstrijden = t
@@ -43,14 +29,14 @@ def test_tegels_volgorde_en_cijfers():
 
 
 def test_tegels_lege_database():
-    with opslag(met_voorbeeld=False) as (db, _):
+    with opslag_met_map(met_voorbeeld=False) as (db, _):
         t = startpagina.tegels(db, VANDAAG)
         assert [x.cijfer for x in t] == ["0", "0", "0", "0"]
         assert t[0].cijfer_label == "actieve atleten"
 
 
 def test_startpagina_route():
-    with opslag() as (_, tmp):
+    with opslag_met_map() as (_, tmp):
         c = app_client(tmp)
         r = c.get("/")
         html = r.get_data(as_text=True)

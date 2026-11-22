@@ -12,9 +12,8 @@ import sqlcipher3
 from db.init_db import DATABASES, GEPSEUDONIMISEERD
 from db.queries import ATLEET_TABELLEN, OnvolledigVerwijderd
 from models import Absentie, Groep, Notitie, Prestatie, Test, Testresultaat, Trainingsschema, Training
-from test_app import client
-from test_queries import _basis, opslag
-from hulp import tekst
+from voorbeeld_atleet import basis_atleten, client
+from hulp import opslag, tekst
 
 #: Kolommen die een persoon aanwijzen en daarom alleen in personen.db mogen staan.
 PERSOONSKOLOMMEN = {"master_id", "atleet_id", "voornaam", "achternaam", "geboortedatum",
@@ -82,7 +81,7 @@ class _Kapot:
 
 
 def _vul(db):
-    anna, tim, *_ = _basis(db)
+    anna, tim, *_ = basis_atleten(db)
     db.prestatie_opslaan(Prestatie("100m", date(2026, 6, 1), 12.9, wind=0.5).gekoppeld(anna.master_id))
     t = db.test_opslaan(Test("30m vliegend", "s", True))
     db.testresultaat_opslaan(Testresultaat(anna.master_id, t.id, date(2026, 10, 1), 3.9))

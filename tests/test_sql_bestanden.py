@@ -16,7 +16,7 @@ import pytest
 from db import init_db as db_init
 from db.init_db import DATABASES, InstallatieFout, controleer_sql_bestanden, init_db, verbind
 from ui.app import maak_app
-from hulp import TESTSLEUTEL
+from hulp import TESTSLEUTEL, zet_versie
 
 
 @pytest.fixture
@@ -80,13 +80,6 @@ def test_lege_of_dubbele_migratie(sql_kopie):
         controleer_sql_bestanden()
 
 
-def _zet_versie(map: Path, database: str, versie: int) -> None:
-    """Doe alsof een database op een andere versie staat (alleen schema_version)."""
-    with contextlib.closing(verbind(database, map, TESTSLEUTEL)) as c, c:
-        c.execute("DELETE FROM schema_version")
-        c.execute("INSERT INTO schema_version (versie) VALUES (?)", (versie,))
-
-
 def _nieuwe_migratie(sql_kopie: Path, database: str) -> int:
     """Een extra (onschuldige) migratie na de nieuwste versie. Geeft het nummer."""
     nummer = db_init.nieuwste_versie(database) + 1
@@ -145,7 +138,7 @@ def test_database_nieuwer_dan_avs(sql_kopie, tmp_path):
     prestaties_voor = _versie(data, "prestaties")
     _nieuwe_migratie(sql_kopie, "prestaties")       # prestaties.db kan nog worden bijgewerkt, maar
     te_nieuw = db_init.nieuwste_versie("personen") + 1
-    _zet_versie(data, "personen", te_nieuw)         # personen.db komt van een nieuwere AVS
+    zet_versie(data, "personen", te_nieuw)         # personen.db komt van een nieuwere AVS
     with pytest.raises(InstallatieFout, match=f"personen.db is versie {te_nieuw}, maar deze AVS kent"):
         _stil(init_db, data, hoofd=TESTSLEUTEL)
     assert _versie(data, "prestaties") == prestaties_voor           # niet half bijgewerkt
@@ -158,7 +151,7 @@ def test_database_ouder_dan_basisversie(sql_kopie, tmp_path):
     prestaties_voor = _versie(data, "prestaties")
     _nieuwe_migratie(sql_kopie, "prestaties")
     te_oud = db_init.basisversie("personen") - 1
-    _zet_versie(data, "personen", te_oud)
+    zet_versie(data, "personen", te_oud)
     with pytest.raises(InstallatieFout) as e:
         _stil(init_db, data, hoofd=TESTSLEUTEL)
     melding = str(e.value)

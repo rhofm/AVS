@@ -4,8 +4,7 @@ Alleen nepgegevens en een vaste testsleutel.
 """
 
 
-from test_app import client
-from test_landingspagina import VANDAAG, opslag, voorbeeld
+from voorbeeld_atleet import VANDAAG, client, opslag, voorbeeld
 
 from atleten import trainingsschema
 from db.queries import Opslag, OpslagFout

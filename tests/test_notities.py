@@ -5,8 +5,7 @@ Alleen nepgegevens en een vaste testsleutel.
 
 from datetime import date, timedelta
 
-from test_app import client
-from test_landingspagina import VANDAAG, opslag, voorbeeld
+from voorbeeld_atleet import VANDAAG, client, opslag, voorbeeld
 
 from atleten import beheer, notities
 from db.queries import Opslag, OpslagFout

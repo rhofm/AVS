@@ -7,17 +7,17 @@ niet is geïnstalleerd.
 
 import importlib.util
 
-from test_trainingen_inhoud import _basis, opslag
+from voorbeeld_training import basis_training
+from hulp import app_client, lege_opslag as opslag
 
 from groepen import trainingen as trainingsbeheer
 from ui import export
-from hulp import app_client
 
 HEEFT_FPDF = importlib.util.find_spec("fpdf") is not None
 
 
 def _met_variant(db):
-    anna, bas, cor, buiten, g, t = _basis(db)
+    anna, bas, cor, buiten, g, t = basis_training(db)
     db.groep_trainingsdagen_opslaan(g.id, {"dinsdag": "18:30"})
     trainingsbeheer.variant_toevoegen(db, t.id, {"onderwerp": "Revalidatie", "kern_a": "30 min fietsen"},
                                       [anna.master_id])

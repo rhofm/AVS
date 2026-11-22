@@ -7,8 +7,8 @@ from atleten import beheer, nieuw
 from groepen.atleten_uit_csv import lees_atletieknu_id
 from importers.atletieknu_prs import atleet_id_uit
 from models import Atleet, Wedstrijd
-from test_app import client, tekst
-from test_queries import opslag
+from voorbeeld_atleet import client
+from hulp import opslag, tekst
 
 
 # ---------------- cijfers die geen gewone cijfers zijn ----------------

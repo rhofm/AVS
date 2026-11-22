@@ -11,22 +11,13 @@ Alleen nepgegevens en een testsleutel.
 
 from datetime import date, timedelta
 
-from test_groep_landingspagina import MAANDAG, VANDAAG, opslag, voorbeeldgroep
+from voorbeeld_groep import MAANDAG, VANDAAG, opslag, voorbeeldgroep
 
 import instellingen
-from db.queries import OpslagFout
 from groepen import periodeplan
 from groepen import trainingen as trainingsbeheer
 from models import Fase, Groep, Mesocyclus, Periode, Periodisering
-from hulp import app_client
-
-
-def _fout(f, *, soort=OpslagFout):
-    try:
-        f()
-    except soort as e:
-        return str(e)
-    raise AssertionError("verwachtte een fout")
+from hulp import app_client, foutmelding
 
 
 # ============================================================
@@ -47,7 +38,7 @@ def test_fase_op_datum():
     assert p.fase_op(date(2027, 9, 5)).naam == "Overgang / rust"
     assert p.fase_op(date(2027, 9, 6)) is None                        # 'Geen' stopt de periodisering
     assert Periodisering([Fase(date(2026, 1, 1), "WP")]).fase_op(date(2030, 1, 1)).fase == "WP"   # loopt door
-    _fout(lambda: Fase(date(2026, 1, 1), "V3"), soort=ValueError)
+    foutmelding(lambda: Fase(date(2026, 1, 1), "V3"), soort=ValueError)
 
 
 def test_fase_blokken():
@@ -73,7 +64,7 @@ def test_mesocyclus():
     assert (w.nummer, w.begin) == (1, date(2026, 11, 2))
     assert Mesocyclus(date(2026, 1, 5), 2, ["a", "b", "c"]).weeknamen == ["a", "b"]   # te veel namen vervallen
     for weken in (0, 13):
-        _fout(lambda: Mesocyclus(date(2026, 1, 5), weken), soort=ValueError)
+        foutmelding(lambda: Mesocyclus(date(2026, 1, 5), weken), soort=ValueError)
 
 
 def test_periodisering_samen():
@@ -114,13 +105,13 @@ def test_opslag():
         assert [m.startdatum for m in db.mesocycli(g.id)] == [date(2026, 11, 2), date(2027, 1, 4)]
         assert db.personen.execute("SELECT COUNT(*) FROM mesocyclus_week").fetchone()[0] == 6   # oude weken weg
 
-        assert "dezelfde dag" in _fout(lambda: db.groep_fasen_opslaan(
+        assert "dezelfde dag" in foutmelding(lambda: db.groep_fasen_opslaan(
             g.id, [Fase(date(2026, 1, 5), "V1"), Fase(date(2026, 1, 5), "V2")]))
-        assert "dezelfde dag" in _fout(lambda: db.mesocycli_opslaan(
+        assert "dezelfde dag" in foutmelding(lambda: db.mesocycli_opslaan(
             g.id, [Mesocyclus(date(2026, 1, 5), 2), Mesocyclus(date(2026, 1, 5), 3)]))
         assert [f.fase for f in db.groep_fasen(g.id)] == ["Rust"]                       # niets veranderd
-        _fout(lambda: db.groep_fasen_opslaan(9999, []))
-        _fout(lambda: db.mesocycli_opslaan(9999, []))
+        foutmelding(lambda: db.groep_fasen_opslaan(9999, []))
+        foutmelding(lambda: db.mesocycli_opslaan(9999, []))
 
         db.groep_fasen_opslaan(g.id, [])
         db.mesocycli_opslaan(g.id, [])
@@ -159,9 +150,9 @@ def test_opslaan_vanuit_formulier():
                             ({"meso-0-weken": "13"}, "1 tot 12 weken"),
                             ({"fasestart-1": "2026-10-05"}, "dezelfde dag"),
                             ({"meso-1-start": "2026-10-09"}, "na het verschuiven")):   # zelfde week als meso-0
-            assert tekst in _fout(lambda: periodeplan.opslaan(db, g.id, _formulier(**fout))), fout
+            assert tekst in foutmelding(lambda: periodeplan.opslaan(db, g.id, _formulier(**fout))), fout
         assert [f.fase for f in db.groep_fasen(g.id)] == ["V1"]                       # niets opgeslagen
-        _fout(lambda: periodeplan.opslaan(db, 9999, _formulier()))
+        foutmelding(lambda: periodeplan.opslaan(db, 9999, _formulier()))
 
 
 def test_week_op_zondag():
@@ -244,10 +235,10 @@ def test_kopieren():
         db.groep_fasen_opslaan(bron.id, [Fase(date(2026, 9, 7), "Rust")])
         assert [f.fase for f in db.groep_fasen(a.id)] == ["V1", "WP"]
 
-        assert "Kies wat" in _fout(lambda: periodeplan.kopieren(db, bron.id, [a.id], fasen=False, cycli=False))
-        assert "minstens één" in _fout(lambda: periodeplan.kopieren(db, bron.id, [], fasen=True, cycli=True))
-        _fout(lambda: periodeplan.kopieren(db, bron.id, [bron.id], fasen=True, cycli=True))
-        _fout(lambda: periodeplan.kopieren(db, bron.id, [9999], fasen=True, cycli=True))
+        assert "Kies wat" in foutmelding(lambda: periodeplan.kopieren(db, bron.id, [a.id], fasen=False, cycli=False))
+        assert "minstens één" in foutmelding(lambda: periodeplan.kopieren(db, bron.id, [], fasen=True, cycli=True))
+        foutmelding(lambda: periodeplan.kopieren(db, bron.id, [bron.id], fasen=True, cycli=True))
+        foutmelding(lambda: periodeplan.kopieren(db, bron.id, [9999], fasen=True, cycli=True))
         assert periodeplan.kopieerpagina(db, 9999) is None
 
 

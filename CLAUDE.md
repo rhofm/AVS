@@ -533,6 +533,9 @@ feature/<naam>  →  dev  →  staging  →  main
 
 - Keep the UI simple for non-technical users; put the complexity in the back end.
 - Write tests for new logic (`tests/`); importers and team selection especially.
+  Shared helpers go in `tests/hulp.py` (fixtures in `conftest.py`), shared fake data in
+  `tests/voorbeeld_*.py`; a test file never imports from another test file
+  (`tests/test_testopzet.py` checks this).
 - Tests that use fixed dates (a `VANDAAG`, a birth year, a meet day) while the
   code under test falls back to `date.today()` must freeze it: put
   `VASTE_VANDAAG = date(...)` (or `= VANDAAG`) at module level; the autouse fixture

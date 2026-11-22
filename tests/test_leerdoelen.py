@@ -9,16 +9,8 @@ from pathlib import Path
 
 from db.init_db import pseudoniem, verbind
 from db.queries import Opslag, OpslagFout
-from models import CATEGORIEEN, Atleet, Leerdoel, LeerdoelScore
-from hulp import TESTSLEUTEL, lege_map, opslag
-
-
-def _verwacht_fout(fout, functie, *args):
-    try:
-        functie(*args)
-    except fout:
-        return
-    raise AssertionError(f"{fout.__name__} verwacht")
+from models import CATEGORIEEN, Atleet, LeerdoelScore
+from hulp import TESTSLEUTEL, lege_map, opslag, verwacht
 
 
 # ---------- catalogus ----------
@@ -49,7 +41,7 @@ def test_filter_categorie_doorlopend_en_leerlijn():
         assert len(tot_u12) == len(db.leerdoelen("U10")) + len(u12)
         sprint = db.leerdoelen(leerlijn="SPR")
         assert [d.id for d in sprint][:2] == ["SPR-U10-01", "SPR-U10-02"]
-        _verwacht_fout(OpslagFout, db.leerdoelen, "U11")
+        verwacht(OpslagFout, db.leerdoelen, "U11")
 
 
 def test_specialisten_en_scoreschaal():
@@ -104,11 +96,11 @@ def test_breed_overzicht():
 def test_ongeldige_scores_geweigerd():
     with opslag() as db:
         anna = db.atleet_opslaan(Atleet("Anna", "Aalbers"))
-        _verwacht_fout(ValueError, LeerdoelScore, anna.master_id, "SPR-U10-01", 6, date(2026, 9, 1))
-        _verwacht_fout(ValueError, LeerdoelScore, anna.master_id, "SPR-U10-01", 0, date(2026, 9, 1))
-        _verwacht_fout(OpslagFout, db.leerdoelscores_opslaan,
+        verwacht(ValueError, LeerdoelScore, anna.master_id, "SPR-U10-01", 6, date(2026, 9, 1))
+        verwacht(ValueError, LeerdoelScore, anna.master_id, "SPR-U10-01", 0, date(2026, 9, 1))
+        verwacht(OpslagFout, db.leerdoelscores_opslaan,
                        [LeerdoelScore(anna.master_id, "XXX-U10-01", 3, date(2026, 9, 1))])
-        _verwacht_fout(OpslagFout, db.leerdoelscores_opslaan,
+        verwacht(OpslagFout, db.leerdoelscores_opslaan,
                        [LeerdoelScore("0" * 32, "SPR-U10-01", 3, date(2026, 9, 1))])
 
 

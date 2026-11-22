@@ -7,7 +7,7 @@ Tijdelijke map met versleutelde databases, vaste testsleutel, alleen nepgegevens
 
 from datetime import date, timedelta
 
-from test_groep_landingspagina import VANDAAG, opslag
+from voorbeeld_groep import VANDAAG, opslag
 
 from atleten import beheer
 from groepen import groep as groepsbeheer

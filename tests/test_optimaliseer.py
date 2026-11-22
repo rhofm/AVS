@@ -6,38 +6,16 @@ Alleen nepgegevens.
 """
 
 import itertools
-import random
-from datetime import date
-
-from test_ploegen import BESTAND, opslag
 
 from db.queries import Opslag
-from models import Atleet, Inzet, Ploeg, PloegLid
-from ploeg import opstelling, paginas, regels, strategieen
+from models import Inzet, Ploeg, PloegLid
+from ploeg import opstelling, paginas, strategieen
 from ploeg.optimaliseer import OptimalisatieFout, optimaliseer
-from ploeg.vergelijk import Cel, Matrix, Rij
+from ploeg.vergelijk import Matrix
 from hulp import TESTSLEUTEL, app_client
+from voorbeeld_ploeg import BESTAND, DAG, REGELS, RS, nep_matrix, opslag
 
-DAG = date(2027, 5, 15)
-RS = regels.laad(BESTAND)
-REGELS = RS.programma("U16-V", "wedstrijd_1")          # 80m, 800m, 80mH, 4x80m, hoog, ver, kogel, discus
 INDIVIDUEEL = [r.sleutel for r in REGELS if r.soort != "estafette"]
-
-
-def nep_matrix(n: int, zaad: int = 1, leeg: float = 0.15) -> tuple[Matrix, list[str]]:
-    """Matrix met n atleten en willekeurige punten (soms geen prestatie)."""
-    rnd = random.Random(zaad)
-    ids = [f"{i:x}" * 32 for i in range(1, n + 1)]
-    rijen = []
-    for k, mid in enumerate(ids):
-        rij = Rij(Atleet(f"A{k}", "Nep", geslacht="V", master_id=mid[:32]), "U16-V", True)
-        for r in REGELS:
-            c = Cel(r.sleutel, r.naam)
-            if r.soort != "estafette" and rnd.random() > leeg:
-                c.waarde, c.punten = 1.0, rnd.randint(200, 900)
-            rij.cellen[r.sleutel] = c
-        rijen.append(rij)
-    return Matrix(RS, "U16-V", "wedstrijd_1", DAG, "seizoen", REGELS, rijen), [r.master_id for r in rijen]
 
 
 def strat(naam):

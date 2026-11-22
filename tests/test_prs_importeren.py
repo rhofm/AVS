@@ -8,8 +8,7 @@ Gebruikt de nagebouwde, geanonimiseerde profielpagina tests/fixtures/atletieknu_
 from dataclasses import replace
 from pathlib import Path
 
-from test_app import client
-from test_landingspagina import opslag, voorbeeld
+from voorbeeld_atleet import client, opslag, voorbeeld
 
 from atleten.prs_importeren import GeenNummer, PRImport, prs_importeren
 from db.queries import Opslag, OpslagFout

@@ -6,6 +6,10 @@ Nieuwe, lege databases voor een test: lege_map() / lege_opslag() / opslag(), nie
 Alleen nepgegevens in een tijdelijke map; de echte sleutelkluis en data/ worden nooit geraakt.
 pytest zet zowel src/ (pyproject.toml) als tests/ (deze map) op het pad, dus overal werkt
 `from hulp import ...`.
+
+Nepgegevens die meerdere testbestanden gebruiken staan in tests/voorbeeld_*.py (atleet, groep,
+ploeg, wedstrijd, training). Een testbestand importeert nooit uit een ander testbestand
+(test_testopzet.py controleert dat): zo breekt het wijzigen van de ene test geen andere.
 """
 
 import atexit
@@ -20,11 +24,13 @@ import tempfile
 from datetime import date
 from pathlib import Path
 
-from db.init_db import init_db
-from db.queries import Opslag
+from db.init_db import init_db, verbind
+from db.queries import Opslag, OpslagFout
 
 TESTSLEUTEL = "22" * 32
 SRC = Path(__file__).resolve().parents[1] / "src"
+TEMPLATES = SRC / "ui" / "templates"
+VANDAAG = date(2026, 10, 16)       # een vrijdag: de vaste 'vandaag' van de voorbeelden
 
 
 @functools.cache
@@ -66,18 +72,62 @@ def opslag():
         yield db
 
 
-def verwacht(fout, fn):
-    """Roept fn() aan en geeft de fout terug; faalt als die fout er niet komt."""
+def verwacht(fout, fn, *args):
+    """Roept fn(*args) aan en geeft de fout terug; faalt als die fout er niet komt."""
     try:
-        fn()
+        fn(*args)
     except fout as e:
         return e
     raise AssertionError(f"{fout.__name__} verwacht")
 
 
+def foutmelding(fn, soort=OpslagFout) -> str:
+    """De tekst van de fout (standaard OpslagFout) die fn() geeft."""
+    return str(verwacht(soort, fn))
+
+
 def tekst(r) -> str:
     """De tekst van een Flask-antwoord."""
     return r.get_data(as_text=True)
+
+
+def zet_versie(map: Path, database: str, versie: int) -> None:
+    """Doe alsof een database op een andere versie staat (alleen schema_version)."""
+    with contextlib.closing(verbind(database, map, TESTSLEUTEL)) as c, c:
+        c.execute("DELETE FROM schema_version")
+        c.execute("INSERT INTO schema_version (versie) VALUES (?)", (versie,))
+
+
+def sjabloonformulier(naam="Sprongkracht", rijen=(), totaal=None, totaal_getoond=None, **extra):
+    """Een testsjabloonformulier zoals de browser het stuurt. rij = (naam, soort, formule, [parameters])."""
+    d = {"naam": naam}
+    if totaal is not None:
+        d["totaal"] = "1" if totaal else ""
+    if totaal_getoond:
+        d["totaal_getoond"] = "1"
+    for i, (n, soort, formule, pars) in enumerate(rijen):
+        d[f"onderdeel-naam-{i}"], d[f"onderdeel-soort-{i}"] = n, soort
+        d[f"onderdeel-formule-{i}"], d[f"onderdeel-aantal-{i}"] = formule, str(len(pars))
+        for j, p in enumerate(pars):
+            d[f"onderdeel-par-{i}-{j}"] = p
+    d.update(extra)
+    return d
+
+
+# ---------------- sleutel herstellen (fixtures kluis en data: conftest.py) ----------------
+SLEUTEL = "5a" * 32               # de 'opgeschreven' herstelsleutel van de databases in `data`
+
+
+def app_zonder_sleutel(map: Path):
+    """Zoals start() het doet als de sleutel ontbreekt: databases bestaan, kluis is leeg."""
+    import pytest
+    from db.init_db import SleutelFout
+    from ui.app import maak_app
+    with pytest.raises(SleutelFout) as e:
+        init_db(map)
+    app = maak_app(map=map, startfout=str(e.value))
+    app.config["TESTING"] = True
+    return app.test_client()
 
 
 def app_client(map: Path):

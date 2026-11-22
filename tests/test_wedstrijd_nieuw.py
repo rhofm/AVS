@@ -8,49 +8,23 @@ pagina (fixtures/atletieknu_tijdschema/meerkamp.html: 'Testmeerkamp 2026', Proef
 29 en 30 augustus 2026, 15 regels).
 """
 
-import contextlib
 from datetime import date
-from pathlib import Path
-
-from test_tijdschema_import import MEERKAMP, NepImporter
 
 from atleten import beheer
 from db.queries import OpslagFout
-from models import Onderdeel
 from wedstrijden import detail, planning, tijdschema_import
 from wedstrijden.detail import Gegevens
-from hulp import app_client, lege_opslag, verwacht as _verwacht
+from hulp import app_client, verwacht as _verwacht
+from voorbeeld_wedstrijd import BROWSERCONTROLE, MEERKAMP, nep_site, NepImporter, opslag_met_100m
 
 LINK = "https://www.atletiek.nu/wedstrijd/main/45678/"
 GENORMALISEERD = "https://www.atletiek.nu/wedstrijd/uitslagen/45678/"
-BROWSERCONTROLE = "<html><body>Checking your browser</body></html>"
-
-
-@contextlib.contextmanager
-def opslag():
-    with lege_opslag() as (db, tmp):
-        db.onderdeel_opslaan(Onderdeel("100m", "tijd", True, "sprint"))
-        yield db, Path(tmp)
-
-
-@contextlib.contextmanager
-def nep_site(inhoud: str | None = None):
-    """Laat tijdschema_import de opgeslagen pagina lezen in plaats van atletiek.nu."""
-    echt = tijdschema_import._ophalen
-
-    def nep(bron, wedstrijd=None, importer=None):
-        return echt(bron, wedstrijd, importer or NepImporter(MEERKAMP, inhoud))
-    tijdschema_import._ophalen = nep
-    try:
-        yield
-    finally:
-        tijdschema_import._ophalen = echt
 
 
 # ---------------------------------------------------------------- van een link
 
 def test_wedstrijd_uit_link():
-    with opslag() as (db, _):
+    with opslag_met_100m() as (db, _):
         n = tijdschema_import.wedstrijd_uit_link(db, LINK, importer=NepImporter(MEERKAMP))
         w = n.wedstrijd
         assert not n.bestond and w.id is not None
@@ -67,7 +41,7 @@ def test_wedstrijd_uit_link():
 
 
 def test_wedstrijd_uit_link_fouten():
-    with opslag() as (db, _):
+    with opslag_met_100m() as (db, _):
         _verwacht(OpslagFout, lambda: tijdschema_import.wedstrijd_uit_link(db, "  "))
         _verwacht(OpslagFout, lambda: tijdschema_import.wedstrijd_uit_link(db, "https://example.com/wedstrijd"))
         _verwacht(OpslagFout, lambda: tijdschema_import.wedstrijd_uit_link(
@@ -78,7 +52,7 @@ def test_wedstrijd_uit_link_fouten():
 # ---------------------------------------------------------------- gegevens
 
 def test_gegevens_opslaan():
-    with opslag() as (db, _):
+    with opslag_met_100m() as (db, _):
         w = detail.gegevens_opslaan(db, None, Gegevens("  Club  kampioenschappen ", "2027-05-15", "Nijmegen"))
         assert (w.naam, w.datum, w.locatie, w.bron_url, w.bron) == (
             "Club kampioenschappen", date(2027, 5, 15), "Nijmegen", None, "handmatig")
@@ -97,7 +71,7 @@ def test_gegevens_opslaan():
 # ---------------------------------------------------------------- pagina's
 
 def test_nieuw_pagina():
-    with opslag() as (db, tmp):
+    with opslag_met_100m() as (db, tmp):
         c = app_client(tmp)
         html = c.get("/wedstrijden/nieuw").get_data(as_text=True)
         assert "Deze pagina komt nog" not in html
@@ -106,7 +80,7 @@ def test_nieuw_pagina():
 
 
 def test_nieuw_van_link_route():
-    with opslag() as (db, tmp):
+    with opslag_met_100m() as (db, tmp):
         c = app_client(tmp)
         with nep_site():
             r = c.post("/wedstrijden/nieuw", data={"soort": "link", "link": LINK, "indoor": "1"})
@@ -128,7 +102,7 @@ def test_nieuw_van_link_route():
 
 
 def test_nieuw_met_de_hand_route():
-    with opslag() as (db, tmp):
+    with opslag_met_100m() as (db, tmp):
         c = app_client(tmp)
         r = c.post("/wedstrijden/nieuw", data={"soort": "hand", "naam": "Clubkampioenschappen",
                                                "datum": "2027-05-15", "locatie": "Nijmegen", "link": ""})
@@ -142,7 +116,7 @@ def test_nieuw_met_de_hand_route():
 
 
 def test_bewerken_route():
-    with opslag() as (db, tmp):
+    with opslag_met_100m() as (db, tmp):
         w = planning.plan_wedstrijd(db, "Clubkampioenschappen", date(2027, 5, 15), "Nijmegen")
         c = app_client(tmp)
         html = c.get(f"/wedstrijd/{w.id}").get_data(as_text=True)
@@ -169,7 +143,7 @@ def test_bewerken_route():
 
 
 def test_tijdschema_knop():
-    with opslag() as (db, tmp):
+    with opslag_met_100m() as (db, tmp):
         w = planning.plan_wedstrijd(db, "Testmeerkamp", date(2026, 8, 29), link=LINK)
         c = app_client(tmp)
         html = c.get(f"/wedstrijd/{w.id}").get_data(as_text=True)
@@ -195,7 +169,7 @@ def test_tijdschema_knop():
 
 def test_inschrijven_na_nieuw():
     """Na het aanmaken kun je direct inschrijven; het tijdschema bepaalt de onderdelen."""
-    with opslag() as (db, tmp):
+    with opslag_met_100m() as (db, tmp):
         anna = beheer.nieuwe_atleet(db, "Anna", "Voorbeeld", geslacht="V", geboortedatum="2008").master_id
         n = tijdschema_import.wedstrijd_uit_link(db, LINK, importer=NepImporter(MEERKAMP))
         c = app_client(tmp)

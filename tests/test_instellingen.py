@@ -92,7 +92,8 @@ def test_laden_en_opslaan():
 
 # ---------------- pagina ----------------
 def test_pagina_en_opslaan():
-    from test_app import client, tekst
+    from voorbeeld_atleet import client
+    from hulp import tekst
     with client() as (c, mid, map):
         r = c.get("/instellingen")
         html = tekst(r)
@@ -122,9 +123,9 @@ def test_pagina_en_opslaan():
 
 
 def test_tijden_op_groepspagina():
-    from test_app import client, tekst
+    from voorbeeld_atleet import client
     from db.queries import Opslag
-    from hulp import TESTSLEUTEL
+    from hulp import TESTSLEUTEL, tekst
     with client() as (c, mid, map):
         with Opslag(map=map, hoofd=TESTSLEUTEL) as db:
             g = db.groepen()[0]
@@ -151,9 +152,9 @@ def test_naam_sleutel():
 
 
 def test_naamvolgorde_in_de_app():
-    from test_app import client, tekst
+    from voorbeeld_atleet import client
     from db.queries import Opslag
-    from hulp import TESTSLEUTEL
+    from hulp import TESTSLEUTEL, tekst
     from atleten import beheer
     with client() as (c, mid, map):
         with Opslag(map=map, hoofd=TESTSLEUTEL) as db:
@@ -178,7 +179,7 @@ def test_naamvolgorde_in_de_app():
 
 
 def test_groepsleden_op_voornaam():
-    from test_groep_landingspagina import opslag, voorbeeldgroep
+    from voorbeeld_groep import opslag, voorbeeldgroep
     with opslag() as (db, _):
         ids = voorbeeldgroep(db)
         groep = db.groep(ids["groep"])

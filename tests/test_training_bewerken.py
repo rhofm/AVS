@@ -6,16 +6,16 @@ Alleen nepgegevens en een vaste testsleutel.
 """
 
 
-from test_trainingen_inhoud import _basis, opslag
+from voorbeeld_training import basis_training
+from hulp import app_client, lege_opslag as opslag, verwacht as _verwacht
 
 from db.queries import OpslagFout
 from groepen import trainingen as trainingsbeheer
-from hulp import app_client, verwacht as _verwacht
 
 
 def test_training_bewerken():
     with opslag() as (db, _):
-        anna, bas, cor, buiten, g, t = _basis(db)
+        anna, bas, cor, buiten, g, t = basis_training(db)
         t2 = trainingsbeheer.training_bewerken(db, t.id, {
             "onderwerp": "  Versnellingen ", "warming_up": "Inlopen\r\nABC", "kern_a": "",
             "kern_b": "4x 60 m", "cooling_down": "Uitlopen", "notities": ""})
@@ -27,7 +27,7 @@ def test_training_bewerken():
 
 def test_variant_toevoegen_bewerken_verwijderen():
     with opslag() as (db, _):
-        anna, bas, cor, buiten, g, t = _basis(db)
+        anna, bas, cor, buiten, g, t = basis_training(db)
         f = trainingsbeheer.variantformulier(db, t.id)
         assert f.nieuw and f.waarden["onderwerp"] == "" and f.waarden["kern_b"] == "3x 150 m"   # begint als kopie
         assert [k.atleet.voornaam for k in f.atleten] and not any(k.gekozen for k in f.atleten)
@@ -59,7 +59,7 @@ def test_variant_toevoegen_bewerken_verwijderen():
 
 def test_routes():
     with opslag() as (db, tmp):
-        anna, bas, cor, buiten, g, t = _basis(db)
+        anna, bas, cor, buiten, g, t = basis_training(db)
         c = app_client(tmp)
 
         html = c.get(f"/training/{t.id}").get_data(as_text=True)

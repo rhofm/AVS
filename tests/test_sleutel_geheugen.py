@@ -10,7 +10,7 @@ import pytest
 from db import init_db as db_init
 from db.init_db import SleutelkluisFout
 from ui.app import maak_app
-from test_sleutel_herstellen import SLEUTEL, _app_zonder_sleutel, _tekst, data  # noqa: F401 (fixture)
+from hulp import SLEUTEL, app_zonder_sleutel, tekst
 
 
 class Nepkluis:
@@ -55,7 +55,7 @@ def test_kluis_onderweg_kapot_pagina_werkt_nog(nepkluis, data):
     assert c.get("/atleten").status_code == 200
     nepkluis.kapot = True
     r = c.get("/atleten")
-    assert r.status_code == 200 and "Anna" in _tekst(r)
+    assert r.status_code == 200 and "Anna" in tekst(r)
 
 
 def test_kluis_eerst_kapot_dan_weer_goed(nepkluis, data):
@@ -63,17 +63,17 @@ def test_kluis_eerst_kapot_dan_weer_goed(nepkluis, data):
     c = _client(data)
     nepkluis.kapot = True
     r = c.get("/atleten")
-    assert r.status_code == 500 and "sleutelkluis" in _tekst(r).lower()
+    assert r.status_code == 500 and "sleutelkluis" in tekst(r).lower()
     nepkluis.kapot = False
     r = c.get("/atleten")
-    assert r.status_code == 200 and "Anna" in _tekst(r)
+    assert r.status_code == 200 and "Anna" in tekst(r)
 
 
 def test_na_sleutel_herstellen_meteen_bruikbaar(nepkluis, data):
     """Kluis leeg bij de start (startfout), dan de herstelsleutel invullen: de pagina's werken
     meteen, met de sleutel die net is teruggezet."""
     nepkluis.sleutel = None
-    c = _app_zonder_sleutel(data)
+    c = app_zonder_sleutel(data)
     assert c.get("/atleten").status_code == 500
     r = c.post("/instellingen/sleutel", data={"herstelsleutel": SLEUTEL})
     assert r.status_code == 302 and nepkluis.sleutel == bytes.fromhex(SLEUTEL)
@@ -88,4 +88,4 @@ def test_herstelsleutel_tonen_gebruikt_de_onthouden_sleutel(nepkluis, data):
     assert c.get("/atleten").status_code == 200
     nepkluis.kapot = True
     r = c.post("/instellingen/sleutel/tonen")
-    assert r.status_code == 200 and SLEUTEL[:8] in _tekst(r)
+    assert r.status_code == 200 and SLEUTEL[:8] in tekst(r)

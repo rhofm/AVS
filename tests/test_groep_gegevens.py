@@ -6,21 +6,16 @@ Alleen nepgegevens en een vaste testsleutel.
 
 from datetime import date
 
-from test_groep_landingspagina import opslag
+from voorbeeld_groep import opslag
 
-from db.queries import OpslagFout
 from groepen import groep as groepsbeheer
 from models import Atleet, Groep
-from hulp import app_client
+from hulp import app_client, foutmelding
 
 
 def _verwacht_fout(fn, tekst):
-    try:
-        fn()
-    except OpslagFout as e:
-        assert tekst in str(e), str(e)
-        return
-    raise AssertionError("OpslagFout verwacht")
+    melding = foutmelding(fn)
+    assert tekst in melding, melding
 
 
 def _groepen(db):

@@ -10,8 +10,7 @@ from datetime import date
 
 import pytest
 
-
-from test_ploegen import DAG, JAAR, opslag
+from voorbeeld_ploeg import DAG, JAAR, opslag
 
 from atleten import beheer
 from models import Onderdeel, Prestatie

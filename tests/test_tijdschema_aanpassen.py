@@ -8,14 +8,15 @@ Alleen nepgegevens en een vaste testsleutel; niets van internet.
 from datetime import timedelta
 
 from hulp import app_client, verwacht as _verwacht
-from test_wedstrijdpagina import DAG, opslag
-from test_wedstrijd_nieuw import nep_site
+from voorbeeld_wedstrijd import DAG, VANDAAG, nep_site, opslag
+
+VASTE_VANDAAG = VANDAAG   # zie conftest.py; de wedstrijd is over 8 dagen
 
 from db.queries import OpslagFout
 from models import ProgrammaOnderdeel
 from wedstrijden import detail
 
-# Het tijdschema uit test_wedstrijdpagina.opslag():
+# Het tijdschema uit voorbeeld_wedstrijd.opslag():
 #   10:00 100m Meisjes U16 (30 min) · 10:15 Verspringen MU16 (45) · 10:30 100m Jongens U16 (30)
 #   11:00 Kogelstoten Jongens U12 · 11:30 Hoogspringen U14
 

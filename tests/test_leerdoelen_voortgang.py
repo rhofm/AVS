@@ -6,7 +6,7 @@ schema_leerlijnen.sql.
 
 from datetime import date
 
-from test_landingspagina import TEMPLATES, VANDAAG, opslag, voorbeeld
+from voorbeeld_atleet import TEMPLATES, VANDAAG, opslag, voorbeeld
 
 from atleten import beheer, landingspagina
 from db.queries import OpslagFout
