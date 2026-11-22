@@ -1,13 +1,13 @@
 """Tests voor src/testen/resultaten.py en de testtabellen in db/queries.py (testen.db).
 
-Alleen nepgegevens en een vaste testsleutel (de nepgroep uit test_groep_landingspagina).
+Alleen nepgegevens en een vaste testsleutel (de nepgroep uit voorbeeld_groep.py).
 
 """
 
 from datetime import date
 
 import pytest
-from test_groep_landingspagina import opslag, voorbeeldgroep
+from voorbeeld_groep import opslag, voorbeeldgroep
 
 from db.queries import OpslagFout
 from models import Test, Testresultaat

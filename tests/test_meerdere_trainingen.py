@@ -11,7 +11,7 @@ Alleen nepgegevens en een vaste testsleutel.
 
 from datetime import date, timedelta
 
-from test_app import client
+from voorbeeld_atleet import client
 
 from atleten import trainingsschema as schema_pagina
 from db.queries import Opslag, OpslagFout

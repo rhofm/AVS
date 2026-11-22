@@ -12,32 +12,18 @@ Alleen nepgegevens en een testsleutel.
 
 from datetime import date, timedelta
 
-import pytest
+from voorbeeld_groep import VANDAAG, opslag
 
-from test_groep_landingspagina import VANDAAG, opslag
-
-from db.queries import OpslagFout
 from groepen import rooster as roosterbeheer
 from groepen import trainingen as trainingsbeheer
 from models import Absentie, Atleet, Groep, GroepRooster, Rooster, RoosterRegel, Training
-from hulp import app_client, vaste_vandaag
+from hulp import app_client, foutmelding
 
 START = date(2026, 10, 19)            # maandag na VANDAAG (vr 16 okt): begin van roosterweek 1
 DI1, ZA1, DI2, DI3 = START + timedelta(1), START + timedelta(5), START + timedelta(8), START + timedelta(15)
 
 
-@pytest.fixture(autouse=True)
-def _vandaag_is_vandaag(monkeypatch):
-    """De tests rekenen met VANDAAG (vr 16 okt 2026); laat de code dat ook doen."""
-    vaste_vandaag(monkeypatch, VANDAAG)
-
-
-def _fout(f, *, soort=OpslagFout):
-    try:
-        f()
-    except soort as e:
-        return str(e)
-    raise AssertionError("verwachtte een fout")
+VASTE_VANDAAG = VANDAAG   # zie conftest.py: vr 16 okt 2026
 
 
 def _groep(db) -> Groep:
@@ -75,14 +61,14 @@ def test_roosterweek():
     assert eenmalig.week_op(START + timedelta(weeks=2), 3) == 3 and eenmalig.week_op(START + timedelta(weeks=3), 3) is None
     tot = GroepRooster(1, 1, START, einddatum=START + timedelta(10))
     assert tot.week_op(START + timedelta(10), 3) == 2 and tot.week_op(START + timedelta(11), 3) is None
-    _fout(lambda: GroepRooster(1, 1, START, einddatum=START - timedelta(1)), soort=ValueError)
+    foutmelding(lambda: GroepRooster(1, 1, START, einddatum=START - timedelta(1)), soort=ValueError)
 
     r = RoosterRegel(2, "Dinsdag", "9.00", onderwerp="  Starts ", notities="\r\n")
     assert (r.dag, r.starttijd, r.onderwerp, r.notities, r.aantal_delen) == ("dinsdag", "09:00", "Starts", None, 0)
     assert RoosterRegel(1, "maandag").leeg
     for f in (lambda: RoosterRegel(0, "maandag"), lambda: RoosterRegel(1, "feestdag"),
               lambda: Rooster("", 4), lambda: Rooster("x", 61)):
-        _fout(f, soort=ValueError)
+        foutmelding(f, soort=ValueError)
 
 
 # ============================================================
@@ -101,8 +87,8 @@ def test_opslag():
         assert nieuw.id == oud and db.rooster_regel(oud).onderwerp == "Snelheid"
         assert db.rooster_regel_opslaan(RoosterRegel(2, "dinsdag", rooster_id=r.id)) is None
         assert len(db.rooster(r.id).regels) == 3
-        assert "maar 2 weken" in _fout(lambda: db.rooster_regel_opslaan(RoosterRegel(3, "dinsdag", onderwerp="x", rooster_id=r.id)))
-        _fout(lambda: db.rooster_regel_opslaan(RoosterRegel(1, "dinsdag", onderwerp="x")))
+        assert "maar 2 weken" in foutmelding(lambda: db.rooster_regel_opslaan(RoosterRegel(3, "dinsdag", onderwerp="x", rooster_id=r.id)))
+        foutmelding(lambda: db.rooster_regel_opslaan(RoosterRegel(1, "dinsdag", onderwerp="x")))
 
         # Vervangen: hetzelfde moment houdt zijn id (trainingen blijven gekoppeld).
         db.rooster_regels_vervangen(r.id, [RoosterRegel(1, "dinsdag", onderwerp="A"), RoosterRegel(2, "zaterdag", onderwerp="B"),
@@ -111,7 +97,7 @@ def test_opslag():
         assert [(x.week, x.dag, x.onderwerp) for x in regels] == [(1, "dinsdag", "A"), (2, "zaterdag", "B2")]
         assert regels[0].id == oud
 
-        assert "week 2" in _fout(lambda: db.rooster_opslaan(Rooster("Najaar", 1, id=r.id)))
+        assert "week 2" in foutmelding(lambda: db.rooster_opslaan(Rooster("Najaar", 1, id=r.id)))
         db.rooster_opslaan(Rooster("Najaar kort", 3, id=r.id))
         assert [x.naam for x in db.roosters()] == ["Najaar kort"]
 
@@ -119,9 +105,9 @@ def test_opslag():
         db.groep_rooster_opslaan(GroepRooster(g.id, r.id, START, herhalen=False))      # zelfde start: vervangen
         assert [(k.startdatum, k.herhalen) for k in db.groep_roosters(g.id)] == [(START, False)]
         assert db.groepen_met_rooster(r.id) == [g.id]
-        assert "nog door een groep" in _fout(lambda: db.rooster_verwijderen(r.id))
-        _fout(lambda: db.groep_rooster_opslaan(GroepRooster(9999, r.id, START)))
-        _fout(lambda: db.groep_rooster_opslaan(GroepRooster(g.id, 9999, START)))
+        assert "nog door een groep" in foutmelding(lambda: db.rooster_verwijderen(r.id))
+        foutmelding(lambda: db.groep_rooster_opslaan(GroepRooster(9999, r.id, START)))
+        foutmelding(lambda: db.groep_rooster_opslaan(GroepRooster(g.id, 9999, START)))
         db.groep_rooster_verwijderen(g.id, START)
         db.rooster_verwijderen(r.id)
         assert db.roosters() == []
@@ -170,7 +156,7 @@ def test_aanpassen_doorvoeren_en_terugzetten():
         assert roosterbeheer.rooster_status(db, g, db.training(di3.id)).gekoppeld
         roosterbeheer.terugzetten(db, di1.id)
         assert db.training(di1.id).onderwerp == "Snelheid" and db.training(di1.id).rooster_regel_id == regel.id
-        assert "plant niets" in _fout(lambda: roosterbeheer.terugzetten(db, _op(db, g, START + timedelta(12)).id))
+        assert "plant niets" in foutmelding(lambda: roosterbeheer.terugzetten(db, _op(db, g, START + timedelta(12)).id))
 
         # Regel leegmaken: gekoppelde trainingen worden weer leeg.
         roosterbeheer.regel_opslaan(db, r.id, 1, "dinsdag", "", {}, peildatum=VANDAAG)
@@ -321,10 +307,10 @@ def test_importeren():
         r, k, n = roosterbeheer.importeren(db, g.id, form, TAB, peildatum=VANDAAG)
         assert (r.naam, r.aantal_weken, len(r.regels), k.startdatum, k.herhalen) == ("Geïmporteerd", 2, 3, START, True)
         assert n > 0 and _op(db, g, DI1).onderwerp == "Starts" and _op(db, g, DI2).onderwerp == "Horden"
-        assert "Kies vanaf" in _fout(lambda: roosterbeheer.importeren(db, g.id, {"naam": "x"}, TAB))
-        assert "klopt niet" in _fout(lambda: roosterbeheer.importeren(db, g.id, form, "week;dag;onderwerp\n1;x;A\n"))
-        assert "naam" in _fout(lambda: roosterbeheer.importeren(db, g.id, {**form, "naam": " "}, TAB))
-        _fout(lambda: roosterbeheer.importeren(db, 9999, form, TAB))
+        assert "Kies vanaf" in foutmelding(lambda: roosterbeheer.importeren(db, g.id, {"naam": "x"}, TAB))
+        assert "klopt niet" in foutmelding(lambda: roosterbeheer.importeren(db, g.id, form, "week;dag;onderwerp\n1;x;A\n"))
+        assert "naam" in foutmelding(lambda: roosterbeheer.importeren(db, g.id, {**form, "naam": " "}, TAB))
+        foutmelding(lambda: roosterbeheer.importeren(db, 9999, form, TAB))
 
 
 # ============================================================

@@ -17,29 +17,15 @@ from models import (
     PR, heeft_windmeting, Absentie, Atleet, Groep, Inschrijving,
     Onderdeel, Prestatie, Test, Testresultaat, Training, Trainingsschema, Wedstrijd, Notitie,
 )
-from hulp import TESTSLEUTEL, verwacht as _verwacht
+from hulp import TESTSLEUTEL, opslag, verwacht as _verwacht
+from voorbeeld_atleet import basis_atleten
 
 
-@contextlib.contextmanager
-def opslag():
-    with tempfile.TemporaryDirectory() as tmp:
-        with contextlib.redirect_stdout(io.StringIO()):  # init_db print meldingen
-            init_db(Path(tmp), hoofd=TESTSLEUTEL)
-        with Opslag(map=Path(tmp), hoofd=TESTSLEUTEL) as db:
-            yield db
-
-
-def _basis(db: Opslag):
-    anna = db.atleet_opslaan(Atleet("Anna", "Voorbeeld", geslacht="V", geboortedatum="2010", atletieknu_id="123456"))
-    tim = db.atleet_opslaan(Atleet("Tim", "Proefmans", geslacht="M"))
-    sprint = db.onderdeel_opslaan(Onderdeel("100m", "tijd", True, "sprint"))
-    ver = db.onderdeel_opslaan(Onderdeel("Verspringen", "afstand", False, "springen"))
-    return anna, tim, sprint, ver
 
 
 def test_atleten():
     with opslag() as db:
-        anna, tim, _, _ = _basis(db)
+        anna, tim, _, _ = basis_atleten(db)
         assert len(anna.master_id) == 32 and anna.aangemaakt_op
         assert db.atleet(anna.master_id).naam == "Anna Voorbeeld"
         assert db.atleet_op_atletieknu_id("123456").master_id == anna.master_id
@@ -66,7 +52,7 @@ def test_atleten():
 
 def test_prestaties_geen_master_id_of_naam_in_prestaties_db():
     with opslag() as db:
-        anna, _, sprint, _ = _basis(db)
+        anna, _, sprint, _ = basis_atleten(db)
         p = Prestatie("100m", date(2026, 6, 1), 13.2, bron="handmatig").gekoppeld(anna.master_id)
         assert db.prestatie_opslaan(p)
         rij = db.prestaties_db.execute("SELECT * FROM prestatie").fetchone()
@@ -76,7 +62,7 @@ def test_prestaties_geen_master_id_of_naam_in_prestaties_db():
 
 def test_prestaties_en_prs():
     with opslag() as db:
-        anna, tim, sprint, ver = _basis(db)
+        anna, tim, sprint, ver = basis_atleten(db)
         w = db.wedstrijd_opslaan(Wedstrijd("Clubkampioenschap", date(2026, 6, 1), bron="atletieknu",
                                            bron_url="https://example.org/wedstrijd/1"))
         # Dezelfde link nog eens: zelfde wedstrijd.
@@ -109,7 +95,7 @@ def test_prestaties_en_prs():
 def test_prestatie_verwijderen():
     """Een verkeerde prestatie weghalen: het PR rekent terug naar de beste die overblijft."""
     with opslag() as db:
-        anna, tim, sprint, _ = _basis(db)
+        anna, tim, sprint, _ = basis_atleten(db)
         for mid, w in ((anna.master_id, 12.9), (anna.master_id, 13.5), (tim.master_id, 12.5)):
             db.prestatie_opslaan(Prestatie("100m", date(2026, 6, 1), w, wind=0.5).gekoppeld(mid))
         fout = next(p for p in db.prestaties(anna.master_id) if p.waarde == 12.9)
@@ -124,7 +110,7 @@ def test_pr_alleen_windlegaal():
     with opslag() as db:
         versie = db.prestaties_db.execute("SELECT MAX(versie) FROM schema_version").fetchone()[0]
         assert versie >= 2, "prestaties.db mist de windlegale PR-view (versie 2)"
-        anna, tim, sprint, ver = _basis(db)
+        anna, tim, sprint, ver = basis_atleten(db)
         assert sprint.windmeting and ver.windmeting
         for waarde, wind in [(13.2, 1.1), (12.9, 2.6), (13.0, 2.0), (12.8, None)]:
             db.prestatie_opslaan(Prestatie("100m", date(2026, 6, 1), waarde, wind=wind,
@@ -155,7 +141,7 @@ def test_windmeting_handmatig_aan_te_passen():
 
 def test_indoor_telt_altijd():
     with opslag() as db:
-        anna, _, sprint, ver = _basis(db)
+        anna, _, sprint, ver = basis_atleten(db)
         zestig = db.onderdeel_opslaan(Onderdeel("60m", "tijd", True, "sprint"))
         hal = db.wedstrijd_opslaan(Wedstrijd("Indoor Apeldoorn", date(2026, 1, 10), indoor=True))
         baan = db.wedstrijd_opslaan(Wedstrijd("Baan", date(2026, 5, 10)))
@@ -195,7 +181,7 @@ def test_windmeting_van_nieuwe_onderdelen():
 
 def test_prestatie_fouten():
     with opslag() as db:
-        anna, _, _, _ = _basis(db)
+        anna, _, _, _ = basis_atleten(db)
         _verwacht(OpslagFout, lambda: db.prestatie_opslaan(Prestatie("100m", date(2026, 6, 1), 13.0)))
         _verwacht(OpslagFout, lambda: db.prestatie_opslaan(
             Prestatie("Hamerslingeren", date(2026, 6, 1), 30.0).gekoppeld(anna.master_id)))
@@ -205,7 +191,7 @@ def test_prestatie_fouten():
 
 def test_inschrijvingen():
     with opslag() as db:
-        anna, _, sprint, _ = _basis(db)
+        anna, _, sprint, _ = basis_atleten(db)
         w = db.wedstrijd_opslaan(Wedstrijd("Competitie", date(2026, 9, 1)))
         for _ in range(2):
             db.inschrijving_opslaan(Inschrijving(anna.master_id, w.id))
@@ -216,7 +202,7 @@ def test_inschrijvingen():
 
 def test_testen():
     with opslag() as db:
-        anna, _, _, _ = _basis(db)
+        anna, _, _, _ = basis_atleten(db)
         t = db.test_opslaan(Test("30m vliegend", "s", True))
         db.testresultaat_opslaan(Testresultaat(anna.master_id, t.id, date(2026, 10, 1), 3.9))
         db.testresultaat_opslaan(Testresultaat(anna.master_id, t.id, date(2026, 9, 1), 4.1))
@@ -229,7 +215,7 @@ def test_testen():
 
 def test_trainingsschema():
     with opslag() as db:
-        anna, tim, _, _ = _basis(db)
+        anna, tim, _, _ = basis_atleten(db)
         # Zonder opgeslagen schema: geen trainingsdagen.
         assert db.trainingsschema(anna.master_id).dagen == []
 
@@ -274,7 +260,7 @@ def test_bestaande_installatie_zonder_trainingsschema():
 
 def test_groepen_trainingen_absentie():
     with opslag() as db:
-        anna, tim, _, _ = _basis(db)
+        anna, tim, _, _ = basis_atleten(db)
         g = db.groep_opslaan(Groep("Junioren C", "2026-2027", [anna.master_id, tim.master_id]))
         assert db.groep(g.id).leden == [tim.master_id, anna.master_id]  # op achternaam
         g.verwijder(tim.master_id)
@@ -291,7 +277,7 @@ def test_groepen_trainingen_absentie():
 
 def test_absentie_eigen_database():
     with opslag() as db:
-        anna, tim, _, _ = _basis(db)
+        anna, tim, _, _ = basis_atleten(db)
         g = db.groep_opslaan(Groep("Junioren C", leden=[anna.master_id, tim.master_id]))
         tr1 = db.training_opslaan(Training(g.id, date(2026, 10, 13)))
         tr2 = db.training_opslaan(Training(g.id, date(2026, 10, 15)))
@@ -333,7 +319,7 @@ def test_absentie_eigen_database():
 
 def test_notities():
     with opslag() as db:
-        anna, tim, _, _ = _basis(db)
+        anna, tim, _, _ = basis_atleten(db)
         lang = "Starthouding:\n" + "Te vroeg rechtop, armen te laag. " * 200   # lange tekst mag
         n1 = db.notitie_opslaan(Notitie(anna.master_id, date(2026, 10, 13), lang))
         n2 = db.notitie_opslaan(Notitie(anna.master_id, date(2026, 10, 15), "Sprong mooi af op de balk."))
@@ -367,7 +353,7 @@ def test_notities():
 
 def test_atleet_verwijderen_wist_alles():
     with opslag() as db:
-        anna, tim, sprint, _ = _basis(db)
+        anna, tim, sprint, _ = basis_atleten(db)
         db.prestatie_opslaan(Prestatie("100m", date(2026, 6, 1), 12.9, wind=0.5).gekoppeld(anna.master_id))
         db.prestatie_opslaan(Prestatie("100m", date(2026, 6, 1), 13.5, wind=0.5).gekoppeld(tim.master_id))
         t = db.test_opslaan(Test("30m vliegend", "s", True))

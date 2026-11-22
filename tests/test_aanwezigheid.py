@@ -5,7 +5,7 @@ Alleen nepgegevens en een vaste testsleutel.
 
 from datetime import date, timedelta
 
-from test_landingspagina import TEMPLATES, VANDAAG, opslag, voorbeeld
+from voorbeeld_atleet import TEMPLATES, VANDAAG, opslag, voorbeeld
 
 from atleten import aanwezigheid, landingspagina
 from models import Absentie, Training

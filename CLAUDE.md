@@ -351,7 +351,12 @@ it only holds `.gitkeep`).
   `PRAGMA foreign_keys = ON`, `temp_store = MEMORY` and `sqlcipher3.Row` are
   set. Never use the plain `sqlite3` module on these files.
 - Tests pass an explicit test key (`hoofd=` in `verbind()` / `init_db()`) and a
-  temporary folder; they never touch the real keyring or `data/`.
+  temporary folder; they never touch the real keyring or `data/`. For fresh empty
+  databases use `hulp.lege_map()` / `lege_opslag()` / `lege_databases(map)` (a copy
+  of one real `init_db()` per test run); call `init_db()` only to test `init_db` itself.
+- `init_db` creates a new database from its baseline schema in one transaction
+  (fast, and an interrupted first start leaves no half database). Migrations run
+  outside a transaction so they can use `PRAGMA foreign_keys = OFF`.
 - Each `schema_<database>.sql` is the **baseline and frozen**. In October 2026
   the old migrations were squashed into it: a new database starts at the
   version in the schema's last line, `INSERT INTO schema_version (versie)
@@ -528,11 +533,20 @@ feature/<naam>  →  dev  →  staging  →  main
 
 - Keep the UI simple for non-technical users; put the complexity in the back end.
 - Write tests for new logic (`tests/`); importers and team selection especially.
-- Tests that use fixed dates (e.g. `VANDAAG` in `tests/test_groep_landingspagina.py`)
-  while the code under test falls back to `date.today()` must freeze it with
-  `hulp.vaste_vandaag(monkeypatch, dag)` (an autouse fixture per module, as in
-  `test_doelen.py` and `test_rooster.py`); otherwise they break once the real
-  date passes the fixed one, and `build.py` refuses to build.
+  Shared helpers go in `tests/hulp.py` (fixtures in `conftest.py`), shared fake data in
+  `tests/voorbeeld_*.py`; a test file never imports from another test file
+  (`tests/test_testopzet.py` checks this).
+- Tests that use fixed dates (a `VANDAAG`, a birth year, a meet day) while the
+  code under test falls back to `date.today()` must freeze it: put
+  `VASTE_VANDAAG = date(...)` (or `= VANDAAG`) at module level; the autouse fixture
+  in `conftest.py` then makes `date.today()` in all AVS modules return that day
+  (`hulp.vaste_vandaag`, which first loads every AVS module so the result never
+  depends on test order). Otherwise they break once the real date moves on (age
+  categories shift on 1 January) and `build.py` refuses to build. Before a release,
+  run the suite a year ahead to find such tests:
+  `TIJDREIS_DATUM=2027-09-01 PYTHONPATH=tests/tijdreis python -m pytest`
+  (PowerShell: `$env:TIJDREIS_DATUM="2027-09-01"; $env:PYTHONPATH="tests	ijdreis"`).
+  A test that only fails there needs `VASTE_VANDAAG`.
 - When a design decision is still open (e.g. the UI framework), propose an
   option and ask rather than silently picking one. Decided: pytest as test
   runner, plain `pyproject.toml` dependencies installed with pip into the conda

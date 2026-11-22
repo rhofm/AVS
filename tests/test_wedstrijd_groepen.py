@@ -6,7 +6,7 @@ Alleen nepgegevens en een vaste testsleutel.
 from datetime import timedelta
 
 import pytest
-from test_landingspagina import VANDAAG, opslag, voorbeeld
+from voorbeeld_atleet import VANDAAG, opslag, voorbeeld
 
 from db.queries import OpslagFout
 from models import ProgrammaOnderdeel

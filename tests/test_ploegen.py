@@ -6,56 +6,16 @@ Alleen nep-atleten en een vaste testsleutel.
 """
 
 import contextlib
-import io
-import tempfile
 from datetime import date
-from pathlib import Path
 
-from atleten import beheer
-from db.init_db import init_db, verbind
+from db.init_db import verbind
 from db.queries import Opslag, OpslagFout
-from models import Inzet, Onderdeel, Ploeg, PloegLid, Prestatie, Wedstrijd
+from models import Inzet, Ploeg, PloegLid, Wedstrijd
 from ploeg import opstelling, regels, vergelijk
 from ploeg.paginas import programma_label
 from ui.app import maak_app
-from hulp import TESTSLEUTEL, lege_opslag, verwacht as _verwacht
-
-DAG = date(2027, 5, 15)            # wedstrijddag (zaterdag)
-JAAR = DAG.year
-BESTAND = "u14_u16_2026-2027"
-
-
-@contextlib.contextmanager
-def opslag():
-    """(Opslag, map, ids). Atleten op de wedstrijddag: anna U16-V, bo U16-V, cato U14-V, dirk U16-M."""
-    with lege_opslag() as (db, tmp):
-        ids = {
-            "anna": beheer.nieuwe_atleet(db, "Anna", "Proef", geslacht="V", geboortedatum=f"{JAAR - 15}-03-01"),
-            "bo": beheer.nieuwe_atleet(db, "Bo", "Proef", geslacht="V", geboortedatum=f"{JAAR - 14}-06-01"),
-            "cato": beheer.nieuwe_atleet(db, "Cato", "Proef", geslacht="V", geboortedatum=f"{JAAR - 13}"),
-            "dirk": beheer.nieuwe_atleet(db, "Dirk", "Proef", geslacht="M", geboortedatum=f"{JAAR - 15}"),
-        }
-        ids = {k: a.master_id for k, a in ids.items()}
-        o = {n: db.onderdeel_opslaan(Onderdeel(n, e, e == "tijd")) for n, e in (
-            ("80 meter", "tijd"), ("80 meter Handtijd", "tijd"), ("800 meter", "tijd"),
-            ("80 meter horden 76,2cm", "tijd"), ("Verspringen", "afstand"), ("Hoogspringen", "hoogte"),
-            ("Kogelstoten 3kg", "afstand"), ("Kogelstoten 2kg", "afstand"), ("Discuswerpen 1kg", "afstand"))}
-
-        def pr(wie, onderdeel, waarde, datum, wind=None):
-            db.prestatie_opslaan(Prestatie(onderdeel, datum, waarde, atleet_id=ids[wie],
-                                           onderdeel_id=o[onderdeel].id, wind=wind))
-
-        pr("anna", "80 meter", 10.60, date(JAAR, 4, 20), wind=1.0)
-        pr("anna", "80 meter", 10.20, date(JAAR, 4, 21), wind=3.1)       # te veel rugwind: telt niet
-        pr("anna", "80 meter", 10.10, date(JAAR - 3, 6, 1), wind=0.0)    # te oud voor 'seizoen', wel PR
-        pr("anna", "Verspringen", 5.10, date(JAAR - 1, 7, 1), wind=0.5)
-        pr("bo", "80 meter", 10.90, date(JAAR, 4, 20), wind=0.0)
-        pr("bo", "80 meter horden 76,2cm", 12.80, date(JAAR, 4, 20), wind=1.5)
-        pr("cato", "80 meter Handtijd", 10.80, date(JAAR, 4, 20))        # handtijd: +0,24
-        pr("cato", "Kogelstoten 2kg", 9.80, date(JAAR, 4, 20))           # U14-materiaal: hint
-        pr("bo", "Kogelstoten 3kg", 10.50, date(JAAR, 5, 20))            # na de wedstrijddag: telt niet
-        pr("anna", "Kogelstoten 3kg", 9.00, date(JAAR, 4, 1))
-        yield db, Path(tmp), ids
+from hulp import TESTSLEUTEL, lege_map, tekst, verwacht as _verwacht
+from voorbeeld_ploeg import BESTAND, DAG, opslag
 
 
 def _ploeg(db, naam="U16 meisjes A", **kw) -> Ploeg:
@@ -73,12 +33,10 @@ def _matrix(db, ids, basis="seizoen"):
 # ------------------------------------------------------------
 def test_ploeg_zonder_datum_wordt_overgeslagen():
     """ploeg.datum mag leeg zijn (zo stond het in oudere databases); het overzicht slaat die over."""
-    with tempfile.TemporaryDirectory() as tmp:
-        with contextlib.redirect_stdout(io.StringIO()):
-            init_db(Path(tmp), hoofd=TESTSLEUTEL)
-        with contextlib.closing(verbind("personen", Path(tmp), TESTSLEUTEL)) as c, c:
+    with lege_map() as tmp:
+        with contextlib.closing(verbind("personen", tmp, TESTSLEUTEL)) as c, c:
             c.execute("INSERT INTO ploeg (id, naam) VALUES (1, 'Zonder datum')")
-        with Opslag(map=Path(tmp), hoofd=TESTSLEUTEL) as db:
+        with Opslag(map=tmp, hoofd=TESTSLEUTEL) as db:
             assert db.ploegen() == []
 
 
@@ -222,10 +180,6 @@ def client():
         app = maak_app(map=tmp, hoofd=TESTSLEUTEL)
         app.config["TESTING"] = True
         yield app.test_client(), tmp, ids
-
-
-def tekst(r) -> str:
-    return r.get_data(as_text=True)
 
 
 def test_paginas_nieuwe_ploeg_opstellen_en_verwijderen():

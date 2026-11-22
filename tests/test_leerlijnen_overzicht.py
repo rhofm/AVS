@@ -5,35 +5,16 @@ Alleen de catalogus uit schema_leerlijnen.sql; geen persoonsgegevens nodig.
 """
 
 import contextlib
-import io
-import tempfile
-from pathlib import Path
 
-from db.init_db import init_db
-from db.queries import Opslag
 from leerlijnen.overzicht import leerlijnoverzicht
 from models import CATEGORIEEN
 from ui.app import maak_app
-from hulp import TESTSLEUTEL
-
-
-@contextlib.contextmanager
-def map_met_db():
-    with tempfile.TemporaryDirectory() as tmp:
-        with contextlib.redirect_stdout(io.StringIO()):
-            init_db(Path(tmp), hoofd=TESTSLEUTEL)
-        yield Path(tmp)
-
-
-@contextlib.contextmanager
-def opslag():
-    with map_met_db() as tmp, Opslag(map=tmp, hoofd=TESTSLEUTEL) as db:
-        yield db
+from hulp import TESTSLEUTEL, lege_map, opslag
 
 
 @contextlib.contextmanager
 def client():
-    with map_met_db() as tmp:
+    with lege_map() as tmp:
         app = maak_app(map=tmp, hoofd=TESTSLEUTEL)
         app.config["TESTING"] = True
         yield app.test_client()

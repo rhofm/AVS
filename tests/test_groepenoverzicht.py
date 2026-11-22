@@ -5,7 +5,7 @@ Alleen nepgegevens en een vaste testsleutel.
 """
 
 
-from test_groep_landingspagina import VANDAAG, opslag
+from voorbeeld_groep import VANDAAG, opslag
 
 from groepen.groepenoverzicht import GEEN_SEIZOEN, groepenoverzicht
 from models import Atleet, Groep

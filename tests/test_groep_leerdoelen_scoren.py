@@ -1,17 +1,19 @@
 """Tests voor src/groepen/leerdoelen_scoren.py en de pagina 'Leerdoelen scoren' van een groep.
 
-Gebruikt de nepgroep uit test_groep_landingspagina (alleen nepgegevens, testsleutel).
+Gebruikt de nepgroep uit voorbeeld_groep.py (alleen nepgegevens, testsleutel).
 
 """
 
 from datetime import date
 
-from test_groep_landingspagina import VANDAAG, opslag, voorbeeldgroep
+from voorbeeld_groep import VANDAAG, opslag, voorbeeldgroep
 
 from atleten import beheer
 from db.queries import OpslagFout
 from groepen import leerdoelen_scoren
 from hulp import app_client, verwacht as _verwacht
+
+VASTE_VANDAAG = VANDAAG   # zie conftest.py; anders verschuift op 1 januari de leeftijdscategorie
 
 
 def _doel(db, categorie="U14", leerlijn="SPR"):

@@ -6,7 +6,6 @@ README daar); er wordt niets van internet gehaald.
 """
 
 from datetime import date
-from pathlib import Path
 
 from db.queries import OpslagFout
 from importers import detect
@@ -17,27 +16,11 @@ from models import Atleet, Inschrijving, Onderdeel, lees_categorie
 from wedstrijden import chronoloog, planning
 from wedstrijden.tijdschema_import import tijdschema_importeren, zoek_onderdeel
 from hulp import opslag, verwacht as _verwacht
-
-MAP = Path(__file__).resolve().parent / "fixtures" / "atletieknu_tijdschema"
-MEERKAMP, TEAMS = MAP / "meerkamp.html", MAP / "teams.html"
+from voorbeeld_wedstrijd import MEERKAMP, TEAMS, NepImporter
 
 
 def _laad(pad):
     return laad_tijdschema(str(pad), log=lambda *a: None)
-
-
-class NepImporter(AtletiekNuTijdschemaImporter):
-    """Geeft een opgeslagen pagina terug in plaats van atletiek.nu op te halen."""
-
-    def __init__(self, pagina: Path, inhoud: str | None = None):
-        super().__init__()
-        self.pagina, self.inhoud, self.opgehaald = pagina, inhoud, []
-
-    def haal_op(self, url: str) -> str:
-        self.opgehaald.append(url)
-        html = self.inhoud if self.inhoud is not None else self.pagina.read_text(encoding="utf-8")
-        self.controleer_pagina(html, url)
-        return html
 
 
 # ---------------------------------------------------------------- parsen

@@ -4,55 +4,11 @@ Echte (versleutelde) databases in een tijdelijke map, vaste testsleutel,
 alleen nepgegevens.
 """
 
-import contextlib
-from datetime import date, timedelta
-from pathlib import Path
+from datetime import timedelta
 
-from atleten import beheer, landingspagina, prestaties
-from db.queries import Opslag
-from models import Absentie, Groep, Notitie, Onderdeel, Test, Testresultaat, Training, Trainingsschema
-from wedstrijden import planning
-from hulp import lege_opslag
-
-VANDAAG = date(2026, 10, 16)   # een vrijdag
-TEMPLATES = Path(__file__).resolve().parents[1] / "src" / "ui" / "templates"
-
-
-@contextlib.contextmanager
-def opslag():
-    with lege_opslag() as (db, tmp):
-        db.onderdeel_opslaan(Onderdeel("100m", "tijd", True, "sprint"))
-        db.onderdeel_opslaan(Onderdeel("Verspringen", "afstand", False, "springen"))
-        yield db
-
-
-def voorbeeld(db: Opslag) -> str:
-    """Een nep-atleet met van alles erbij. Geeft de master_id."""
-    a = beheer.nieuwe_atleet(db, "Anna", "Voorbeeld", geslacht="V", geboortedatum="2011-03-14",
-                             specialisatie="Sprint & verspringen")
-    mid = a.master_id
-    db.trainingsschema_opslaan(Trainingsschema.met_dagen(mid, ["dinsdag", "donderdag", "zaterdag"]))
-    g = db.groep_opslaan(Groep("U16 sprint", "2026-2027", [mid]))
-    maandag = VANDAAG - timedelta(days=VANDAAG.weekday())
-    db.training_opslaan(Training(g.id, maandag + timedelta(days=1), "Startblok"))
-    db.training_opslaan(Training(g.id, maandag + timedelta(days=8), "Volgende week"))   # valt buiten deze week
-    oud = db.training_opslaan(Training(g.id, VANDAAG - timedelta(days=10), "Horden"))
-    heel_oud = db.training_opslaan(Training(g.id, VANDAAG - timedelta(weeks=20), "Kracht"))
-    db.absenties_opslaan([Absentie(oud.id, mid, "blessure", "enkel"),
-                          Absentie(heel_oud.id, mid, "blessure", "knie")])
-    for i in range(7):
-        db.notitie_opslaan(Notitie(mid, VANDAAG - timedelta(days=i), f"Notitie {i}\ntweede regel"))
-    w = planning.plan_wedstrijd(db, "Clubkampioenschappen", VANDAAG + timedelta(days=8), "Sportpark")
-    planning.inschrijven(db, w.id, mid, ["100m", "Verspringen"])
-    w2 = planning.plan_wedstrijd(db, "Indoor Cup", VANDAAG + timedelta(days=40))
-    planning.inschrijven(db, w2.id, mid)
-    oud_w = planning.plan_wedstrijd(db, "Vorig seizoen", VANDAAG - timedelta(days=30))
-    planning.inschrijven(db, oud_w.id, mid, ["100m"])
-    prestaties.handmatig_toevoegen(db, mid, "100m", date(2026, 6, 1), "13,20", wind=1.0)
-    prestaties.handmatig_toevoegen(db, mid, "Verspringen", date(2026, 6, 1), "4,80", wind=0.5)
-    t = db.test_opslaan(Test("30m vliegend", "s", True))
-    db.testresultaat_opslaan(Testresultaat(mid, t.id, date(2026, 9, 1), 4.25))
-    return mid
+from atleten import beheer, landingspagina
+from models import Training, Trainingsschema
+from voorbeeld_atleet import TEMPLATES, VANDAAG, opslag, voorbeeld
 
 
 def test_leeftijdscategorie():

@@ -12,7 +12,7 @@ import random
 from datetime import date
 
 import yaml
-from test_ploegen import BESTAND, DAG, JAAR, opslag
+from voorbeeld_ploeg import BESTAND, DAG, JAAR, opslag
 
 from atleten import beheer
 from models import Atleet, Inzet, Ploeg, PloegLid, Prestatie

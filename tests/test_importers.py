@@ -4,10 +4,9 @@ import sys
 import unittest
 from pathlib import Path
 
-REPO = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(REPO))
-
-from src.importers import atletieknu_prs, atletieknu_tijdschema, atletieknu_wedstrijd, base, detect, seltec
+# Gewoon `importers`, net als de app (src/ staat op het pad). Niet via `src.importers`: dan laadt
+# Python elke importer nog een keer, met een eigen Importer-register en eigen klassen.
+from importers import atletieknu_prs, atletieknu_tijdschema, atletieknu_wedstrijd, base, detect, seltec
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 SELTEC_URL = "https://uitslagen.atletiek.nl/Competitions/Resultoverview/19133"
@@ -193,6 +192,78 @@ class NepSessie:
     def get(self, url, timeout=None):
         self.urls.append(url)
         return self.antwoorden.pop(0)
+
+
+class NepSite:
+    """Een sessie die elke URL beantwoordt met een opgeslagen pagina (dict url -> html)."""
+
+    def __init__(self, paginas):
+        self.paginas, self.urls = paginas, []
+
+    def get(self, url, timeout=None):
+        self.urls.append(url)
+        return NepAntwoord(200, self.paginas[url]) if url in self.paginas else NepAntwoord(404, "")
+
+
+class TestAtletiekNuWedstrijdOnline(unittest.TestCase):
+    """parse() met een link: eerst de uitslagenpagina, dan elke onderdeelpagina die daar staat.
+    De 'site' is fixtures/atletieknu_wedstrijd/meerkamp (dezelfde pagina's als de map-import)."""
+
+    MAP = FIXTURES / "atletieknu_wedstrijd" / "meerkamp"
+    BASIS = "https://www.atletiek.nu/wedstrijd/"
+
+    def site(self, weg=()):
+        paginas = {self.BASIS + "uitslagen/90001/": (self.MAP / "00_uitslagen.html").read_text(encoding="utf-8")}
+        for bestand in self.MAP.glob("*.html"):
+            if bestand.name != "00_uitslagen.html" and bestand.stem not in weg:
+                paginas[f"{self.BASIS}uitslagenonderdeel/90001/{bestand.stem}/"] = bestand.read_text(encoding="utf-8")
+        imp = atletieknu_wedstrijd.AtletiekNuWedstrijdImporter()
+        imp._sessie = NepSite(paginas)
+        imp.pauze = imp.eerste_wachttijd = 0
+        imp.log = lambda *a, **k: None
+        return imp
+
+    @staticmethod
+    def kern(uitslagen):
+        return sorted((u.atleet, u.onderdeel_code, u.ronde, u.prestatie, u.waarde, u.punten) for u in uitslagen)
+
+    def test_wedstrijdlink_haalt_alle_onderdelen_op(self):
+        lokaal_w, lokaal = atletieknu_wedstrijd.AtletiekNuWedstrijdImporter().parse(str(self.MAP))
+        for bron in ("90001", self.BASIS + "main/90001/", self.BASIS + "uitslagen/90001/"):
+            imp = self.site()
+            w, uitslagen = imp.parse(bron)
+            self.assertEqual((w.wedstrijd_id, w.naam, w.datum, w.einddatum, w.plaats),
+                             ("90001", lokaal_w.naam, lokaal_w.datum, lokaal_w.einddatum, lokaal_w.plaats), bron)
+            self.assertEqual(self.kern(uitslagen), self.kern(lokaal), bron)
+            self.assertEqual(imp._sessie.urls[0], self.BASIS + "uitslagen/90001/")
+            self.assertEqual(len(imp._sessie.urls), len(set(imp._sessie.urls)), "elke pagina één keer")
+            self.assertEqual(len(imp._sessie.urls), 7)        # uitslagen + 6 onderdelen
+
+    def test_een_onderdeellink_haalt_alleen_dat_onderdeel(self):
+        imp = self.site()
+        w, uitslagen = imp.parse(self.BASIS + "uitslagenonderdeel/90001/Kogel/#tab2")
+        self.assertEqual(imp._sessie.urls, [self.BASIS + "uitslagenonderdeel/90001/Kogel/"])
+        self.assertEqual(w.wedstrijd_id, "90001")
+        self.assertTrue(uitslagen)
+        self.assertEqual({u.onderdeel_code for u in uitslagen}, {"Kogel"})
+
+    def test_ontbrekende_onderdeelpagina_is_importfout(self):
+        with self.assertRaises(base.ImportFout):
+            self.site(weg=("Hoog",)).parse("90001")
+
+    def test_nog_geen_uitslagen_is_importfout(self):
+        imp = self.site()
+        imp._sessie.paginas[self.BASIS + "uitslagen/90001/"] = "<div class='pageTitle'>Wedstrijd</div>"
+        with self.assertRaisesRegex(base.ImportFout, "Geen onderdelen"):
+            imp.parse("90001")
+
+    def test_onderdeel_links_alleen_van_deze_wedstrijd_en_zonder_dubbelen(self):
+        html = ("<a href='/wedstrijd/uitslagenonderdeel/90001/100m/'>a</a>"
+                "<a href='https://www.atletiek.nu/wedstrijd/uitslagenonderdeel/90001/100m/#x'>b</a>"
+                "<a href='/wedstrijd/uitslagenonderdeel/90001/Ver/?s=1'>c</a>"
+                "<a href='/wedstrijd/uitslagenonderdeel/12345/Ver/'>andere wedstrijd</a>")
+        self.assertEqual(atletieknu_wedstrijd.onderdeel_links(html, "90001"),
+                         [self.BASIS + "uitslagenonderdeel/90001/100m/", self.BASIS + "uitslagenonderdeel/90001/Ver/"])
 
 
 class TestBase(unittest.TestCase):

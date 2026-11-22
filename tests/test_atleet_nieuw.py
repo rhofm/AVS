@@ -4,20 +4,17 @@ Alleen nepgegevens en een vaste testsleutel.
 """
 
 
-from test_app import client
-from test_landingspagina import VANDAAG, opslag, voorbeeld
+from voorbeeld_atleet import VANDAAG, client, opslag, voorbeeld
 
 from atleten import beheer, nieuw
 from db.queries import Opslag
-from hulp import TESTSLEUTEL, tekst
+from hulp import TESTSLEUTEL, tekst, verwacht
+
+VASTE_VANDAAG = VANDAAG   # zie conftest.py; anders verschuift op 1 januari de leeftijdscategorie
 
 
 def _fout(fn) -> dict:
-    try:
-        fn()
-    except nieuw.InvoerFout as e:
-        return e.fouten
-    raise AssertionError("InvoerFout verwacht")
+    return verwacht(nieuw.InvoerFout, fn).fouten
 
 
 def test_lees_formulier():

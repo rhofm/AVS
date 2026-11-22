@@ -5,21 +5,23 @@ dan het inschrijfformulier met die atleet al aangevinkt, en terug naar zijn plan
 Alleen nepgegevens en een vaste testsleutel; niets van internet.
 """
 
-from datetime import date, timedelta
+from datetime import timedelta
 
 from hulp import app_client
-from test_wedstrijdpagina import DAG, opslag
+from voorbeeld_wedstrijd import DAG, VANDAAG, opslag
+
+VASTE_VANDAAG = VANDAAG   # zie conftest.py; de wedstrijd is over 8 dagen
 
 from wedstrijden import detail, planning
 
-# Uit test_wedstrijdpagina.opslag(): 'Clubkampioenschappen' over 8 dagen met tijdschema;
+# Uit voorbeeld_wedstrijd.opslag(): 'Clubkampioenschappen' over 8 dagen met tijdschema;
 # Anna (U16V) staat ingeschreven voor 100m en Verspringen, Bram (U16M) ook, Cees (U12M) niet.
 
 
 def _extra(db):
-    los = planning.plan_wedstrijd(db, "Indoor Cup", date.today() + timedelta(days=40), "Apeldoorn", indoor=True)
-    planning.plan_wedstrijd(db, "Vorig jaar", date.today() - timedelta(days=30))
-    vandaag = planning.plan_wedstrijd(db, "Avondwedstrijd", date.today())
+    los = planning.plan_wedstrijd(db, "Indoor Cup", VANDAAG + timedelta(days=40), "Apeldoorn", indoor=True)
+    planning.plan_wedstrijd(db, "Vorig jaar", VANDAAG - timedelta(days=30))
+    vandaag = planning.plan_wedstrijd(db, "Avondwedstrijd", VANDAAG)
     return los, vandaag
 
 

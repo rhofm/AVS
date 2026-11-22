@@ -6,21 +6,18 @@ Alleen nepgegevens en een vaste testsleutel.
 """
 
 import contextlib
-import io
 import re
-import tempfile
 from datetime import date, timedelta
 from pathlib import Path
 
-from test_landingspagina import VANDAAG, opslag, voorbeeld
+from voorbeeld_atleet import VANDAAG, opslag, voorbeeld
 
 from atleten import beheer
-from db.init_db import init_db
 from db.queries import Opslag
 from models import Onderdeel
 from wedstrijden import planning
 from wedstrijden.overzicht import wedstrijdenoverzicht
-from hulp import TESTSLEUTEL
+from hulp import TESTSLEUTEL, lege_map
 
 
 def test_komend_en_afgelopen():
@@ -68,10 +65,8 @@ def test_leeg():
 
 @contextlib.contextmanager
 def _client(vul=True):
-    with tempfile.TemporaryDirectory() as tmp:
-        with contextlib.redirect_stdout(io.StringIO()):
-            init_db(Path(tmp), hoofd=TESTSLEUTEL)
-        with Opslag(map=Path(tmp), hoofd=TESTSLEUTEL) as db:
+    with lege_map() as tmp:
+        with Opslag(map=tmp, hoofd=TESTSLEUTEL) as db:
             db.onderdeel_opslaan(Onderdeel("100m", "tijd", True, "sprint"))
             db.onderdeel_opslaan(Onderdeel("Verspringen", "afstand", False, "springen"))
             if vul:

@@ -6,8 +6,7 @@ Alleen nepgegevens.
 """
 
 
-from test_optimaliseer import nep_matrix
-from test_ploegen import BESTAND, DAG, opslag
+from voorbeeld_ploeg import BESTAND, DAG, nep_matrix, opslag
 
 from db.queries import Opslag, OpslagFout
 from models import Inzet, Ploeg, PloegLid

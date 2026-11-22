@@ -6,8 +6,7 @@ Alleen nepgegevens en een vaste testsleutel.
 """
 
 
-from test_app import client
-from test_landingspagina import opslag, voorbeeld
+from voorbeeld_atleet import client, opslag, voorbeeld
 
 from atleten import aanpassen, beheer, nieuw
 from db.queries import Opslag

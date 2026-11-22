@@ -1,19 +1,21 @@
 """Tests voor de pagina's onder een groep: groepen/overzichten.py, groepen/trainingen.py en de routes.
 
-Gebruikt de nepgroep uit test_groep_landingspagina (alleen nepgegevens, testsleutel).
+Gebruikt de nepgroep uit voorbeeld_groep.py (alleen nepgegevens, testsleutel).
 
 """
 
 import re
 from datetime import date
 
-from test_groep_landingspagina import MAANDAG, VANDAAG, opslag, voorbeeldgroep
+from voorbeeld_groep import MAANDAG, VANDAAG, opslag, voorbeeldgroep
 
 from atleten import beheer, prestaties
 from db.queries import OpslagFout
 from groepen import overzichten, trainingen
 from models import Test, Testresultaat
 from hulp import app_client
+
+VASTE_VANDAAG = VANDAAG   # zie conftest.py; anders verschuift op 1 januari de leeftijdscategorie
 
 
 def _met_prestaties(db, ids):

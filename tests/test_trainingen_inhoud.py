@@ -10,33 +10,15 @@ from datetime import date
 
 from db.queries import OpslagFout
 from groepen import trainingen as trainingsbeheer
-from models import Absentie, Atleet, Groep, Training
+from models import Absentie, Training
 from ui.markdown import naar_html
 from hulp import TESTSLEUTEL, lege_opslag as opslag, verwacht as _verwacht
-
-DINSDAG = date(2026, 10, 20)
-
-KERN_A = """# Starts
-- 6x **30 m** uit startblok
-- *rustig* teruglopen
-Herstel 2 min"""
-
-
-def _basis(db):
-    anna = db.atleet_opslaan(Atleet("Anna", "Aalbers"))
-    bas = db.atleet_opslaan(Atleet("Bas", "Bakker"))
-    cor = db.atleet_opslaan(Atleet("Cor", "Claassen"))
-    buiten = db.atleet_opslaan(Atleet("Dirk", "Buiten"))
-    g = db.groep_opslaan(Groep("Sprintgroep", leden=[anna.master_id, bas.master_id, cor.master_id]))
-    t = db.training_opslaan(Training(g.id, DINSDAG, "Starts", "Veld 2 bezet, **binnenbaan**.",
-                                     warming_up="10 min inlopen\nABC", kern_a=KERN_A, kern_b="3x 150 m",
-                                     cooling_down="Uitlopen"))
-    return anna, bas, cor, buiten, g, t
+from voorbeeld_training import DINSDAG, KERN_A, basis_training
 
 
 def test_velden_opslaan_en_lezen():
     with opslag() as (db, _):
-        _, _, _, _, g, t = _basis(db)
+        _, _, _, _, g, t = basis_training(db)
         terug = db.training(t.id)
         assert (terug.warming_up, terug.kern_a, terug.kern_b, terug.cooling_down) == (
             "10 min inlopen\nABC", KERN_A, "3x 150 m", "Uitlopen")
@@ -52,7 +34,7 @@ def test_velden_opslaan_en_lezen():
 
 def test_afwijkende_training():
     with opslag() as (db, _):
-        anna, bas, cor, buiten, g, t = _basis(db)
+        anna, bas, cor, buiten, g, t = basis_training(db)
         v = db.training_opslaan(Training(0, date(2000, 1, 1), "Horden i.p.v. starts",
                                          kern_a="5x horden 76,2 cm", hoofdtraining_id=t.id,
                                          atleten=[bas.master_id, cor.master_id]))
@@ -97,7 +79,7 @@ def test_afwijkende_training():
 def test_trainingpagina_en_html():
     from ui.app import maak_app
     with opslag() as (db, tmp):
-        _, bas, _, _, _, t = _basis(db)
+        _, bas, _, _, _, t = basis_training(db)
         v = db.training_opslaan(Training(0, DINSDAG, "Horden", kern_a="5x horden", hoofdtraining_id=t.id,
                                          atleten=[bas.master_id]))
         tp = trainingsbeheer.trainingpagina(db, v.id, peildatum=DINSDAG)          # variant -> pagina gewone training

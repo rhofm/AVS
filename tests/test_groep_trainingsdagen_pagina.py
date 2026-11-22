@@ -1,14 +1,14 @@
 """Tests voor de pagina 'Trainingsdagen wijzigen' van een groep (/groep/<id>/trainingsdagen),
 groepen.groep.trainingsdagen_opslaan() en de gedeelde dag/tijd-keuze (_tijdkeuze.html).
 
-Gebruikt de nepgroep uit test_groep_landingspagina (alleen nepgegevens, testsleutel).
+Gebruikt de nepgroep uit voorbeeld_groep.py (alleen nepgegevens, testsleutel).
 
 """
 
 import re
 from pathlib import Path
 
-from test_groep_landingspagina import opslag, voorbeeldgroep
+from voorbeeld_groep import opslag, voorbeeldgroep
 
 from db.queries import OpslagFout
 from groepen import groep as groepsbeheer

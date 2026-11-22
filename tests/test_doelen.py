@@ -12,31 +12,17 @@ Alleen nepgegevens en een testsleutel.
 
 from datetime import date, timedelta
 
-import pytest
+from voorbeeld_groep import VANDAAG, opslag
 
-from test_groep_landingspagina import VANDAAG, opslag
-
-from db.queries import OpslagFout
 from groepen import doelen as doelbeheer
 from models import (Atleet, Doel, DoelRegel, Groep, Inschrijving, LeerdoelScore, Prestatie,
                     Wedstrijd)
-from hulp import app_client, vaste_vandaag
+from hulp import app_client, foutmelding
 
 WEDSTRIJDDAG = VANDAAG + timedelta(days=8)              # za 24 okt 2026
 
 
-@pytest.fixture(autouse=True)
-def _vandaag_is_vandaag(monkeypatch):
-    """De tests rekenen met VANDAAG (vr 16 okt 2026); laat de code dat ook doen."""
-    vaste_vandaag(monkeypatch, VANDAAG)
-
-
-def _fout(f, *, soort=OpslagFout):
-    try:
-        f()
-    except soort as e:
-        return str(e)
-    raise AssertionError("verwachtte een fout")
+VASTE_VANDAAG = VANDAAG   # zie conftest.py: vr 16 okt 2026
 
 
 def _basis(db):
@@ -67,7 +53,7 @@ def test_model():
               lambda: DoelRegel("vrij"), lambda: DoelRegel("vrij", omschrijving="x", beoordeling="top"),
               lambda: Doel(" "), lambda: Doel("x" * 121),
               lambda: Doel("NK", startdatum=date(2026, 11, 1), datum=date(2026, 10, 1))):
-        _fout(f, soort=ValueError)
+        foutmelding(f, soort=ValueError)
     assert Doel("NK", groep_id=None).persoonlijk
 
 
@@ -88,19 +74,19 @@ def test_opslag():
         ruw = db.prestaties_db.execute("SELECT atleet_ref FROM doel_regel WHERE atleet_ref IS NOT NULL").fetchone()[0]
         assert ruw != ids["anna"] and len(ruw) == 32
 
-        assert "groep" in _fout(lambda: db.doel_opslaan(Doel("x", ids["groep"], ids["w"], regels=[
+        assert "groep" in foutmelding(lambda: db.doel_opslaan(Doel("x", ids["groep"], ids["w"], regels=[
             DoelRegel("prestatie", ids["cas"], ids["100m"], streefwaarde=13)])))
-        assert "precies één atleet" in _fout(lambda: db.doel_opslaan(Doel("x", None, ids["w"], regels=[
+        assert "precies één atleet" in foutmelding(lambda: db.doel_opslaan(Doel("x", None, ids["w"], regels=[
             DoelRegel("prestatie", ids["anna"], ids["100m"], streefwaarde=13),
             DoelRegel("prestatie", ids["bram"], ids["100m"], streefwaarde=13)])))
-        assert "precies één atleet" in _fout(lambda: db.doel_opslaan(Doel("x", None, ids["w"])))
-        assert "wedstrijd of een streefdatum" in _fout(lambda: db.doel_opslaan(Doel("x", ids["groep"])))
-        assert "Leerdoel" in _fout(lambda: db.doel_opslaan(Doel("x", ids["groep"], ids["w"], regels=[
+        assert "precies één atleet" in foutmelding(lambda: db.doel_opslaan(Doel("x", None, ids["w"])))
+        assert "wedstrijd of een streefdatum" in foutmelding(lambda: db.doel_opslaan(Doel("x", ids["groep"])))
+        assert "Leerdoel" in foutmelding(lambda: db.doel_opslaan(Doel("x", ids["groep"], ids["w"], regels=[
             DoelRegel("leerdoel", ids["anna"], leerdoel_id="XXX-U99-99", streefwaarde=3)])))
-        assert "voor de startdatum" in _fout(lambda: db.doel_opslaan(Doel("x", ids["groep"], ids["w"],
+        assert "voor de startdatum" in foutmelding(lambda: db.doel_opslaan(Doel("x", ids["groep"], ids["w"],
                                                                            startdatum=WEDSTRIJDDAG + timedelta(1))))
-        _fout(lambda: db.doel_opslaan(Doel("x", 9999, ids["w"])))
-        _fout(lambda: db.doel_opslaan(Doel("x", ids["groep"], 9999)))
+        foutmelding(lambda: db.doel_opslaan(Doel("x", 9999, ids["w"])))
+        foutmelding(lambda: db.doel_opslaan(Doel("x", ids["groep"], 9999)))
 
         # Wie de groep verliet, mag in een bestaand doel blijven staan.
         g = db.groep(ids["groep"])
@@ -236,7 +222,7 @@ def test_formulier_en_opslaan():
                              ({"regel-1-omschrijving": "", "regel-1-beoordeling": "behaald"}, "Regel 2: beschrijf"),
                              ({"regel-2-soort": "leerdoel", "regel-2-leerdoel": "XX", "regel-2-streef": "3"}, "bestaand leerdoel"),
                              ({"titel": ""}, "titel"), ({"datum": "morgen"}, "Streefdatum")):
-            assert tekst in _fout(lambda: doelbeheer.opslaan(db, _form(ids, **extra), doel_id=d.id)), extra
+            assert tekst in foutmelding(lambda: doelbeheer.opslaan(db, _form(ids, **extra), doel_id=d.id)), extra
         d2 = doelbeheer.opslaan(db, _form(ids, **{"regel-0-streef": "2:05,00", "regel-0-onderdeel": str(ids["100m"]),
                                                    "evaluatie": "Goed gegaan"}), doel_id=d.id)
         assert d2.id == d.id and d2.regels[0].streefwaarde == 125.0 and db.doel(d.id).evaluatie == "Goed gegaan"
@@ -254,7 +240,7 @@ def test_persoonlijk_doel():
                 "regel-0-soort": "prestatie", "regel-0-onderdeel": str(ids["ver"]), "regel-0-streef": "5,50"}
         d = doelbeheer.opslaan(db, form, master_id=ids["cas"])
         assert d.persoonlijk and d.regels[0].atleet_id == ids["cas"]
-        assert "minstens één regel" in _fout(lambda: doelbeheer.opslaan(db, {"titel": "x", "datum": "2026-12-01"},
+        assert "minstens één regel" in foutmelding(lambda: doelbeheer.opslaan(db, {"titel": "x", "datum": "2026-12-01"},
                                                                         master_id=ids["cas"]))
         assert doelbeheer.doelformulier(db, doel_id=d.id).atleet.voornaam == "Cas"
 

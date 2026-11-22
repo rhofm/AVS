@@ -1,15 +1,14 @@
 """Tests voor groepen/testen_invullen.py en de pagina 'Testresultaten invullen' van een groep.
 
-Alleen nepgegevens en een vaste testsleutel (de nepgroep uit test_groep_landingspagina).
+Alleen nepgegevens en een vaste testsleutel (de nepgroep uit voorbeeld_groep.py).
 
 """
 
 from datetime import date
 
 import pytest
-from test_groep_landingspagina import opslag, voorbeeldgroep
-from test_testen_paginas import form
-from hulp import app_client
+from voorbeeld_groep import opslag, voorbeeldgroep
+from hulp import app_client, sjabloonformulier
 
 from groepen import testen_invullen as ti
 from testen import resultaten as res
@@ -85,7 +84,7 @@ def test_routes():
         html = c.get(f"/groep/{gid}/testen/invullen?sjabloon=30m_vliegend").get_data(as_text=True)
         assert f'name="waarde-{ids["anna"]}-0"' in html and f'name="waarde-{ids["bram"]}-0"' in html
         # Nieuw sjabloon vanaf de groep -> meteen de groepspagina met dat sjabloon.
-        d = form("Sprongkracht", [("Hoog", "lengte", "C1 * L", ["100"]), ("Sprint", "tijd", "C1 / T", ["150"])],
+        d = sjabloonformulier("Sprongkracht", [("Hoog", "lengte", "C1 * L", ["100"]), ("Sprint", "tijd", "C1 / T", ["150"])],
                  actie="opslaan", groep=str(gid))
         r = c.post("/testen/sjablonen/nieuw", data=d)
         assert r.status_code == 302 and r.headers["Location"] == f"/groep/{gid}/testen/invullen?sjabloon=sprongkracht"

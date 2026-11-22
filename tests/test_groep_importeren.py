@@ -8,7 +8,7 @@ tijdelijke map met versleutelde databases en een vaste testsleutel; alleen nepge
 import re
 from pathlib import Path
 
-from test_startpagina import opslag
+from voorbeeld_atleet import opslag_met_map
 
 from atleten import beheer
 from db.queries import OpslagFout
@@ -92,7 +92,7 @@ def test_licentienummer_in_de_tabel():
 
 
 def test_importeren_met_licentienummer():
-    with opslag(met_voorbeeld=False) as (db, _):
+    with opslag_met_map(met_voorbeeld=False) as (db, _):
         res = gi.importeren(db, [rij("Test", "Vries", "999999", licentie="1234567")],
                             gi.Groepkeuze("nieuw", naam="Licenties"), haal_html=profiel)
         assert len(res.gelukt) == 1
@@ -102,7 +102,7 @@ def test_importeren_met_licentienummer():
 # ----------------------------------------------------------------- importeren
 
 def test_importeren_in_nieuwe_groep():
-    with opslag(met_voorbeeld=False) as (db, _):
+    with opslag_met_map(met_voorbeeld=False) as (db, _):
         res = gi.importeren(db, [rij("Test", "Vries", "999999", "de", "25-03-2011", "M"),
                                  rij("Proef", "Jansen", "888888")],
                             gi.Groepkeuze("nieuw", naam="U14 import", seizoen="2026-2027"), haal_html=profiel)
@@ -117,7 +117,7 @@ def test_importeren_in_nieuwe_groep():
 
 
 def test_importeren_in_bestaande_groep_en_opnieuw():
-    with opslag() as (db, _):
+    with opslag_met_map() as (db, _):
         g = db.groepen()[0]                                    # 'U16 sprint' met Anna
         anna = g.leden[0]
         res = gi.importeren(db, [rij("Test", "Vries", "999999")], gi.Groepkeuze("bestaand", g.id),
@@ -136,7 +136,7 @@ def test_importeren_in_bestaande_groep_en_opnieuw():
 
 
 def test_fouten_vooraf_veranderen_niets():
-    with opslag() as (db, _):
+    with opslag_met_map() as (db, _):
         bestaande = db.groepen()[0]
         # Tabel klopt niet: niets opgehaald.
         opgehaald = []
@@ -166,7 +166,7 @@ def test_een_mislukte_atleet_stopt_de_rest_niet():
             raise ConnectionError("geen internet")             # wordt een nette ImportFout
         return PROFIEL
 
-    with opslag(met_voorbeeld=False) as (db, _):
+    with opslag_met_map(met_voorbeeld=False) as (db, _):
         res = gi.importeren(db, [rij("Weg", "Fout", "111111"), rij("Test", "Vries", "999999")],
                             gi.Groepkeuze("nieuw", naam="Gemengd"), haal_html=haal)
         assert [r.index for r in res.mislukt] == [0] and [r.index for r in res.gelukt] == [1]
@@ -179,7 +179,7 @@ def test_een_mislukte_atleet_stopt_de_rest_niet():
 
 
 def test_zelfde_naam_zonder_nummer():
-    with opslag(met_voorbeeld=False) as (db, _):
+    with opslag_met_map(met_voorbeeld=False) as (db, _):
         oud = beheer.nieuwe_atleet(db, "Test", "Jansen")
         keuze = gi.Groepkeuze("nieuw", naam="A")
         res = gi.importeren(db, [rij("Test", "Jansen", "999999")], keuze, haal_html=profiel)   # overslaan
@@ -197,7 +197,7 @@ def test_zelfde_naam_zonder_nummer():
 # ----------------------------------------------------------------- pagina
 
 def test_pagina_leeg():
-    with opslag() as (db, tmp):
+    with opslag_met_map() as (db, tmp):
         c = _client(tmp)
         html = c.get("/importeren/groep").get_data(as_text=True)
         assert html.count('name="voornaam"') == gi.LEGE_RIJEN
@@ -208,7 +208,7 @@ def test_pagina_leeg():
         html = c.get(f"/importeren/groep?groep={g.id}").get_data(as_text=True)
         assert f'<option value="{g.id}" selected>' in html
         assert "Anna" not in html                              # geen namen van bestaande atleten
-    with opslag(met_voorbeeld=False) as (_, tmp):
+    with opslag_met_map(met_voorbeeld=False) as (_, tmp):
         html = _client(tmp).get("/importeren/groep").get_data(as_text=True)
         assert "nog geen groepen" in html and 'id="soort-bestaand" disabled' in html
         assert 'value="nieuw" id="soort-nieuw" checked' in html
@@ -220,7 +220,7 @@ def test_pagina_importeren_en_mislukte_regels_terug_in_tabel():
             raise ImportFout("atletiek.nu gaf een browsercontrole-pagina terug.")
         return PROFIEL
 
-    with opslag() as (db, tmp):
+    with opslag_met_map() as (db, tmp):
         c = _client(tmp, haal)
         f = formulier([rij("Test", "Vries", "999999", "de"), rij("Weg", "Fout", "111111"), rij()],
                       groepsoort="nieuw", groepnaam="Import U14", seizoen="2026-2027", dubbel="overslaan")
@@ -237,7 +237,7 @@ def test_pagina_importeren_en_mislukte_regels_terug_in_tabel():
 
 
 def test_pagina_fouten_en_regels_toevoegen():
-    with opslag() as (db, tmp):
+    with opslag_met_map() as (db, tmp):
         c = _client(tmp, lambda _: (_ for _ in ()).throw(AssertionError("mag niet ophalen")))
         # Fout in de tabel: alles blijft staan, rode melding bij de regel, niets opgeslagen.
         f = formulier([rij("Test", "Vries", "999999"), rij("Zonder", "Nummer")],
