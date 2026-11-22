@@ -5,6 +5,8 @@ Tegen opgeslagen, geanonimiseerde pagina's in fixtures/atletieknu_tijdschema/ (z
 README daar); er wordt niets van internet gehaald.
 """
 
+import pytest
+
 from datetime import date
 
 from db.queries import OpslagFout
@@ -173,3 +175,18 @@ def test_hoogte_met_punt_zonder_eenheid_of_afgerond():
     kogel = [Onderdeel("Kogelstoten 7,26kg", "afstand", False, "werpen", id=4), Onderdeel("Kogelstoten 4kg", "afstand", False, "werpen", id=5)]
     assert zoek_onderdeel(kogel, "Kogelstoten 7.26kg").id == 4 and zoek_onderdeel(kogel, "Kogelstoten 4 kg").id == 5
     assert zoek_onderdeel(kogel, "Kogelstoten 3kg") is None
+
+
+def test_403_wijst_naar_de_opgeslagen_pagina():
+    class Antwoord:
+        status_code, headers, text, encoding = 403, {}, "", "utf-8"
+
+    class Sessie:
+        def get(self, url, timeout=None):
+            return Antwoord()
+
+    importer = AtletiekNuTijdschemaImporter()
+    importer._sessie = Sessie()
+    with pytest.raises(ImportFout) as e:
+        importer.haal_op("https://www.atletiek.nu/wedstrijd/chronoloog/1/")
+    assert "403" in str(e.value) and "sla het op" in str(e.value)

@@ -203,6 +203,10 @@ class Importer(ABC):
             time.sleep(pauze)
             wacht *= 2
 
+        if resp.status_code == 403:
+            raise ImportFout(f"{self.site} weigert AVS (fout 403) voor {url}. Meestal is dit een tijdelijke blokkade "
+                             "na veel verzoeken kort achter elkaar: wacht een tijdje, of gebruik de opgeslagen pagina.\n"
+                             f"{self.browsercontrole_uitleg}")
         if resp.status_code >= 400:
             raise ImportFout(f"{self.site} gaf fout {resp.status_code} voor {url}.")
         if not getattr(resp, "encoding", None):
