@@ -17,16 +17,7 @@ from models import (
     PR, heeft_windmeting, Absentie, Atleet, Groep, Inschrijving,
     Onderdeel, Prestatie, Test, Testresultaat, Training, Trainingsschema, Wedstrijd, Notitie,
 )
-from hulp import TESTSLEUTEL, verwacht as _verwacht
-
-
-@contextlib.contextmanager
-def opslag():
-    with tempfile.TemporaryDirectory() as tmp:
-        with contextlib.redirect_stdout(io.StringIO()):  # init_db print meldingen
-            init_db(Path(tmp), hoofd=TESTSLEUTEL)
-        with Opslag(map=Path(tmp), hoofd=TESTSLEUTEL) as db:
-            yield db
+from hulp import TESTSLEUTEL, opslag, verwacht as _verwacht
 
 
 def _basis(db: Opslag):

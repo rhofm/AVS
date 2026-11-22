@@ -6,19 +6,17 @@ Alleen nep-atleten en een vaste testsleutel.
 """
 
 import contextlib
-import io
-import tempfile
 from datetime import date
 from pathlib import Path
 
 from atleten import beheer
-from db.init_db import init_db, verbind
+from db.init_db import verbind
 from db.queries import Opslag, OpslagFout
 from models import Inzet, Onderdeel, Ploeg, PloegLid, Prestatie, Wedstrijd
 from ploeg import opstelling, regels, vergelijk
 from ploeg.paginas import programma_label
 from ui.app import maak_app
-from hulp import TESTSLEUTEL, lege_opslag, verwacht as _verwacht
+from hulp import TESTSLEUTEL, lege_map, lege_opslag, verwacht as _verwacht
 
 DAG = date(2027, 5, 15)            # wedstrijddag (zaterdag)
 JAAR = DAG.year
@@ -73,12 +71,10 @@ def _matrix(db, ids, basis="seizoen"):
 # ------------------------------------------------------------
 def test_ploeg_zonder_datum_wordt_overgeslagen():
     """ploeg.datum mag leeg zijn (zo stond het in oudere databases); het overzicht slaat die over."""
-    with tempfile.TemporaryDirectory() as tmp:
-        with contextlib.redirect_stdout(io.StringIO()):
-            init_db(Path(tmp), hoofd=TESTSLEUTEL)
-        with contextlib.closing(verbind("personen", Path(tmp), TESTSLEUTEL)) as c, c:
+    with lege_map() as tmp:
+        with contextlib.closing(verbind("personen", tmp, TESTSLEUTEL)) as c, c:
             c.execute("INSERT INTO ploeg (id, naam) VALUES (1, 'Zonder datum')")
-        with Opslag(map=Path(tmp), hoofd=TESTSLEUTEL) as db:
+        with Opslag(map=tmp, hoofd=TESTSLEUTEL) as db:
             assert db.ploegen() == []
 
 

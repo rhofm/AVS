@@ -351,7 +351,12 @@ it only holds `.gitkeep`).
   `PRAGMA foreign_keys = ON`, `temp_store = MEMORY` and `sqlcipher3.Row` are
   set. Never use the plain `sqlite3` module on these files.
 - Tests pass an explicit test key (`hoofd=` in `verbind()` / `init_db()`) and a
-  temporary folder; they never touch the real keyring or `data/`.
+  temporary folder; they never touch the real keyring or `data/`. For fresh empty
+  databases use `hulp.lege_map()` / `lege_opslag()` / `lege_databases(map)` (a copy
+  of one real `init_db()` per test run); call `init_db()` only to test `init_db` itself.
+- `init_db` creates a new database from its baseline schema in one transaction
+  (fast, and an interrupted first start leaves no half database). Migrations run
+  outside a transaction so they can use `PRAGMA foreign_keys = OFF`.
 - Each `schema_<database>.sql` is the **baseline and frozen**. In October 2026
   the old migrations were squashed into it: a new database starts at the
   version in the schema's last line, `INSERT INTO schema_version (versie)

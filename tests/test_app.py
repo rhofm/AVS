@@ -5,17 +5,14 @@ Tijdelijke map met versleutelde databases, vaste testsleutel, alleen nepgegevens
 """
 
 import contextlib
-import io
 import re
-import tempfile
 from pathlib import Path
 
 from test_landingspagina import VANDAAG, voorbeeld
 
-from db.init_db import init_db
 from db.queries import Opslag
 from ui.app import maak_app
-from hulp import TESTSLEUTEL
+from hulp import TESTSLEUTEL, lege_map
 
 VASTE_VANDAAG = VANDAAG   # zie conftest.py; anders verschuift op 1 januari de leeftijdscategorie
 
@@ -23,10 +20,8 @@ VASTE_VANDAAG = VANDAAG   # zie conftest.py; anders verschuift op 1 januari de l
 @contextlib.contextmanager
 def client():
     """(Flask-testclient, master_id van Anna) met een tijdelijke database."""
-    with tempfile.TemporaryDirectory() as tmp:
-        with contextlib.redirect_stdout(io.StringIO()):
-            init_db(Path(tmp), hoofd=TESTSLEUTEL)
-        with Opslag(map=Path(tmp), hoofd=TESTSLEUTEL) as db:
+    with lege_map() as tmp:
+        with Opslag(map=tmp, hoofd=TESTSLEUTEL) as db:
             from models import Onderdeel
             db.onderdeel_opslaan(Onderdeel("100m", "tijd", True, "sprint"))
             db.onderdeel_opslaan(Onderdeel("Verspringen", "afstand", False, "springen"))

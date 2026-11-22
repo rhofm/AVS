@@ -1,15 +1,20 @@
-"""Gedeelde hulpjes voor de tests: één testsleutel, een tijdelijke database en foutcontroles.
+"""Gedeelde hulpjes voor de tests: één testsleutel, tijdelijke databases en foutcontroles.
+
+Nieuwe, lege databases voor een test: lege_map() / lege_opslag() / opslag(), niet zelf init_db()
+(die alleen in tests van init_db zelf). Ze zijn een kopie van één keer init_db() per testrun.
 
 Alleen nepgegevens in een tijdelijke map; de echte sleutelkluis en data/ worden nooit geraakt.
 pytest zet zowel src/ (pyproject.toml) als tests/ (deze map) op het pad, dus overal werkt
 `from hulp import ...`.
 """
 
+import atexit
 import contextlib
 import functools
 import importlib
 import io
 import os
+import shutil
 import sys
 import tempfile
 from datetime import date
@@ -22,14 +27,36 @@ TESTSLEUTEL = "22" * 32
 SRC = Path(__file__).resolve().parents[1] / "src"
 
 
+@functools.cache
+def _sjabloon() -> Path:
+    """Eén keer per testrun: een map met nieuwe, lege databases (echte init_db, testsleutel)."""
+    map = Path(tempfile.mkdtemp(prefix="avs-test-sjabloon-"))
+    atexit.register(shutil.rmtree, map, ignore_errors=True)
+    with contextlib.redirect_stdout(io.StringIO()):         # init_db print meldingen
+        init_db(map, hoofd=TESTSLEUTEL)
+    return map
+
+
+def lege_databases(map: Path) -> Path:
+    """Zet nieuwe, lege databases (testsleutel) in `map`, zoals init_db() dat doet maar veel
+    sneller: een kopie van één keer init_db() per testrun. Geeft de map terug."""
+    for bestand in _sjabloon().glob("*.db"):
+        shutil.copyfile(bestand, Path(map) / bestand.name)
+    return Path(map)
+
+
+@contextlib.contextmanager
+def lege_map():
+    """Een tijdelijke map met nieuwe, lege databases (zie lege_databases)."""
+    with tempfile.TemporaryDirectory() as tmp:
+        yield lege_databases(Path(tmp))
+
+
 @contextlib.contextmanager
 def lege_opslag():
     """(Opslag, map) met nieuwe, lege versleutelde databases in een tijdelijke map."""
-    with tempfile.TemporaryDirectory() as tmp:
-        with contextlib.redirect_stdout(io.StringIO()):
-            init_db(Path(tmp), hoofd=TESTSLEUTEL)
-        with Opslag(map=Path(tmp), hoofd=TESTSLEUTEL) as db:
-            yield db, Path(tmp)
+    with lege_map() as map, Opslag(map=map, hoofd=TESTSLEUTEL) as db:
+        yield db, map
 
 
 @contextlib.contextmanager

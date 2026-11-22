@@ -12,15 +12,14 @@ import pytest
 from db import init_db as db_init
 from db.init_db import InstallatieFout, OntbrekendeDatabase, db_pad, init_db, verbind
 from db.queries import Opslag
-from hulp import TESTSLEUTEL
+from hulp import TESTSLEUTEL, lege_databases
 from test_sleutel_herstellen import SLEUTEL, _app_zonder_sleutel, data, kluis  # noqa: F401 (fixtures)
 from ui.app import maak_app
 
 
 @pytest.fixture
 def map_met_anna(tmp_path):
-    with contextlib.redirect_stdout(io.StringIO()):
-        init_db(tmp_path, hoofd=TESTSLEUTEL)
+    lege_databases(tmp_path)
     from atleten import beheer
     with Opslag(map=tmp_path, hoofd=TESTSLEUTEL) as db:
         beheer.nieuwe_atleet(db, "Anna", "Voorbeeld", geslacht="V", geboortedatum="2011-03-14")
@@ -75,6 +74,31 @@ def test_nieuwe_database_na_een_update_mag_ontbreken(map_met_anna, monkeypatch):
     db_pad("notities", map_met_anna).unlink()
     _init(map_met_anna)
     assert db_pad("notities", map_met_anna).exists()
+
+
+def test_onderbroken_eerste_start_laat_geen_halve_database_achter(tmp_path, monkeypatch):
+    """Het basisschema gaat in één transactie: faalt het halverwege, dan blijft de database leeg
+    en maakt de volgende start hem gewoon af. leerlijnen.db vult ook de catalogus; zonder
+    transactie gaf de tweede keer 'UNIQUE constraint failed'."""
+    import shutil
+    echt = db_init.SQL_DIR
+    kapot = tmp_path / "sql"
+    shutil.copytree(echt, kapot)
+    schema = kapot / "schema_leerlijnen.sql"
+    schema.write_text(schema.read_text(encoding="utf-8").replace(
+        "INSERT INTO schema_version", "SELECT * FROM bestaat_niet;\nINSERT INTO schema_version"), encoding="utf-8")
+    # leerlijnen als laatste, zodat de andere bestanden er al zijn (anders: OntbrekendeDatabase)
+    monkeypatch.setattr(db_init, "DATABASES",
+                        tuple(d for d in db_init.DATABASES if d != "leerlijnen") + ("leerlijnen",))
+    monkeypatch.setattr(db_init, "SQL_DIR", kapot)
+    data = tmp_path / "data"
+    data.mkdir()
+    with pytest.raises(Exception, match="bestaat_niet"):
+        _init(data)
+    monkeypatch.setattr(db_init, "SQL_DIR", echt)
+    _init(data)
+    with Opslag(map=data, hoofd=TESTSLEUTEL) as db:
+        assert db.leerdoel("SPR-U10-01") is not None
 
 
 # ---------------- verbind ----------------

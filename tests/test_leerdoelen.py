@@ -4,15 +4,13 @@ Alleen nepgegevens en een vaste testsleutel.
 """
 
 import contextlib
-import io
-import tempfile
 from datetime import date
 from pathlib import Path
 
-from db.init_db import init_db, pseudoniem, verbind
+from db.init_db import pseudoniem, verbind
 from db.queries import Opslag, OpslagFout
 from models import CATEGORIEEN, Atleet, Leerdoel, LeerdoelScore
-from hulp import TESTSLEUTEL, opslag
+from hulp import TESTSLEUTEL, lege_map, opslag
 
 
 def _verwacht_fout(fout, functie, *args):
@@ -115,10 +113,8 @@ def test_ongeldige_scores_geweigerd():
 
 
 def test_privacy_alleen_pseudoniem_en_verwijderen():
-    with tempfile.TemporaryDirectory() as tmp:
-        with contextlib.redirect_stdout(io.StringIO()):
-            init_db(Path(tmp), hoofd=TESTSLEUTEL)
-        with Opslag(map=Path(tmp), hoofd=TESTSLEUTEL) as db:
+    with lege_map() as tmp:
+        with Opslag(map=tmp, hoofd=TESTSLEUTEL) as db:
             anna = db.atleet_opslaan(Atleet("Anna", "Aalbers"))
             db.leerdoelscores_opslaan([LeerdoelScore(anna.master_id, "SPR-U10-01", 4, date(2026, 9, 1))])
         with contextlib.closing(verbind("leerdoelscores", Path(tmp), TESTSLEUTEL)) as conn:
