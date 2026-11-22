@@ -161,3 +161,15 @@ def test_een_horden_regel_voor_meerdere_hoogtes():
     programma, los = naar_programma(7, [regel], horden)
     assert not los and [(p.onderdeel_id, p.onderdeel_tekst) for p in programma] == [
         (1, "60 meter horden 106,7cm"), (2, "60 meter horden 91,4cm")]
+
+
+def test_hoogte_met_punt_zonder_eenheid_of_afgerond():
+    horden = [Onderdeel(n, "tijd", True, "horden", id=i) for i, n in
+              ((1, "60 meter horden 106,7cm"), (2, "60 meter horden 91,4cm"), (3, "60 meter horden 100cm"))]
+    for naam in ("60m horden 91.4cm", "60m horden 91.4", "60m horden 91", "60m horden (91 cm)", "60 meter horden 91,4"):
+        assert zoek_onderdeel(horden, naam).id == 2, naam
+    assert zoek_onderdeel(horden, "60m horden 107").id == 1          # 106,7 afgerond
+    assert zoek_onderdeel(horden, "60m horden 99") is None
+    kogel = [Onderdeel("Kogelstoten 7,26kg", "afstand", False, "werpen", id=4), Onderdeel("Kogelstoten 4kg", "afstand", False, "werpen", id=5)]
+    assert zoek_onderdeel(kogel, "Kogelstoten 7.26kg").id == 4 and zoek_onderdeel(kogel, "Kogelstoten 4 kg").id == 5
+    assert zoek_onderdeel(kogel, "Kogelstoten 3kg") is None

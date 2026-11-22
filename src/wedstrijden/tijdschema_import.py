@@ -38,7 +38,8 @@ from models import Onderdeel, ProgrammaOnderdeel, Wedstrijd
 from .planning import bron_uit_link, normaliseer_link
 
 
-_SPECIFICATIE = re.compile(r"\s*\d{1,3}(?:[.,]\d{1,3})?\s?(?:kg|cm)\b", re.I)    # gewicht of hoogte: '3kg', '76,2cm'
+_SPECIFICATIE = re.compile(r"[\s(]*(\d{1,3}(?:[.,]\d{1,3})?)\s?(kg|cm)\b\)?", re.I)    # gewicht of hoogte: '3kg', '76,2 cm'
+_HOOGTE_ZONDER_EENHEID = re.compile(r"(?<=horden)[\s(]*(\d{2,3}(?:[.,]\d{1,3})?)\)?\s*$", re.I)   # '60m horden 91.4'
 
 
 def _sleutel(naam: str) -> str:
@@ -50,25 +51,55 @@ def _sleutel(naam: str) -> str:
     return re.sub(r"[\s\-]+", "", t)
 
 
+def _splits(naam: str) -> tuple[str, float | None, str]:
+    """('60mh', 91.4, 'cm') voor '60 meter horden 91,4cm' (ook '91.4' of '91.4 cm'); ('kogelstoten', None, '') zonder maat."""
+    m = _SPECIFICATIE.search(naam)
+    eenheid = m.group(2).lower() if m else "cm"
+    if m is None:
+        m = _HOOGTE_ZONDER_EENHEID.search(naam)
+    if m is None:
+        return _sleutel(naam), None, ""
+    return _sleutel(naam[:m.start()] + naam[m.end():]), float(m.group(1).replace(",", ".")), eenheid
+
+
+def _zelfde_maat(a: float, b: float, eenheid: str) -> bool:
+    """Hoogtes tellen op hele centimeters (sommige tijdschema's ronden 91,4 af op 91); gewichten niet."""
+    if eenheid == "cm":
+        return int(a + 0.5) == int(b + 0.5)
+    return abs(a - b) < 0.005
+
+
 def zoek_onderdelen(onderdelen: list[Onderdeel], naam: str, code: str = "") -> list[Onderdeel]:
     """De onderdelen uit de lijst die bij deze naam of code horen.
 
-    Eén onderdeel bij een naam of code die precies past. Staat er in het tijdschema een gewicht of hoogte
-    die de lijst niet heeft ('Kogelstoten 3kg' tegen 'Kogelstoten'), dan telt het onderdeel zonder dat
-    als het er maar één is. Staat er geen gewicht of hoogte bij ('60m horden', terwijl de lijst
-    '60m horden 91,4cm' en '60m horden 106,7cm' heeft), dan horen alle varianten erbij: één tijdschemaregel
-    voor meerdere categorieën met elk een eigen hoogte. Anders: leeg.
+    Eén onderdeel bij een naam of code die precies past. Anders wordt naam en maat apart vergeleken:
+      * punt of komma maakt niet uit ('91.4' = '91,4'), 'cm' mag ontbreken, en een hoogte telt op hele
+        centimeters ('91' = '91,4cm'); past er dan precies één, dan is dat het onderdeel;
+      * noemt het tijdschema een maat die de lijst niet heeft ('Kogelstoten 3kg' tegen 'Kogelstoten'), dan
+        telt het onderdeel zonder maat, als het er maar één is;
+      * noemt het tijdschema geen maat ('60m horden', terwijl de lijst '60m horden 91,4cm' en '106,7cm'
+        heeft), dan horen alle varianten erbij: één regel voor meerdere categorieën met elk een eigen hoogte.
+    Anders: leeg.
     """
     namen = [x for x in (naam, code) if x]
     gezocht = {_sleutel(x) for x in namen}
     treffers = [o for o in onderdelen if _sleutel(o.naam) in gezocht]
     if treffers:
         return treffers if len(treffers) == 1 else []
-    zonder = {_sleutel(_SPECIFICATIE.sub("", x)) for x in namen}
-    if zonder != gezocht:                               # het tijdschema noemt een gewicht of hoogte
-        treffers = [o for o in onderdelen if _sleutel(o.naam) in zonder]
-        return treffers if len(treffers) == 1 else []
-    return [o for o in onderdelen if _sleutel(_SPECIFICATIE.sub("", o.naam)) in gezocht]
+    lijst = [(o, *_splits(o.naam)) for o in onderdelen]
+    for x in namen:
+        basis, maat, eenheid = _splits(x)
+        if maat is None:
+            continue
+        gelijk = [o for o, b, m, e in lijst if b == basis and m is not None and e == eenheid and _zelfde_maat(m, maat, eenheid)]
+        if not gelijk:
+            gelijk = [o for o, b, m, _ in lijst if b == basis and m is None]
+        if len(gelijk) == 1:
+            return gelijk
+    if all(_splits(x)[1] is None for x in namen):
+        basissen = {_splits(x)[0] for x in namen}
+        return [o for o, b, _, _ in lijst if b in basissen]
+    return []
 
 
 def zoek_onderdeel(onderdelen: list[Onderdeel], naam: str, code: str = "") -> Onderdeel | None:
