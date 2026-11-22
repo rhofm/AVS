@@ -75,10 +75,10 @@ def test_nieuwe_database_na_een_update_mag_ontbreken(map_met_anna, monkeypatch):
     assert db_pad("notities", map_met_anna).exists()
 
 
-def test_onderbroken_eerste_start_laat_geen_halve_database_achter(tmp_path, monkeypatch):
-    """Het basisschema gaat in één transactie: faalt het halverwege, dan blijft de database leeg
-    en maakt de volgende start hem gewoon af. leerlijnen.db vult ook de catalogus; zonder
-    transactie gaf de tweede keer 'UNIQUE constraint failed'."""
+@pytest.fixture
+def onderbroken_eerste_start(tmp_path, monkeypatch):
+    """Een datamap waarin de allereerste start halverwege leerlijnen.db stopte: personen ...
+    absentie zijn er, leerlijnen is leeg, leerdoelscores en notities zijn er nog niet."""
     import shutil
     echt = db_init.SQL_DIR
     kapot = tmp_path / "sql"
@@ -86,18 +86,34 @@ def test_onderbroken_eerste_start_laat_geen_halve_database_achter(tmp_path, monk
     schema = kapot / "schema_leerlijnen.sql"
     schema.write_text(schema.read_text(encoding="utf-8").replace(
         "INSERT INTO schema_version", "SELECT * FROM bestaat_niet;\nINSERT INTO schema_version"), encoding="utf-8")
-    # leerlijnen als laatste, zodat de andere bestanden er al zijn (anders: OntbrekendeDatabase)
-    monkeypatch.setattr(db_init, "DATABASES",
-                        tuple(d for d in db_init.DATABASES if d != "leerlijnen") + ("leerlijnen",))
     monkeypatch.setattr(db_init, "SQL_DIR", kapot)
     data = tmp_path / "data"
-    data.mkdir()
     with pytest.raises(Exception, match="bestaat_niet"):
         _init(data)
     monkeypatch.setattr(db_init, "SQL_DIR", echt)
+    assert db_pad("personen", data).exists() and not db_pad("notities", data).exists()
+    assert (data / db_init.EERSTE_START).exists()
+    return data
+
+
+def test_onderbroken_eerste_start_maakt_de_volgende_start_af(onderbroken_eerste_start):
+    """Geen 'databases verloren' (er waren nog geen gegevens), en geen halve leerlijnen.db: het
+    basisschema gaat in één transactie (anders 'UNIQUE constraint failed' op de catalogus)."""
+    data = onderbroken_eerste_start
+    assert db_init.ontbrekende_databases(data) == []
     _init(data)
+    assert all(db_pad(d, data).exists() for d in db_init.DATABASES)
+    assert not (data / db_init.EERSTE_START).exists()
     with Opslag(map=data, hoofd=TESTSLEUTEL) as db:
         assert db.leerdoel("SPR-U10-01") is not None
+
+
+def test_eerste_start_laat_geen_markering_achter(tmp_path):
+    _init(tmp_path)
+    assert not (tmp_path / db_init.EERSTE_START).exists()
+    db_pad("notities", tmp_path).unlink()           # daarna is een ontbrekend bestand wél verloren
+    with pytest.raises(OntbrekendeDatabase):
+        _init(tmp_path)
 
 
 # ---------------- verbind ----------------

@@ -174,7 +174,10 @@ Instellingen page shows the data folder. Empty databases are only created when
 the folder has none at all (first start): if some exist and one is missing (lost,
 not copied), `init_db()` raises `OntbrekendeDatabase` and creates nothing; the
 error page offers 'Toch leeg beginnen' (checkbox, `POST /databases/leeg-beginnen`
-→ `init_db(lege_toestaan=...)`). A database added in a later AVS version goes in
+→ `init_db(lege_toestaan=...)`). While the very first start creates the databases,
+the marker file `eerste-start.bezig` (`init_db.EERSTE_START`, no data) is in the folder;
+if that start was interrupted, the next one finishes it instead of reporting lost
+databases. A database added in a later AVS version goes in
 `init_db.NIEUW_NA_BASIS`, so existing installations get it silently. `verbind()`
 never creates a file (only `aanmaken=True`, used by `init_db()`). Never hard-code `data/` elsewhere. The files:
 
