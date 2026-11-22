@@ -113,7 +113,7 @@ def _schema(regels: list[ProgrammaOnderdeel], onderdelen: set[int] | Mapping[int
         if r.onderdeel_id is None or r.onderdeel_id not in keuzes:
             continue
         if keuzes[r.onderdeel_id] is not None:             # groep zelf gekozen: gaat voor op de categorie
-            if r.groep_sleutel == keuzes[r.onderdeel_id]:
+            if keuzes[r.onderdeel_id] in (r.groep_sleutel, r.groep_sleutel_zonder_gewicht):
                 gekozen.append((r, True))
             continue
         past = past_bij(r, categorie, geslacht)

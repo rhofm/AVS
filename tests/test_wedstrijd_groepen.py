@@ -9,7 +9,7 @@ import pytest
 from voorbeeld_atleet import VANDAAG, opslag, voorbeeld
 
 from db.queries import OpslagFout
-from models import ProgrammaOnderdeel
+from models import Onderdeel, ProgrammaOnderdeel
 from wedstrijden import chronoloog, detail, planning
 
 
@@ -35,6 +35,35 @@ def test_groep_sleutel_en_tekst():
     assert r.groep_sleutel == "Mannen|2" and r.groep_tekst == "Mannen · groep 2"
     assert ProgrammaOnderdeel(1, VANDAAG, "10:00", None, "Kogel", None, groep=1).groep_tekst == "Groep 1"
     assert ProgrammaOnderdeel(1, VANDAAG, "10:00", None, "Kogel").groep_tekst == "Alle"
+
+
+def test_groep_met_gewicht():
+    r = ProgrammaOnderdeel(1, VANDAAG, "10:00", None, "Kogelstoten 7,26kg", "Mannen", groep=2)
+    assert r.gewicht == "7,26kg"
+    assert r.groep_sleutel == "Mannen|2|7,26kg" and r.groep_sleutel_zonder_gewicht == "Mannen|2"
+    assert r.groep_tekst == "7,26kg · Mannen · groep 2"
+    assert ProgrammaOnderdeel(1, VANDAAG, "10:00", None, "Kogel", None, opmerking="3 kg").groep_tekst == "3kg"
+    assert ProgrammaOnderdeel(1, VANDAAG, "10:00", None, "Kogel").gewicht is None
+    assert ProgrammaOnderdeel(1, VANDAAG, "10:00", None, "100m horden 83,8cm").gewicht is None
+
+
+def test_gemengde_werpgroepen_per_gewicht_kiesbaar():
+    with opslag() as db:
+        mid = voorbeeld(db)
+        dag = VANDAAG + timedelta(days=10)
+        w = planning.plan_wedstrijd(db, "Werpwedstrijd", dag)
+        kogel = db.onderdeel_opslaan(Onderdeel("Kogelstoten", "afstand", False, "werpen"))
+        db.programma_vervangen(w.id, [
+            ProgrammaOnderdeel(w.id, dag, "10:00", kogel.id, "Kogelstoten 3kg", "Vrouwen U16", groep=1),
+            ProgrammaOnderdeel(w.id, dag, "10:00", kogel.id, "Kogelstoten 4kg", "Vrouwen U16", groep=1),
+        ])
+        d = detail.wedstrijd_detail(db, w.id)
+        assert [t for _, t in d.groepsopties[kogel.id]] == ["3kg · Vrouwen U16 · groep 1", "4kg · Vrouwen U16 · groep 1"]
+        detail.inschrijven_uit_formulier(db, w.id, [mid], [kogel.id], {kogel.id: "Vrouwen U16|1|4kg"})
+        assert [r.regel.onderdeel_tekst for r in chronoloog.persoonlijk_schema(db, w.id, mid)] == ["Kogelstoten 4kg"]
+        # Een keuze van vóór het gewicht ('Vrouwen U16|1') geeft beide groepen.
+        db.inschrijving_groep_zetten(mid, w.id, kogel.id, "Vrouwen U16|1")
+        assert len(chronoloog.persoonlijk_schema(db, w.id, mid)) == 2
 
 
 def test_gekozen_groep_gaat_voor_op_categorie():

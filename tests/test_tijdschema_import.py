@@ -142,3 +142,9 @@ def test_importeren_randgevallen():
         ander = planning.plan_wedstrijd(db, "Andere dag", date(2026, 10, 3))
         v = tijdschema_importeren(db, ander.id, str(TEAMS))
         assert v.waarschuwingen and "Klopt de link?" in v.tekst
+
+
+def test_zoek_onderdeel_zonder_gewicht_in_de_lijst():
+    kogel = Onderdeel("Kogelstoten", "afstand", False, "werpen", id=7)
+    assert zoek_onderdeel([kogel], "Kogelstoten 3kg").id == 7
+    assert zoek_onderdeel([kogel], "Discuswerpen 1kg") is None

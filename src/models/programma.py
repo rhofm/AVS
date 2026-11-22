@@ -14,6 +14,7 @@ from datetime import date, datetime, timedelta
 from .groep import normaliseer_tijd
 
 MAX_DUUR = 720          # minuten (12 uur); een meerkampdag past erin
+_GEWICHT = re.compile(r"(?<![\d.,])(\d{1,2}(?:[.,]\d{1,3})?)\s?kg\b", re.I)     # '3kg', '7,26 kg', '0.6kg'
 
 
 @dataclass(slots=True)
@@ -75,18 +76,37 @@ class ProgrammaOnderdeel:
 
     # ---------- groep ----------
     @property
-    def groep_sleutel(self) -> str:
-        """Wat bij een inschrijving wordt bewaard als de trainer een groep kiest: 'Mannen|2', 'Vrouwen|', '|1'.
+    def gewicht(self) -> str | None:
+        """Gewicht van het werptuig uit het tijdschema, bijv. '4kg' of '7,26kg'; None als er geen staat.
 
-        Categorie + groepsnummer van de regel, dus ook na het opnieuw importeren van het tijdschema
-        nog te vinden (regel-id's veranderen dan wel).
+        Gemengde werpgroepen (leeftijd en geslacht door elkaar) zijn per gewicht ingedeeld; dat gewicht
+        staat in de naam van het onderdeel ('Kogelstoten 4kg'), de opmerking of de categorie.
         """
+        for tekst in (self.onderdeel_tekst, self.opmerking, self.categorie):
+            if tekst and (m := _GEWICHT.search(tekst)):
+                return m.group(1).replace(".", ",") + "kg"
+        return None
+
+    @property
+    def groep_sleutel(self) -> str:
+        """Wat bij een inschrijving wordt bewaard als de trainer een groep kiest: 'Mannen|2', 'Vrouwen|', '|1',
+        met gewicht 'Mannen|2|4kg'.
+
+        Categorie + groepsnummer (+ gewicht) van de regel, dus ook na het opnieuw importeren van het
+        tijdschema nog te vinden (regel-id's veranderen dan wel).
+        """
+        basis = self.groep_sleutel_zonder_gewicht
+        return f"{basis}|{self.gewicht}" if self.gewicht else basis
+
+    @property
+    def groep_sleutel_zonder_gewicht(self) -> str:
+        """De sleutel van vóór het gewicht erbij kwam; bewaarde keuzes van toen blijven zo werken."""
         return f"{self.categorie or ''}|{self.groep or ''}"
 
     @property
     def groep_tekst(self) -> str:
-        """Voor een keuzelijst: 'Mannen · groep 2', 'Vrouwen', 'Groep 1', 'Alle'."""
-        delen = [self.categorie, f"groep {self.groep}" if self.groep else None]
+        """Voor een keuzelijst: 'Mannen · groep 2', 'Vrouwen', 'Groep 1', 'Alle'; met gewicht '4kg · Mannen · groep 2'."""
+        delen = [self.gewicht, self.categorie, f"groep {self.groep}" if self.groep else None]
         tekst = " · ".join(d for d in delen if d)
         return tekst[:1].upper() + tekst[1:] if tekst else "Alle"
 

@@ -38,6 +38,9 @@ from models import Onderdeel, ProgrammaOnderdeel, Wedstrijd
 from .planning import bron_uit_link, normaliseer_link
 
 
+_GEWICHT_TEKST = re.compile(r"\s*\d{1,2}(?:[.,]\d{1,3})?\s?kg\b", re.I)
+
+
 def _sleutel(naam: str) -> str:
     """'80 meter horden' / '80mH' / '80m horden' -> '80mh'; 'Verspringen' -> 'verspringen'."""
     t = naam.lower().replace(",", ".")
@@ -51,6 +54,12 @@ def zoek_onderdeel(onderdelen: list[Onderdeel], naam: str, code: str = "") -> On
     """Het onderdeel uit de lijst met deze naam of code; None als er geen (of meer dan één) past."""
     gezocht = {_sleutel(x) for x in (naam, code) if x}
     treffers = [o for o in onderdelen if _sleutel(o.naam) in gezocht]
+    if not treffers:
+        # 'Kogelstoten 3kg' in het tijdschema, maar de lijst heeft alleen 'Kogelstoten': het gewicht
+        # zit dan in de groep (ProgrammaOnderdeel.gewicht), niet in het onderdeel.
+        zonder = {_sleutel(_GEWICHT_TEKST.sub("", x)) for x in (naam, code) if x}
+        if zonder != gezocht:
+            treffers = [o for o in onderdelen if _sleutel(o.naam) in zonder]
     return treffers[0] if len(treffers) == 1 else None
 
 
