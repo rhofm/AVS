@@ -6,7 +6,10 @@ pytest zet zowel src/ (pyproject.toml) als tests/ (deze map) op het pad, dus ove
 """
 
 import contextlib
+import functools
+import importlib
 import io
+import os
 import sys
 import tempfile
 from datetime import date
@@ -58,7 +61,7 @@ def app_client(map: Path):
     return app.test_client()
 
 
-class _IsEenDatum(type):
+class _IsEenDatum(type(date)):         # type(date) is gewoon type; zie tests/tijdreis/
     """Metaklasse: isinstance(x, date) blijft werken als `date` de nepklasse is."""
     def __instancecheck__(cls, obj):
         return isinstance(obj, date)
@@ -84,7 +87,19 @@ def vaste_vandaag(monkeypatch, dag: date) -> None:
         def today(cls):
             return dag
 
+    _laad_alle_modules()                    # anders houdt een module die de test later laadt de echte datum
+    src = os.path.normcase(str(SRC)) + os.sep          # Windows: 'c:' en 'C:' zijn dezelfde schijf
     for module in list(sys.modules.values()):
-        bestand = getattr(module, "__file__", None) or ""
-        if bestand.startswith(str(SRC)) and getattr(module, "date", None) is date:
+        bestand = os.path.normcase(getattr(module, "__file__", None) or "")
+        if bestand.startswith(src) and getattr(module, "date", None) is date:
             monkeypatch.setattr(module, "date", VasteDatum)
+
+
+@functools.cache
+def _laad_alle_modules() -> None:
+    """Laad alle AVS-modules één keer, zodat vaste_vandaag ze allemaal vastzet, ook een module
+    (bijv. ui.app) die een test pas halverwege importeert. Anders hangt het af van de volgorde
+    van de tests of zo'n module de vaste of de echte datum ziet."""
+    import zelftest
+    for naam in zelftest.eigen_modules():
+        importlib.import_module(naam)

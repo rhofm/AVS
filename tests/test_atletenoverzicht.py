@@ -13,6 +13,8 @@ from db.queries import Opslag
 from models import Groep
 from hulp import TESTSLEUTEL, tekst
 
+VASTE_VANDAAG = VANDAAG   # zie conftest.py; anders verschuift op 1 januari de leeftijdscategorie
+
 
 def _vul(db):
     """Anna (U16V, sprint & verspringen, groep U16 sprint) plus drie anderen."""

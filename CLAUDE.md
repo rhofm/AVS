@@ -528,11 +528,17 @@ feature/<naam>  →  dev  →  staging  →  main
 
 - Keep the UI simple for non-technical users; put the complexity in the back end.
 - Write tests for new logic (`tests/`); importers and team selection especially.
-- Tests that use fixed dates (e.g. `VANDAAG` in `tests/test_groep_landingspagina.py`)
-  while the code under test falls back to `date.today()` must freeze it with
-  `hulp.vaste_vandaag(monkeypatch, dag)` (an autouse fixture per module, as in
-  `test_doelen.py` and `test_rooster.py`); otherwise they break once the real
-  date passes the fixed one, and `build.py` refuses to build.
+- Tests that use fixed dates (a `VANDAAG`, a birth year, a meet day) while the
+  code under test falls back to `date.today()` must freeze it: put
+  `VASTE_VANDAAG = date(...)` (or `= VANDAAG`) at module level; the autouse fixture
+  in `conftest.py` then makes `date.today()` in all AVS modules return that day
+  (`hulp.vaste_vandaag`, which first loads every AVS module so the result never
+  depends on test order). Otherwise they break once the real date moves on (age
+  categories shift on 1 January) and `build.py` refuses to build. Before a release,
+  run the suite a year ahead to find such tests:
+  `TIJDREIS_DATUM=2027-09-01 PYTHONPATH=tests/tijdreis python -m pytest`
+  (PowerShell: `$env:TIJDREIS_DATUM="2027-09-01"; $env:PYTHONPATH="tests	ijdreis"`).
+  A test that only fails there needs `VASTE_VANDAAG`.
 - When a design decision is still open (e.g. the UI framework), propose an
   option and ask rather than silently picking one. Decided: pytest as test
   runner, plain `pyproject.toml` dependencies installed with pip into the conda

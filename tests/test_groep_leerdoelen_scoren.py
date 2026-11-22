@@ -13,6 +13,8 @@ from db.queries import OpslagFout
 from groepen import leerdoelen_scoren
 from hulp import app_client, verwacht as _verwacht
 
+VASTE_VANDAAG = VANDAAG   # zie conftest.py; anders verschuift op 1 januari de leeftijdscategorie
+
 
 def _doel(db, categorie="U14", leerlijn="SPR"):
     return db.leerdoelen(categorie, leerlijn)[0]

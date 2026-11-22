@@ -10,12 +10,14 @@ import re
 import tempfile
 from pathlib import Path
 
-from test_landingspagina import voorbeeld
+from test_landingspagina import VANDAAG, voorbeeld
 
 from db.init_db import init_db
 from db.queries import Opslag
 from ui.app import maak_app
 from hulp import TESTSLEUTEL
+
+VASTE_VANDAAG = VANDAAG   # zie conftest.py; anders verschuift op 1 januari de leeftijdscategorie
 
 
 @contextlib.contextmanager

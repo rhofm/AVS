@@ -15,6 +15,8 @@ from groepen import overzichten, trainingen
 from models import Test, Testresultaat
 from hulp import app_client
 
+VASTE_VANDAAG = VANDAAG   # zie conftest.py; anders verschuift op 1 januari de leeftijdscategorie
+
 
 def _met_prestaties(db, ids):
     prestaties.handmatig_toevoegen(db, ids["anna"], "100m", date(2026, 6, 1), "13,20", wind=1.0)

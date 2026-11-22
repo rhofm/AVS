@@ -11,6 +11,8 @@ from atleten import beheer, nieuw
 from db.queries import Opslag
 from hulp import TESTSLEUTEL, tekst
 
+VASTE_VANDAAG = VANDAAG   # zie conftest.py; anders verschuift op 1 januari de leeftijdscategorie
+
 
 def _fout(fn) -> dict:
     try:

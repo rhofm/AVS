@@ -18,6 +18,8 @@ from hulp import app_client, lege_opslag
 
 VANDAAG = date(2026, 10, 16)                       # een vrijdag
 MAANDAG = VANDAAG - timedelta(days=VANDAAG.weekday())
+
+VASTE_VANDAAG = VANDAAG   # zie conftest.py; anders verschuift op 1 januari de leeftijdscategorie
 TEMPLATES = Path(__file__).resolve().parents[1] / "src" / "ui" / "templates"
 
 

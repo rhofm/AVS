@@ -6,7 +6,7 @@ Alleen nepgegevens.
 """
 
 import contextlib
-from datetime import date
+from datetime import date, timedelta
 
 from test_ploegen import BESTAND, DAG, JAAR, opslag
 
@@ -17,6 +17,8 @@ from ploeg import opstelling, paginas, punten, regels, strategieen, tijdschema, 
 from ploeg.optimaliseer import optimaliseer
 from ui.app import maak_app
 from hulp import TESTSLEUTEL, app_client, verwacht as _verwacht
+
+VASTE_VANDAAG = DAG - timedelta(days=14)   # zie conftest.py; twee weken voor de wedstrijddag
 
 RS = regels.laad(BESTAND)
 

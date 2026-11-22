@@ -12,23 +12,18 @@ Alleen nepgegevens en een testsleutel.
 
 from datetime import date, timedelta
 
-import pytest
-
 from test_groep_landingspagina import VANDAAG, opslag
 
 from db.queries import OpslagFout
 from groepen import doelen as doelbeheer
 from models import (Atleet, Doel, DoelRegel, Groep, Inschrijving, LeerdoelScore, Prestatie,
                     Wedstrijd)
-from hulp import app_client, vaste_vandaag
+from hulp import app_client
 
 WEDSTRIJDDAG = VANDAAG + timedelta(days=8)              # za 24 okt 2026
 
 
-@pytest.fixture(autouse=True)
-def _vandaag_is_vandaag(monkeypatch):
-    """De tests rekenen met VANDAAG (vr 16 okt 2026); laat de code dat ook doen."""
-    vaste_vandaag(monkeypatch, VANDAAG)
+VASTE_VANDAAG = VANDAAG   # zie conftest.py: vr 16 okt 2026
 
 
 def _fout(f, *, soort=OpslagFout):
